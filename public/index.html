@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>파티형 메타버스 공포 방탈출 - 미아</title>
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <meta name="theme-color" content="#1a0508" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Nanum+Myeongjo:wght@400;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css" />
+  <script type="importmap">
+    { "imports": { "three": "/vendor/three/build/three.module.js", "three/addons/": "/vendor/three/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- 시작 화면 -->
+  <div id="splash">
+    <div class="sp-text">
+      <div class="sp-sub">파티형 메타버스 공포 방탈출</div>
+      <div class="sp-dash">-</div>
+      <div class="sp-main">미아</div>
+    </div>
+    <div class="sp-skip">클릭하면 건너뜁니다</div>
+  </div>
+
+  <!-- 로그인 / 아바타 꾸미기 -->
+  <div id="login" class="screen">
+    <div class="login-card">
+      <div class="logo">
+        <div class="logo-han">迷兒</div>
+        <div class="logo-ko">미아</div>
+        <div class="logo-sub">파티형 메타버스 공포 방탈출 · 캐릭터를 만들어 주세요</div>
+      </div>
+      <div class="login-body">
+        <div class="pv-wrap">
+          <canvas id="preview" width="300" height="380"></canvas>
+          <div class="pv-tip">드래그해서 돌려보기</div>
+        </div>
+        <div class="custom">
+          <label id="nickRow">닉네임<input id="nick" maxlength="12" placeholder="최대 12자" autocomplete="off" /></label>
+          <div class="ctabs">
+            <button class="ctab active" data-tab="base">기본</button>
+            <button class="ctab" data-tab="face">얼굴</button>
+            <button class="ctab" data-tab="hair">헤어</button>
+            <button class="ctab" data-tab="outfit">의상</button>
+            <button class="ctab" data-tab="acc">💍 장신구</button>
+            <button class="ctab" data-tab="photo">📷 사진 얼굴</button>
+          </div>
+          <div class="cpanels">
+            <div class="cpanel" data-panel="base">
+              <div class="opt"><span>피부</span><div data-sw="body" class="swatches"></div></div>
+              <div class="opt"><span>포인트 색</span><div data-sw="accent" class="swatches"></div></div>
+              <div class="opt"><span>귀</span><div data-chip="ears" class="chips"></div></div>
+            </div>
+            <div class="cpanel hidden" data-panel="face">
+              <div class="opt"><span>눈</span><div data-chip="eyes" class="chips"></div></div>
+              <div class="opt"><span>눈동자</span><div data-sw="eyeColor" class="swatches"></div></div>
+              <div class="opt"><span>눈썹</span><div data-chip="brows" class="chips"></div></div>
+              <div class="opt"><span>입</span><div data-chip="mouth" class="chips"></div></div>
+              <div class="opt"><span>볼</span><div data-chip="cheeks" class="chips"></div></div>
+              <div class="opt"><span>장식</span><div data-chip="extra" class="chips"></div></div>
+            </div>
+            <div class="cpanel hidden" data-panel="hair">
+              <div class="opt"><span>머리</span><div data-chip="hair" class="chips"></div></div>
+              <div class="opt"><span>머리색</span><div data-sw="hairColor" class="swatches"></div></div>
+            </div>
+            <div class="cpanel hidden" data-panel="acc">
+              <div class="opt"><span>장신구</span><div data-chip="acc" class="chips"></div></div>
+              <div class="opt"><span>모자</span><div data-chip="hat" class="chips"></div></div>
+            </div>
+            <div class="cpanel hidden" data-panel="outfit">
+              <div class="opt"><span>의상</span><div data-chip="outfit" class="chips"></div></div>
+              <p class="muted">모자를 '없음'으로 두면 의상 전용 머리 장식(갓·간호사 모자·탐정 모자 등)이 함께 나와요.</p>
+            </div>
+            <div class="cpanel hidden" data-panel="photo">
+              <div class="photo-row">
+                <canvas id="photoCrop" width="160" height="170"></canvas>
+                <div class="photo-ctl">
+                  <button id="photoPick" class="btn small">🖼️ 사진 불러오기</button>
+                  <input id="photoFile" type="file" accept="image/*" hidden />
+                  <label class="sl">확대 <input id="pZoom" type="range" min="1" max="3" step="0.01" value="1" /></label>
+                  <label class="sl">좌우 <input id="pX" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+                  <label class="sl">상하 <input id="pY" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+                  <label class="chk"><input id="photoOn" type="checkbox" /> 사진을 얼굴로 쓰기</label>
+                  <button id="photoClear" class="btn small">사진 지우기</button>
+                </div>
+              </div>
+              <p class="muted">사진은 이 컴퓨터에서 작게 줄여서 사용하며, 같은 서버에 접속한 사람들에게 내 얼굴로 보입니다.</p>
+            </div>
+          </div>
+          <div class="row">
+            <button id="randomBtn" class="btn">🎲 랜덤</button>
+            <button id="enterBtn" class="btn primary">입장하기</button>
+          </div>
+          <p class="warn">⚠ 강한 공포 연출(점프스케어·큰 소리·잔혹 묘사)이 포함되어 있습니다. 헤드폰 사용을 권장합니다.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HUD -->
+  <div id="hud" class="hidden">
+    <div id="topLeft">
+      <div id="placeTitle">대기 광장</div>
+      <div id="placeSub">심야방송 크루 집결지</div>
+      <div id="objective" class="hidden">
+        <div class="obj-label">현재 목표</div>
+        <div id="objText"></div>
+        <div class="obj-row">
+          <button id="hintBtn" class="btn small">💡 힌트 <span id="hintLeft"></span></button>
+          <button id="journalBtn" class="btn small">📓 수첩 (J)</button>
+          <span id="relics" title="모은 아이들의 유품">유품 0/7</span>
+        </div>
+        <div id="fearBadge" class="muted"></div>
+        <div class="hidden">
+        </div>
+      </div>
+    </div>
+
+    <div id="topRight">
+      <div class="panel" id="partyPanel">
+        <div class="panel-head"><b>파티</b><span id="partyCount"></span></div>
+        <div id="partyMembers"><div class="muted">파티 없음 · 접속자 목록에서 초대하세요</div></div>
+        <div id="partyActions">
+          <button id="micBtn" class="btn small">🎙️ 마이크 꺼짐</button>
+          <button id="leaveBtn" class="btn small hidden">파티 나가기</button>
+        </div>
+        <div id="startBox">
+          <select id="scenarioSel" title="방탈출 선택"></select>
+          <div id="scenarioDesc" class="muted"></div>
+          <select id="fearSel" title="공포도">
+            <option value="0">🍼 공포도 0 · 왕초보 (쫓아오는 귀신 없음, 깜짝 놀람 없음)</option>
+            <option value="1">😊 공포도 1 · 순한맛 (점프스케어 없음, 귀신 느림)</option>
+            <option value="2">😨 공포도 2 · 보통 (이야기 연출만)</option>
+            <option value="3">💀 공포도 3 · 매운맛 (전부)</option>
+          </select>
+          <select id="chapterSel"></select>
+          <button id="startBtn" class="btn primary small">방탈출 시작</button>
+          <button id="nudgeBtn" class="btn small hidden">🔔 파티장에게 시작 요청</button>
+        </div>
+        <button id="quitBtn" class="btn small danger hidden">로비로 돌아가기</button>
+      </div>
+      <div class="panel" id="sharePanel">
+        <div class="panel-head"><b>🔗 친구 초대 주소</b><button id="shareCopy" class="btn tiny">복사</button></div>
+        <div id="shareUrl">…</div>
+        <div id="shareNote" class="muted"></div>
+      </div>
+      <div class="panel" id="rosterPanel">
+        <div class="panel-head"><b>접속자</b><span id="rosterCount"></span><button id="rosterToggle" class="btn tiny">접기</button></div>
+        <div id="roster"></div>
+      </div>
+    </div>
+
+    <div id="chat">
+      <div class="chat-tabs">
+        <button data-ch="all" class="tab active">전체</button>
+        <button data-ch="party" class="tab">파티 <span id="partyUnread" class="badge hidden">●</span></button>
+      </div>
+      <div id="chatLog"></div>
+      <input id="chatInput" maxlength="200" placeholder="Enter 로 채팅 (Tab: 전체/파티 전환)" autocomplete="off" />
+    </div>
+
+    <div id="inventory"></div>
+    <div id="invHint">클릭: 바로 사용/읽기 · 우클릭: 조합·건네기</div>
+    <div id="prompt" class="hidden"></div>
+    <div id="status"></div>
+    <canvas id="minimap" width="180" height="180" class="hidden"></canvas>
+    <div id="emotePanel" class="hidden"></div>
+    <div id="sideBtns">
+      <button id="emoteBtn" class="btn small">😀 감정표현 (X)</button>
+      <button id="rankBtn" class="btn small">🏆 랭킹</button>
+      <button id="lookBtn" class="btn small">👗 꾸미기</button>
+      <button id="settingsBtn" class="btn small">⚙ 설정</button>
+      <button id="helpBtn" class="btn small">❔ 조작법</button>
+    </div>
+  </div>
+
+  <div id="tooltip" class="hidden"></div>
+  <div id="toasts"></div>
+
+  <!-- 일반 모달 -->
+  <div id="modal" class="screen hidden">
+    <div class="modal-card">
+      <div id="modalTitle"></div>
+      <div id="modalText"></div>
+      <div id="modalBody"></div>
+      <div class="modal-foot"><button id="modalClose" class="btn">닫기 (Esc)</button></div>
+    </div>
+  </div>
+
+  <!-- 아이템 메뉴 -->
+  <div id="itemMenu" class="hidden"></div>
+
+  <!-- 스토리 -->
+  <div id="story" class="screen hidden">
+    <div class="story-card">
+      <div id="storyTitle"></div>
+      <div id="storyText"></div>
+      <div class="story-foot"><span id="storyBy"></span><button id="storyClose" class="btn">계속 (Space)</button></div>
+    </div>
+  </div>
+
+  <!-- 엔딩 -->
+  <div id="ending" class="screen hidden">
+    <div class="story-card ending">
+      <div id="endTitle"></div>
+      <div id="endText"></div>
+      <div id="endRelics"></div>
+      <button id="endBtn" class="btn primary">로비로 돌아가기</button>
+    </div>
+  </div>
+
+  <div id="inviteBox" class="hidden">
+    <div id="inviteText"></div>
+    <div><button id="inviteYes" class="btn primary small">수락</button><button id="inviteNo" class="btn small">거절</button></div>
+  </div>
+  <div id="playerMenu" class="hidden"></div>
+
+  <div id="vignette"></div>
+  <canvas id="scare" class="hidden"></canvas>
+  <div id="caughtFx" class="hidden"></div>
+  <div id="voiceAudio"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>

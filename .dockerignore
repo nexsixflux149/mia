@@ -1,0 +1,12 @@
+node_modules
+data
+.claude
+.git
+홍보영상
+홍보캡처
+*.mp4
+
+.env
+.env.local
+.neon
+도메인 터널 설정.txt

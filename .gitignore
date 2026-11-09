@@ -1,0 +1,11 @@
+node_modules/
+data/
+# 홍보용 영상·캡처 (용량이 커서 서버에 올리지 않음)
+홍보영상/
+홍보캡처/
+*.mp4
+.claude/
+.neon
+.env.local
+.env
+도메인 터널 설정.txt
