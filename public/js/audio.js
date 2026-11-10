@@ -64,6 +64,7 @@ export class AudioFX {
         camp: ['wind', 'giggle', 'crawl', 'whisper', 'wave', 'creak', 'giggle', 'drip'],
         west: ['wind', 'wind', 'creak', 'bell', 'whisper', 'knock', 'chain'],
         kimono: ['gayageum', 'gong', 'whisper', 'wind', 'giggle', 'creak', 'drip'],
+        clown: ['honk', 'clown_laugh', 'giggle', 'creak', 'pop', 'whisper', 'jackbox', 'calliope_far'],
       }[mode] || ['creak', 'whisper', 'knock'];
       this.horrorTimer = setInterval(() => { if (!this.mode || this.mode === 'lobby') return clearInterval(this.horrorTimer); if (Math.random() < 0.75) this.play(EV[Math.floor(Math.random() * EV.length)]); }, mode === 'doll' || mode === 'gwimun' ? 6000 : 7500);
       // 시나리오 고유의 배경 레이어
@@ -75,11 +76,38 @@ export class AudioFX {
         this.tickTimer && clearInterval(this.tickTimer);
         let tk = 0; this.tickTimer = setInterval(() => { if (this.mode !== 'doll') return clearInterval(this.tickTimer); this.noise(0.03, { freq: tk++ % 2 ? 3200 : 2600, q: 8, gain: 0.04 }); }, 1000);
       }
+      if (mode === 'clown') this.circusWaltz();
       if (mode === 'gwimun' || mode === 'rain') { // 낮게 깔리는 대금 같은 숨소리
         const o = c.createOscillator(); o.type = 'sine'; o.frequency.value = 220; const og = c.createGain(); og.gain.value = 0; const l = c.createOscillator(); l.frequency.value = 0.05; const lg = c.createGain(); lg.gain.value = 0.012; l.connect(lg).connect(og.gain); o.connect(og).connect(g); o.start(); l.start(); nodes.push(o, l);
       }
     }
     this.amb = { g, nodes };
+  }
+
+  // 삐에로 배경음악 (자작곡): 바람 빠진 증기 오르간이 연주하는 느리고 비뚤어진 왈츠.
+  // 쿵-짝-짝 반주 위로 반음씩 미끄러지는 멜로디. 한 바퀴 돌 때마다 음이 조금씩 더 어긋난다.
+  circusWaltz() {
+    clearInterval(this.waltzTimer);
+    const f = (n) => 440 * Math.pow(2, n / 12); // A4 기준 반음
+    const NOTE = { E4: -5, 'G#4': -1, A4: 0, B4: 2, C5: 3, D5: 5, 'D#5': 6, E5: 7, F5: 8, A5: 12, B5: 14, C6: 15 };
+    const mel = ['E5', '-', 'D#5', 'E5', '-', 'C5', 'B4', '-', 'A4', 'G#4', '-', '-', 'A4', 'B4', 'C5', 'D5', '-', 'C5', 'B4', '-', 'G#4', 'A4', '-', '-',
+      'E5', 'F5', 'E5', 'D#5', 'E5', '-', 'C6', '-', 'B5', 'A5', '-', '-', 'F5', 'E5', 'D5', 'C5', 'B4', 'A4', 'G#4', 'B4', 'E4', 'A4', '-', '-'];
+    const CH = { Am: [110, [220, 261.6, 329.6]], Dm: [146.8, [220, 293.7, 349.2]], E: [82.4, [207.7, 246.9, 329.6]], F: [87.3, [174.6, 220, 261.6]] };
+    const bars = ['Am', 'Am', 'E', 'E', 'Am', 'Dm', 'E', 'Am', 'Am', 'Am', 'F', 'Am', 'Dm', 'Am', 'E', 'Am'];
+    let step = 0, lap = 0;
+    const beat = () => {
+      if (this.mode !== 'clown') return clearInterval(this.waltzTimer);
+      const i = step % mel.length, bar = Math.floor(i / 3), b = i % 3; if (i === 0 && step) lap++;
+      const wob = () => (Math.random() - 0.5) * (18 + Math.min(lap, 6) * 9); // 점점 더 어긋나는 음정
+      const [root, tri] = CH[bars[bar]];
+      if (b === 0) { this.tone(bar % 2 ? root * 1.5 : root, 0.34, { type: 'triangle', gain: 0.07, release: 0.25, detune: wob() }); this.noise(0.05, { freq: 140, type: 'lowpass', gain: 0.12 }); }
+      else tri.forEach((fq) => this.tone(fq, 0.16, { type: 'square', gain: 0.006, release: 0.1, detune: wob() }));
+      const n = mel[i];
+      if (n !== '-') { const fq = f(NOTE[n]); this.tone(fq, 0.42, { type: 'square', gain: 0.016, release: 0.3, detune: wob() }); this.tone(fq * 2, 0.35, { type: 'triangle', gain: 0.012, release: 0.28, detune: wob() }); this.tone(fq * 1.005, 0.42, { type: 'sawtooth', gain: 0.006, release: 0.3 }); }
+      if (b === 0 && bar === 15 && Math.random() < 0.5) this.play('honk');
+      step++;
+    };
+    this.waltzTimer = setInterval(beat, 380);
   }
 
   // 귀신이 쫓아올 때 깔리는 긴장 음악 (스타카토 현악 + 불협 트레몰로)
@@ -129,6 +157,12 @@ export class AudioFX {
       case 'bell': [1, 1.5, 2.76].forEach((m) => this.tone(620 * m, 2.5, { gain: 0.08 / m, release: 2.3 })); this.tone(620, 2.5, { gain: 0.06, release: 2.3, at: 0.4, detune: 30 }); break;
       case 'organ': { const seq = [392, 392, 440, 440, 392, 392, 329.6, 392, 392, 329.6, 329.6, 293.7]; seq.forEach((f, i) => { this.tone(f, 0.42, { type: 'square', gain: 0.04, at: i * 0.45, release: 0.15 }); this.tone(f / 2, 0.42, { type: 'triangle', gain: 0.05, at: i * 0.45, release: 0.15, detune: -12 }); }); break; }
       case 'note': break;
+      case 'honk': [0, 0.22].forEach((a) => { this.tone(330, 0.18, { type: 'sawtooth', gain: 0.12, at: a, slide: 300 }); this.tone(415, 0.18, { type: 'square', gain: 0.05, at: a }); }); break;
+      case 'clown_laugh': for (let i = 0; i < 7; i++) this.tone(380 - i * 18 + Math.random() * 30, 0.14, { type: 'sawtooth', gain: 0.07, at: i * 0.16, slide: 260 - i * 15 }); this.noise(1.2, { freq: 1600, q: 3, gain: 0.04 }); break;
+      case 'jackbox': [523, 587, 659, 523, 659, 523, 659].forEach((fq, i) => this.tone(fq, 0.18, { type: 'triangle', gain: 0.05, at: i * 0.2 })); this.noise(0.2, { freq: 2500, gain: 0.4, at: 1.45 }); this.tone(880, 0.6, { type: 'sawtooth', gain: 0.15, slide: 1600, at: 1.45 }); break;
+      case 'pop': this.noise(0.08, { freq: 1800, q: 0.8, gain: 0.7 }); this.tone(120, 0.1, { type: 'square', gain: 0.2, slide: 60 }); break;
+      case 'calliope_far': [659, 622, 659, 523, 494].forEach((fq, i) => this.tone(fq * (1 + (Math.random() - 0.5) * 0.03), 0.4, { type: 'square', gain: 0.012, at: i * 0.38, release: 0.3 })); break;
+      case 'whip': this.noise(0.06, { freq: 4000, q: 1, gain: 0.6 }); this.tone(2200, 0.05, { type: 'square', gain: 0.08, slide: 600 }); break;
       case 'stomp': this.noise(0.18, { freq: 90, type: 'lowpass', gain: 0.7 }); this.tone(48, 0.2, { gain: 0.3, slide: 35 }); break;
       case 'jingle': for (let i = 0; i < 6; i++) this.tone(2400 + Math.random() * 900, 0.25, { type: 'triangle', gain: 0.03, at: i * 0.05, release: 0.2 }); break;
       case 'pipe': [0, 0.25].forEach((a) => this.noise(0.05, { freq: 1500, q: 4, gain: 0.25, at: a })); break;

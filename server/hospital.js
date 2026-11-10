@@ -182,7 +182,7 @@ export const HOSPITAL_CHAPTERS = [
         wrongScare: true,
         on: { flag: 'isolation', sound: 'door', ghost: 'start',
           story: T('격리실', `다이얼이 맞물리자 철문이 안쪽으로 밀려 열렸다.\n\n격리실 바닥에 지하로 내려가는 계단.\n그리고 계단 앞에 하얀 간호사 모자 하나가 놓여 있다.\n모자 안쪽에 수놓인 이름: "윤해림"\n\n등 뒤 병실 다섯 곳에서 동시에 호출벨이 울렸다.`) } },
-      { id: 'to_basement', t: 'iron_door', x: 11.75, z: 3, r: -90, label: '지하 계단', kind: 'door', hidden: true, req: ['isolation'], to: 2 },
+      { id: 'to_basement', t: 'iron_door', x: 11.75, z: 3, r: -90, label: '비상 계단', kind: 'door', hidden: true, req: ['isolation'], to: 2 },
     ],
     ghost: { type: 'nurse', speed: 2.4, sense: 7, teleport: 22, spawn: [10, 4], name: '수간호사', auto: true },
     ghosts: [{ type: 'child', speed: 2.0, sense: 6, startFlag: 'isolation', spawn: [-4.8, -4], name: '702호 아이' }],
@@ -194,10 +194,119 @@ export const HOSPITAL_CHAPTERS = [
     ],
   },
 
-  // ─────────────────────────────── 3장
+  // ─────────────────────────────── 3장 (새 챕터)
   {
     id: 2,
-    title: '3장 · 지하 영안실',
+    title: '3장 · 원장실',
+    place: '백야요양병원 행정동 5층',
+    size: [22, 16],
+    spawn: [-8, 5],
+    ambient: 'candle',
+    floor: '#3a2e26', wall: '#6a5a48', fog: 0.055,
+    walls: [{ x: 1, z: -3.5, w: 0.3, d: 9 }],
+    intro: T('3장 · 원장실', `계단은 지하까지 이어지지 않았다.
+5층 방화문 앞에서 끊겨 있었다. 문에는 붉은 글씨 — "원장 승인 시에만 개방".
+
+복도 끝 원장실. 두꺼운 카펫, 금박 액자, 그리고 약 냄새.
+책상 위에는 제약회사 로고가 찍힌 서류 봉투가 산처럼 쌓여 있다.
+
+어디선가 쉭… 쉭… 하는 숨소리.
+방독면을 쓴 사내가 약제실 쪽 복도를 천천히 걸어간다.
+가슴에 이름표: "약제부장 — 원장님 지시만 따름"`),
+    props: [
+      { t: 'teacher_desk', x: -2, z: -5.5 }, { t: 'chair', x: -2, z: -4.4, r: 180 }, { t: 'bookcase', x: -10.4, z: -3, r: 90 }, { t: 'bookcase', x: -10.4, z: 1, r: 90 },
+      { t: 'med_cabinet', x: 10.5, z: -5, r: -90 }, { t: 'med_cabinet', x: 10.5, z: -1, r: -90 }, { t: 'rug', x: -5, z: -1 }, { t: 'grandfather_clock', x: -6, z: -7.4 },
+      { t: 'iv_stand', x: 6, z: 6.5 }, { t: 'wheelchair', x: 3.5, z: 6.3, r: 150 },
+    ],
+    objects: [
+      { id: 'plaque', t: 'monument', x: -6.5, z: 6.6, r: 180, label: '개원 기념패', kind: 'examine', once: true,
+        on: { flag: 'plaque', sound: 'whisper' },
+        text: `금도금 기념패.
+
+  「 백야요양병원 개원 」
+  「 1983년 4월 19일 · 원장 차도윤 」
+  「 잠든 이에게 영원한 평안을 」
+
+기념패 모서리에 손톱으로 긁은 글씨: "평안? 실험이었잖아."` },
+      { id: 'portrait', t: 'painting', x: -10.85, z: 5, r: 90, y: 1.8, label: '원장의 초상화', kind: 'examine',
+        text: '금박 액자 속 차도윤 원장. 미소 짓고 있지만 눈동자만 아래를 본다. 금고 쪽이다.',
+        reveal: { item: 'flashlight', text: '손전등을 비스듬히 비추자 물감 아래 연필 글씨가 떠오른다.\n  "금고 번호 = 이 병원이 태어난 날 (YYMMDD)"' } },
+      { id: 'safe', t: 'safe', x: -9.8, z: -6.8, label: '원장의 금고', kind: 'lock',
+        text: '벽에 박힌 금고. 6자리 번호.',
+        lock: { input: 'digits', len: 6, answer: '830419' }, wrongScare: true,
+        doneText: '빈 금고. 약 냄새가 밴 서류 봉투만 남았다.',
+        on: { flag: 'safe', sound: 'drawer', ghost: 'start',
+          story: T('제약회사 계약서', `금고 안에 두꺼운 계약서 한 묶음.
+
+【 신약 '백야정' 임상 시험 위탁 계약 】
+  시험 대상  7병동 입원 환자 5명 (본인 동의 없음)
+  시험 내용  고용량 수면 유도 — "깨어나지 않을 때까지"
+  사례금     1인당 2천만 원 / 원장 차도윤
+
+계약서 맨 뒤에 원장의 메모.
+"12월 24일 마지막 투약. 결과가 나오면 7병동 기록은 모두 태울 것."
+
+그 순간 등 뒤에서 방독면의 숨소리가 멎었다. 아주 가까이에서.`) } },
+      { id: 'scale_note', t: 'paper', x: 6.5, z: -6.6, y: 0.95, label: '약제실 조제 메모', kind: 'examine',
+        text: `【 백야정 조제 메모 · 약제부 】
+
+  1회분 = 정확히 15g.
+  분동은 반드시 세 개만 쓸 것. 같은 무게 두 번 금지.
+
+  ※ 5g 분동은 금이 가서 폐기함. 쓰지 말 것.` },
+      { id: 'scale_table', t: 'table', x: 6.5, z: -6.6, kind: 'deco' },
+      { id: 'scale', t: 'workbench', x: 8.6, z: -6.4, label: '약제실 저울', kind: 'lock', req: ['safe'],
+        lockedText: '약제실 저울. 방독면 사내가 지키고 있던 자리다. 아직 손댈 이유가 없다.',
+        text: '구리 접시 저울. 백야정 1회분을 정확히 달아 보자. 해독제 칸이 함께 열릴지도 모른다.',
+        lock: { input: 'balance', weights: [2, 4, 5, 6, 8, 9], target: 15, pick: 3, unit: 'g', answer: [2, 4, 9] }, wrongScare: true,
+        doneText: '저울 아래 서랍이 열려 있다.',
+        on: { flag: 'scale', give: 'antidote', sound: 'drawer',
+          story: T('해독제', `저울이 수평이 되자 아래 서랍이 툭 열렸다.
+
+갈색 앰풀 다섯 개. 라벨: "백야정 해독제 — 투여 금지 (원장 지시)"
+해독제는 처음부터 있었다. 원장이 쓰지 못하게 했을 뿐.
+
+앰풀 상자 밑에 쪽지 한 장. 수간호사 윤해림의 글씨.
+"해독제는 내가 훔쳐 둘게. 오늘 밤 12시에 다섯 분 모두 깨운다."
+— 불은 11시 40분에 났다.`) } },
+      { id: 'firemap_note', t: 'paper', x: 3, z: 3, y: 0.85, label: '소방관 진술서', kind: 'examine',
+        text: `【 소방관 진술서 (일부) 】
+
+"불은 간호사실에서 시작됐습니다.
+ 복도 바람을 타고 홀수 병실부터 차례로 삼켰어요. 701, 703, 705.
+ 끝에서 되돌아오면서 짝수 병실로 — 704, 그리고 마지막이 702호였습니다.
+ 702호 아이는… 마지막까지 문을 두드렸다고 합니다."` },
+      { id: 'firemap_box', t: 'crate', x: 3, z: 3, kind: 'deco' },
+      { id: 'firemap', t: 'easel', x: 6, z: 2.6, label: '화재 조사 상황판', kind: 'lock', req: ['safe'],
+        lockedText: '화재 조사 상황판. 7병동 평면도에 핀이 꽂혀 있다.',
+        text: '7병동 평면도. 간호사실과 병실 다섯 칸에 핀이 꽂혀 있다. 불이 번진 길을 실로 이어 보자.',
+        lock: { input: 'stars', points: [[0.08, 0.72], [0.22, 0.25], [0.38, 0.25], [0.54, 0.25], [0.7, 0.25], [0.86, 0.25]], labels: ['간호사실', '701', '702', '703', '704', '705'], len: 6, answer: [0, 1, 3, 5, 4, 2] }, wrongScare: true,
+        doneText: '상황판의 붉은 실이 702호에서 끝난다.',
+        on: { flag: 'firemap', sound: 'whisper', scare: 'tv',
+          story: T('불길의 길', `마지막 핀에 실을 감자 상황판 뒤에서 무언가 떨어졌다.
+원장실 방화문 열쇠. 꼬리표: "지하 — 원장 전용"
+
+702호 핀이 혼자 흔들렸다. 똑, 똑, 똑.
+상황판 속 작은 병실에서 누군가 문을 두드리고 있었다.
+
+"…선생님, 문 열어 주세요. 뜨거워요."`) } },
+      { id: 'fire_door', t: 'iron_door', x: 10.85, z: 4, r: -90, label: '지하로 가는 방화문', kind: 'door', req: ['scale', 'firemap'], to: 3,
+        lockedText: '"원장 승인 시에만 개방". 방화문이 꿈쩍도 하지 않는다. 원장실의 비밀을 더 찾아야 한다.' },
+    ],
+    ghost: { type: 'gasmask', speed: 2.5, sense: 7, teleport: 20, spawn: [8, 5], name: '방독면 약제부장', hearRun: true },
+    objectives: [
+      { until: 'plaque', text: '원장실을 살펴보자', hints: ['문 옆 개원 기념패.'] },
+      { until: 'safe', text: '원장의 금고를 열자', hints: ['원장의 초상화를 손전등을 가진 사람이 살펴보자.', '개원일 1983년 4월 19일을 YYMMDD로.', '830419'] },
+      { until: 'scale', text: '약제실 저울을 맞추자', hints: ['저울 옆 탁자의 조제 메모.', '5g 빼고 세 개로 15g.', '2g · 4g · 9g'] },
+      { until: 'firemap', text: '불이 번진 길을 이어 보자', hints: ['가운데 상자 위 소방관 진술서.', '간호사실 → 701 → 703 → 705 → 704 → 702'] },
+      { until: '__end', text: '지하로 내려가자', hints: ['오른쪽 벽 방화문.'] },
+    ],
+  },
+
+  // ─────────────────────────────── 4장
+  {
+    id: 3,
+    title: '4장 · 지하 영안실',
     place: '백야요양병원 지하',
     size: [18, 14],
     spawn: [-5, 3.4],
@@ -205,7 +314,7 @@ export const HOSPITAL_CHAPTERS = [
     startDark: true,
     floor: '#2a2c2c', wall: '#4a504c', fog: 0.07,
     walls: [{ x: 2, z: -3, w: 0.3, d: 8 }],
-    intro: T('3장 · 지하 영안실', `계단을 다 내려오자 등 뒤에서 철문이 닫혔다.
+    intro: T('4장 · 지하 영안실', `방화문 너머 계단을 다 내려오자 등 뒤에서 철문이 닫혔다.
 
 차가운 공기. 형광등은 모두 깨져 있다.
 한쪽에는 영안실 냉장고, 벽 너머에는 수술실.

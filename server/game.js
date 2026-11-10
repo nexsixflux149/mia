@@ -208,7 +208,8 @@ export class GameInstance {
         }
         this.emitTo(p.id, 'ui:lock', { id: o.id, title, text: this.textFor(o), input: o.lock.input, buttons: o.lock.buttons, len: o.lock.len, notes: !!o.lock.notes, drum: !!o.lock.drum, morse: !!o.lock.morse, wheels: o.lock.wheels, size: o.lock.size, lightsOut: !!o.lock.lightsOut,
           min: o.lock.min, max: o.lock.max, step: o.lock.step, unit: o.lock.unit, left: o.lock.left, right: o.lock.right, colors: o.lock.colors,
-          sequence: o.lock.input === 'simon' ? o.lock.answer : undefined, rings: o.lock.rings, positions: o.lock.positions, image: o.lock.image, labels: o.lock.labels });
+          sequence: o.lock.input === 'simon' ? o.lock.answer : undefined, rings: o.lock.rings, positions: o.lock.positions, image: o.lock.image, labels: o.lock.labels,
+          points: o.lock.points, weights: o.lock.weights, target: o.lock.target, pick: o.lock.pick, cups: o.lock.cups, swaps: o.lock.input === 'cups' ? this.cupSwaps(o) : undefined, start: o.lock.start, close: o.lock.close });
         break;
       }
       case 'use': {
@@ -273,12 +274,28 @@ export class GameInstance {
       const ok = Math.abs(Number(answer) - o.lock.answer) <= (o.lock.tol ?? 0.3);
       return this.lockResult(p, o, ok);
     }
-    const seq = ['buttons', 'dial', 'wires', 'simon', 'rotate'].includes(o.lock.input);
+    if (o.lock.input === 'balance') { // 저울: 올린 추의 조합 (순서 무관)
+      const pick = [].concat(answer).map(Number).sort((a, b) => a - b).join(',');
+      return this.lockResult(p, o, pick === [...o.lock.answer].sort((a, b) => a - b).join(','));
+    }
+    if (o.lock.input === 'cups') { // 야바위: 섞기가 끝난 뒤 공이 든 컵 (서버가 섞은 결과로 채점)
+      const ok = Number(answer) === this.cupEnd?.[o.id]; delete this.cupEnd?.[o.id];
+      return this.lockResult(p, o, ok);
+    }
+    const seq = ['buttons', 'dial', 'wires', 'simon', 'rotate', 'stars'].includes(o.lock.input);
     const answers = Array.isArray(o.lock.answer) && seq ? [o.lock.answer.join(',')] : [].concat(o.lock.answer);
     // 말 입력은 쉼표·마침표·느낌표 같은 문장부호를 무시한다 ("수아야, 같이 집에 가자!")
     const loose = (v) => norm(v).replace(/[,.!?~'"…。、！？]/g, '');
     const eq = o.lock.input === 'text' ? (a) => loose(a) === loose(given) : (a) => norm(a) === norm(given);
     return this.lockResult(p, o, answers.some((a) => eq(a) || (o.lock.input === 'digits' && Number(given) === Number(a) && String(given).length >= 3)));
+  }
+  // 야바위 컵 섞기: 매번 새로 섞고, 공의 마지막 위치를 기억해 둔다
+  cupSwaps(o) {
+    const n = o.lock.cups || 3, k = o.lock.swaps || 8;
+    let ball = o.lock.start ?? 1; const swaps = [];
+    for (let i = 0; i < k; i++) { const a = Math.floor(Math.random() * n); let b = Math.floor(Math.random() * (n - 1)); if (b >= a) b++; swaps.push([a, b]); if (ball === a) ball = b; else if (ball === b) ball = a; }
+    (this.cupEnd ||= {})[o.id] = ball;
+    return swaps;
   }
   lockResult(p, o, ok) {
     if (ok) {

@@ -13,7 +13,8 @@ export const OPTIONS = {
   hair: [['none', '없음'], ['short', '짧은'], ['bob', '단발'], ['long', '긴머리'], ['twintail', '양갈래'], ['ponytail', '포니테일'], ['bun', '똥머리'], ['spiky', '삐죽'], ['bowl', '바가지']],
   outfit: [['plain', '기본'], ['sailor', '세일러 교복'], ['blazer', '블레이저 교복'], ['hanbok', '한복'], ['shaman', '무녀복'], ['reaper', '저승사자'], ['priest', '퇴마 신부'], ['nurse', '간호사'], ['detective', '탐정'], ['maid', '메이드'], ['hoodie', '심야방송 후드'], ['pajama', '곰 잠옷'],
     ['police', '경찰'], ['doctor', '의사 가운'], ['chef', '요리사'], ['firefighter', '소방관'], ['pirate', '해적'], ['witch', '마녀'], ['vampire', '뱀파이어'],
-    ['mummy', '미라'], ['astronaut', '우주복'], ['ninja', '닌자'], ['santa', '산타'], ['raincoat', '노란 우비'], ['tracksuit', '학교 체육복'], ['dino', '공룡 잠옷'], ['cowboy', '카우보이'], ['kimono', '기모노']],
+    ['mummy', '미라'], ['astronaut', '우주복'], ['ninja', '닌자'], ['santa', '산타'], ['raincoat', '노란 우비'], ['tracksuit', '학교 체육복'], ['dino', '공룡 잠옷'], ['cowboy', '카우보이'], ['kimono', '기모노'],
+    ['clown', '삐에로'], ['ringmaster', '서커스 단장'], ['magician', '마술사'], ['knight', '기사 갑옷'], ['princess', '공주 드레스'], ['gothic', '고딕 드레스'], ['wizard', '마법사 로브'], ['idol', '아이돌 무대의상'], ['hiphop', '힙합'], ['explorer', '탐험가'], ['bee', '꿀벌 잠옷'], ['panda', '판다 잠옷']],
 };
 export const SKIN = ['#ffd6a5', '#fff1e6', '#ffe0cc', '#f1c27d', '#d4a373', '#a3714f', '#ffc8dd', '#cde7b0', '#bde0fe', '#e2c2ff', '#f6e58d', '#c9c9c9'];
 export const ACCENT = ['#ff8fab', '#ff6b6b', '#ffa94d', '#ffd43b', '#74c0fc', '#63e6be', '#b197fc', '#495057', '#ffffff', '#1c1c24'];
@@ -242,6 +243,18 @@ function outfitColors(l) {
     raincoat: { top: '#f2c81a', legs: '#3d5a8a', shoes: '#f2c81a', sleeve: '#f2c81a' },
     tracksuit: { top: '#2a6a3a', legs: '#2a6a3a', shoes: '#f2f2f2', sleeve: '#2a6a3a' },
     dino: { top: '#5fbf6a', legs: '#5fbf6a', shoes: '#5fbf6a', sleeve: '#5fbf6a' },
+    clown: { top: '#f6f2ea', legs: '#f6f2ea', shoes: '#d6303a', sleeve: '#f6f2ea' },
+    ringmaster: { top: '#a0101e', legs: '#f4f1ea', shoes: '#111', sleeve: '#a0101e' },
+    magician: { top: '#121218', legs: '#121218', shoes: '#0a0a0c', sleeve: '#121218' },
+    knight: { top: '#b8bec8', legs: '#9aa0aa', shoes: '#6a707a', sleeve: '#b8bec8' },
+    princess: { top: a, legs: a, shoes: '#f4e8f0', sleeve: '#fff0f6' },
+    gothic: { top: '#16101a', legs: '#16101a', shoes: '#0a0a0c', sleeve: '#16101a' },
+    wizard: { top: '#2a3a8a', legs: '#2a3a8a', shoes: '#3a2414', sleeve: '#2a3a8a' },
+    idol: { top: '#f4f4f8', legs: '#1c1c24', shoes: '#f4f4f8', sleeve: '#f4f4f8' },
+    hiphop: { top: a, legs: '#3a4a6a', shoes: '#f2f2f2', sleeve: a },
+    explorer: { top: '#c8b48a', legs: '#7a6a4a', shoes: '#4a3420', sleeve: '#c8b48a' },
+    bee: { top: '#f2c81a', legs: '#f2c81a', shoes: '#1a1a1a', sleeve: '#1a1a1a' },
+    panda: { top: '#f8f8f6', legs: '#1a1a1e', shoes: '#1a1a1e', sleeve: '#1a1a1e' },
   };
   return map[l.outfit] || map.plain;
 }
@@ -263,6 +276,75 @@ function addOutfit(rig, l, O) {
       for (const s of [-1, 1]) add(new THREE.BoxGeometry(0.06, 0.26, 0.24), l.accent, 0.38 * s, 0.5, 0);
       break;
     case 'plain': add(new THREE.SphereGeometry(0.2, 16, 12), l.body, 0, 0.5, 0.15).scale.set(1, 1.05, 0.55); break;
+    case 'clown':
+      skirt('#f6f2ea', 0.3, 0.42, 0.42, 0.32);
+      for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2; add(new THREE.CircleGeometry(0.035, 10), ['#d6303a', '#2f5fd0', '#ffd36a'][i % 3], Math.sin(a) * 0.3, 0.42 + (i % 3) * 0.12, Math.cos(a) * 0.3, 0, a, 0, { side: THREE.DoubleSide }); }
+      add(new THREE.TorusGeometry(0.27, 0.07, 6, 18), '#ffffff', 0, 0.84, 0, Math.PI / 2);
+      for (let i = 0; i < 3; i++) add(new THREE.SphereGeometry(0.035, 8, 6), '#d6303a', 0, 0.72 - i * 0.12, 0.28);
+      break;
+    case 'ringmaster':
+      add(new THREE.BoxGeometry(0.18, 0.36, 0.03), '#ffd36a', 0, 0.6, 0.27, 0, 0, 0, { metalness: 0.4 });
+      for (let i = 0; i < 4; i++) add(new THREE.SphereGeometry(0.02, 6, 4), '#ffd36a', 0.12, 0.74 - i * 0.09, 0.28, 0, 0, 0, { metalness: 0.9 });
+      add(new THREE.BoxGeometry(0.46, 0.4, 0.04), '#7a0814', 0, 0.2, -0.3, 0.25);
+      add(new THREE.BoxGeometry(0.12, 0.05, 0.03), '#111', 0, 0.8, 0.27);
+      break;
+    case 'magician':
+      add(new THREE.BoxGeometry(0.16, 0.34, 0.03), '#f4f4f0', 0, 0.62, 0.27);
+      add(new THREE.BoxGeometry(0.12, 0.05, 0.03), '#c0262d', 0, 0.8, 0.28);
+      add(new THREE.CylinderGeometry(0.3, 0.52, 0.85, 20, 1, true, Math.PI * 0.6, Math.PI * 0.8), '#121218', 0, 0.42, -0.02, 0, 0, 0, { side: THREE.DoubleSide });
+      add(new THREE.CylinderGeometry(0.29, 0.5, 0.8, 20, 1, true, Math.PI * 0.62, Math.PI * 0.76), '#7a0a2a', 0, 0.42, 0, 0, 0, 0, { side: THREE.DoubleSide });
+      break;
+    case 'knight':
+      add(new THREE.CylinderGeometry(0.3, 0.3, 0.42, 18), '#c8ccd4', 0, 0.6, 0, 0, 0, 0, { metalness: 0.8, roughness: 0.25 });
+      add(new THREE.BoxGeometry(0.2, 0.22, 0.03), '#c0262d', 0, 0.6, 0.3);
+      add(new THREE.BoxGeometry(0.04, 0.16, 0.035), '#ffd36a', 0, 0.62, 0.315, 0, 0, 0, { metalness: 0.8 }); add(new THREE.BoxGeometry(0.12, 0.04, 0.035), '#ffd36a', 0, 0.65, 0.315, 0, 0, 0, { metalness: 0.8 });
+      for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.13, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), '#c8ccd4', 0.33 * s, 0.76, 0, 0, 0, 0.4 * s, { metalness: 0.8, roughness: 0.25 });
+      skirt('#9aa0aa', 0.28, 0.36, 0.2, 0.3);
+      break;
+    case 'princess':
+      skirt(l.accent, 0.27, 0.56, 0.6, 0.27);
+      skirt('#fff0f6', 0.4, 0.58, 0.12, 0.27);
+      for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; add(new THREE.SphereGeometry(0.025, 6, 4), '#ffd36a', Math.sin(a) * 0.5, 0.3, Math.cos(a) * 0.5, 0, 0, 0, { metalness: 0.8 }); }
+      for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.09, 10, 8), '#fff0f6', 0.3 * s, 0.8, 0);
+      add(new THREE.SphereGeometry(0.035, 8, 6), '#ff8fd0', 0, 0.72, 0.28, 0, 0, 0, { emissive: '#ff4fb0', emissiveIntensity: 0.5 });
+      break;
+    case 'gothic':
+      skirt('#16101a', 0.27, 0.5, 0.58, 0.28);
+      for (let i = 0; i < 3; i++) skirt(i % 2 ? '#2a1a2a' : '#4a0a1a', 0.42 + i * 0.03, 0.5 + i * 0.03, 0.05, 0.3 + i * 0.06);
+      add(new THREE.TorusGeometry(0.26, 0.04, 6, 18), '#e8e0f0', 0, 0.83, 0, Math.PI / 2);
+      add(new THREE.BoxGeometry(0.03, 0.12, 0.015), '#c0c4cc', 0, 0.62, 0.285, 0, 0, 0, { metalness: 0.8 }); add(new THREE.BoxGeometry(0.08, 0.025, 0.015), '#c0c4cc', 0, 0.65, 0.287, 0, 0, 0, { metalness: 0.8 });
+      break;
+    case 'wizard':
+      skirt('#2a3a8a', 0.28, 0.48, 0.6, 0.27);
+      for (let i = 0; i < 9; i++) { const a = (i * 2.4) % (Math.PI * 2); add(new THREE.OctahedronGeometry(0.03), '#ffd36a', Math.sin(a) * 0.38, 0.3 + (i % 3) * 0.15, Math.cos(a) * 0.38, 0, 0, 0, { emissive: '#ffcc33', emissiveIntensity: 0.8 }); }
+      add(new THREE.CylinderGeometry(0.3, 0.3, 0.06, 18), '#ffd36a', 0, 0.56, 0, 0, 0, 0, { metalness: 0.6 });
+      break;
+    case 'idol':
+      add(new THREE.BoxGeometry(0.5, 0.06, 0.34), '#ffd36a', 0, 0.84, 0, 0, 0, 0, { metalness: 0.6, emissive: '#aa8800', emissiveIntensity: 0.3 });
+      for (let i = 0; i < 12; i++) add(new THREE.CircleGeometry(0.02, 6), ['#ff8fd0', '#9ad0ff', '#ffffff'][i % 3], -0.15 + (i % 4) * 0.1, 0.5 + Math.floor(i / 4) * 0.1, 0.285, 0, 0, 0, { emissive: '#ffffff', emissiveIntensity: 0.5, metalness: 0.8 });
+      skirt('#1c1c24', 0.27, 0.36, 0.2, 0.3);
+      add(new THREE.BoxGeometry(0.03, 0.1, 0.03), '#333', 0.12, 0.92, 0.22); add(new THREE.SphereGeometry(0.03, 8, 6), '#333', 0.12, 0.98, 0.24);
+      break;
+    case 'hiphop':
+      add(new THREE.BoxGeometry(0.56, 0.08, 0.4), '#f2f2f2', 0, 0.28, 0);
+      add(new THREE.TorusGeometry(0.17, 0.02, 6, 18), '#ffd36a', 0, 0.68, 0.16, Math.PI / 2 - 0.5, 0, 0, { metalness: 0.9, roughness: 0.2 });
+      add(new THREE.CylinderGeometry(0.05, 0.05, 0.02, 12), '#ffd36a', 0, 0.55, 0.29, Math.PI / 2, 0, 0, { metalness: 0.9 });
+      break;
+    case 'explorer':
+      for (const s of [-1, 1]) add(new THREE.BoxGeometry(0.1, 0.1, 0.04), '#a8946a', 0.12 * s, 0.62, 0.27);
+      add(new THREE.BoxGeometry(0.58, 0.07, 0.48), '#5a4020', 0, 0.36, 0); add(new THREE.BoxGeometry(0.06, 0.6, 0.02), '#5a4020', 0.08, 0.6, 0.28, 0, 0, 0.6);
+      add(new THREE.CylinderGeometry(0.06, 0.06, 0.1, 12), '#3a3a40', 0.24, 0.4, 0.22, Math.PI / 2, 0, 0); add(new THREE.CircleGeometry(0.05, 12), '#cfe8ff', 0.24, 0.4, 0.275);
+      break;
+    case 'bee':
+      for (let i = 0; i < 3; i++) add(new THREE.CylinderGeometry(0.295, 0.295, 0.07, 20), '#1a1a1a', 0, 0.4 + i * 0.16, 0);
+      for (const s of [-1, 1]) { const w = add(new THREE.SphereGeometry(0.2, 12, 8), '#e8f4ff', 0.2 * s, 0.7, -0.32, 0, 0, 0, { transparent: true, opacity: 0.6 }); w.scale.set(0.5, 1, 0.2); w.rotation.z = 0.5 * s; }
+      add(new THREE.ConeGeometry(0.06, 0.16, 8), '#1a1a1a', 0, 0.32, -0.3, -1.6, 0, 0);
+      break;
+    case 'panda':
+      add(new THREE.SphereGeometry(0.2, 16, 12), '#ffffff', 0, 0.52, 0.15).scale.set(1, 1.05, 0.55);
+      add(new THREE.CylinderGeometry(0.3, 0.3, 0.16, 18), '#1a1a1e', 0, 0.78, 0);
+      add(new THREE.SphereGeometry(0.08, 10, 8), '#1a1a1e', 0, 0.3, -0.3);
+      break;
     case 'sailor':
       add(new THREE.BoxGeometry(0.46, 0.2, 0.05), '#1f2f5a', 0, 0.74, -0.24);
       for (const s of [-1, 1]) add(new THREE.BoxGeometry(0.08, 0.26, 0.04), '#1f2f5a', 0.1 * s, 0.66, 0.25, 0.25, 0, 0.5 * s);
@@ -528,6 +610,18 @@ function addOutfitHeadwear(head, l) {
   if (l.outfit === 'raincoat') { const h = add(new THREE.SphereGeometry(0.5, 22, 14, 0, Math.PI * 2, 0, Math.PI / 1.6), '#f2c81a', 0, 0.02, -0.06, { roughness: 0.25 }); h.rotation.x = 0.45; h.position.z = -0.12; }
   if (l.outfit === 'tracksuit') { add(new THREE.BoxGeometry(0.62, 0.07, 0.04), '#f2f2f2', 0, 0.22, 0.32); }
   if (l.outfit === 'dino') { add(new THREE.SphereGeometry(0.5, 24, 14, 0, Math.PI * 2, 0, Math.PI / 2.1), '#5fbf6a', 0, 0.02, -0.05); for (let i = 0; i < 4; i++) add(new THREE.ConeGeometry(0.07, 0.16, 4), '#f28a3a', 0, 0.52 - i * 0.02, -0.05 - i * 0.14); for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.06, 10, 8), '#ffffff', 0.18 * s, 0.4, 0.3); }
+  if (l.outfit === 'clown') { for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.17, 12, 10), '#ff4a1a', 0.42 * s, 0.05, -0.05).scale.set(0.9, 1.1, 1.3); const c = add(new THREE.ConeGeometry(0.16, 0.42, 14), '#2f5fd0', 0.1, 0.62, 0); c.rotation.z = -0.3; add(new THREE.SphereGeometry(0.06, 10, 8), '#ffd36a', 0.18, 0.84, 0); }
+  if (l.outfit === 'ringmaster') { add(new THREE.CylinderGeometry(0.5, 0.5, 0.025, 28), '#0a0a0e', 0, 0.36, 0); add(new THREE.CylinderGeometry(0.26, 0.26, 0.5, 22), '#0a0a0e', 0, 0.62, 0); add(new THREE.CylinderGeometry(0.265, 0.265, 0.08, 22), '#a0101e', 0, 0.42, 0); }
+  if (l.outfit === 'magician') { add(new THREE.CylinderGeometry(0.5, 0.5, 0.025, 28), '#121218', 0, 0.36, 0); add(new THREE.CylinderGeometry(0.25, 0.25, 0.46, 22), '#121218', 0, 0.6, 0); add(new THREE.CylinderGeometry(0.255, 0.255, 0.06, 22), '#7a0a2a', 0, 0.41, 0); const r = add(new THREE.SphereGeometry(0.07, 10, 8), '#ffffff', 0.18, 0.86, 0); r.scale.set(0.8, 1.2, 0.8); }
+  if (l.outfit === 'knight') { const h = add(new THREE.SphereGeometry(0.5, 24, 16, Math.PI / 2 + 0.95, Math.PI * 2 - 1.9, 0, Math.PI / 1.7), '#c8ccd4', 0, 0, -0.02, { metalness: 0.8, roughness: 0.25 }); h.material.side = THREE.DoubleSide; add(new THREE.BoxGeometry(0.06, 0.4, 0.06), '#c0262d', 0, 0.62, -0.1); const pl = add(new THREE.ConeGeometry(0.1, 0.4, 8), '#c0262d', 0, 0.68, -0.2); pl.rotation.x = -1.0; }
+  if (l.outfit === 'princess') { for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI - Math.PI / 2; add(new THREE.ConeGeometry(0.05, 0.16, 4), '#ffd36a', Math.sin(a) * 0.2, 0.52, Math.cos(a) * 0.2 - 0.05, { metalness: 0.9, roughness: 0.2 }); } add(new THREE.TorusGeometry(0.22, 0.025, 6, 20), '#ffd36a', 0, 0.45, -0.05, { metalness: 0.9 }).rotation.x = Math.PI / 2; add(new THREE.SphereGeometry(0.04, 8, 6), '#ff4fb0', 0, 0.54, 0.16, { emissive: '#ff2a90', emissiveIntensity: 0.8 }); }
+  if (l.outfit === 'gothic') { add(new THREE.BoxGeometry(0.46, 0.08, 0.12), '#16101a', 0, 0.42, 0.06).rotation.x = -0.3; for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.08, 10, 8), '#4a0a1a', 0.22 * s, 0.44, 0.06).scale.set(1.4, 0.8, 0.6); }
+  if (l.outfit === 'wizard') { add(new THREE.CylinderGeometry(0.6, 0.6, 0.03, 28), '#2a3a8a', 0, 0.32, 0); const c = add(new THREE.ConeGeometry(0.32, 0.85, 20), '#2a3a8a', 0, 0.75, -0.04); c.rotation.x = -0.25; for (let i = 0; i < 4; i++) add(new THREE.OctahedronGeometry(0.035), '#ffd36a', Math.sin(i * 1.7) * 0.18, 0.5 + i * 0.12, 0.12 - i * 0.05, { emissive: '#ffcc33', emissiveIntensity: 0.9 }); }
+  if (l.outfit === 'idol') { add(new THREE.TorusGeometry(0.46, 0.025, 6, 24, Math.PI), '#222', 0, 0.12, 0).rotation.y = Math.PI / 2; add(new THREE.CylinderGeometry(0.012, 0.012, 0.3, 6), '#222', 0.3, -0.15, 0.3).rotation.x = 1.0; add(new THREE.SphereGeometry(0.03, 8, 6), '#222', 0.18, -0.25, 0.42); }
+  if (l.outfit === 'hiphop') { const c = add(new THREE.SphereGeometry(0.47, 22, 12, 0, Math.PI * 2, 0, Math.PI / 2.3), l.accent, 0, 0.08, 0); c.rotation.y = Math.PI; add(new THREE.CylinderGeometry(0.28, 0.28, 0.03, 20, 1, false, -Math.PI / 2, Math.PI), l.accent, 0, 0.18, -0.38).rotation.y = Math.PI; }
+  if (l.outfit === 'explorer') { add(new THREE.CylinderGeometry(0.62, 0.62, 0.03, 28), '#c8b48a', 0, 0.3, 0); add(new THREE.SphereGeometry(0.34, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), '#c8b48a', 0, 0.3, 0); add(new THREE.CylinderGeometry(0.345, 0.345, 0.05, 20), '#5a4020', 0, 0.34, 0); }
+  if (l.outfit === 'bee') { add(new THREE.SphereGeometry(0.47, 24, 14, 0, Math.PI * 2, 0, Math.PI / 2.1), '#f2c81a', 0, 0.02, -0.04); for (const s of [-1, 1]) { const an = add(new THREE.CylinderGeometry(0.012, 0.012, 0.32, 6), '#1a1a1a', 0.14 * s, 0.6, 0); an.rotation.z = -0.35 * s; add(new THREE.SphereGeometry(0.05, 10, 8), '#1a1a1a', 0.2 * s, 0.75, 0); } }
+  if (l.outfit === 'panda') { add(new THREE.SphereGeometry(0.47, 24, 14, 0, Math.PI * 2, 0, Math.PI / 2.1), '#f8f8f6', 0, 0.02, -0.04); for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.12, 12, 10), '#1a1a1e', 0.3 * s, 0.38, -0.04); }
   if (l.outfit === 'priest') { /* 맨머리 */ }
 }
 

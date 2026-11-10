@@ -203,6 +203,27 @@ Y −·−−    Z −−··
   kimono_relic_5: { name: '하루의 편지 다발', icon: '💌', use: null, relic: true, desc: '"올해도 왔어, 유키." 매년 동백이 질 때마다 쓴 편지들.' },
 };
 
+// ── 새 챕터 아이템
+Object.assign(ITEMS, {
+  antidote: { name: '백야정 해독제', icon: '💉', use: null, desc: '갈색 앰풀 다섯 개. "투여 금지 (원장 지시)". 해독제는 처음부터 있었다.' },
+  battery: { name: '건전지 두 개', icon: '🔋', use: null, desc: '무전기에서 나온 새 건전지. 캠코더에 맞을 것 같다.' },
+});
+// ── 삐에로 (블루문 서커스)
+Object.assign(ITEMS, {
+  tent_key: { name: '거울의 집 열쇠', icon: '🗝️', use: null, desc: '곰인형 배 속에서 나온 열쇠. 꼬리표: "거울의 집 — 단장 외 출입 금지"' },
+  trapeze_hook: { name: '공중그네 갈고리', icon: '🪝', use: null, desc: '곡예용 쇠갈고리. 손잡이에 "리나" 각인. 높은 곳에 닿을 수 있다.' },
+  ledger: { name: '단장의 이중장부', icon: '📒', use: null, desc: '검은 가죽 장부. "화재보험 가입 — 보험금 3억", "광대 녀석의 입을 막아야 한다."' },
+  insurance: { name: '화재보험 증권', icon: '📜', use: null, desc: '1998년 12월 1일 가입, 수익자 마르코. 봉투에 "24일 밤 10시. 관객 다 빠지면."' },
+  lighter: { name: '금장 라이터', icon: '🔥', use: null, desc: '녹아내린 기름통 사이에서 주운 라이터. 뚜껑에 "M." 각인.' },
+  clown_relic_1: { name: '은별의 반쪽 입장권', icon: '🎟️', use: null, relic: true, desc: '맨 앞줄 7번. 뒷면에 "은별 — 뽀삐 아저씨 보러 옴!"' },
+  clown_relic_2: { name: '은별의 별 머리띠', icon: '⭐', use: null, relic: true, desc: '반짝이는 별 모양 머리띠. 안쪽에 "한은별" 스티커.' },
+  clown_relic_3: { name: '토끼 인형 깡총이', icon: '🐰', use: null, relic: true, desc: '한쪽 귀가 그을린 토끼 인형. "레오야 무서워하지 마."' },
+  clown_relic_4: { name: '은별의 크레용 그림', icon: '🖍️', use: null, relic: true, desc: '빨간 코 삐에로와 여자아이. "뽀삐 아저씨랑 나 ♥"' },
+  clown_relic_5: { name: '뽀삐의 빨간 코', icon: '🔴', use: null, relic: true, desc: '빨간 고무 코. "은별이 거 — 빌려준 것. 앵콜 때 돌려받기!"' },
+  clown_relic_6: { name: '오르골 태엽 열쇠', icon: '🎠', use: null, relic: true, desc: '작은 태엽 열쇠. 리본에 "은별 ★ 8살"' },
+  clown_relic_7: { name: '꼬마 단원 이름표', icon: '📛', use: null, relic: true, desc: '"한은별 — 사라지는 상자 담당". 뒤에 반쯤 탄 쪽지.' },
+});
+
 export const RECIPES = [
   { a: 'doll_head', b: 'doll_body', out: 'doll_torso', flag: 'torso', text: '머리를 몸통에 끼우자 인형의 목이 "딸깍" 소리를 내며 저절로 돌아갔다. 당신 쪽으로.' },
   { a: 'doll_torso', b: 'doll_arms', out: 'mended_doll', flag: 'mended_doll_made', text: '팔을 끼우자 인형이 당신의 손가락을 꼭 쥐었다. 그리고 놓지 않았다.\n(인형의 집에 눕혀 주자)' },

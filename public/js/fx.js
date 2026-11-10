@@ -32,7 +32,7 @@ const HorrorShader = {
       col *= brightness;
       float v = smoothstep(0.85, 0.2, length(c) * (1.0 + 0.35 * danger));
       col *= mix(1.0, v, vignette);
-      col += (rnd(uv * 1000.0 + time) - 0.5) * grain;
+      col += (rnd(uv * 1000.0 + time) - 0.5) * grain; // grain 은 0 (화면 노이즈 없음)
       gl_FragColor = vec4(col, 1.0);
     }`,
 };
@@ -86,8 +86,8 @@ export class FX {
     u.time.value = t;
     u.danger.value += (danger - u.danger.value) * 0.08;
     u.brightness.value = this.brightness;
-    if (mode === 'lobby') { u.grain.value = 0.015; u.vignette.value = 0.35; u.desat.value = 0; this.bloom.strength = 0.3; this.bloom.threshold = 1.15; }
-    else { u.grain.value = 0.04; u.vignette.value = 1; u.desat.value = 0.2; this.bloom.strength = 0.65; this.bloom.threshold = 1.05; }
+    if (mode === 'lobby') { u.grain.value = 0; u.vignette.value = 0; u.desat.value = 0; this.bloom.strength = 0.3; this.bloom.threshold = 1.15; }
+    else { u.grain.value = 0; u.vignette.value = 1; u.desat.value = 0.2; this.bloom.strength = 0.65; this.bloom.threshold = 1.05; }
     this.composer.render();
   }
 }

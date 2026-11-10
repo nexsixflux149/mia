@@ -38,6 +38,9 @@ export const FOOT = {
   rock: [1.2, 1.0], pole: [0.3, 0.3], lamp: [0.3, 0.3], altar_stone: [1.6, 0.8], pillar: [0.4, 0.4], pillar_c: [0.8, 0.8], box: [0.8, 0.8],
   drum: [0.8, 0.8], radio: [0.8, 0.5], screen_med: [1.6, 0.2], signpost: [0.3, 0.3], flagpole: [0.25, 0.25], tablets: [1.6, 0.4],
   bench: [1.6, 0.5], gwimun: [3.4, 0.6], iron_door: [2.6, 0.35], safe: [0.7, 0.7], valve: [0.6, 0.6], fountain: [2.6, 2.6], bus: [5.2, 2.2], stall: [2, 1.2],
+  jack_box: [0.9, 0.9], balloon_stand: [0.7, 0.7], popcorn_cart: [1.3, 0.8], ticket_booth: [1.9, 1.5], cage: [2.3, 2.3], circus_wagon: [3.1, 1.5], strongman: [0.9, 0.6],
+  cups_table: [1.5, 0.8], funhouse_mirror: [1.3, 0.3], vanity_bulb: [1.6, 0.6], bleachers: [6, 2.4], magic_box: [1.3, 1.3], clown_statue: [1.1, 1.1], cannon: [1.4, 2.2], spotlight: [0.7, 0.7],
+  burnt_beam: [3, 0.6], scarecrow: [0.6, 0.6],
 };
 
 export function buildProp(p) {
@@ -514,6 +517,147 @@ export function buildProp(p) {
       const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color: '#d8ff7a', size: 0.09, transparent: true, opacity: 0.95, depthWrite: false }));
       pts.onBeforeRender = () => { const t = performance.now() / 1000; pts.rotation.y = t * 0.15; pts.position.y = Math.sin(t * 0.8) * 0.15; pts.material.opacity = 0.65 + Math.sin(t * 3) * 0.3; };
       g.add(pts); const pl = new THREE.PointLight('#c8ff6a', 1.2, 4, 2); pl.position.y = 1.2; g.add(pl); g.userData.flicker = pl; break;
+    }
+    // ── 서커스 · 카니발 (삐에로)
+    case 'jack_box': {
+      B(g, 0.8, 0.8, 0.8, '#c0262d'); for (let i = 0; i < 4; i++) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.12, 0.02), M(i % 2 ? '#ffd36a' : '#2f5fd0')); p.position.set(0, 0.2 + i * 0.16, 0.41); g.add(p); }
+      const lid = B(g, 0.8, 0.05, 0.8, '#ffd36a', 0, 0.8, -0.38); lid.geometry.translate(0, 0, 0.4); lid.position.z = -0.4; lid.rotation.x = -1.9;
+      for (let i = 0; i < 6; i++) { const r = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.03, 6, 14), M('#c9ccd0', { metalness: 0.8 })); r.rotation.x = Math.PI / 2; r.position.y = 0.85 + i * 0.09; g.add(r); }
+      const head = S(g, 0.24, '#f4f1ea', 0, 1.55, 0); S(g, 0.06, '#d6303a', 0, 1.53, 0.23);
+      for (const s of [-1, 1]) { S(g, 0.035, '#111', 0.09 * s, 1.62, 0.21); const h = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.32, 8), M(s < 0 ? '#2f5fd0' : '#d6303a')); h.position.set(0.12 * s, 1.85, 0); h.rotation.z = -0.5 * s; g.add(h); }
+      const grin = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.022, 6, 16, Math.PI), M('#8e1c17')); grin.rotation.z = Math.PI; grin.position.set(0, 1.47, 0.2); g.add(grin);
+      head.userData.bob = true; break;
+    }
+    case 'balloon_stand': {
+      C(g, 0.06, 0.08, 1.2, '#ddd'); B(g, 0.6, 0.12, 0.6, '#8a5a3a');
+      const BC = ['#ff6f91', '#ffc75f', '#6fd6ff', '#b39dff', '#7ee0a8', '#ff2a6a', '#ffffff'];
+      for (let i = 0; i < 7; i++) { const a = i * 0.9, r = i ? 0.35 : 0; const b = S(g, 0.24, BC[i], Math.cos(a) * r, 2.0 + (i % 3) * 0.25, Math.sin(a) * r, { roughness: 0.25, emissive: BC[i], emissiveIntensity: 0.15 }); b.scale.y = 1.15; const s = C(g, 0.006, 0.006, 0.8, '#eee', Math.cos(a) * r * 0.5, 1.2, Math.sin(a) * r * 0.5); s.castShadow = false; }
+      break;
+    }
+    case 'unicycle': {
+      const w = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.05, 8, 24), M('#1a1a1e')); w.position.y = 0.34; g.add(w);
+      for (let i = 0; i < 6; i++) { const sp = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.62, 0.015), M('#c9ccd0', { metalness: 0.8 })); sp.position.y = 0.34; sp.rotation.z = (i / 6) * Math.PI; g.add(sp); }
+      C(g, 0.025, 0.025, 0.7, '#c0262d', 0, 0.34); B(g, 0.12, 0.05, 0.3, '#1a1a1e', 0, 1.04, 0); break;
+    }
+    case 'popcorn_cart': {
+      B(g, 1.2, 0.8, 0.7, '#c0262d', 0, 0.25); for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.04, 6, 16), M('#ffd36a')); w.position.set(0.45 * s, 0.22, 0.38); g.add(w); }
+      const glass = B(g, 1.0, 0.8, 0.6, M('#e8f4ff', { transparent: true, opacity: 0.35 }), 0, 1.05); glass.castShadow = false;
+      for (let i = 0; i < 40; i++) S(g, 0.05, '#fff6d0', (Math.random() - 0.5) * 0.85, 1.1 + Math.random() * 0.35, (Math.random() - 0.5) * 0.45);
+      B(g, 1.3, 0.1, 0.8, '#ffd36a', 0, 1.85); const roof = new THREE.Mesh(new THREE.ConeGeometry(0.8, 0.5, 4), M('#ffffff')); roof.rotation.y = Math.PI / 4; roof.position.y = 2.2; g.add(roof);
+      const sign = canvasTex(256, 64, (x, w, h) => { x.fillStyle = '#ffd36a'; x.fillRect(0, 0, w, h); x.fillStyle = '#c0262d'; x.font = 'bold 40px sans-serif'; x.textAlign = 'center'; x.fillText('POPCORN', w / 2, 46); });
+      Plane(g, 1.0, 0.25, sign, 0, 0.75, 0.36); break;
+    }
+    case 'ticket_booth': {
+      B(g, 1.8, 1.0, 1.4, '#2f5fd0'); B(g, 1.8, 1.4, 0.1, '#c0262d', 0, 1.0, -0.65); for (const s of [-1, 1]) B(g, 0.1, 1.4, 1.4, '#c0262d', 0.85 * s, 1.0);
+      const win = B(g, 1.2, 0.8, 0.04, M('#a8d0ff', { transparent: true, opacity: 0.3 }), 0, 1.2, 0.68); win.castShadow = false;
+      B(g, 2.0, 0.14, 1.6, '#ffd36a', 0, 2.4); const roof = new THREE.Mesh(new THREE.ConeGeometry(1.35, 0.9, 4), M('#ffffff')); roof.rotation.y = Math.PI / 4; roof.position.y = 2.95; g.add(roof);
+      const sign = canvasTex(256, 64, (x, w, h) => { x.fillStyle = '#1a0a24'; x.fillRect(0, 0, w, h); x.fillStyle = '#ffd36a'; x.font = 'bold 34px serif'; x.textAlign = 'center'; x.fillText('TICKETS · 매표소', w / 2, 44); });
+      Plane(g, 1.7, 0.42, sign, 0, 2.2, 0.72); break;
+    }
+    case 'cage': {
+      B(g, 2.2, 0.15, 2.2, '#3a2a1a'); B(g, 2.2, 0.12, 2.2, '#3a2a1a', 0, 2.2);
+      for (let i = 0; i < 9; i++) for (const [ax, az] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) { if (p.open && az === 1 && i > 2 && i < 6) continue; const k = -1 + (i / 8) * 2; C(g, 0.025, 0.025, 2.1, '#8a8e94', ax ? ax * 1.05 : k * 1.05, 0.12, az ? az * 1.05 : k * 1.05, 6, { metalness: 0.8, roughness: 0.4 }); }
+      for (let i = 0; i < 10; i++) B(g, 0.3, 0.05, 0.1, '#c9a24a', (Math.random() - 0.5) * 1.6, 0.15, (Math.random() - 0.5) * 1.6).rotation.y = Math.random() * 3; break;
+    }
+    case 'circus_wagon': {
+      B(g, 3.0, 1.6, 1.4, '#7a1424', 0, 0.45); B(g, 3.1, 0.12, 1.5, '#ffd36a', 0, 2.05);
+      for (let i = 0; i < 7; i++) C(g, 0.03, 0.03, 1.4, '#ffd36a', -1.3 + i * 0.43, 0.55, 0.71, 6, { metalness: 0.7 });
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const w = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.07, 6, 18), M('#ffd36a')); w.position.set(1.0 * sx, 0.42, 0.74 * sz); g.add(w); for (let k = 0; k < 4; k++) { const sp = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.78, 0.03), M('#c0262d')); sp.position.copy(w.position); sp.rotation.z = (k / 4) * Math.PI; g.add(sp); } }
+      break;
+    }
+    case 'strongman': {
+      B(g, 0.9, 0.2, 0.6, '#8a5a3a'); B(g, 0.35, 0.25, 0.35, '#c0262d', 0, 0.2);
+      const pole = B(g, 0.22, 3.6, 0.12, '#ffffff', 0, 0.2, -0.15);
+      for (let i = 0; i < 8; i++) B(g, 0.24, 0.04, 0.13, ['#2fbf71', '#a8d83a', '#ffd43b', '#ffa94d', '#ff6b6b', '#c0262d', '#9b59b6', '#2f5fd0'][i], 0, 0.5 + i * 0.4, -0.14);
+      const bell = S(g, 0.22, '#ffd36a', 0, 3.95, -0.15, { metalness: 0.8, roughness: 0.3 }); bell.scale.y = 0.8;
+      const puck = B(g, 0.18, 0.12, 0.16, '#c9ccd0', 0, 0.6, -0.02); g.userData.puck = puck; break;
+    }
+    case 'cups_table': {
+      B(g, 1.5, 0.08, 0.8, '#3a1424', 0, 0.78); for (const sx of [-1, 1]) for (const sz of [-1, 1]) B(g, 0.07, 0.78, 0.07, '#2a0a14', 0.65 * sx, 0, 0.32 * sz);
+      const cloth = B(g, 1.55, 0.3, 0.85, '#c0262d', 0, 0.55); cloth.castShadow = false;
+      for (let i = 0; i < 3; i++) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, 0.22, 14), M('#d6303a')); c.position.set(-0.4 + i * 0.4, 0.97, 0); g.add(c); }
+      break;
+    }
+    case 'funhouse_mirror': {
+      const fr = B(g, 1.3, 2.4, 0.12, '#ffd36a'); fr.position.y = 1.2;
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 2.1, 12, 12), new THREE.MeshStandardMaterial({ color: '#c8d4e0', metalness: 0.95, roughness: 0.06, emissive: '#1a2230', emissiveIntensity: 0.35 }));
+      const pos = m.geometry.attributes.position; for (let i = 0; i < pos.count; i++) pos.setZ(i, Math.sin(pos.getY(i) * (p.wave || 2.4)) * 0.08); m.geometry.computeVertexNormals();
+      m.position.set(0, 1.25, 0.07); g.add(m);
+      for (let i = 0; i < 8; i++) S(g, 0.05, i % 2 ? '#fff2a8' : '#ff9ad0', -0.6 + (i % 2) * 1.2, 0.3 + Math.floor(i / 2) * 0.6, 0.08, { emissive: '#ffcc66', emissiveIntensity: 0.8 });
+      break;
+    }
+    case 'vanity_bulb': {
+      B(g, 1.6, 0.8, 0.55, '#3a2a30'); B(g, 1.62, 0.05, 0.6, '#5a4048', 0, 0.8);
+      const mir = B(g, 1.3, 1.0, 0.04, M('#b8c4d0', { metalness: 0.9, roughness: 0.1 }), 0, 0.95, -0.22); mir.castShadow = false;
+      for (let i = 0; i < 12; i++) { const top = i < 6; const x = top ? -0.6 + i * 0.24 : (i < 9 ? -0.72 : 0.72), y = top ? 2.02 : 1.05 + ((i - 6) % 3) * 0.3; S(g, 0.05, '#fff6d0', x, y, -0.18, { emissive: '#ffe0a0', emissiveIntensity: 1.2 }); }
+      for (let i = 0; i < 5; i++) C(g, 0.025, 0.03, 0.12 + (i % 2) * 0.06, ['#ffffff', '#d6303a', '#2f5fd0', '#111', '#ffd36a'][i], -0.5 + i * 0.22, 0.85, 0.1);
+      const wig = S(g, 0.16, '#ff5a2a', 0.55, 1.05, 0.05); wig.scale.set(1.3, 0.8, 1.3); break;
+    }
+    case 'trapeze': {
+      const h = p.h || 5.2; for (const s of [-1, 1]) { const r = C(g, 0.012, 0.012, h - 1.6, '#d8d0c0', 0.5 * s, 1.6); r.castShadow = false; }
+      C(g, 0.035, 0.035, 1.1, '#c0262d', 0, 1.6).rotation.z = Math.PI / 2; g.userData.swing = true; break;
+    }
+    case 'ring_stage': {
+      const r = p.r2 || 5; const base = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.08, 48), M('#c8a070', { roughness: 1 })); base.position.y = 0.04; base.receiveShadow = true; g.add(base);
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(r, 0.2, 8, 64), M('#c0262d')); rim.rotation.x = Math.PI / 2; rim.position.y = 0.2; g.add(rim);
+      const rim2 = new THREE.Mesh(new THREE.TorusGeometry(r + 0.05, 0.06, 6, 64), M('#ffd36a', { metalness: 0.6 })); rim2.rotation.x = Math.PI / 2; rim2.position.y = 0.38; g.add(rim2);
+      for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2; B(g, 0.6, 0.02, 0.22, i % 2 ? '#ffd36a' : '#ffffff', Math.cos(a) * r * 0.55, 0.08, Math.sin(a) * r * 0.55).rotation.y = -a; }
+      break;
+    }
+    case 'spotlight': {
+      C(g, 0.3, 0.35, 0.15, '#222'); C(g, 0.05, 0.05, 1.5, '#333', 0, 0.15);
+      const head = C(g, 0.28, 0.22, 0.6, '#1a1a1e', 0, 1.5); head.rotation.x = -0.9;
+      const lens = new THREE.Mesh(new THREE.CircleGeometry(0.24, 18), new THREE.MeshBasicMaterial({ color: p.on ? '#fff6d0' : '#3a3a30' })); lens.position.set(0, 1.95, 0.27); lens.rotation.x = -0.9; g.add(lens);
+      if (p.on) { const l = new THREE.PointLight('#fff2c8', 5, 9, 1.5); l.position.set(0, 2.2, 0.6); g.add(l); }
+      break;
+    }
+    case 'bleachers': {
+      const w = p.w || 6; for (let i = 0; i < 4; i++) { B(g, w, 0.12, 0.6, i % 2 ? '#7a1424' : '#a02030', 0, 0.35 + i * 0.4, 0.9 - i * 0.6); B(g, w, 0.35 + i * 0.4, 0.08, '#3a2a1a', 0, 0, 1.18 - i * 0.6); }
+      break;
+    }
+    case 'magic_box': {
+      const box = B(g, 1.0, 1.9, 1.0, '#1a0a3a', 0, 0.2); B(g, 1.3, 0.2, 1.3, '#ffd36a', 0, 0); B(g, 1.08, 0.1, 1.08, '#ffd36a', 0, 2.1);
+      const tex = canvasTex(128, 256, (x, w, h) => { x.fillStyle = '#1a0a3a'; x.fillRect(0, 0, w, h); x.fillStyle = '#ffd36a'; for (let i = 0; i < 14; i++) { const cx = 16 + ((i * 47) % 96), cy = 18 + ((i * 83) % 220); x.beginPath(); for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + (k * Math.PI) / 5; const r = k % 2 ? 4 : 10; x.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); } x.fill(); } x.font = 'bold 22px serif'; x.fillStyle = '#ff9ad0'; x.fillText('?', 56, 140); });
+      Plane(g, 0.96, 1.85, tex, 0, 1.15, 0.51); if (p.open) box.material = M('#0a0418'); break;
+    }
+    case 'clown_statue': {
+      const s = p.s || 1; C(g, 0.5 * s, 0.6 * s, 0.3, '#8a7a8a');
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.3 * s, 0.55 * s, 1.4 * s, 12), M('#f4f1ea')); body.position.y = 0.3 + 0.7 * s; g.add(body);
+      for (let i = 0; i < 3; i++) S(g, 0.08 * s, '#d6303a', 0, 0.6 + (0.3 + i * 0.35) * s, 0.42 * s - i * 0.04 * s);
+      const ruff = new THREE.Mesh(new THREE.TorusGeometry(0.34 * s, 0.12 * s, 6, 16), M('#ffffff')); ruff.rotation.x = Math.PI / 2; ruff.position.y = 0.3 + 1.45 * s; g.add(ruff);
+      S(g, 0.32 * s, '#f6f2ec', 0, 0.3 + 1.8 * s, 0); S(g, 0.08 * s, '#d6303a', 0, 0.3 + 1.78 * s, 0.31 * s);
+      const hat = new THREE.Mesh(new THREE.ConeGeometry(0.2 * s, 0.6 * s, 12), M('#2f5fd0')); hat.position.y = 0.3 + 2.35 * s; g.add(hat); S(g, 0.07 * s, '#ffd36a', 0, 0.3 + 2.68 * s, 0);
+      for (const sx of [-1, 1]) { S(g, 0.045 * s, '#111', 0.11 * sx * s, 0.3 + 1.9 * s, 0.28 * s); const tear = new THREE.Mesh(new THREE.ConeGeometry(0.025 * s, 0.1 * s, 6), M('#2f5fd0')); tear.rotation.x = Math.PI; tear.position.set(0.11 * sx * s, 0.3 + 1.78 * s, 0.3 * s); g.add(tear); }
+      const grin = new THREE.Mesh(new THREE.TorusGeometry(0.14 * s, 0.025 * s, 6, 16, Math.PI), M('#8e1c17')); grin.rotation.z = Math.PI; grin.position.set(0, 0.3 + 1.68 * s, 0.28 * s); g.add(grin);
+      break;
+    }
+    case 'cannon': {
+      for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.08, 6, 18), M('#ffd36a')); w.position.set(0.5 * s, 0.45, 0); w.rotation.y = Math.PI / 2; g.add(w); }
+      const barrel = C(g, 0.32, 0.42, 2.2, '#c0262d', 0, 0.2); barrel.geometry.translate(0, 0, 0); barrel.rotation.x = -1.1; barrel.position.set(0, 0.9, 0.2);
+      for (let i = 0; i < 3; i++) { const r = new THREE.Mesh(new THREE.TorusGeometry(0.38 - i * 0.03, 0.04, 6, 18), M('#ffd36a')); r.position.set(0, 0.6 + i * 0.35, -0.15 - i * 0.62); r.rotation.x = -1.1 + Math.PI / 2; g.add(r); }
+      break;
+    }
+    case 'star_lamp': {
+      C(g, 0.02, 0.02, (p.h || 3.2) - 0.3, '#333', 0, 0.3); const b = S(g, 0.16, '#fff6d0', 0, p.h || 3.2, 0, { emissive: p.on ? '#ffe0a0' : '#000', emissiveIntensity: p.on ? 2 : 0 });
+      if (p.on) { const l = new THREE.PointLight('#ffe9a8', 2.5, 5, 2); l.position.y = (p.h || 3.2) - 0.2; g.add(l); }
+      b.castShadow = false; break;
+    }
+    case 'burnt_beam': { const b = B(g, 3.0, 0.3, 0.3, '#1a120c', 0, 0.15); b.rotation.y = 0.2; const b2 = B(g, 2.2, 0.25, 0.25, '#120c08', 0.3, 0.3, 0.3); b2.rotation.set(0.1, -0.5, 0.25); for (let i = 0; i < 6; i++) S(g, 0.05, '#ff5a1a', (Math.random() - 0.5) * 2.4, 0.3, (Math.random() - 0.5) * 0.4, { emissive: '#ff3a0a', emissiveIntensity: 1.5 }); break; }
+    case 'juggling_pins': { for (let i = 0; i < 5; i++) { const pin = C(g, 0.02, 0.06, 0.4, i % 2 ? '#ffffff' : '#d6303a', (i - 2) * 0.12, 0, Math.sin(i) * 0.1); pin.rotation.z = Math.PI / 2 * (i % 2 ? 0.95 : 1.05); pin.position.y = 0.06; } break; }
+    case 'big_top': {
+      const r = p.r2 || 9, h = p.h || 8; const tex = canvasTex(512, 64, (x, w, hh) => { for (let i = 0; i < 16; i++) { x.fillStyle = i % 2 ? '#c0262d' : '#f4f1ea'; x.fillRect((w / 16) * i, 0, w / 16 + 1, hh); } });
+      const wall = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h * 0.45, 32, 1, true), new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide, roughness: 0.9 })); wall.position.y = h * 0.225; g.add(wall);
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(r * 1.05, h * 0.55, 32, 1, true), new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide, roughness: 0.9 })); roof.position.y = h * 0.45 + h * 0.275; g.add(roof);
+      C(g, 0.06, 0.06, 1.4, '#ffd36a', 0, h); const flag = B(g, 0.6, 0.35, 0.02, '#ff2a6a', 0.32, h + 1.0); g.userData.flag = flag; break;
+    }
+    case 'scarecrow': {
+      C(g, 0.05, 0.05, 2.0, '#5a3d27'); const arm = C(g, 0.04, 0.04, 1.6, '#5a3d27', 0, 1.5); arm.rotation.z = Math.PI / 2;
+      const shirt = B(g, 0.6, 0.7, 0.3, '#5a6a3a', 0, 1.0); for (const s of [-1, 1]) B(g, 0.5, 0.18, 0.2, '#5a6a3a', 0.5 * s, 1.45);
+      const head = S(g, 0.22, '#d8c08a', 0, 2.0, 0); head.scale.y = 1.1; const hat = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.4, 12), M('#6a5030')); hat.position.y = 2.32; g.add(hat);
+      for (const s of [-1, 1]) { const e = B(g, 0.07, 0.07, 0.02, '#111', 0.08 * s, 2.03, 0.2); e.rotation.z = 0.78; }
+      const stitch = B(g, 0.2, 0.02, 0.02, '#3a1a10', 0, 1.9, 0.21); stitch.castShadow = false;
+      for (let i = 0; i < 10; i++) { const st = C(g, 0.01, 0.005, 0.25, '#e8d08a', (Math.random() - 0.5) * 0.9, 1.3, (Math.random() - 0.5) * 0.2); st.rotation.z = (Math.random() - 0.5) * 2; }
+      break;
     }
     case 'none': break;
     default: B(g, 0.6, 0.6, 0.6, '#777');

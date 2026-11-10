@@ -422,7 +422,8 @@ const LOOK_ENUM = {
   acc: ['none', 'necklace', 'pendant', 'bell', 'scarf', 'bowtie', 'backpack', 'wings', 'batwings', 'cape', 'tail', 'balloon', 'teddy', 'lantern'],
   hair: ['none', 'short', 'bob', 'long', 'twintail', 'ponytail', 'bun', 'spiky', 'bowl'],
   outfit: ['plain', 'sailor', 'blazer', 'hanbok', 'shaman', 'reaper', 'priest', 'nurse', 'detective', 'maid', 'hoodie', 'pajama',
-    'police', 'doctor', 'chef', 'firefighter', 'pirate', 'witch', 'vampire', 'mummy', 'astronaut', 'ninja', 'santa', 'raincoat', 'tracksuit', 'dino', 'cowboy', 'kimono'],
+    'police', 'doctor', 'chef', 'firefighter', 'pirate', 'witch', 'vampire', 'mummy', 'astronaut', 'ninja', 'santa', 'raincoat', 'tracksuit', 'dino', 'cowboy', 'kimono',
+    'clown', 'ringmaster', 'magician', 'knight', 'princess', 'gothic', 'wizard', 'idol', 'hiphop', 'explorer', 'bee', 'panda'],
 };
 function sanitizeLook(l = {}) {
   const hex = (v, d) => (/^#[0-9a-f]{6}$/i.test(v) ? v : d);

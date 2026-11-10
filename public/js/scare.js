@@ -38,6 +38,81 @@ function dark(x, w, h, a = 0.85) { x.fillStyle = `rgba(0,0,0,${a})`; x.fillRect(
 
 // ── 22종
 const SCARES = {
+  // ── 새 놀래키기 ──
+  // 삐에로: 화면 가득 하얀 분칠 얼굴, 귀까지 찢어진 붉은 웃음, 뾰족한 이
+  clown(x, w, h, t) {
+    dark(x, w, h, 0.97); const cx = w / 2 + (R() - 0.5) * 24, cy = h / 2 + (R() - 0.5) * 24, s = Math.min(w, h) * (0.45 + t * 0.3);
+    for (const sx of [-1, 1]) { for (let i = 0; i < 26; i++) ell(x, cx + sx * s * (0.62 + R() * 0.25), cy - s * 0.2 + (R() - 0.5) * s * 0.6, s * 0.12, s * 0.12, i % 2 ? '#e8401a' : '#ff6a2a'); }
+    ell(x, cx, cy, s * 0.6, s * 0.78, '#f6f2ea'); veins(x, cx, cy, s * 0.7, 10, 'rgba(120,0,0,.35)');
+    for (const sx of [-1, 1]) { const ex = cx + sx * s * 0.24, ey = cy - s * 0.18; x.fillStyle = '#1a1a40'; x.beginPath(); x.moveTo(ex, ey - s * 0.22); x.lineTo(ex + s * 0.08, ey); x.lineTo(ex, ey + s * 0.26); x.lineTo(ex - s * 0.08, ey); x.fill(); ell(x, ex, ey, s * 0.09, s * 0.07, '#fff'); ell(x, ex, ey, s * 0.03 * (1 - t * 0.6), s * 0.05, '#000'); }
+    ell(x, cx, cy + s * 0.05, s * 0.12, s * 0.11, '#d0101a'); ell(x, cx - s * 0.04, cy + s * 0.01, s * 0.03, s * 0.025, 'rgba(255,255,255,.6)');
+    const mw = s * (0.5 + t * 0.12), my = cy + s * 0.38;
+    x.fillStyle = '#b0101a'; x.beginPath(); x.moveTo(cx - mw, my - s * 0.12); x.quadraticCurveTo(cx, my + s * 0.42, cx + mw, my - s * 0.12); x.quadraticCurveTo(cx, my + s * 0.12, cx - mw, my - s * 0.12); x.fill();
+    x.fillStyle = '#100'; x.beginPath(); x.moveTo(cx - mw * 0.8, my - s * 0.04); x.quadraticCurveTo(cx, my + s * 0.34 * (0.6 + t), cx + mw * 0.8, my - s * 0.04); x.quadraticCurveTo(cx, my + s * 0.1, cx - mw * 0.8, my - s * 0.04); x.fill();
+    x.fillStyle = '#fffbe8'; for (let i = 0; i < 14; i++) { const k = i / 13, tx = cx - mw * 0.75 + k * mw * 1.5, ty = my + s * 0.02 + Math.sin(k * Math.PI) * s * 0.12; x.beginPath(); x.moveTo(tx - s * 0.03, ty); x.lineTo(tx + s * 0.03, ty); x.lineTo(tx, ty + s * 0.08); x.fill(); }
+  },
+  // 깜짝 상자: 상자에서 용수철 목의 광대 머리가 튀어나온다
+  jackbox(x, w, h, t) {
+    dark(x, w, h, 0.95); const cx = w / 2, by = h * 0.98, s = Math.min(w, h) * 0.3;
+    x.fillStyle = '#a0141e'; x.fillRect(cx - s, by - s * 0.9, s * 2, s * 0.9); x.fillStyle = '#ffd36a'; for (let i = 0; i < 4; i++) x.fillRect(cx - s, by - s * 0.9 + i * s * 0.22, s * 2, s * 0.05);
+    const pop = Math.min(1, t * 3.2), top = by - s * 0.9 - pop * h * 0.55;
+    x.strokeStyle = '#b8bcc4'; x.lineWidth = 10; x.beginPath(); for (let i = 0; i <= 40; i++) { const k = i / 40, yy = by - s * 0.9 - (by - s * 0.9 - top) * k; x.lineTo(cx + Math.sin(k * 30) * s * 0.25, yy); } x.stroke();
+    const hs = s * (0.9 + t * 0.6);
+    x.save(); x.translate(cx, top); x.scale(hs / (Math.min(w, h) * 0.45), hs / (Math.min(w, h) * 0.45)); x.translate(-w / 2, -h / 2); SCARES.clownHead(x, w, h, t); x.restore();
+  },
+  clownHead(x, w, h, t) { const cx = w / 2, cy = h / 2, s = Math.min(w, h) * 0.45; ell(x, cx, cy, s * 0.6, s * 0.75, '#f6f2ea'); for (const sx of [-1, 1]) { ell(x, cx + sx * s * 0.24, cy - s * 0.15, s * 0.1, s * 0.14, '#000'); ell(x, cx + sx * s * 0.24, cy - s * 0.15, s * 0.03, s * 0.03, '#ff2a2a'); ell(x, cx + sx * s * 0.62, cy - s * 0.3, s * 0.22, s * 0.2, '#ff5a1a'); } ell(x, cx, cy + s * 0.05, s * 0.12, s * 0.11, '#d0101a'); x.strokeStyle = '#a0101a'; x.lineWidth = s * 0.08; x.beginPath(); x.arc(cx, cy + s * 0.12, s * 0.42, 0.15 * Math.PI, 0.85 * Math.PI); x.stroke(); },
+  // 풍선: 둥둥 떠오르는 풍선마다 사람 얼굴이 비친다
+  balloons(x, w, h, t) {
+    dark(x, w, h, 0.9); const C = ['#d6303a', '#ffd36a', '#2f5fd0', '#2fbf71', '#b39dff', '#ff6fa8'];
+    for (let i = 0; i < 16; i++) {
+      const k = ((i * 53) % 100) / 100, bx = w * (0.08 + k * 0.84), by = h * (1.15 - ((t * (0.9 + (i % 4) * 0.25) + i * 0.07) % 1.3)), r = Math.min(w, h) * (0.06 + (i % 3) * 0.03);
+      x.strokeStyle = 'rgba(220,220,220,.5)'; x.lineWidth = 1.5; x.beginPath(); x.moveTo(bx, by + r * 1.2); x.lineTo(bx + Math.sin(i + t * 5) * 10, by + r * 4); x.stroke();
+      ell(x, bx, by, r, r * 1.18, C[i % 6]); ell(x, bx - r * 0.3, by - r * 0.4, r * 0.22, r * 0.3, 'rgba(255,255,255,.35)');
+      ell(x, bx - r * 0.3, by - r * 0.1, r * 0.13, r * 0.18, '#000'); ell(x, bx + r * 0.3, by - r * 0.1, r * 0.13, r * 0.18, '#000'); ell(x, bx, by + r * 0.45, r * 0.22, r * 0.25 * (0.5 + t), '#000');
+    }
+    if (t > 0.6) { SCARES.clownHead(x, w, h, t); }
+  },
+  // 줄 인형: 천장에서 실에 매달린 인형이 툭 떨어져 얼굴 앞에서 멈춘다
+  marionette(x, w, h, t) {
+    dark(x, w, h, 0.96); const cx = w / 2 + Math.sin(t * 20) * 8, drop = Math.min(1, t * 2.5), cy = -h * 0.2 + drop * h * 0.65, s = Math.min(w, h) * 0.38;
+    x.strokeStyle = 'rgba(230,220,200,.7)'; x.lineWidth = 2; for (const ox of [-0.7, -0.3, 0, 0.3, 0.7]) { x.beginPath(); x.moveTo(cx + ox * s, 0); x.lineTo(cx + ox * s * 0.8, cy + s * (ox ? 0.9 : -0.4)); x.stroke(); }
+    ell(x, cx, cy, s * 0.5, s * 0.6, '#e8d4b8'); ell(x, cx - s * 0.22, cy + s * 0.1, s * 0.08, s * 0.06, '#e05a6a'); ell(x, cx + s * 0.22, cy + s * 0.1, s * 0.08, s * 0.06, '#e05a6a');
+    for (const sx of [-1, 1]) { ell(x, cx + sx * s * 0.18, cy - s * 0.12, s * 0.09, s * 0.11, '#fff'); ell(x, cx + sx * s * 0.18 + (R() - 0.5) * 6, cy - s * 0.12, s * 0.04, s * 0.05, '#000'); }
+    const jaw = s * (0.08 + Math.abs(Math.sin(t * 18)) * 0.25); x.fillStyle = '#000'; x.fillRect(cx - s * 0.18, cy + s * 0.28, s * 0.36, jaw); x.fillStyle = '#e8d4b8'; x.fillRect(cx - s * 0.2, cy + s * 0.28 + jaw, s * 0.4, s * 0.14);
+    x.strokeStyle = '#2a1a10'; x.lineWidth = 3; for (const sx of [-1, 1]) { x.beginPath(); x.moveTo(cx + sx * s * 0.2, cy + s * 0.28); x.lineTo(cx + sx * s * 0.2, cy + s * 0.5 + jaw); x.stroke(); }
+  },
+  // 거미처럼 천장을 기는 여자: 위에서 거꾸로 매달린 얼굴과 사방으로 꺾인 팔다리
+  crawler(x, w, h, t) {
+    dark(x, w, h, 0.92); const cx = w / 2, cy = h * (0.15 + Math.min(1, t * 2) * 0.35), s = Math.min(w, h) * 0.35;
+    x.strokeStyle = '#b8c0bc'; x.lineCap = 'round';
+    for (let i = 0; i < 4; i++) { const sx = i % 2 ? 1 : -1, sy = i < 2 ? -1 : 1; x.lineWidth = 22; x.beginPath(); x.moveTo(cx, cy); const kx = cx + sx * s * 1.1, ky = cy + sy * s * 0.4 - s * 0.3; x.lineTo(kx, ky); x.lineTo(kx + sx * s * 0.5, ky + s * 0.9 + Math.sin(t * 30 + i) * 10); x.stroke(); }
+    x.save(); x.translate(cx, cy); x.rotate(Math.PI); x.translate(-cx, -cy); hair(x, cx, cy, s * 0.9, 60); paleFace(x, cx, cy, s * 0.8); hollowEyes(x, cx, cy, s * 0.8, t); mouth(x, cx, cy + s * 0.34, s * 0.8, t); x.restore();
+  },
+  // 단장: 실크햇 아래 금빛 눈, 상어 같은 이빨
+  ringmaster(x, w, h, t) {
+    dark(x, w, h, 0.97); const cx = w / 2, cy = h * 0.58, s = Math.min(w, h) * (0.42 + t * 0.2);
+    x.fillStyle = '#0a0a0e'; x.fillRect(cx - s * 0.42, cy - s * 1.45, s * 0.84, s * 0.85); ell(x, cx, cy - s * 0.6, s * 0.85, s * 0.1, '#0a0a0e'); x.fillStyle = '#7a0a14'; x.fillRect(cx - s * 0.42, cy - s * 0.78, s * 0.84, s * 0.12);
+    ell(x, cx, cy, s * 0.55, s * 0.66, '#c8b8a8');
+    for (const sx of [-1, 1]) { ell(x, cx + sx * s * 0.2, cy - s * 0.12, s * 0.1, s * 0.07, '#ffcc33'); ell(x, cx + sx * s * 0.2, cy - s * 0.12, s * 0.015, s * 0.06, '#000'); x.strokeStyle = '#1a1010'; x.lineWidth = s * 0.05; x.beginPath(); x.moveTo(cx, cy + s * 0.12); x.quadraticCurveTo(cx + sx * s * 0.3, cy + s * 0.05, cx + sx * s * 0.45, cy - s * 0.08); x.stroke(); }
+    const mw = s * 0.4, my = cy + s * 0.32, op = s * (0.08 + t * 0.2); ell(x, cx, my, mw, op, '#200'); x.fillStyle = '#f4f0e0';
+    for (let i = 0; i < 12; i++) { const tx = cx - mw * 0.9 + (i / 11) * mw * 1.8; x.beginPath(); x.moveTo(tx - 7, my - op * 0.8); x.lineTo(tx + 7, my - op * 0.8); x.lineTo(tx, my - op * 0.1); x.fill(); x.beginPath(); x.moveTo(tx - 7, my + op * 0.8); x.lineTo(tx + 7, my + op * 0.8); x.lineTo(tx, my + op * 0.1); x.fill(); }
+  },
+  // 어둠 속 웃음들: 사방에서 하얀 미소만 떠오른다
+  smiles(x, w, h, t) {
+    dark(x, w, h, 0.98); const n = 10 + Math.floor(t * 30);
+    for (let i = 0; i < n; i++) { const k1 = ((i * 97) % 100) / 100, k2 = ((i * 61) % 100) / 100, sx = w * k1, sy = h * k2, r = Math.min(w, h) * (0.03 + ((i * 13) % 7) * 0.01);
+      x.strokeStyle = `rgba(255,255,255,${0.4 + (i % 3) * 0.2})`; x.lineWidth = r * 0.25; x.beginPath(); x.arc(sx, sy, r, 0.1 * Math.PI, 0.9 * Math.PI); x.stroke(); ell(x, sx - r * 0.5, sy - r * 0.6, r * 0.12, r * 0.12, '#fff'); ell(x, sx + r * 0.5, sy - r * 0.6, r * 0.12, r * 0.12, '#fff'); }
+    if (t > 0.55) { const s = Math.min(w, h) * 0.5 * (t - 0.4); x.strokeStyle = '#fff'; x.lineWidth = s * 0.1; x.beginPath(); x.arc(w / 2, h / 2, s, 0.1 * Math.PI, 0.9 * Math.PI); x.stroke(); ell(x, w / 2 - s * 0.45, h / 2 - s * 0.5, s * 0.1, s * 0.13, '#f00'); ell(x, w / 2 + s * 0.45, h / 2 - s * 0.5, s * 0.1, s * 0.13, '#f00'); }
+  },
+  // 낡은 TV: 지직거리는 화면 속 얼굴이 화면 밖으로 손을 뻗는다
+  tv(x, w, h, t) {
+    x.fillStyle = '#0a0806'; x.fillRect(0, 0, w, h); const tw = Math.min(w * 0.8, h * 1.0), th = tw * 0.72, tx = (w - tw) / 2, ty = (h - th) / 2;
+    x.fillStyle = '#3a2a1a'; x.fillRect(tx - 30, ty - 30, tw + 60, th + 60); const img = x.createImageData(Math.max(1, Math.floor(tw / 4)), Math.max(1, Math.floor(th / 4)));
+    for (let i = 0; i < img.data.length; i += 4) { const v = R() * 255; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255; }
+    const c2 = document.createElement('canvas'); c2.width = img.width; c2.height = img.height; c2.getContext('2d').putImageData(img, 0, 0); x.imageSmoothingEnabled = false; x.drawImage(c2, tx, ty, tw, th);
+    if (t > 0.25) { x.save(); x.globalAlpha = Math.min(1, (t - 0.25) * 3); const s = th * 0.45 * (1 + (t - 0.25) * 0.8); hair(x, w / 2, h / 2, s); paleFace(x, w / 2, h / 2, s); hollowEyes(x, w / 2, h / 2, s, t); mouth(x, w / 2, h / 2 + s * 0.42, s, t); x.restore(); }
+    for (let y = 0; y < h; y += 4) { x.fillStyle = 'rgba(0,0,0,.25)'; x.fillRect(0, y, w, 2); }
+  },
   // 1. 긴 머리 여자 얼굴
   face(x, w, h, t) { const cx = w / 2 + (R() - 0.5) * 30, cy = h / 2 + (R() - 0.5) * 30, s = Math.min(w, h) * 0.42 * (1 + t * 0.35); dark(x, w, h); hair(x, cx, cy, s); paleFace(x, cx, cy, s); veins(x, cx, cy, s); hollowEyes(x, cx, cy, s, t); mouth(x, cx, cy + s * 0.42, s, t); },
   // 2. 아이 얼굴
@@ -184,15 +259,16 @@ const SCARES = {
 
 // 시나리오별로 어울리는 놀래키기
 const POOLS = {
-  gwimun: ['face', 'child', 'hands', 'upside', 'faces', 'longneck', 'faceless', 'writing', 'eye', 'hang'],
+  gwimun: ['face', 'child', 'hands', 'upside', 'faces', 'longneck', 'faceless', 'writing', 'eye', 'hang', 'crawler', 'tv'],
   ophelia: ['drowned', 'hands', 'handprints', 'static', 'eye', 'faces', 'skull', 'shadow', 'blood', 'writing'],
-  doll: ['doll', 'child', 'teeth', 'mirror', 'eyes', 'writing', 'faces', 'hang', 'blood', 'shadow'],
-  hospital: ['face', 'hands', 'faceless', 'static', 'blood', 'writing', 'eye', 'shadow', 'longneck', 'upside'],
-  camp: ['child', 'drowned', 'handprints', 'faces', 'eye', 'shadow', 'longneck', 'writing'],
-  west: ['hang', 'faces', 'shadow', 'eye', 'skull', 'longneck', 'writing'],
-  kimono: ['face', 'faceless', 'longneck', 'upside', 'hands', 'eye', 'writing', 'faces'],
+  doll: ['doll', 'child', 'teeth', 'mirror', 'eyes', 'writing', 'faces', 'hang', 'blood', 'shadow', 'marionette', 'smiles'],
+  hospital: ['face', 'hands', 'faceless', 'static', 'blood', 'writing', 'eye', 'shadow', 'longneck', 'upside', 'tv', 'crawler'],
+  camp: ['child', 'drowned', 'handprints', 'faces', 'eye', 'shadow', 'longneck', 'writing', 'smiles', 'crawler'],
+  west: ['hang', 'faces', 'shadow', 'eye', 'skull', 'longneck', 'writing', 'ringmaster', 'tv'],
+  kimono: ['face', 'faceless', 'longneck', 'upside', 'hands', 'eye', 'writing', 'faces', 'crawler', 'tv'],
+  clown: ['clown', 'jackbox', 'balloons', 'marionette', 'ringmaster', 'smiles', 'clown', 'crawler', 'tv', 'teeth'],
 };
-export const SCARE_TYPES = Object.keys(SCARES);
+export const SCARE_TYPES = Object.keys(SCARES).filter((k) => k !== 'clownHead');
 
 // type: 'face' 같은 지정형, 또는 'random'. scenario 에 맞춰 같은 계열 중에서 무작위로 바꿔 준다.
 export function pickScare(type, scenario = 'gwimun') {
@@ -202,7 +278,7 @@ export function pickScare(type, scenario = 'gwimun') {
   return SCARES[type] ? type : pool[0];
 }
 
-const SOUND = { eye: 'growl', teeth: 'growl', static: 'glitch', writing: 'glitch', eyes: 'growl', skull: 'scream', drowned: 'scream_wet', doll: 'scream_child', child: 'scream_child', faceless: 'sting', shadow: 'growl', mirror: 'glass', handprints: 'bang', hang: 'creak', blood: 'scream' };
+const SOUND = { clown: 'clown_laugh', jackbox: 'jackbox', balloons: 'pop', marionette: 'creak', crawler: 'scream', ringmaster: 'growl', smiles: 'giggle', tv: 'glitch', eye: 'growl', teeth: 'growl', static: 'glitch', writing: 'glitch', eyes: 'growl', skull: 'scream', drowned: 'scream_wet', doll: 'scream_child', child: 'scream_child', faceless: 'sting', shadow: 'growl', mirror: 'glass', handprints: 'bang', hang: 'creak', blood: 'scream' };
 
 export function jumpscare(type, audio) {
   const c = cv();

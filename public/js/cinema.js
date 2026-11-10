@@ -508,6 +508,49 @@ export class Cinema {
     ];
   }
 
+  // ── 삐에로 (블루문 서커스)
+  buildClown(looks) {
+    return this.set('clown', (g) => {
+      g.position.set(3200, 0, 0);
+      const gr = new THREE.Mesh(new THREE.PlaneGeometry(70, 50), new THREE.MeshStandardMaterial({ color: '#2a1a22', roughness: 1 })); gr.rotation.x = -Math.PI / 2; g.add(gr);
+      this.prop(g, { t: 'big_top', x: 0, z: -10, r2: 8, h: 9 });
+      this.prop(g, { t: 'ticket_booth', x: -6, z: 2, r: 40 }); this.prop(g, { t: 'balloon_stand', x: 5, z: 3 }); this.prop(g, { t: 'popcorn_cart', x: 7, z: -1, r: -40 });
+      this.prop(g, { t: 'lantern_string', x: 0, z: 0, len: 14 }); this.prop(g, { t: 'clown_statue', x: -3, z: 6, r: 160 }); this.prop(g, { t: 'jack_box', x: 3.5, z: -3.5 });
+      this.poppy = createAvatar({ outfit: 'clown', extra: 'clown', hair: 'spiky', hairColor: '#ff4a1a', ears: 'none', eyes: 'smile', mouth: 'grin', cheeks: 'none', body: '#f6f2ea', accent: '#d6303a', hat: 'none' });
+      this.poppy.position.set(0.6, 0, 2.5); g.add(this.poppy);
+      this.byul = createAvatar({ outfit: 'plain', hair: 'twintail', hairColor: '#2b1d16', ears: 'none', eyes: 'sparkle', mouth: 'open', cheeks: 'blush', body: '#ffe0cc', accent: '#d6303a', hat: 'none', acc: 'teddy' });
+      this.byul.position.set(-0.6, 0, 2.5); this.byul.scale.setScalar(0.75); g.add(this.byul);
+      this.clownCrew = (looks.length ? looks : [{}]).slice(0, 4).map((l, i) => { const a = createAvatar(l); a.position.set(-2 + i * 1.2, 0, 12); a.rotation.y = Math.PI; g.add(a); return a; });
+      this.clownFire = new THREE.PointLight('#ff6a20', 0, 30, 1.6); this.clownFire.position.set(0, 4, -8); g.add(this.clownFire);
+      this.clownHemi = new THREE.HemisphereLight('#a07ab0', '#1a0a14', 0.9); g.add(this.clownHemi);
+      const moon = new THREE.DirectionalLight('#c8b0ff', 0.6); moon.position.set(-8, 12, 6); g.add(moon);
+    });
+  }
+  clownShots(kind, looks) {
+    const A = () => this.audio;
+    this.buildClown(looks);
+    const X = 3200;
+    if (kind === 'clown_intro') return [
+      { dur: 9, caption: '2026년 12월 24일 밤 8시.\n27년 전 문을 닫은 폐유원지, 블루문 랜드.', setup: (c) => { c.show('clown'); c.night(0.035, '#0e0610'); c.poppy.visible = false; c.byul.visible = false; c.clownFire.intensity = 0; A()?.ambient('clown'); },
+        update: (c, t, k, dt) => { c.clownCrew.forEach((a) => { a.position.z = 12 - t * 0.7; animateAvatar(a, dt, true, t); }); c.look(X + 4 - k * 4, 2.2, 20 - k * 4, X, 2.5, -4); } },
+      { dur: 10, sepia: true, caption: '1998년 12월 24일, 블루문 서커스의 고별 공연.\n맨 앞줄 7번, 여덟 살 은별이는 삐에로 뽀삐를 보러 왔다.', setup: (c) => { c.show('clown'); c.scene.background = new THREE.Color('#d8b8a0'); c.scene.fog = new THREE.Fog('#d8b8a0', 18, 70); c.clownCrew.forEach((a) => (a.visible = false)); c.poppy.visible = true; c.byul.visible = true; c.poppy.rotation.y = -0.5; c.byul.rotation.y = 0.5; A()?.ambient(null); A()?.play('jackbox'); },
+        update: (c, t, k, dt) => { animateAvatar(c.poppy, dt, false, t, false, 'wave', t); animateAvatar(c.byul, dt, false, t, false, 'heart', t); c.look(X + 2.4, 1.5, 7 - k, X, 1.0, 2.5); } },
+      { dur: 8, caption: '그날 밤 천막에 불이 났다.\n아이와 광대는 끝내 돌아오지 않았다.', capAt: 1.2, setup: (c) => { c.show('clown'); c.night(0.05, '#1a0404'); c.poppy.visible = false; c.byul.visible = false; A()?.play(c.fear >= 2 ? 'scream' : 'whisper'); },
+        update: (c, t, k) => { c.clownFire.intensity = 25 + Math.random() * 25; c.look(X, 3 + k, 12 - k * 4, X, 4, -10); } },
+      { dur: 5, setup: (c) => { c.show(); c.scene.background = new THREE.Color('#000'); c.title('삐에로', '— 블루문 서커스의 마지막 앵콜 —'); A()?.play(c.fear >= 2 ? 'clown_laugh' : 'calliope_far'); } },
+    ];
+    if (kind === 'clown_true') return [
+      { dur: 11, caption: '"앵콜!"\n은별이가 뽀삐의 얼굴에 빨간 코를 달아 주었다.', setup: (c) => { c.show('clown'); c.scene.background = new THREE.Color('#ffd0b8'); c.scene.fog = new THREE.Fog('#ffd0b8', 20, 80); c.clownHemi.intensity = 2.2; c.clownFire.intensity = 0; c.clownCrew.forEach((a) => (a.visible = false)); c.poppy.visible = true; c.byul.visible = true; c.poppy.rotation.y = 0; c.byul.rotation.y = 0; A()?.play('musicbox'); },
+        update: (c, t, k, dt) => { animateAvatar(c.poppy, dt, false, t, false, t < 6 ? 'bow' : 'wave', t); animateAvatar(c.byul, dt, false, t, false, t < 6 ? 'bow' : 'jump', t); c.look(X, 1.7, 8 - k * 1.5, X, 1.1, 2.5); } },
+      { dur: 5, setup: (c) => { c.show(); c.scene.background = new THREE.Color('#000'); c.title('마지막 앵콜', '불길 속으로 돌아간 광대 · 28년 만의 누명 해제'); A()?.play('bell'); } },
+    ];
+    return [
+      { dur: 8, caption: '일주일 뒤, 영상의 마지막 프레임.\n천막 입구에 새 포스터가 붙어 있었다.', setup: (c) => { c.show('clown'); c.night(0.05, '#0a0408'); c.poppy.visible = false; c.byul.visible = false; c.clownFire.intensity = 0; A()?.ambient('horror'); },
+        update: (c, t, k, dt) => { c.clownCrew.forEach((a) => animateAvatar(a, dt, false, t, false, 'shiver', t)); c.look(X, 1.8, 16 - k * 3, X, 1.4, 11); } },
+      { dur: 5, setup: (c) => { c.show(); c.scene.background = new THREE.Color('#000'); c.title('새 단원 모집 완료', '은별의 물건을 모두 찾으면, 다른 결말이…'); A()?.play(c.fear >= 2 ? 'clown_laugh' : 'whisper'); } },
+    ];
+  }
+
   // ── 재생
   play(kind, { looks = [], audio, fear = 2 } = {}) {
     this.clear();
@@ -562,6 +605,7 @@ export class Cinema {
     if (kind.startsWith('camp')) return this.campShots(kind, looks);
     if (kind.startsWith('west')) return this.westShots(kind, looks);
     if (kind.startsWith('kimono')) return this.kimonoShots(kind, looks);
+    if (kind.startsWith('clown')) return this.clownShots(kind, looks);
     if (kind === 'prologue') {
       this.buildRoad(); this.buildSchool(); this.buildCircle(); this.buildStop(looks);
       return [
