@@ -1,35 +1,164 @@
 import * as THREE from 'three';
 
 // 귀신 종류: woman(하얀 여자) · janitor(소사) · elder(이장, 꺾인 목) · mudang(거꾸로 기는 무당) · child
-const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9, ...o });
+// 재질 · 지오메트리는 종류별로 한 번만 만들어 돌려 쓴다 (귀신이 나타났다 사라질 때마다 새로 만들지 않음)
+const MC = new Map();
+const keyOf = (o) => JSON.stringify(o, (k, v) => (v && v.isTexture ? v.uuid : v));
+const M = (c, o = {}) => { const k = c + keyOf(o); let m = MC.get(k); if (!m) { m = new THREE.MeshStandardMaterial({ color: c, roughness: 0.9, ...o }); MC.set(k, m); } return m; };
 const PALE = () => M('#c9d1cd', { emissive: '#23303a', emissiveIntensity: 0.7 });
-const HAIR = () => M('#040404', { roughness: 1, side: THREE.DoubleSide });
+const HAIR = () => M('#040404', { roughness: 0.35, metalness: 0.1, side: THREE.DoubleSide });
+const GC = new Map();
+const GG = (key, make) => { let g = GC.get(key); if (!g) { g = make(); GC.set(key, g); } return g; };
+const r3 = (v) => Math.round(v * 1000) / 1000;
 
-function eyes(parent, y, z, spread = 0.055, size = 0.024) {
-  const em = new THREE.MeshBasicMaterial({ color: '#ff2a1a' });
-  for (const s of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(size, 8, 6), em); e.position.set(spread * s, y, z); parent.add(e); }
+// 부드러운 원형 빛 (눈빛 · 안개)
+let _glow = null, _fog = null;
+function glowTex() { if (_glow) return _glow; const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); const g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.25, 'rgba(255,255,255,.55)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return (_glow = new THREE.CanvasTexture(c)); }
+function fogTexture() { if (_fog) return _fog; const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(0,0,0,.8)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); return (_fog = new THREE.CanvasTexture(c)); }
+
+function eyes(parent, y, z, spread = 0.055, size = 0.024, color = '#ff2a1a') {
+  const em = M(color, { emissive: color, emissiveIntensity: 3, roughness: 0.2 });
+  const gm = GG('eyeglow' + color, () => new THREE.SpriteMaterial({ map: glowTex(), color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.75 }));
+  for (const s of [-1, 1]) {
+    const e = new THREE.Mesh(GG('eye' + r3(size), () => new THREE.SphereGeometry(size, 10, 8)), em); e.position.set(spread * s, y, z); parent.add(e);
+    // 동공 (눈동자 한가운데 검은 점) + 번지는 눈빛
+    const pu = new THREE.Mesh(GG('pupil' + r3(size), () => new THREE.SphereGeometry(size * 0.38, 8, 6)), M('#000000')); pu.position.set(0, 0, size * 0.75); e.add(pu);
+    const halo = new THREE.Sprite(gm); halo.scale.setScalar(size * 9); e.add(halo);
+  }
+}
+// 끝이 가늘어지며 바깥으로 휘는 머리카락 한 가닥 (길이별로 지오메트리 공유)
+function strandGeo(len) {
+  return GG('strand' + r3(len), () => {
+    const g = new THREE.PlaneGeometry(0.042, len, 1, 8); g.translate(0, -len / 2, 0);
+    const p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) { const t = -p.getY(i) / len; p.setX(i, p.getX(i) * (1 - t * 0.65)); p.setZ(i, t * t * 0.09 + Math.sin(t * 9) * 0.008); }
+    g.computeVertexNormals(); return g;
+  });
 }
 function hairStrands(parent, count, top, len, radius, y) {
   const strands = [];
+  const geo = strandGeo(len);
+  count = Math.round(count * 1.6); // 가늘고 촘촘하게
   for (let i = 0; i < count; i++) {
-    const a = (i / count) * Math.PI * 2;
-    const s = new THREE.Mesh(new THREE.PlaneGeometry(0.06, len * (0.75 + Math.random() * 0.5), 1, 6), HAIR());
-    s.geometry.translate(0, -s.geometry.parameters.height / 2, 0);
-    s.position.set(Math.sin(a) * radius, y, Math.cos(a) * radius);
-    s.rotation.y = a;
+    const a = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.12;
+    const s = new THREE.Mesh(geo, HAIR());
+    s.scale.y = 0.75 + Math.random() * 0.5; s.scale.x = 0.7 + Math.random() * 0.7;
+    s.position.set(Math.sin(a) * radius, y + (Math.random() - 0.5) * 0.03, Math.cos(a) * radius);
+    s.rotation.y = a; s.rotation.z = (Math.random() - 0.5) * 0.18;
     parent.add(s); strands.push(s);
   }
   return strands;
 }
+// 옷감: 위는 깨끗하고 아래로 갈수록 흙·핏물에 젖은 얼룩 (같은 그림을 모든 귀신이 함께 쓴다)
+let _cloth = null;
+function clothTex() {
+  if (_cloth) return _cloth;
+  const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d');
+  x.fillStyle = '#ffffff'; x.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 24; i++) { const px = (i / 24) * 256; const g = x.createLinearGradient(px, 0, px + 10, 0); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(0.5, 'rgba(0,0,0,.12)'); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(px, 0, 10, 256); }
+  const dirt = x.createLinearGradient(0, 120, 0, 256); dirt.addColorStop(0, 'rgba(70,60,45,0)'); dirt.addColorStop(1, 'rgba(50,40,30,.75)'); x.fillStyle = dirt; x.fillRect(0, 120, 256, 136);
+  for (let i = 0; i < 18; i++) { const px = Math.random() * 256, py = 80 + Math.random() * 140; x.fillStyle = `rgba(110,10,10,${0.25 + Math.random() * 0.35})`; x.beginPath(); x.ellipse(px, py, 3 + Math.random() * 12, 3 + Math.random() * 9, Math.random() * 3, 0, 7); x.fill(); x.fillRect(px - 1, py, 2, 10 + Math.random() * 40); }
+  for (let i = 0; i < 1600; i++) { x.fillStyle = `rgba(0,0,0,${Math.random() * 0.07})`; x.fillRect(Math.random() * 256, Math.random() * 256, 2, 2); }
+  _cloth = new THREE.CanvasTexture(c); _cloth.colorSpace = THREE.SRGBColorSpace; _cloth.wrapS = THREE.RepeatWrapping; return _cloth;
+}
 // 너덜너덜한 옷자락
 function tatteredCone(r, h, color, opacity = 0.93) {
-  const geo = new THREE.ConeGeometry(r, h, 24, 6, true);
+  const geo = new THREE.ConeGeometry(r, h, 28, 8, true);
   const p = geo.attributes.position;
-  for (let i = 0; i < p.count; i++) { const y = p.getY(i); if (y < -h / 2 + 0.01) p.setY(i, y + Math.random() * 0.3); else { p.setX(i, p.getX(i) * (1 + (Math.random() - 0.5) * 0.08)); } }
+  for (let i = 0; i < p.count; i++) { const y = p.getY(i); const a = Math.atan2(p.getZ(i), p.getX(i)); if (y < -h / 2 + 0.01) p.setY(i, y + Math.random() * 0.3); else { p.setX(i, p.getX(i) * (1 + Math.sin(a * 9 + y * 4) * 0.05 + (Math.random() - 0.5) * 0.04)); p.setZ(i, p.getZ(i) * (1 + Math.sin(a * 9 + y * 4) * 0.05)); } }
   geo.computeVertexNormals();
-  return new THREE.Mesh(geo, M(color, { transparent: true, opacity, side: THREE.DoubleSide, emissive: '#1a2028', emissiveIntensity: 0.5 }));
+  return new THREE.Mesh(geo, M(color, { map: clothTex(), transparent: true, opacity, side: THREE.DoubleSide, emissive: '#1a2028', emissiveIntensity: 0.5 }));
 }
-function limb(len, r, mat) { const g = new THREE.Group(); const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.8, len, 6), mat); m.position.y = -len / 2; g.add(m); g.userData.len = len; return g; }
+function limb(len, r, mat) { const g = new THREE.Group(); const m = new THREE.Mesh(GG(`limb${r3(len)},${r3(r)}`, () => new THREE.CylinderGeometry(r, r * 0.8, len, 7)), mat); m.position.y = -len / 2; g.add(m); g.userData.len = len; return g; }
+// 길고 앙상한 손가락 (팔 끝에 붙인다)
+function claws(arm, k = 1, mat = PALE()) {
+  const len = arm.userData.len; const fg = GG('finger' + r3(k), () => new THREE.CylinderGeometry(0.009 * k, 0.004 * k, 0.15 * k, 4).translate(0, -0.075 * k, 0));
+  for (let i = 0; i < 4; i++) { const f = new THREE.Mesh(fg, mat); f.position.set((i - 1.5) * 0.018 * k, -len - 0.02 * k, 0.01 * k); f.rotation.z = (i - 1.5) * 0.18; f.rotation.x = -0.25 - (i % 2) * 0.12; arm.add(f); }
+  const th = new THREE.Mesh(fg, mat); th.position.set(0.035 * k, -len + 0.01, 0.02 * k); th.rotation.z = 0.8; th.scale.y = 0.6; arm.add(th);
+}
+
+// ───── 얼굴 그림 (머리 구에 감싸는 텍스처: 가로 = 머리 둘레, 세로 = 정수리→턱. 얼굴 정면은 가로 1/4 지점)
+const FACE = {
+  woman: { skin: '#c4cdc9', style: 'pale' }, child: { skin: '#b8c2be', style: 'pale' }, mudang: { skin: '#c9d1cd', style: 'pale' }, crawler: { skin: '#c9d1cd', style: 'pale' }, headless: { skin: '#c4ccc8', style: 'pale' },
+  janitor: { skin: '#b8c0b4', style: 'gaunt' }, father: { skin: '#c8c0b4', style: 'gaunt' }, elder: { skin: '#a8a090', style: 'old' }, sailor: { skin: '#8fa39a', style: 'bloated' },
+  doll: { skin: '#f4ece4', style: 'porcelain' }, clown: { skin: '#f8f6f0', style: 'clown' }, ringmaster: { skin: '#c8b8a8', style: 'sallow' }, marionette: { skin: '#e8d4b8', style: 'wood' },
+  scarecrow: { skin: '#c8b080', style: 'burlap' }, nurse: { skin: '#efe6d4', style: 'gauze' }, dalgyal: { skin: '#f6f4ee', style: 'egg' }, slender: { skin: '#f4f4f2', style: 'egg' },
+};
+const FT = new Map();
+function faceTex(type) {
+  const f = FACE[type]; if (!f) return null;
+  if (FT.has(type)) return FT.get(type);
+  const W = 512, H = 256, cx = 128, ey = 124, my = 170;
+  const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+  const R = (() => { let s = type.length * 977; return () => ((s = (s * 16807) % 2147483647) / 2147483647); })();
+  x.fillStyle = f.skin; x.fillRect(0, 0, W, H);
+  // 피부 얼룩 · 모공
+  for (let i = 0; i < 2600; i++) { x.fillStyle = `rgba(${R() > 0.5 ? '255,255,255' : '40,30,40'},${R() * 0.05})`; x.fillRect(R() * W, R() * H, 2, 2); }
+  const blot = (bx, by, r, col) => { const g = x.createRadialGradient(bx, by, 0, bx, by, r); g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(bx - r, by - r, r * 2, r * 2); };
+  const vein = (sx, sy, n, col, len = 18) => { x.strokeStyle = col; x.lineWidth = 1.2; for (let k = 0; k < n; k++) { let px = sx, py = sy; x.beginPath(); x.moveTo(px, py); for (let j = 0; j < 5; j++) { px += (R() - 0.5) * len; py += (R() - 0.3) * len * 0.8; x.lineTo(px, py); } x.stroke(); } };
+  const sockets = (r = 24, col = 'rgba(0,0,0,.85)') => { for (const s of [-1, 1]) blot(cx + s * 24, ey, r, col); };
+  const streak = (sx, sy, len, col, w = 3) => { const g = x.createLinearGradient(0, sy, 0, sy + len); g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.beginPath(); x.moveTo(sx - w / 2, sy); x.quadraticCurveTo(sx + 3, sy + len * 0.5, sx, sy + len); x.lineTo(sx + w / 2, sy); x.fill(); };
+  switch (f.style) {
+    case 'pale':
+      blot(cx, ey + 10, 70, 'rgba(60,80,90,.25)'); sockets(26, 'rgba(10,8,14,.92)');
+      for (const s of [-1, 1]) { vein(cx + s * 52, ey - 20, 4, 'rgba(70,40,90,.45)'); streak(cx + s * 24, ey + 12, 70, 'rgba(90,0,0,.85)', 4); }
+      blot(cx, my, 22, 'rgba(20,0,0,.6)'); x.strokeStyle = 'rgba(90,20,30,.8)'; x.lineWidth = 2; for (let i = -3; i <= 3; i++) { x.beginPath(); x.moveTo(cx + i * 5, my - 9); x.lineTo(cx + i * 5 + 1, my - 3); x.stroke(); }
+      streak(cx + 6, my + 8, 55, 'rgba(70,0,0,.8)', 5); break;
+    case 'gaunt':
+      sockets(28, 'rgba(0,0,0,.9)'); for (const s of [-1, 1]) { blot(cx + s * 40, ey + 34, 26, 'rgba(30,30,20,.45)'); } blot(cx, my + 20, 30, 'rgba(30,30,20,.35)');
+      x.strokeStyle = 'rgba(30,10,10,.85)'; x.lineWidth = 2; x.beginPath(); x.moveTo(cx - 30, my); x.lineTo(cx + 30, my); x.stroke(); for (let i = -4; i <= 4; i++) { x.beginPath(); x.moveTo(cx + i * 7, my - 6); x.lineTo(cx + i * 7 + 2, my + 7); x.stroke(); }
+      for (let i = 0; i < 300; i++) { x.fillStyle = 'rgba(30,30,30,.35)'; x.fillRect(cx - 40 + R() * 80, my + 6 + R() * 40, 1, 2); } break;
+    case 'old':
+      sockets(22, 'rgba(20,10,5,.8)'); x.strokeStyle = 'rgba(60,40,25,.55)'; x.lineWidth = 1.4;
+      for (let i = 0; i < 5; i++) { x.beginPath(); x.moveTo(cx - 50, ey - 40 - i * 7); x.quadraticCurveTo(cx, ey - 46 - i * 7, cx + 50, ey - 40 - i * 7); x.stroke(); }
+      for (const s of [-1, 1]) { for (let i = 0; i < 3; i++) { x.beginPath(); x.moveTo(cx + s * 44, ey - 6 + i * 6); x.lineTo(cx + s * 60, ey - 10 + i * 9); x.stroke(); } x.beginPath(); x.moveTo(cx + s * 16, ey + 30); x.quadraticCurveTo(cx + s * 26, my - 4, cx + s * 22, my + 12); x.stroke(); }
+      for (let i = 0; i < 16; i++) blot(R() * W, R() * H, 4 + R() * 6, 'rgba(90,60,30,.4)'); break;
+    case 'bloated':
+      for (let i = 0; i < 30; i++) blot(R() * W, R() * H, 8 + R() * 22, `rgba(${30 + R() * 30},${60 + R() * 40},${40 + R() * 30},.35)`);
+      sockets(30, 'rgba(0,10,10,.85)'); for (let i = 0; i < 40; i++) { x.fillStyle = 'rgba(200,210,190,.6)'; x.beginPath(); x.arc(R() * W, R() * H, 1.5 + R() * 3, 0, 7); x.fill(); }
+      for (const s of [-1, 1]) vein(cx + s * 40, ey + 20, 5, 'rgba(20,60,50,.6)', 22); x.strokeStyle = 'rgba(40,70,40,.8)'; x.lineWidth = 4; for (let i = 0; i < 6; i++) { x.beginPath(); const px = R() * W; x.moveTo(px, 0); x.bezierCurveTo(px + 10, 50, px - 10, 90, px + 4, 120); x.stroke(); } break;
+    case 'porcelain':
+      blot(cx - 40, my - 14, 18, 'rgba(255,120,140,.5)'); blot(cx + 40, my - 14, 18, 'rgba(255,120,140,.5)');
+      x.strokeStyle = '#2a1a1a'; x.lineWidth = 2; for (const s of [-1, 1]) for (let i = 0; i < 6; i++) { x.beginPath(); x.moveTo(cx + s * (12 + i * 5), ey - 16); x.lineTo(cx + s * (10 + i * 7), ey - 26 - (i % 2) * 4); x.stroke(); }
+      x.strokeStyle = 'rgba(40,20,20,.9)'; x.lineWidth = 1.6; for (let k = 0; k < 7; k++) { let px = cx - 20 + R() * 40, py = 40 + R() * 30; x.beginPath(); x.moveTo(px, py); for (let j = 0; j < 7; j++) { px += (R() - 0.5) * 22; py += 6 + R() * 14; x.lineTo(px, py); if (R() < 0.3) { x.moveTo(px, py); x.lineTo(px + (R() - 0.5) * 16, py + 8); x.moveTo(px, py); } } x.stroke(); }
+      x.fillStyle = 'rgba(20,10,10,.85)'; x.beginPath(); x.moveTo(cx + 30, ey - 50); x.lineTo(cx + 52, ey - 30); x.lineTo(cx + 36, ey - 14); x.closePath(); x.fill(); break;
+    case 'clown':
+      for (const s of [-1, 1]) { x.fillStyle = '#1a2a6a'; x.beginPath(); x.moveTo(cx + s * 24, ey - 34); x.lineTo(cx + s * 34, ey); x.lineTo(cx + s * 24, ey + 40); x.lineTo(cx + s * 14, ey); x.closePath(); x.fill(); streak(cx + s * 24, ey + 30, 50, 'rgba(20,30,90,.7)', 5); }
+      x.fillStyle = 'rgba(180,10,20,.85)'; x.beginPath(); x.moveTo(cx - 52, my - 16); x.quadraticCurveTo(cx, my + 34, cx + 52, my - 16); x.quadraticCurveTo(cx, my + 8, cx - 52, my - 16); x.fill();
+      x.strokeStyle = 'rgba(160,0,10,.6)'; x.lineWidth = 3; for (const s of [-1, 1]) { x.beginPath(); x.moveTo(cx + s * 52, my - 16); x.lineTo(cx + s * 70, my - 30); x.stroke(); }
+      x.strokeStyle = 'rgba(120,110,100,.5)'; x.lineWidth = 1; for (let k = 0; k < 40; k++) { const px = R() * 256, py = R() * H; x.beginPath(); x.moveTo(px, py); x.lineTo(px + (R() - 0.5) * 14, py + (R() - 0.5) * 14); x.stroke(); } break;
+    case 'sallow':
+      for (const s of [-1, 1]) { blot(cx + s * 24, ey + 10, 22, 'rgba(60,20,40,.55)'); } blot(cx, ey - 50, 50, 'rgba(90,70,50,.25)');
+      x.strokeStyle = 'rgba(40,20,20,.7)'; x.lineWidth = 1.5; for (const s of [-1, 1]) { x.beginPath(); x.moveTo(cx + s * 14, ey + 30); x.quadraticCurveTo(cx + s * 30, my - 6, cx + s * 34, my + 10); x.stroke(); }
+      x.strokeStyle = '#3a0a10'; x.lineWidth = 2.5; x.beginPath(); x.moveTo(cx - 28, my + 4); x.quadraticCurveTo(cx, my + 14, cx + 28, my + 4); x.stroke(); break;
+    case 'wood':
+      x.strokeStyle = 'rgba(120,80,40,.35)'; x.lineWidth = 1.4; for (let i = 0; i < 40; i++) { x.beginPath(); const py = i * 7; x.moveTo(0, py); x.bezierCurveTo(130, py + 6, 260, py - 6, 512, py + 2); x.stroke(); }
+      blot(cx - 40, my - 10, 18, 'rgba(230,80,100,.55)'); blot(cx + 40, my - 10, 18, 'rgba(230,80,100,.55)');
+      for (const s of [-1, 1]) { x.strokeStyle = '#2a1a10'; x.lineWidth = 2; x.beginPath(); x.moveTo(cx + s * 12, ey - 22); x.quadraticCurveTo(cx + s * 24, ey - 30, cx + s * 36, ey - 22); x.stroke(); }
+      x.strokeStyle = '#2a1a10'; x.lineWidth = 2.4; for (const s of [-1, 1]) { x.beginPath(); x.moveTo(cx + s * 20, my - 4); x.lineTo(cx + s * 22, my + 42); x.stroke(); } x.beginPath(); x.moveTo(cx + 10, 40); x.lineTo(cx + 18, 70); x.lineTo(cx + 8, 96); x.stroke(); break;
+    case 'burlap':
+      x.strokeStyle = 'rgba(90,70,40,.45)'; x.lineWidth = 1; for (let i = 0; i < W; i += 4) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, H); x.stroke(); } for (let j = 0; j < H; j += 4) { x.beginPath(); x.moveTo(0, j); x.lineTo(W, j); x.stroke(); }
+      blot(cx, ey, 60, 'rgba(40,30,10,.3)'); x.strokeStyle = '#1a1008'; x.lineWidth = 3; x.beginPath(); x.moveTo(cx - 44, my); x.quadraticCurveTo(cx, my + 22, cx + 44, my); x.stroke(); for (let i = -5; i <= 5; i++) { x.beginPath(); x.moveTo(cx + i * 8, my + 8 - Math.abs(i) * 1.3); x.lineTo(cx + i * 8, my - 6 - Math.abs(i) * 1.3); x.stroke(); }
+      x.fillStyle = 'rgba(100,20,10,.5)'; x.beginPath(); x.ellipse(cx + 30, my + 30, 12, 20, 0.4, 0, 7); x.fill(); break;
+    case 'gauze':
+      x.strokeStyle = 'rgba(150,140,120,.5)'; x.lineWidth = 2; for (let j = 0; j < H; j += 9) { x.beginPath(); x.moveTo(0, j); x.lineTo(W, j + 6); x.stroke(); } for (let i = 0; i < 1200; i++) { x.fillStyle = 'rgba(120,110,90,.15)'; x.fillRect(R() * W, R() * H, 2, 1); }
+      for (let i = 0; i < 6; i++) blot(cx - 60 + R() * 120, ey - 20 + R() * 80, 10 + R() * 18, 'rgba(130,10,10,.7)'); for (const s of [-1, 1]) blot(cx + s * 24, ey, 14, 'rgba(60,0,0,.85)'); streak(cx - 24, ey + 10, 60, 'rgba(110,0,0,.8)', 4); break;
+    case 'egg':
+      blot(cx, ey - 20, 80, 'rgba(255,255,255,.35)'); blot(cx, my + 10, 60, 'rgba(120,120,110,.18)');
+      if (type === 'slender') { for (const s of [-1, 1]) blot(cx + s * 24, ey, 16, 'rgba(60,60,70,.12)'); } break;
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  FT.set(type, t); return t;
+}
+// 머리 구(첫 번째 자식)를 얼굴 그림이 입혀진 부드러운 구로 바꾼다
+function dressFace(type, head) {
+  const tex = faceTex(type); if (!tex || !head) return;
+  const m = head.children.find((c) => c.isMesh && c.geometry?.type === 'SphereGeometry'); if (!m) return;
+  const p = m.geometry.parameters; if (p.phiLength < 6) return;
+  m.geometry = GG('face' + r3(p.radius), () => new THREE.SphereGeometry(p.radius, 32, 22));
+  const emi = { doll: '#2a2624', clown: '#3a3836' }[type] || (FACE[type].style === 'egg' ? '#3a3a38' : '#2a343a');
+  m.material = M('#ffffff', { map: tex, emissive: emi, emissiveMap: tex, emissiveIntensity: type === 'doll' ? 0.6 : 0.85, roughness: FACE[type].style === 'porcelain' ? 0.22 : 0.75 });
+}
 
 export function createGhost(type = 'woman') {
   const g = new THREE.Group();
@@ -292,9 +421,24 @@ export function createGhost(type = 'woman') {
     P.arms = [-1, 1].map((s) => { const a = limb(0.85, 0.08, M('#2a2e26')); a.position.set(0.4 * s, 1.65, 0); body.add(a); return a; });
     const lantern = new THREE.PointLight('#a8ff9a', 1.2, 3, 2); lantern.position.y = -0.9; P.arms[0].add(lantern);
   }
+  // ── 디테일: 얼굴 그림 · 앙상한 손가락 · 입가에 흐르는 피 · 발밑 그림자
+  dressFace(type, P.head);
+  if (['woman', 'child', 'dalgyal', 'nurse', 'mudang', 'crawler'].includes(type)) {
+    const k = type === 'child' ? 0.55 : 1;
+    if (P.arms) P.arms.forEach((a) => claws(a, k));
+    if (P.limbs) P.limbs.forEach((L) => { L.low.userData.len = L.low.userData.len || 0.6; claws(L.low, 0.9); });
+  }
+  if ((type === 'woman' || type === 'child' || type === 'headless') && P.mouth) {
+    const drip = new THREE.Mesh(GG('drip', () => new THREE.CylinderGeometry(0.006, 0.002, 0.16, 4).translate(0, -0.08, 0)), M('#5a0000', { roughness: 0.2, emissive: '#200000' }));
+    drip.position.set(P.mouth.position.x + 0.015, P.mouth.position.y - 0.02, P.mouth.position.z); P.head.add(drip);
+  }
+  if (type !== 'shadow') {
+    const blob = new THREE.Mesh(GG('gblob', () => new THREE.CircleGeometry(0.45, 18)), GG('gblobm', () => new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: 0.45, depthWrite: false })));
+    blob.rotation.x = -Math.PI / 2; blob.position.y = 0.02; g.add(blob);
+  }
   const light = new THREE.PointLight(type === 'mudang' ? '#ff4a3a' : type === 'sailor' ? '#5a9aff' : type === 'doll' ? '#ffd0e0' : type === 'clown' ? '#ff3a6a' : type === 'ringmaster' ? '#ffb030' : type === 'gasmask' ? '#a8ff9a' : type === 'scarecrow' ? '#ff8a30' : '#8899ff', 2.2, 4.5, 2); light.position.y = 1.5; g.add(light); u.light = light; if (type === 'shadow') { light.color.set('#000'); light.distance = 0.01; }
   // 주변 검은 안개
-  const fogTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(0,0,0,.8)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
+  const fogTex = fogTexture();
   u.fog = [];
   for (let i = 0; i < 6; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: fogTex, transparent: true, depthWrite: false, opacity: 0.6 })); s.scale.setScalar(1.2 + Math.random()); s.position.set((Math.random() - 0.5) * 0.8, 0.3 + Math.random() * 1.2, (Math.random() - 0.5) * 0.8); g.add(s); u.fog.push(s); }
   g.userData = u;

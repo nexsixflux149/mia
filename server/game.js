@@ -178,7 +178,7 @@ export class GameInstance {
           if (p.inv.includes(o.reveal.item)) { text += '\n\n' + o.reveal.text; if (o.reveal.flag && !this.flags.has(o.reveal.flag)) { this.flags.add(o.reveal.flag); this.syncAll(); } }
           else if (o.reveal.hint !== false) text += '\n\n(무언가 특별한 도구로 비춰 보면 다른 것이 보일지도 모른다)';
         }
-        this.emitTo(p.id, 'ui:examine', { title, text });
+        this.emitTo(p.id, 'ui:examine', { title, text, doc: o.t }); // doc: 소품 종류 (화면에서 종이 모양을 고르는 데만 쓴다)
         if (first) { this.flags.add('seen:' + o.id); this.apply(o.on, p); }
         else if (o.on && !o.once && !this.flags.has('seen:' + o.id)) { this.flags.add('seen:' + o.id); this.apply(o.on, p); }
         break;
@@ -192,7 +192,7 @@ export class GameInstance {
         const key = o.perPlayer ? o.id + ':' + p.id : o.id;
         if (this.taken.has(key)) { this.emitTo(p.id, 'ui:examine', { title, text: o.takenText || '이미 가져갔다.' }); return; }
         this.taken.add(key);
-        if (o.text) this.emitTo(p.id, 'ui:examine', { title, text: o.text });
+        if (o.text) this.emitTo(p.id, 'ui:examine', { title, text: o.text, doc: o.t });
         this.giveItem(p, o.item);
         if (o.onPick) this.apply(o.onPick, p); else this.syncAll();
         break;

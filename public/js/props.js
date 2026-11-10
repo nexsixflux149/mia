@@ -7,27 +7,76 @@ const M = (c, o = {}) => {
 };
 const WOOD = '#6b4a2e', DWOOD = '#3e2a1a', METAL = '#5d6066', PAPER = '#e9e2cc', RED = '#8e1c17';
 
+// ── 지오메트리 재사용: 같은 크기의 상자·원기둥·구는 한 번만 만든다 (소품 수백 개 → 지오메트리 수십 개)
+// 공유 지오메트리는 절대 직접 변형(translate 등)하지 말 것. 변형이 필요하면 새로 만든다.
+const GC = new Map();
+export const geo = (key, make) => { let g = GC.get(key); if (!g) { g = make(); g.userData.shared = true; GC.set(key, g); } return g; };
+const r3 = (v) => Math.round(v * 1000) / 1000;
+const boxG = (w, h, d) => geo(`b${r3(w)},${r3(h)},${r3(d)}`, () => new THREE.BoxGeometry(w, h, d));
+const cylG = (rt, rb, h, seg) => geo(`c${r3(rt)},${r3(rb)},${r3(h)},${seg}`, () => new THREE.CylinderGeometry(rt, rb, h, seg));
+const sphG = (r, ws = 16, hs = 12) => geo(`s${r3(r)},${ws},${hs}`, () => new THREE.SphereGeometry(r, ws, hs));
+// 아주 작은 조각은 그림자를 드리우지 않는다 (그림자 패스 비용 절감, 모습은 그대로)
 function B(g, w, h, d, c, x = 0, y = 0, z = 0, o) {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), typeof c === 'string' ? M(c, o) : c);
-  m.position.set(x, y + h / 2, z); m.castShadow = true; m.receiveShadow = true; g.add(m); return m;
+  const m = new THREE.Mesh(boxG(w, h, d), typeof c === 'string' ? M(c, o) : c);
+  const big = Math.max(w, h, d) > 0.22;
+  m.position.set(x, y + h / 2, z); m.castShadow = big; m.receiveShadow = big; g.add(m); return m;
 }
 function C(g, rt, rb, h, c, x = 0, y = 0, z = 0, seg = 14, o) {
-  const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), typeof c === 'string' ? M(c, o) : c);
-  m.position.set(x, y + h / 2, z); m.castShadow = true; g.add(m); return m;
+  const m = new THREE.Mesh(cylG(rt, rb, h, seg), typeof c === 'string' ? M(c, o) : c);
+  m.position.set(x, y + h / 2, z); m.castShadow = h > 0.3 || Math.max(rt, rb) > 0.15; g.add(m); return m;
 }
 function S(g, r, c, x = 0, y = 0, z = 0, o) {
-  const m = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), typeof c === 'string' ? M(c, o) : c);
-  m.position.set(x, y, z); m.castShadow = true; g.add(m); return m;
+  const m = new THREE.Mesh(r < 0.05 ? sphG(r, 8, 6) : r < 0.12 ? sphG(r, 12, 8) : sphG(r), typeof c === 'string' ? M(c, o) : c);
+  m.position.set(x, y, z); m.castShadow = r > 0.1; g.add(m); return m;
 }
-function canvasTex(w, h, draw) {
+// 캔버스 텍스처 — key 를 주면 같은 그림은 한 번만 그린다
+const TC = new Map();
+function canvasTex(w, h, draw, key) {
+  if (key && TC.has(key)) return TC.get(key);
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   draw(c.getContext('2d'), w, h);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  if (key) TC.set(key, t);
+  return t;
 }
+export { canvasTex };
+const TM = new Map();
 function Plane(g, w, h, tex, x, y, z, o = {}) {
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, ...o }));
+  // 같은 텍스처 + 같은 옵션이면 재질도 하나로
+  const mk = tex.uuid + JSON.stringify(o);
+  let mt = TM.get(mk); if (!mt) { mt = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, ...o }); TM.set(mk, mt); }
+  const m = new THREE.Mesh(geo(`p${r3(w)},${r3(h)}`, () => new THREE.PlaneGeometry(w, h)), mt);
   m.position.set(x, y, z); g.add(m); return m;
 }
+// 종이 질감 (누런 바탕 + 얼룩 + 줄) — 3D 소품용
+function paperTex(key, { base = '#e9e2cc', lines = 9, ink = 'rgba(40,30,25,.55)', title, stain = true, w = 128, h = 160, grid = false } = {}) {
+  return canvasTex(w, h, (x) => {
+    const g = x.createLinearGradient(0, 0, w, h); g.addColorStop(0, base); g.addColorStop(1, shade(base, -18)); x.fillStyle = g; x.fillRect(0, 0, w, h);
+    for (let i = 0; i < 260; i++) { x.fillStyle = `rgba(90,60,30,${Math.random() * 0.05})`; x.fillRect(Math.random() * w, Math.random() * h, 2, 2); }
+    if (stain) { const sx = w * (0.2 + Math.random() * 0.6), sy = h * (0.3 + Math.random() * 0.5), sr = w * (0.12 + Math.random() * 0.12); const sg = x.createRadialGradient(sx, sy, sr * 0.3, sx, sy, sr); sg.addColorStop(0, 'rgba(120,80,30,.0)'); sg.addColorStop(0.85, 'rgba(120,80,30,.18)'); sg.addColorStop(1, 'rgba(120,80,30,0)'); x.fillStyle = sg; x.fillRect(0, 0, w, h); }
+    x.strokeStyle = ink; x.lineCap = 'round';
+    let y0 = h * 0.12;
+    if (title) { x.fillStyle = ink; x.font = `bold ${Math.round(w / 9)}px serif`; x.textAlign = 'center'; x.fillText(title, w / 2, h * 0.13); y0 = h * 0.22; }
+    if (grid) { x.lineWidth = 1; for (let i = 0; i <= 6; i++) { x.beginPath(); x.moveTo(w * 0.08, y0 + i * (h * 0.7 / 6)); x.lineTo(w * 0.92, y0 + i * (h * 0.7 / 6)); x.stroke(); } for (let j = 0; j <= 4; j++) { x.beginPath(); x.moveTo(w * 0.08 + j * (w * 0.84 / 4), y0); x.lineTo(w * 0.08 + j * (w * 0.84 / 4), y0 + h * 0.7); x.stroke(); } }
+    else for (let i = 0; i < lines; i++) { x.lineWidth = 1.6; x.beginPath(); const yy = y0 + i * (h * 0.78 / lines); let xx = w * 0.1; x.moveTo(xx, yy); const end = w * (0.6 + Math.random() * 0.3); while (xx < end) { xx += 4 + Math.random() * 6; x.lineTo(xx, yy + (Math.random() - 0.5) * 1.6); } x.stroke(); }
+  }, key);
+}
+// 가지 끝이 처진 솔잎 층 (꼭짓점 흔들기는 위치값으로 정해서 모든 화면에서 같다)
+function pineCone(r, h, k) {
+  const g = new THREE.ConeGeometry(r, h, 10, 2);
+  const pos = g.attributes.position;
+  for (let i = 0; i < pos.count; i++) { const y = pos.getY(i); if (y < -h / 2 + 0.01) { const a = Math.atan2(pos.getZ(i), pos.getX(i)); const j = 1 + Math.sin(a * 5 + k) * 0.12; pos.setX(i, pos.getX(i) * j); pos.setZ(i, pos.getZ(i) * j); pos.setY(i, y - Math.abs(Math.sin(a * 5 + k)) * 0.12); } }
+  g.computeVertexNormals(); return g;
+}
+// 울퉁불퉁한 나뭇잎 덩어리
+function blobGeo(r) {
+  const g = new THREE.IcosahedronGeometry(r, 1);
+  const pos = g.attributes.position;
+  for (let i = 0; i < pos.count; i++) { const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i); const n = 1 + Math.sin(x * 7.1 + y * 3.3) * 0.08 + Math.cos(z * 6.3 - y * 4.1) * 0.08; pos.setXYZ(i, x * n, y * n * 0.92, z * n); }
+  g.computeVertexNormals(); return g;
+}
+function shade(hex, amt) { const c = new THREE.Color(hex); const h = {}; c.getHSL(h); c.setHSL(h.h, h.s, Math.max(0, Math.min(1, h.l + amt / 100))); return '#' + c.getHexString(); }
+const DECO_ONLY = (g) => { g.traverse((m) => { if (m.isMesh) { m.userData.noOcc = true; m.castShadow = false; } }); return g; };
 
 // 충돌 크기 [폭, 깊이]
 export const FOOT = {
@@ -43,6 +92,64 @@ export const FOOT = {
   burnt_beam: [3, 0.6], scarecrow: [0.6, 0.6],
 };
 
+// 지금 짓는 맵의 테마 (포스터·게시물 그림을 테마에 맞게 그린다)
+let THEME = 'gwimun';
+export function setPropTheme(id) { THEME = id || 'gwimun'; }
+const seedOf = (p) => Math.abs(Math.round((p.x || 0) * 7.3 + (p.z || 0) * 3.1 + (p.y || 0) * 11));
+
+// 테마별 포스터 그림
+function posterTex(p) {
+  const label = String(p.label || '');
+  const th = THEME;
+  return canvasTex(180, 240, (x, w, h) => {
+    const font = (s, b = 'bold') => `${b} ${s}px "Gowun Dodum", "Nanum Myeongjo", serif`;
+    x.textAlign = 'center';
+    if (th === 'clown') {
+      x.fillStyle = '#1a0a2a'; x.fillRect(0, 0, w, h);
+      for (let i = 0; i < 16; i++) { x.fillStyle = i % 2 ? '#c0262d' : '#ffd36a'; x.beginPath(); x.moveTo(w / 2, h * 0.42); const a0 = (i / 16) * Math.PI * 2, a1 = ((i + 1) / 16) * Math.PI * 2; x.lineTo(w / 2 + Math.cos(a0) * 220, h * 0.42 + Math.sin(a0) * 220); x.lineTo(w / 2 + Math.cos(a1) * 220, h * 0.42 + Math.sin(a1) * 220); x.fill(); }
+      x.fillStyle = '#f6f2ea'; x.beginPath(); x.ellipse(w / 2, h * 0.42, 42, 52, 0, 0, Math.PI * 2); x.fill();
+      x.fillStyle = '#d0101a'; x.beginPath(); x.arc(w / 2, h * 0.44, 9, 0, 7); x.fill();
+      x.strokeStyle = '#a0101a'; x.lineWidth = 6; x.beginPath(); x.arc(w / 2, h * 0.45, 24, 0.15 * Math.PI, 0.85 * Math.PI); x.stroke();
+      for (const s of [-1, 1]) { x.fillStyle = '#1a1a40'; x.beginPath(); x.ellipse(w / 2 + s * 16, h * 0.38, 6, 10, 0, 0, 7); x.fill(); x.fillStyle = '#ff5a1a'; x.beginPath(); x.arc(w / 2 + s * 46, h * 0.36, 16, 0, 7); x.fill(); }
+      x.fillStyle = '#ffd36a'; x.fillRect(0, 0, w, 36); x.fillStyle = '#7a0a14'; x.font = font(19); x.fillText('BLUE MOON', w / 2, 25);
+      x.fillStyle = '#ffd36a'; x.fillRect(0, h - 58, w, 58); x.fillStyle = '#7a0a14'; x.font = font(15); x.fillText(label.slice(0, 11), w / 2, h - 34); x.font = font(11, ''); x.fillText('1998 · 12 · 24  8PM', w / 2, h - 14);
+    } else if (th === 'hospital') {
+      x.fillStyle = '#e8ecea'; x.fillRect(0, 0, w, h); x.fillStyle = '#2a6a5a'; x.fillRect(0, 0, w, 34); x.fillStyle = '#fff'; x.font = font(15); x.fillText('백야 요양병원', w / 2, 23);
+      x.fillStyle = '#1a2a26'; x.font = font(14); x.fillText(label.slice(0, 12), w / 2, 58);
+      x.strokeStyle = '#7a8a86'; x.lineWidth = 1; for (let i = 0; i < 9; i++) { x.beginPath(); x.moveTo(14, 76 + i * 16); x.lineTo(w - 14, 76 + i * 16); x.stroke(); }
+      x.fillStyle = '#3a4a46'; for (let i = 0; i < 8; i++) x.fillRect(18, 66 + i * 16, 40 + (i * 37) % 80, 4);
+      x.fillStyle = '#a01a1a'; x.font = font(12); x.fillText('※ 외부 반출 금지', w / 2, h - 16);
+    } else if (th === 'doll') {
+      x.fillStyle = '#e6dcc4'; x.fillRect(0, 0, w, h); x.fillStyle = '#1a1410'; x.font = font(18); x.fillText('THE GAZETTE', w / 2, 24); x.fillRect(10, 30, w - 20, 2);
+      x.font = font(12); x.fillText(label.slice(0, 13), w / 2, 48);
+      x.fillStyle = '#8a8278'; x.fillRect(14, 58, 70, 60); x.fillStyle = '#4a443e'; x.beginPath(); x.arc(49, 82, 12, 0, 7); x.fill(); x.fillRect(37, 94, 24, 24);
+      x.fillStyle = 'rgba(30,24,20,.7)'; for (let i = 0; i < 14; i++) x.fillRect(i < 5 ? 92 : 14, 60 + (i < 5 ? i : i - 3) * 9 + (i < 5 ? 0 : 36), i < 5 ? 74 : w - 28, 3);
+    } else if (th === 'camp') {
+      x.fillStyle = '#fff4c8'; x.fillRect(0, 0, w, h); x.fillStyle = '#2a6a3a'; x.font = font(16); x.fillText('🌲 ' + label.slice(0, 10), w / 2, 30);
+      for (let i = 0; i < 6; i++) { x.fillStyle = ['#ff8a5a', '#5ab0ff', '#ffd36a', '#7ed07a'][i % 4]; x.beginPath(); x.arc(24 + i * 26, 52, 7, 0, 7); x.fill(); }
+      x.strokeStyle = '#3a3a2a'; x.lineWidth = 1.4; for (let i = 0; i < 10; i++) { x.beginPath(); x.moveTo(16, 76 + i * 15); x.lineTo(w - 16 - (i % 3) * 18, 76 + i * 15); x.stroke(); }
+    } else if (th === 'west') {
+      x.fillStyle = '#d8c090'; x.fillRect(0, 0, w, h); x.fillStyle = '#3a1a0a'; x.font = font(26); x.fillText('NOTICE', w / 2, 36); x.font = font(13); x.fillText(label.slice(0, 12), w / 2, 60);
+      for (let i = 0; i < 9; i++) { x.fillStyle = 'rgba(58,26,10,.55)'; x.fillRect(18, 76 + i * 15, w - 36 - (i % 2) * 30, 4); }
+    } else if (th === 'kimono') {
+      x.fillStyle = '#efe4cc'; x.fillRect(0, 0, w, h); x.fillStyle = '#8a1a20'; x.beginPath(); x.arc(w / 2, 46, 26, 0, 7); x.fill();
+      x.fillStyle = '#1a1010'; x.font = font(14); for (let c = 0; c < 4; c++) for (let r = 0; r < 8; r++) if ((c * 3 + r) % 5) x.fillRect(w - 34 - c * 30, 84 + r * 17, 9, 11);
+    } else if (th === 'ophelia') {
+      x.fillStyle = '#d8d0b4'; x.fillRect(0, 0, w, h); x.fillStyle = '#1a2a4a'; x.font = font(15); x.fillText('S.S. OPHELIA', w / 2, 26);
+      x.strokeStyle = '#1a2a4a'; x.lineWidth = 3; x.beginPath(); x.moveTo(30, 110); x.lineTo(150, 110); x.lineTo(136, 130); x.lineTo(44, 130); x.closePath(); x.stroke(); x.fillRect(70, 80, 10, 30); x.fillRect(96, 74, 10, 36);
+      x.font = font(12); x.fillStyle = '#2a2a2a'; x.fillText(label.slice(0, 13), w / 2, 160); for (let i = 0; i < 4; i++) x.fillRect(22, 176 + i * 13, w - 44, 3);
+    } else {
+      x.fillStyle = '#e6dfc8'; x.fillRect(0, 0, w, h); x.fillStyle = '#222'; x.font = font(16); x.fillText(label.slice(0, 11) || '안내', w / 2, 28);
+      for (let i = 0; i < 10; i++) { x.fillRect(16, 46 + i * 17, 70, 4); x.fillRect(100, 46 + i * 17, 46, 4); }
+      x.fillStyle = '#a00'; x.fillRect(16, h - 20, w - 32, 4);
+    }
+    // 낡은 종이: 얼룩 · 가장자리 그을림 · 접힌 자국
+    const vg = x.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.3, w / 2, h / 2, Math.max(w, h) * 0.7); vg.addColorStop(0, 'rgba(60,40,20,0)'); vg.addColorStop(1, 'rgba(60,40,20,.45)'); x.fillStyle = vg; x.fillRect(0, 0, w, h);
+    x.fillStyle = 'rgba(255,255,255,.08)'; x.fillRect(0, h / 2 - 1, w, 2);
+    for (let i = 0; i < 140; i++) { x.fillStyle = `rgba(70,50,30,${Math.random() * 0.08})`; x.fillRect(Math.random() * w, Math.random() * h, 3, 3); }
+  });
+}
+
 export function buildProp(p) {
   const g = new THREE.Group();
   const t = p.t;
@@ -50,12 +157,16 @@ export function buildProp(p) {
     // ── 바깥
     case 'pine': {
       C(g, 0.12, 0.18, 1.2, '#3b2a1c');
-      for (let i = 0; i < 4; i++) { const c = new THREE.Mesh(new THREE.ConeGeometry(1.1 - i * 0.22, 1.3, 9), M('#1d3324')); c.position.y = 1.4 + i * 0.75; c.castShadow = true; g.add(c); }
+      const pc = p.color || '#1d3324';
+      for (let i = 0; i < 4; i++) { const c = new THREE.Mesh(geo('pine' + i, () => pineCone(1.1 - i * 0.22, 1.3, i)), M(i % 2 ? shade(pc, 3) : pc, { flatShading: true })); c.position.y = 1.4 + i * 0.75; c.rotation.y = i * 0.7; c.castShadow = true; g.add(c); }
       break;
     }
     case 'tree': {
       C(g, 0.14, 0.2, 1.4, '#5a3d27');
-      S(g, 1.0, p.color || '#ffb7c9', 0, 2.1, 0); S(g, 0.7, p.color || '#ffc9d6', 0.6, 1.8, 0.3); S(g, 0.7, p.color || '#ffa8bf', -0.6, 1.9, -0.2);
+      for (const [s, a, b] of [[-1, 0.5, 1.5], [1, -0.6, 1.6]]) { const br = C(g, 0.04, 0.07, 0.8, '#5a3d27', 0, b, 0, 6); br.rotation.z = a; br.position.x = s * 0.18; }
+      const tc = p.color || '#ffb7c9';
+      const leaf = (r, x, y, z, c) => { const m = new THREE.Mesh(geo('blob' + r3(r), () => blobGeo(r)), M(c, { flatShading: true })); m.position.set(x, y, z); m.castShadow = true; g.add(m); return m; };
+      leaf(1.0, 0, 2.1, 0, tc); leaf(0.7, 0.6, 1.8, 0.3, shade(tc, 5)); leaf(0.7, -0.6, 1.9, -0.2, shade(tc, -4)); leaf(0.55, 0.1, 2.75, 0.2, shade(tc, 8));
       break;
     }
     case 'rock': { const r = S(g, 0.6, '#555a58', 0, 0.25, 0); r.scale.set(1.1, 0.6, 0.9); break; }
@@ -68,8 +179,14 @@ export function buildProp(p) {
     case 'fence': { const len = p.len || 6; for (let i = 0; i < len; i++) C(g, 0.06, 0.07, 1.2, DWOOD, -len / 2 + i + 0.5, 0, 0, 6); B(g, len, 0.08, 0.06, DWOOD, 0, 0.9, 0); B(g, len, 0.08, 0.06, DWOOD, 0, 0.45, 0); break; }
     case 'pole': { C(g, 0.1, 0.13, 6, '#4a4542'); B(g, 1.4, 0.08, 0.08, '#3a3532', 0, 5.4, 0); break; }
     case 'lamp': {
-      C(g, 0.05, 0.07, 3, '#2d2d30'); const bulb = S(g, 0.16, '#ffd58a', 0, 3.05, 0, { emissive: '#ffb347', emissiveIntensity: 2 });
-      const l = new THREE.PointLight('#ffb35c', 6, 9, 2); l.position.y = 2.9; g.add(l); g.userData.flicker = l; bulb.userData.f = 1;
+      // 가로등: 받침 · 기둥 · 장식 고리 · 유리 등갓 · 갓 지붕
+      const pole = p.color || '#2d2d30';
+      C(g, 0.13, 0.16, 0.25, pole); C(g, 0.05, 0.07, 2.8, pole, 0, 0.2); C(g, 0.09, 0.09, 0.06, pole, 0, 1.0, 0, 10); C(g, 0.08, 0.06, 0.12, pole, 0, 2.86, 0, 8);
+      const bulb = S(g, 0.12, '#ffe2a8', 0, 3.1, 0, { emissive: '#ffb347', emissiveIntensity: 2.2 });
+      C(g, 0.13, 0.09, 0.3, M('#fff2d0', { transparent: true, opacity: 0.35, roughness: 0.1 }), 0, 2.96, 0, 8).castShadow = false;
+      const cap = new THREE.Mesh(geo('lampcap', () => new THREE.ConeGeometry(0.2, 0.16, 8)), M(pole)); cap.position.y = 3.34; g.add(cap);
+      if (!p.noLight) { const l = new THREE.PointLight('#ffb35c', 6, 9, 2); l.position.y = 2.9; g.add(l); g.userData.flicker = l; }
+      bulb.userData.f = 1;
       break;
     }
     case 'bus_stop': {
@@ -177,7 +294,7 @@ export function buildProp(p) {
     case 'clock': {
       const face = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.06, 24), M('#e8e0c8')); face.rotation.x = Math.PI / 2; g.add(face);
       const rim = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.03, 8, 24), M(DWOOD)); g.add(rim);
-      const hh = B(g, 0.025, 0.14, 0.01, '#111', 0, 0, 0.04); hh.geometry.translate(0, -0.07 + 0.07, 0); hh.position.set(0, 0, 0.04); hh.rotation.z = -(2 + 47 / 60) / 12 * Math.PI * 2; hh.geometry = new THREE.BoxGeometry(0.025, 0.14, 0.01).translate(0, 0.07, 0);
+      const hh = B(g, 0.025, 0.14, 0.01, '#111', 0, 0, 0.04); hh.position.set(0, 0, 0.04); hh.rotation.z = -(2 + 47 / 60) / 12 * Math.PI * 2; hh.geometry = new THREE.BoxGeometry(0.025, 0.14, 0.01).translate(0, 0.07, 0);
       const mh = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.22, 0.01).translate(0, 0.11, 0), M('#111')); mh.position.z = 0.045; mh.rotation.z = -(47 / 60) * Math.PI * 2; g.add(mh);
       break;
     }
@@ -217,7 +334,13 @@ export function buildProp(p) {
     case 'uniform': { B(g, 0.55, 0.75, 0.12, '#4c5a3a'); B(g, 0.12, 0.04, 0.02, '#ddd', 0.12, 0.55, 0.07); B(g, 0.06, 0.3, 0.1, '#3a462c', -0.3, 0.3, 0); B(g, 0.06, 0.3, 0.1, '#3a462c', 0.3, 0.3, 0); break; }
     case 'futon': { B(g, 1.0, 0.12, 2.0, '#b04a4a'); B(g, 0.6, 0.15, 0.3, '#e8dcc6', 0, 0.12, -0.75); B(g, 0.96, 0.08, 1.2, '#a33', 0, 0.12, 0.35); break; }
     case 'mirror': { B(g, 0.7, 0.9, 0.04, '#2a2a2a'); B(g, 0.6, 0.8, 0.02, '#9fb3bd', 0, 0.05, 0.02, { metalness: 0.9, roughness: 0.1 }); B(g, 0.7, 0.15, 0.4, '#d8d8d0', 0, -0.5, 0.15); break; }
-    case 'poster': { Plane(g, 0.9, 1.1, canvasTex(90, 110, (x, w, h) => { x.fillStyle = '#e6dfc8'; x.fillRect(0, 0, w, h); x.fillStyle = '#222'; x.font = 'bold 10px sans-serif'; x.fillText('신체검사표', 18, 14); for (let i = 0; i < 8; i++) { x.fillRect(10, 24 + i * 10, 40, 3); x.fillRect(60, 24 + i * 10, 18, 3); } x.fillStyle = '#a00'; x.fillRect(10, 104, 70, 3); }), 0, 0, 0.02); break; }
+    case 'poster': {
+      const pl = Plane(g, 0.9, 1.15, posterTex(p), 0, 0, 0.02); pl.rotation.z = ((seedOf(p) % 7) - 3) * 0.012;
+      // 귀퉁이를 고정한 압정/테이프
+      for (const [sx, sy] of [[-0.4, 0.52], [0.4, 0.52]]) S(g, 0.018, THEME === 'clown' ? '#ffd36a' : '#c0262d', sx, sy, 0.035, { metalness: 0.5 });
+      B(g, 0.14, 0.04, 0.004, '#e8dcb0', 0.36, -0.58, 0.025).rotation.z = 0.5;
+      break;
+    }
     case 'med_cabinet': { B(g, 1.2, 1.8, 0.45, '#d6d8d0'); B(g, 1.1, 1.0, 0.02, '#9cb', 0, 0.75, 0.23, { transparent: true, opacity: 0.5 }); B(g, 0.1, 0.1, 0.03, '#c33', 0, 1.65, 0.24); for (let i = 0; i < 7; i++) C(g, 0.04, 0.04, 0.14, '#6a3a1a', -0.45 + i * 0.15, 1.05, 0); break; }
     case 'bed': { B(g, 0.9, 0.5, 1.9, '#9aa0a2'); B(g, 0.86, 0.12, 1.85, '#e8e6df', 0, 0.5, 0); B(g, 0.5, 0.12, 0.3, '#fff', 0, 0.62, -0.7); B(g, 0.9, 0.8, 0.05, '#7f8587', 0, 0.3, -0.95); break; }
     case 'fusebox': { B(g, 0.5, 0.6, 0.15, '#4a4d50', 0, -0.3, 0); B(g, 0.4, 0.06, 0.02, '#c33', 0, -0.05, 0.08); break; }
@@ -242,8 +365,27 @@ export function buildProp(p) {
       break;
     }
     case 'top': { const c = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.12, 10), M('#a8743a')); c.rotation.x = Math.PI; c.position.y = 0.07; g.add(c); C(g, 0.08, 0.08, 0.03, '#8a5a2a', 0, 0.12, 0); break; }
-    case 'book': { B(g, 0.35, 0.06, 0.25, '#4a2a1a'); B(g, 0.33, 0.04, 0.23, PAPER, 0, 0.03, 0); break; }
-    case 'photo': { B(g, 0.5, 0.62, 0.04, '#2a1a10'); Plane(g, 0.4, 0.52, canvasTex(40, 52, (x, w, h) => { x.fillStyle = '#9a958a'; x.fillRect(0, 0, w, h); x.fillStyle = '#333'; x.beginPath(); x.arc(20, 18, 7, 0, 7); x.fill(); x.fillRect(12, 25, 16, 20); x.fillStyle = '#ddd'; x.beginPath(); x.arc(20, 40, 5, 0, 7); x.fill(); }), 0, 0.31, 0.025); break; }
+    case 'book': {
+      // 펼쳐진 공책: 표지 + 양쪽 페이지(살짝 V자) + 책갈피 끈
+      const cover = { camp: '#3a6a8a', clown: '#5a1a3a', hospital: '#2a4a44', doll: '#5a2030', kimono: '#6a1a1a', west: '#4a3018', ophelia: '#1a2a3a' }[THEME] || '#4a2a1a';
+      B(g, 0.44, 0.025, 0.31, cover);
+      for (const s of [-1, 1]) { const pg = Plane(g, 0.2, 0.28, paperTex('bookpg' + THEME + s, { w: 96, h: 128, lines: 11, stain: s > 0, base: '#efe8d4' }), 0.104 * s, 0.04, 0); pg.rotation.set(-Math.PI / 2, -s * 0.1, 0); }
+      B(g, 0.014, 0.022, 0.29, '#d8d0b8', 0, 0.025, 0);
+      B(g, 0.012, 0.004, 0.16, '#a01a20', 0.03, 0.045, 0.19);
+      break;
+    }
+    case 'photo': {
+      // 흑백 사진 액자: 나무 테 + 매트지 + 세피아 사진 + 유리 반사
+      B(g, 0.54, 0.66, 0.05, '#2a1a10'); B(g, 0.46, 0.58, 0.012, '#e8e0cc', 0, 0.04, 0.02);
+      Plane(g, 0.36, 0.46, canvasTex(72, 92, (x, w, h) => {
+        const gr = x.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#a8a090'); gr.addColorStop(1, '#6a6458'); x.fillStyle = gr; x.fillRect(0, 0, w, h);
+        x.fillStyle = '#2a2622'; x.beginPath(); x.arc(36, 30, 11, 0, 7); x.fill(); x.fillRect(22, 41, 28, 34); x.fillStyle = '#d8d0c0'; x.beginPath(); x.arc(36, 70, 8, 0, 7); x.fill(); x.fillRect(28, 76, 16, 14);
+        const vg = x.createRadialGradient(36, 46, 10, 36, 46, 60); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(30,20,10,.6)'); x.fillStyle = vg; x.fillRect(0, 0, w, h);
+      }, 'photoPic'), 0, 0.33, 0.028);
+      const gl = Plane(g, 0.46, 0.58, canvasTex(32, 32, (x) => { const gg = x.createLinearGradient(0, 0, 32, 32); gg.addColorStop(0, 'rgba(255,255,255,0)'); gg.addColorStop(0.45, 'rgba(255,255,255,.18)'); gg.addColorStop(0.55, 'rgba(255,255,255,0)'); x.fillStyle = gg; x.fillRect(0, 0, 32, 32); }, 'glassSheen'), 0, 0.33, 0.032, { transparent: true, depthWrite: false });
+      gl.userData.noOcc = true;
+      break;
+    }
     case 'chest': { B(g, 1.3, 0.75, 0.6, '#3a1e12'); B(g, 1.2, 0.35, 0.02, '#52301c', 0, 0.38, 0.31); for (let i = 0; i < 6; i++) S(g, 0.03, '#d8d8f0', -0.5 + i * 0.2, 0.55, 0.31, { metalness: 0.5, emissive: '#446', emissiveIntensity: 0.6 }); B(g, 0.12, 0.12, 0.03, '#c9a24a', 0, 0.5, 0.32, { metalness: 0.8 }); break; }
     case 'jar': { const j = S(g, 0.35, '#3b2a1e', 0, 0.4, 0, { roughness: 0.4 }); j.scale.y = 1.2; C(g, 0.22, 0.25, 0.08, '#2e2018', 0, 0.78, 0); break; }
     case 'big_gate': { for (const s of [-1, 1]) { B(g, 0.4, 3.2, 0.4, '#3a2416', 1.4 * s, 0, 0); B(g, 1.2, 2.6, 0.12, '#4a2e1a', 0.62 * s, 0, 0); } B(g, 3.4, 0.3, 0.6, '#2a2420', 0, 3.1, 0); B(g, 2.6, 0.18, 0.18, '#5a3a22', 0, 1.2, 0.12); g.userData.foot = [3.2, 0.4]; break; }
@@ -288,7 +430,14 @@ export function buildProp(p) {
       break;
     }
     case 'gwimun_core': { S(g, 0.25, '#ff2a1a', 0, 0, 0, { emissive: '#f20', emissiveIntensity: 3 }); break; }
-    case 'paper': { B(g, 0.28, 0.01, 0.2, PAPER); break; }
+    case 'paper': {
+      // 실제 종이 한 장: 글씨 줄 · 얼룩 · 접힌 귀퉁이
+      const k = seedOf(p) % 4;
+      const sh = Plane(g, 0.3, 0.22, paperTex('paper' + THEME + k, { w: 128, h: 96, lines: 6, base: THEME === 'hospital' ? '#eef0ec' : THEME === 'clown' ? '#f2e6c8' : PAPER }), 0, 0.006, 0);
+      sh.rotation.set(-Math.PI / 2, 0, (k - 1.5) * 0.25); sh.receiveShadow = true;
+      const fold = B(g, 0.05, 0.003, 0.05, '#cfc6aa', 0.12, 0.008, 0.085); fold.rotation.y = 0.78 + (k - 1.5) * 0.25;
+      break;
+    }
     case 'lostbox': { B(g, 0.5, 0.45, 0.3, '#5a4a32', 0, -0.2, 0); B(g, 0.4, 0.05, 0.02, '#d8d0b4', 0, 0.12, 0.16); C(g, 0.06, 0.06, 0.03, '#888', 0.12, -0.05, 0.16, 12, { metalness: 0.8 }).rotation.x = Math.PI / 2; break; }
     case 'eye': { S(g, 0.08, '#c8a06a', 0, 0.08, 0); S(g, 0.04, '#1a1008', 0, 0.1, 0.06); break; }
     case 'duty_board': { B(g, 0.8, 0.35, 0.04, '#3a2616', 0, -0.17, 0); Plane(g, 0.72, 0.28, canvasTex(144, 56, (x, w, h) => { x.fillStyle = '#e9e2cc'; x.fillRect(0, 0, w, h); x.fillStyle = '#222'; x.font = 'bold 16px sans-serif'; x.fillText('오늘의 일직', 10, 22); x.fillRect(10, 40, 120, 2); }), 0, 0, 0.025); break; }
@@ -507,7 +656,11 @@ export function buildProp(p) {
     case 'notice_board': {
       for (const sx of [-1, 1]) B(g, 0.1, 1.9, 0.1, DWOOD, 0.75 * sx, 0, 0);
       B(g, 1.7, 1.0, 0.06, '#7a5a36', 0, 0.9, 0); B(g, 1.9, 0.12, 0.3, '#3a2a1a', 0, 1.95, 0);
-      [[-0.45, 1.5, '#f2ead8'], [0.3, 1.45, '#ffe28a'], [-0.2, 1.1, '#f2ead8'], [0.5, 1.05, '#bde0fe']].forEach(([x, y, c]) => B(g, 0.45, 0.32, 0.01, c, x, y - 0.16, 0.04));
+      // 압정으로 꽂은 종이 네 장 (글씨 줄과 얼룩이 그려진 진짜 종이)
+      [[-0.45, 1.5, '#f2ead8', 0.06], [0.32, 1.47, '#ffe8a8', -0.08], [-0.18, 1.08, '#f2ead8', -0.04], [0.5, 1.05, '#d6ecff', 0.1]].forEach(([x, y, c, r], i) => {
+        const pl = Plane(g, 0.46, 0.34, paperTex('nb' + THEME + i, { w: 112, h: 84, lines: 5, base: c, title: i === 0 && THEME === 'west' ? 'WANTED' : undefined }), x, y, 0.04); pl.rotation.z = r;
+        S(g, 0.016, ['#d6303a', '#2f5fd0', '#2fbf71', '#ffd36a'][i], x, y + 0.14, 0.05);
+      });
       g.userData.foot = [1.7, 0.3]; break;
     }
     case 'fireflies': {
@@ -521,7 +674,7 @@ export function buildProp(p) {
     // ── 서커스 · 카니발 (삐에로)
     case 'jack_box': {
       B(g, 0.8, 0.8, 0.8, '#c0262d'); for (let i = 0; i < 4; i++) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.12, 0.02), M(i % 2 ? '#ffd36a' : '#2f5fd0')); p.position.set(0, 0.2 + i * 0.16, 0.41); g.add(p); }
-      const lid = B(g, 0.8, 0.05, 0.8, '#ffd36a', 0, 0.8, -0.38); lid.geometry.translate(0, 0, 0.4); lid.position.z = -0.4; lid.rotation.x = -1.9;
+      const lid = B(g, 0.8, 0.05, 0.8, '#ffd36a', 0, 0.8, -0.38); lid.geometry = new THREE.BoxGeometry(0.8, 0.05, 0.8).translate(0, 0, 0.4); lid.position.z = -0.4; lid.rotation.x = -1.9;
       for (let i = 0; i < 6; i++) { const r = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.03, 6, 14), M('#c9ccd0', { metalness: 0.8 })); r.rotation.x = Math.PI / 2; r.position.y = 0.85 + i * 0.09; g.add(r); }
       const head = S(g, 0.24, '#f4f1ea', 0, 1.55, 0); S(g, 0.06, '#d6303a', 0, 1.53, 0.23);
       for (const s of [-1, 1]) { S(g, 0.035, '#111', 0.09 * s, 1.62, 0.21); const h = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.32, 8), M(s < 0 ? '#2f5fd0' : '#d6303a')); h.position.set(0.12 * s, 1.85, 0); h.rotation.z = -0.5 * s; g.add(h); }
@@ -633,7 +786,7 @@ export function buildProp(p) {
     }
     case 'cannon': {
       for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.08, 6, 18), M('#ffd36a')); w.position.set(0.5 * s, 0.45, 0); w.rotation.y = Math.PI / 2; g.add(w); }
-      const barrel = C(g, 0.32, 0.42, 2.2, '#c0262d', 0, 0.2); barrel.geometry.translate(0, 0, 0); barrel.rotation.x = -1.1; barrel.position.set(0, 0.9, 0.2);
+      const barrel = C(g, 0.32, 0.42, 2.2, '#c0262d', 0, 0.2); barrel.rotation.x = -1.1; barrel.position.set(0, 0.9, 0.2);
       for (let i = 0; i < 3; i++) { const r = new THREE.Mesh(new THREE.TorusGeometry(0.38 - i * 0.03, 0.04, 6, 18), M('#ffd36a')); r.position.set(0, 0.6 + i * 0.35, -0.15 - i * 0.62); r.rotation.x = -1.1 + Math.PI / 2; g.add(r); }
       break;
     }
@@ -659,6 +812,142 @@ export function buildProp(p) {
       for (let i = 0; i < 10; i++) { const st = C(g, 0.01, 0.005, 0.25, '#e8d08a', (Math.random() - 0.5) * 0.9, 1.3, (Math.random() - 0.5) * 0.2); st.rotation.z = (Math.random() - 0.5) * 2; }
       break;
     }
+    // ───────── 테마 장식 (월드가 자동으로 흩뿌린다 · 충돌 없음 · 조명 없이 발광 재질만)
+    case 'cobweb': {
+      const tex = canvasTex(128, 128, (x, w, h) => {
+        x.strokeStyle = 'rgba(230,230,235,.55)'; x.lineWidth = 1.2;
+        for (let i = 0; i <= 7; i++) { const a = (i / 7) * Math.PI / 2; x.beginPath(); x.moveTo(0, 0); x.lineTo(Math.cos(a) * w * 1.1, Math.sin(a) * h * 1.1); x.stroke(); }
+        for (let r = 14; r < 130; r += 12 + r * 0.12) { x.beginPath(); for (let i = 0; i <= 7; i++) { const a = (i / 7) * Math.PI / 2; const rr = r * (1 + Math.sin(i * 2.1 + r) * 0.06); const px = Math.cos(a) * rr, py = Math.sin(a) * rr; if (i) x.quadraticCurveTo(Math.cos(a - 0.11) * rr * 0.9, Math.sin(a - 0.11) * rr * 0.9, px, py); else x.moveTo(px, py); } x.stroke(); }
+      }, 'cobweb');
+      const mt = (TM.get('cobweb') || TM.set('cobweb', new THREE.MeshStandardMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide, roughness: 1, alphaTest: 0.02 })).get('cobweb'));
+      const s = p.s || 1.2; const m = new THREE.Mesh(geo('p1x1', () => new THREE.PlaneGeometry(1, 1).translate(0.5, -0.5, 0)), mt); m.scale.set(s, s, 1); g.add(m); m.userData.noOcc = true; break;
+    }
+    case 'sconce': {
+      const c = p.color || '#ffcf8a';
+      B(g, 0.14, 0.24, 0.05, '#3a2a1a', 0, -0.12, 0); C(g, 0.015, 0.015, 0.18, '#8a7a5a', 0, -0.02, 0.08, 6, { metalness: 0.7 }).rotation.x = Math.PI / 2;
+      C(g, 0.09, 0.05, 0.14, M(c, { emissive: c, emissiveIntensity: 1.6, transparent: true, opacity: 0.9 }), 0, 0.02, 0.16, 10).castShadow = false;
+      DECO_ONLY(g); break;
+    }
+    case 'paper_lantern': {
+      const c = p.color || '#d02a34';
+      C(g, 0.006, 0.006, 0.4, '#222', 0, 0.38, 0, 4);
+      const body = S(g, 0.2, M(c, { emissive: c, emissiveIntensity: 1.3, roughness: 1 }), 0, 0.15, 0); body.scale.y = 1.35;
+      for (const y of [-0.12, 0.42]) C(g, 0.09, 0.09, 0.05, '#141010', 0, y, 0, 10);
+      for (let i = 0; i < 4; i++) { const r = new THREE.Mesh(geo('lanrib', () => new THREE.TorusGeometry(0.2, 0.006, 4, 16)), M('#2a1010')); r.rotation.x = Math.PI / 2; r.position.y = 0.0 + i * 0.1; r.scale.setScalar(Math.sin(((i + 0.5) / 4) * Math.PI) * 0.95 + 0.05); g.add(r); }
+      DECO_ONLY(g); g.userData.sway = true; break;
+    }
+    case 'string_lights': {
+      const len = p.len || 6, sag = p.sag ?? 0.35, n = Math.max(4, Math.round(len * 2.2));
+      const cols = p.colors || ['#fff2a8', '#ff9ad0', '#9ad0ff', '#ffd36a'];
+      const pts = []; for (let i = 0; i <= 24; i++) { const k = i / 24; pts.push(new THREE.Vector3(-len / 2 + k * len, -Math.sin(k * Math.PI) * sag, 0)); }
+      const wire = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, 0.008, 3), M('#1a1a1a')); g.add(wire);
+      for (let i = 0; i < n; i++) { const k = (i + 0.5) / n; const b = new THREE.Mesh(sphG(0.045, 8, 6), new THREE.MeshBasicMaterial({ color: cols[i % cols.length] })); b.position.set(-len / 2 + k * len, -Math.sin(k * Math.PI) * sag - 0.05, 0); g.add(b); }
+      DECO_ONLY(g); break;
+    }
+    case 'bunting': {
+      const len = p.len || 6, sag = p.sag ?? 0.3, n = Math.round(len * 2.4);
+      const cols = p.colors || ['#d6303a', '#ffd36a', '#2f5fd0', '#f4f1ea'];
+      const tri = geo('bunt', () => { const s = new THREE.Shape(); s.moveTo(-0.1, 0); s.lineTo(0.1, 0); s.lineTo(0, -0.24); s.closePath(); return new THREE.ShapeGeometry(s); });
+      for (let i = 0; i < n; i++) { const k = (i + 0.5) / n; const f = new THREE.Mesh(tri, M(cols[i % cols.length], { side: THREE.DoubleSide, roughness: 1 })); f.position.set(-len / 2 + k * len, -Math.sin(k * Math.PI) * sag, 0); f.rotation.y = (i % 2) * 0.2; g.add(f); }
+      const pts = []; for (let i = 0; i <= 16; i++) { const k = i / 16; pts.push(new THREE.Vector3(-len / 2 + k * len, -Math.sin(k * Math.PI) * sag + 0.005, 0)); }
+      g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 16, 0.006, 3), M('#d8d0c0')));
+      DECO_ONLY(g); break;
+    }
+    case 'hanging_bulb': {
+      const len = p.len || 1.2, c = p.color || '#ffe2a8';
+      C(g, 0.004, 0.004, len, '#111', 0, -len, 0, 4);
+      C(g, 0.03, 0.03, 0.05, '#2a2a2a', 0, -len - 0.03, 0, 8);
+      S(g, 0.055, M(c, { emissive: c, emissiveIntensity: p.off ? 0 : 2.2 }), 0, -len - 0.08, 0);
+      if (p.shade) { const sh = new THREE.Mesh(geo('bulbshade', () => new THREE.ConeGeometry(0.2, 0.16, 12, 1, true)), M(p.shade, { side: THREE.DoubleSide, metalness: 0.4 })); sh.position.y = -len - 0.02; g.add(sh); }
+      DECO_ONLY(g); g.userData.sway = true; break;
+    }
+    case 'candle_set': {
+      const n = p.n || 4;
+      for (let i = 0; i < n; i++) { const a = i * 2.4, r = i ? 0.09 + (i % 2) * 0.05 : 0; const h = 0.12 + ((i * 37) % 10) / 50; const x = Math.cos(a) * r, z = Math.sin(a) * r;
+        C(g, 0.025, 0.028, h, '#efe6d0', x, 0, z, 8); for (let k = 0; k < 2; k++) C(g, 0.006, 0.004, 0.05, '#efe6d0', x + 0.02 * (k ? 1 : -1), h - 0.06, z + 0.01, 4);
+        const f = new THREE.Mesh(geo('flame', () => new THREE.ConeGeometry(0.012, 0.045, 6).translate(0, 0.022, 0)), new THREE.MeshBasicMaterial({ color: '#ffcf6a' })); f.position.set(x, h + 0.004, z); g.add(f); }
+      if (p.light) { const pl = new THREE.PointLight('#ff9a4a', 1.4, 3.5, 2); pl.position.y = 0.35; g.add(pl); g.userData.flicker = pl; }
+      DECO_ONLY(g); break;
+    }
+    case 'debris': {
+      const c = p.color || '#4a3424';
+      for (let i = 0; i < 5; i++) { const s = (seedOf(p) + i * 17) % 10; const b = B(g, 0.08 + s * 0.04, 0.03, 0.08, i % 2 ? c : shade(c, -8), (s - 5) * 0.08, 0, ((s * 3) % 10 - 5) * 0.06); b.rotation.y = s; }
+      for (let i = 0; i < 3; i++) { const s = (seedOf(p) + i * 29) % 10; const pp = Plane(g, 0.14, 0.1, paperTex('scrap' + (i % 2), { w: 48, h: 36, lines: 3, stain: false }), (s - 5) * 0.1, 0.004 + i * 0.002, (5 - s) * 0.07); pp.rotation.set(-Math.PI / 2, 0, s); }
+      DECO_ONLY(g); break;
+    }
+    case 'bottles': {
+      const cols = ['#2a5a2a', '#6a3a1a', '#3a4a6a', '#5a5a2a'];
+      for (let i = 0; i < (p.n || 4); i++) { const x = (i - 1.5) * 0.1, c = cols[(seedOf(p) + i) % 4]; const bm = M(c, { roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.85 }); C(g, 0.035, 0.04, 0.2, bm, x, 0, (i % 2) * 0.05, 10); C(g, 0.012, 0.03, 0.08, bm, x, 0.2, (i % 2) * 0.05, 8); }
+      if (p.fallen) { const fb = C(g, 0.035, 0.04, 0.2, M('#2a5a2a', { roughness: 0.15, transparent: true, opacity: 0.85 }), 0.3, 0.035, 0.1, 10); fb.rotation.z = Math.PI / 2; }
+      DECO_ONLY(g); break;
+    }
+    case 'pipe_run': {
+      const len = p.len || 8, c = p.color || '#5a5048';
+      for (let i = 0; i < (p.n || 2); i++) { const pm = C(g, 0.06 - i * 0.015, 0.06 - i * 0.015, len, M(c, { metalness: 0.55, roughness: 0.5 }), 0, 0, i * 0.16, 8); pm.rotation.z = Math.PI / 2; pm.position.set(0, -i * 0.04, i * 0.16); }
+      for (let k = 0; k < Math.floor(len / 2); k++) { const cl = B(g, 0.05, 0.12, 0.34, '#3a3632', -len / 2 + 1 + k * 2, -0.1, 0.06); void cl; }
+      if (p.drip) for (let k = 0; k < 3; k++) S(g, 0.02, M('#6a8aaa', { roughness: 0.05 }), -len / 3 + k * len / 3, -0.1, 0);
+      DECO_ONLY(g); break;
+    }
+    case 'wall_frame': {
+      const w2 = p.w || 0.6, h2 = p.h || 0.8; const fc = p.color || '#5a3a1a';
+      B(g, w2 + 0.1, h2 + 0.1, 0.05, fc, 0, -h2 / 2 - 0.05, 0); B(g, w2 + 0.02, h2 + 0.02, 0.06, shade(fc, 10), 0, -h2 / 2 - 0.01, -0.005);
+      const art = p.art || THEME; const k = seedOf(p) % 3;
+      Plane(g, w2, h2, canvasTex(96, 128, (x, w, h) => {
+        if (art === 'doll') { x.fillStyle = ['#3a2a3a', '#2a3a3a', '#4a3020'][k]; x.fillRect(0, 0, w, h); x.fillStyle = '#e8d8c8'; x.beginPath(); x.ellipse(48, 52, 20, 26, 0, 0, 7); x.fill(); x.fillStyle = '#d8b060'; x.beginPath(); x.ellipse(48, 40, 26, 22, 0, Math.PI, 0); x.fill(); x.fillStyle = '#5a6a9a'; x.fillRect(26, 80, 44, 48); x.fillStyle = '#111'; x.fillRect(40, 50, 4, 4); x.fillRect(53, 50, 4, 4); if (k === 1) { x.fillStyle = '#000'; x.fillRect(36, 46, 26, 10); } }
+        else if (art === 'ophelia') { x.fillStyle = '#2a3a4a'; x.fillRect(0, 0, w, h); x.fillStyle = '#4a6a7a'; x.fillRect(0, 80, w, 48); x.fillStyle = '#1a1a1a'; x.beginPath(); x.moveTo(20, 84); x.lineTo(76, 84); x.lineTo(68, 96); x.lineTo(28, 96); x.fill(); x.fillRect(46, 50, 3, 34); x.fillStyle = '#e8e0d0'; x.beginPath(); x.moveTo(49, 52); x.lineTo(72, 80); x.lineTo(49, 80); x.fill(); }
+        else if (art === 'kimono') { x.fillStyle = '#e8dcc0'; x.fillRect(0, 0, w, h); x.strokeStyle = '#2a1a10'; x.lineWidth = 3; x.beginPath(); x.moveTo(20, 120); x.quadraticCurveTo(40, 60, 70, 30); x.stroke(); x.fillStyle = '#c0202a'; for (let i = 0; i < 6; i++) { x.beginPath(); x.arc(30 + i * 9, 100 - i * 13, 6, 0, 7); x.fill(); } }
+        else if (art === 'west') { x.fillStyle = '#c89060'; x.fillRect(0, 0, w, h); x.fillStyle = '#8a4a2a'; x.beginPath(); x.moveTo(0, 90); x.lineTo(20, 60); x.lineTo(40, 60); x.lineTo(50, 80); x.lineTo(70, 50); x.lineTo(96, 50); x.lineTo(96, 128); x.lineTo(0, 128); x.fill(); x.fillStyle = '#ffd08a'; x.beginPath(); x.arc(70, 26, 12, 0, 7); x.fill(); }
+        else if (art === 'clown') { x.fillStyle = '#1a0a24'; x.fillRect(0, 0, w, h); x.fillStyle = '#f6f2ea'; x.beginPath(); x.ellipse(48, 58, 24, 30, 0, 0, 7); x.fill(); x.fillStyle = '#d0101a'; x.beginPath(); x.arc(48, 62, 6, 0, 7); x.fill(); x.strokeStyle = '#a0101a'; x.lineWidth = 4; x.beginPath(); x.arc(48, 66, 14, 0.2, Math.PI - 0.2); x.stroke(); x.fillStyle = '#2f5fd0'; x.beginPath(); x.moveTo(36, 30); x.lineTo(60, 30); x.lineTo(48, 4); x.fill(); }
+        else if (art === 'hospital') { x.fillStyle = '#d8dcd8'; x.fillRect(0, 0, w, h); x.fillStyle = '#3a4a46'; x.font = 'bold 12px sans-serif'; x.fillText('개원 1974', 18, 20); x.fillStyle = '#6a7a76'; x.fillRect(14, 30, 68, 50); x.fillStyle = '#2a3a36'; for (let i = 0; i < 4; i++) x.fillRect(14, 90 + i * 9, 68 - i * 8, 3); }
+        else if (art === 'camp') { x.fillStyle = '#2a4a6a'; x.fillRect(0, 0, w, h); x.fillStyle = '#1a3a1a'; for (let i = 0; i < 5; i++) { x.beginPath(); x.moveTo(i * 22, 128); x.lineTo(i * 22 + 12, 70 + (i % 2) * 10); x.lineTo(i * 22 + 24, 128); x.fill(); } x.fillStyle = '#f8f0c8'; x.beginPath(); x.arc(70, 26, 9, 0, 7); x.fill(); }
+        else { x.fillStyle = ['#6a1e1e', '#2e4a2a', '#1e3a5a'][k]; x.fillRect(0, 0, w, h); x.fillStyle = '#d8b878'; x.beginPath(); x.arc(48, 40, 16, 0, 7); x.fill(); x.fillStyle = '#c8a058'; x.fillRect(32, 58, 32, 50); x.strokeStyle = '#e8c870'; x.lineWidth = 3; x.strokeRect(4, 4, w - 8, h - 8); }
+        const vg = x.createRadialGradient(48, 64, 20, 48, 64, 90); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.5)'); x.fillStyle = vg; x.fillRect(0, 0, w, h);
+      }, 'wf' + art + k), 0, -h2 / 2 - 0.05, 0.032);
+      DECO_ONLY(g); if (p.tilt) g.rotation.z = p.tilt; break;
+    }
+    case 'talisman': {
+      // 노란 부적: 붉은 주사 글씨
+      const tex = canvasTex(48, 128, (x, w, h) => { x.fillStyle = '#e8c84a'; x.fillRect(0, 0, w, h); x.strokeStyle = '#b01010'; x.lineWidth = 3; x.strokeRect(4, 4, w - 8, h - 8); x.fillStyle = '#a00a0a'; x.font = 'bold 20px serif'; x.textAlign = 'center'; x.fillText('勅', 24, 30); x.lineWidth = 2.4; x.beginPath(); for (let i = 0; i < 6; i++) { x.moveTo(12, 44 + i * 12); x.quadraticCurveTo(36, 40 + i * 12, 24, 52 + i * 12); } x.stroke(); for (let i = 0; i < 40; i++) { x.fillStyle = `rgba(90,60,10,${Math.random() * 0.15})`; x.fillRect(Math.random() * w, Math.random() * h, 2, 2); } }, 'talisman');
+      const pl = Plane(g, 0.16, 0.42, tex, 0, -0.21, 0.01, { side: THREE.DoubleSide }); pl.rotation.z = ((seedOf(p) % 5) - 2) * 0.06; DECO_ONLY(g); break;
+    }
+    case 'shimenawa': {
+      const len = p.len || 3;
+      const pts = []; for (let i = 0; i <= 16; i++) { const k = i / 16; pts.push(new THREE.Vector3(-len / 2 + k * len, -Math.sin(k * Math.PI) * 0.25, 0)); }
+      g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, 0.05, 6), M('#c8b070', { roughness: 1 })));
+      const zz = geo('shide', () => { const s = new THREE.Shape(); s.moveTo(-0.04, 0); s.lineTo(0.04, 0); s.lineTo(0.04, -0.1); s.lineTo(-0.02, -0.1); s.lineTo(0.04, -0.2); s.lineTo(-0.02, -0.2); s.lineTo(0.02, -0.32); s.lineTo(-0.04, -0.2); s.lineTo(0.0, -0.2); s.lineTo(-0.04, -0.1); s.closePath(); return new THREE.ShapeGeometry(s); });
+      for (let i = 1; i < 5; i++) { const k = i / 5; const m = new THREE.Mesh(zz, M('#f8f6f0', { side: THREE.DoubleSide, emissive: '#222', emissiveIntensity: 0.3 })); m.position.set(-len / 2 + k * len, -Math.sin(k * Math.PI) * 0.25 - 0.04, 0.03); g.add(m); }
+      DECO_ONLY(g); break;
+    }
+    case 'tumbleweed': { const m = new THREE.Mesh(geo('tumble', () => new THREE.IcosahedronGeometry(0.4, 1)), M('#8a6a3a', { wireframe: true })); m.position.y = 0.38; g.add(m); const m2 = new THREE.Mesh(geo('tumble2', () => new THREE.IcosahedronGeometry(0.3, 0)), M('#6a4a2a', { wireframe: true })); m2.position.y = 0.38; m2.rotation.set(1, 2, 0); g.add(m2); DECO_ONLY(g); break; }
+    case 'cow_skull': { const sk = S(g, 0.16, '#e8e0cc', 0, 0.1, 0); sk.scale.set(1, 0.7, 1.4); for (const s of [-1, 1]) { const h = C(g, 0.025, 0.05, 0.36, '#d8ccb0', 0.2 * s, 0.1, -0.05, 6); h.rotation.z = -1.2 * s; S(g, 0.04, '#111', 0.07 * s, 0.14, 0.12); } DECO_ONLY(g); break; }
+    case 'seaweed': { for (let i = 0; i < 5; i++) { const s = C(g, 0.02, 0.008, 0.5 + (i % 3) * 0.2, M('#2f4a2a', { roughness: 0.4 }), (i - 2) * 0.06, -(0.5 + (i % 3) * 0.2), 0, 4); s.rotation.z = (i - 2) * 0.08; } DECO_ONLY(g); break; }
+    case 'rope_coil': { for (let i = 0; i < 4; i++) { const r = new THREE.Mesh(geo('rope' + i, () => new THREE.TorusGeometry(0.28 - i * 0.05, 0.035, 6, 20)), M('#a88a5a', { roughness: 1 })); r.rotation.x = Math.PI / 2; r.position.y = 0.035 + i * 0.05; g.add(r); } DECO_ONLY(g); break; }
+    case 'toy_blocks': { const cols = ['#ff8fab', '#9ab7d8', '#ffd166', '#7ee0a8']; for (let i = 0; i < 6; i++) { const b = B(g, 0.12, 0.12, 0.12, cols[i % 4], (i % 3) * 0.13 - 0.13, Math.floor(i / 3) * 0.12, 0); b.rotation.y = i * 0.3; } DECO_ONLY(g); break; }
+    case 'teddy': {
+      const fur = M(p.color || '#8a5a3a'), lite = M('#e8c9a0');
+      const body = S(g, 0.14, fur, 0, 0.14, 0); body.scale.set(1, 1.1, 0.9); S(g, 0.11, fur, 0, 0.36, 0.02); S(g, 0.045, lite, 0, 0.34, 0.12);
+      for (const s of [-1, 1]) { S(g, 0.045, fur, 0.08 * s, 0.46, 0); S(g, 0.06, fur, 0.13 * s, 0.18, 0.04); S(g, 0.06, fur, 0.08 * s, 0.04, 0.1); S(g, 0.016, '#111', 0.04 * s, 0.39, 0.1); }
+      if (p.torn) { const st = C(g, 0.005, 0.005, 0.12, '#e8e0c0', 0.05, 0.1, 0.13, 4); st.rotation.z = 0.8; }
+      DECO_ONLY(g); break;
+    }
+    case 'mushrooms': { for (let i = 0; i < 4; i++) { const x = (i - 1.5) * 0.12, z = (i % 2) * 0.1; const h = 0.06 + (i % 3) * 0.04; C(g, 0.015, 0.02, h, '#e8e0cc', x, 0, z, 6); const cap = S(g, 0.04 + (i % 2) * 0.02, M(p.color || '#c8a060', { emissive: p.glow || '#000', emissiveIntensity: p.glow ? 0.8 : 0 }), x, h, z); cap.scale.y = 0.55; } DECO_ONLY(g); break; }
+    case 'blood_smear': { const tex = canvasTex(128, 128, (x, w, h) => { x.fillStyle = 'rgba(90,0,0,.85)'; for (let i = 0; i < 14; i++) { x.beginPath(); x.ellipse(64 + (Math.random() - 0.5) * 60, 64 + (Math.random() - 0.5) * 60, 6 + Math.random() * 22, 4 + Math.random() * 14, Math.random() * 3, 0, 7); x.fill(); } for (let i = 0; i < 30; i++) { x.beginPath(); x.arc(Math.random() * w, Math.random() * h, 1 + Math.random() * 3, 0, 7); x.fill(); } }, 'blood' + (seedOf(p) % 2)); const m = Plane(g, p.s || 1.1, p.s || 1.1, tex, 0, 0.012, 0, { transparent: true, depthWrite: false, roughness: 0.3 }); m.rotation.x = -Math.PI / 2; m.rotation.z = seedOf(p); m.userData.noOcc = true; m.castShadow = false; break; }
+    case 'handprints': { const tex = canvasTex(128, 128, (x) => { x.fillStyle = 'rgba(110,0,0,.8)'; for (let k = 0; k < 3; k++) { const cx = 30 + k * 34, cy = 70 - (k % 2) * 24; x.beginPath(); x.ellipse(cx, cy, 10, 12, 0, 0, 7); x.fill(); for (let f = 0; f < 5; f++) { const a = -Math.PI / 2 + (f - 2) * 0.35; x.beginPath(); x.ellipse(cx + Math.cos(a) * 17, cy + Math.sin(a) * 19, 3, 6, a + Math.PI / 2, 0, 7); x.fill(); } x.fillRect(cx - 2, cy + 10, 3, 20 + k * 6); } }, 'handprints'); Plane(g, 0.9, 0.9, tex, 0, 0, 0.01, { transparent: true, depthWrite: false }); DECO_ONLY(g); break; }
+    case 'neon_sign': {
+      const txt = String(p.text || 'OPEN'), c = p.color || '#ff3a8a';
+      const tex = canvasTex(256, 64, (x, w, h) => { x.fillStyle = '#0a0410'; x.fillRect(0, 0, w, h); x.font = 'bold 40px "Gowun Dodum", sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.shadowColor = c; x.shadowBlur = 14; x.fillStyle = '#ffffff'; x.fillText(txt, w / 2, h / 2 + 2); x.shadowBlur = 0; x.strokeStyle = c; x.lineWidth = 2; x.strokeText(txt, w / 2, h / 2 + 2); }, 'neon' + txt + c);
+      const m = new THREE.Mesh(geo('p1.6x0.4', () => new THREE.PlaneGeometry(1.6, 0.4)), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, color: '#ffffff' })); m.position.z = 0.02; g.add(m);
+      B(g, 1.66, 0.46, 0.03, '#1a1a1e', 0, -0.23, 0); DECO_ONLY(g); g.userData.neon = m; break;
+    }
+    case 'bamboo': { for (let i = 0; i < (p.n || 5); i++) { const h = 3 + ((seedOf(p) + i * 13) % 10) * 0.25; const x = Math.cos(i * 2.4) * 0.3 * (i ? 1 : 0), z = Math.sin(i * 2.4) * 0.3 * (i ? 1 : 0); C(g, 0.045, 0.05, h, M('#5a8a3a', { roughness: 0.5 }), x, 0, z, 6); for (let k = 1; k < 5; k++) C(g, 0.055, 0.055, 0.03, '#4a7a2a', x, (h * k) / 5, z, 6); const lf = S(g, 0.3, M('#3a6a2a', { flatShading: true }), x, h, z); lf.scale.set(1, 0.4, 1); } break; }
+    case 'mesa': { const c = p.color || '#8a3a20'; const s = p.s || 1; const m1 = new THREE.Mesh(geo('mesa', () => { const gg = new THREE.CylinderGeometry(3.2, 4.2, 4, 7, 2); const ps = gg.attributes.position; for (let i = 0; i < ps.count; i++) { const y = ps.getY(i); const a = Math.atan2(ps.getZ(i), ps.getX(i)); const j = 1 + Math.sin(a * 3 + y) * 0.12; ps.setX(i, ps.getX(i) * j); ps.setZ(i, ps.getZ(i) * j); } gg.computeVertexNormals(); return gg; }), M(c, { flatShading: true, roughness: 1 })); m1.scale.set(s * 1.4, s, s); m1.position.y = 2 * s; g.add(m1); const band = new THREE.Mesh(cylG(3.0, 3.05, 0.3, 7), M(shade(c, 12), { flatShading: true })); band.scale.set(s * 1.4, s, s); band.position.y = 3.2 * s; g.add(band); DECO_ONLY(g); break; }
+    case 'crt_tv': { B(g, 0.6, 0.48, 0.5, '#2a2622'); const scr = Plane(g, 0.46, 0.34, canvasTex(64, 48, (x, w, h) => { const id = x.createImageData(w, h); for (let i = 0; i < id.data.length; i += 4) { const v = 60 + Math.random() * 150; id.data[i] = v * 0.8; id.data[i + 1] = v; id.data[i + 2] = v * 0.9; id.data[i + 3] = 255; } x.putImageData(id, 0, 0); }, 'crt'), 0, 0.24, 0.255, { emissive: '#8aa898', emissiveIntensity: 0.9, emissiveMap: null }); scr.material.emissiveMap = scr.material.map; C(g, 0.006, 0.006, 0.3, '#666', -0.12, 0.48, 0, 4).rotation.z = 0.5; C(g, 0.006, 0.006, 0.3, '#666', 0.12, 0.48, 0, 4).rotation.z = -0.5; break; }
+    case 'drape': { const c = p.color || '#8a0a1a'; const w2 = p.w || 2, h2 = p.h || 3.2; const gg = geo(`drape${w2},${h2}`, () => { const pg = new THREE.PlaneGeometry(w2, h2, 24, 1); const ps = pg.attributes.position; for (let i = 0; i < ps.count; i++) ps.setZ(i, Math.sin(ps.getX(i) * 9) * 0.06); pg.computeVertexNormals(); return pg; }); const m = new THREE.Mesh(gg, M(c, { roughness: 0.95, side: THREE.DoubleSide })); m.position.y = -h2 / 2; g.add(m); B(g, w2 + 0.1, 0.12, 0.08, p.trim || '#c9a24a', 0, -0.12, 0, { metalness: 0.5 }); DECO_ONLY(g); break; }
+    case 'radiator': { for (let i = 0; i < 9; i++) B(g, 0.06, 0.6, 0.14, '#b8bcb4', -0.32 + i * 0.08, 0.08, 0, { metalness: 0.4, roughness: 0.6 }); B(g, 0.74, 0.04, 0.16, '#a8aca4', 0, 0.12, 0); B(g, 0.74, 0.04, 0.16, '#a8aca4', 0, 0.62, 0); DECO_ONLY(g); break; }
+    case 'wagon_wheel': { const w = new THREE.Mesh(geo('wwheel', () => new THREE.TorusGeometry(0.5, 0.05, 6, 20)), M('#5a3a1a')); w.position.y = 0.52; w.rotation.y = 0.3; w.rotation.x = 0.25; g.add(w); for (let i = 0; i < 6; i++) { const sp = new THREE.Mesh(boxG(0.04, 1.0, 0.03), M('#6a4426')); sp.rotation.z = (i * Math.PI) / 6; w.add(sp); } DECO_ONLY(g); break; }
+    case 'wall_shelf': { B(g, 1.0, 0.04, 0.24, '#4a3020', 0, 0, 0.1); for (const s of [-1, 1]) B(g, 0.03, 0.14, 0.18, '#3a2416', 0.4 * s, -0.14, 0.08); const items = p.items || ['#6a3a1a', '#2a5a2a', '#e8e0cc', '#3a4a6a']; items.forEach((c, i) => { if (i % 2) C(g, 0.05, 0.05, 0.16, M(c, { roughness: 0.3 }), -0.33 + i * 0.22, 0.04, 0.1, 8); else B(g, 0.09, 0.12, 0.09, c, -0.33 + i * 0.22, 0.04, 0.1); }); DECO_ONLY(g); break; }
+    case 'leaves': { const cols = p.colors || ['#6a4a1a', '#8a5a1a', '#5a3a1a', '#7a6a2a']; const lg = geo('leaf', () => new THREE.CircleGeometry(0.06, 5)); for (let i = 0; i < (p.n || 14); i++) { const s = (seedOf(p) + i * 41) % 100; const l = new THREE.Mesh(lg, M(cols[i % cols.length], { side: THREE.DoubleSide, roughness: 1 })); l.rotation.x = -Math.PI / 2; l.rotation.z = s; l.position.set(((s * 7) % 100 / 100 - 0.5) * (p.r2 || 1.6), 0.01 + i * 0.0005, ((s * 13) % 100 / 100 - 0.5) * (p.r2 || 1.6)); l.scale.set(1, 0.6, 1); g.add(l); } DECO_ONLY(g); break; }
+    case 'stepping_stone': { const r = S(g, 0.35, '#7a7a72', 0, 0.02, 0); r.scale.set(1, 0.12, 0.8); r.castShadow = false; r.receiveShadow = true; break; }
     case 'none': break;
     default: B(g, 0.6, 0.6, 0.6, '#777');
   }

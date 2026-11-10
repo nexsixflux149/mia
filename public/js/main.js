@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { createAvatar, animateAvatar, textSprite, OPTIONS, SKIN, ACCENT, HAIRC, EYEC, DEFAULT_LOOK, EMOTES, EMOTE_DUR } from './avatar.js';
 import { Cinema } from './cinema.js';
 import { createGhost, animateGhost } from './ghosts.js';
+import { renderDoc } from './paper.js';
 import { buildLobby, buildChapter, disposeWorld } from './world.js';
 import { AudioFX } from './audio.js';
 import { jumpscare, pickScare } from './scare.js';
@@ -198,6 +199,7 @@ function updateLabels() {
 const cam = { yaw: 0, pitch: 0.55, dist: 7 };
 let myAvatar = null;
 const me = { x: 0, z: 5, ry: Math.PI, moving: false };
+if (window.__dbg) Object.assign(window.__dbg, { S, cam, me, scene, camera, renderer }); // ?debug 일 때만 (테스트용)
 const fill = new THREE.PointLight('#ffe9d0', 4, 6, 1.6);
 scene.add(fill);
 
@@ -249,7 +251,7 @@ function enterChapter(state, showIntro = true) {
   disposeWorld(scene, S.world);
   const ch = state.chapter;
   S.chapter = ch; S.room = 'game'; S.mount = null; S.perch = null; me.y = 0; closeThemePop(); noticeBox.classList.add('hidden');
-  S.world = buildChapter(scene, ch);
+  S.world = buildChapter(scene, ch, S.scenario?.id);
   S.objState = state.objects; S.dark = state.dark;
   me.x = ch.spawn[0] + (Math.random() - 0.5); me.z = ch.spawn[1];
   me.ry = Math.PI; cam.yaw = 0;
@@ -550,9 +552,11 @@ function occluderList() {
   const list = [];
   w.root.traverse((m) => {
     if (!m.isMesh || m.isInstancedMesh || !m.material || Array.isArray(m.material)) return;
+    if (m.userData.noOcc) return; // 벽 장식·천장등·작은 잡동사니는 카메라를 가리지 않으므로 검사에서 뺀다
     if (m.material.isShaderMaterial || m.material.depthTest === false || m.material.side === THREE.BackSide) return;
     m.geometry.computeBoundingSphere?.();
     if ((m.geometry.boundingSphere?.radius || 0) * Math.max(m.scale.x, m.scale.y, m.scale.z) > 40) return; // 하늘·바다 같은 큰 것 제외
+    if (!m.userData.objId && (m.geometry.boundingSphere?.radius || 0) * Math.max(m.scale.x, m.scale.y, m.scale.z) < 0.09) return; // 손가락만 한 조각은 가려도 티가 안 난다
     list.push(m);
   });
   w._occ = list; return list;
@@ -961,7 +965,7 @@ socket.on('game:sync', (st) => {
   if (S.dark !== st.dark) { S.dark = st.dark; applyDark(); if (st.dark) audio.play('power'); }
   setObjective(st.objective, st.relics);
 });
-socket.on('ui:examine', ({ title, text }) => { openModal(title, text); addJournal(title, text, 'clue'); });
+socket.on('ui:examine', ({ title, text, doc }) => { openDoc(title, text, { prop: doc }); addJournal(title, text, 'clue'); });
 socket.on('ui:lock', (l) => { openLock(l); addJournal(l.title, l.text, 'clue'); });
 socket.on('ui:signal', (sg) => { openSignal(sg); addJournal(sg.title, sg.text + (sg.morse ? '\n신호: ' + sg.morse.replace(/\./g, '·').replace(/-/g, '−') : '') + (sg.letters ? '\n글자: ' + sg.letters.split('').join(' ') : ''), 'clue'); });
 function openSignal(sg) {
@@ -1042,8 +1046,15 @@ function fadeTransition(fn) {
 }
 
 // ─────────────────────────── 모달
+// 편지·쪽지·포스터 같은 글은 실제 종이처럼 그려서 보여 준다 (글 내용은 그대로)
+function openDoc(title, text, hint) {
+  let paper = null; try { paper = renderDoc(title, text, hint, S.scenario?.id || 'gwimun'); } catch (e) { console.warn('문서 그리기 실패', e); }
+  if (!paper) return openModal(title, text);
+  openModal(title, '', paper); $('#modal .modal-card').classList.add('doc-mode');
+}
 function openModal(title, text, bodyEl) {
   S.modalOpen = true; S.lockCtx = null; hideMenus();
+  $('#modal .modal-card').classList.remove('doc-mode');
   $('#modalTitle').textContent = title || '';
   $('#modalText').textContent = text || '';
   const b = $('#modalBody'); b.innerHTML = ''; if (bodyEl) b.appendChild(bodyEl);
@@ -1493,7 +1504,7 @@ function renderInv() {
 function primaryItem(it, i, slotEl) {
   const d = S.items[it]; if (!d) return;
   if (d.use === 'flashlight' || d.use === 'talisman') return useItem(it);
-  if (d.use === 'read') { openModal(`${d.icon} ${d.name}`, `${d.desc}\n\n${d.read}`); addJournal(d.name, d.read, 'item'); return; }
+  if (d.use === 'read') { openDoc(`${d.icon} ${d.name}`, `${d.desc}\n\n${d.read}`, { item: d }); addJournal(d.name, d.read, 'item'); return; }
   itemMenu(it, i, slotEl || $('#inventory').children[i]);
 }
 function useItem(it) {

@@ -6,17 +6,39 @@ const TAU = Math.PI * 2;
 // ── 공통 그리기 도구
 function ell(x, cx, cy, rx, ry, c, rot = 0) { x.fillStyle = c; x.beginPath(); x.ellipse(cx, cy, Math.max(1, rx), Math.max(1, ry), rot, 0, TAU); x.fill(); }
 function hair(x, cx, cy, s, n = 70, color = '#030303') {
+  x.lineCap = 'round';
   for (let i = 0; i < n; i++) {
     const a = -Math.PI + (i / n) * TAU;
     x.beginPath(); x.moveTo(cx + Math.cos(a) * s * 0.7, cy - s * 0.6);
     x.quadraticCurveTo(cx + Math.cos(a) * s * 1.3, cy, cx + Math.cos(a) * s * (1.1 + R() * 0.3), cy + s * (1.4 + R()));
     x.lineWidth = 6 + R() * 10; x.strokeStyle = color; x.stroke();
+    // 젖은 머리카락의 희미한 윤기
+    if (i % 5 === 0) { x.lineWidth = 1.5; x.strokeStyle = 'rgba(120,130,140,.18)'; x.stroke(); }
   }
 }
 function paleFace(x, cx, cy, s, tone = ['#d6dcd8', '#7d8784', '#2a302e'], rx = 0.62, ry = 0.85) {
-  const g = x.createRadialGradient(cx, cy, s * 0.1, cx, cy, s * 0.95);
+  const g = x.createRadialGradient(cx, cy - s * 0.15, s * 0.1, cx, cy, s * 0.95);
   g.addColorStop(0, tone[0]); g.addColorStop(0.7, tone[1]); g.addColorStop(1, tone[2]);
   x.fillStyle = g; x.beginPath(); x.ellipse(cx, cy, s * rx, s * ry, 0, 0, TAU); x.fill();
+  x.save(); x.beginPath(); x.ellipse(cx, cy, s * rx, s * ry, 0, 0, TAU); x.clip();
+  // 얼룩진 피부 · 움푹 꺼진 볼 · 눈썹뼈 그림자 · 콧날 그림자
+  for (let i = 0; i < 9; i++) ell(x, cx + (R() - 0.5) * s * rx * 1.6, cy + (R() - 0.5) * s * ry * 1.6, s * (0.05 + R() * 0.1), s * (0.04 + R() * 0.08), 'rgba(60,70,80,.12)', R() * 3);
+  for (const sd of [-1, 1]) { const cg = x.createRadialGradient(cx + sd * s * 0.34, cy + s * 0.22, 0, cx + sd * s * 0.34, cy + s * 0.22, s * 0.26); cg.addColorStop(0, 'rgba(20,24,28,.45)'); cg.addColorStop(1, 'rgba(20,24,28,0)'); x.fillStyle = cg; x.fillRect(cx - s, cy - s, s * 2, s * 2); }
+  for (const sd of [-1, 1]) { const bg = x.createRadialGradient(cx + sd * s * 0.25, cy - s * 0.2, 0, cx + sd * s * 0.25, cy - s * 0.2, s * 0.24); bg.addColorStop(0, 'rgba(10,12,14,.4)'); bg.addColorStop(1, 'rgba(10,12,14,0)'); x.fillStyle = bg; x.fillRect(cx - s, cy - s, s * 2, s * 2); }
+  x.fillStyle = 'rgba(20,24,28,.35)'; x.beginPath(); x.moveTo(cx - s * 0.02, cy - s * 0.05); x.lineTo(cx + s * 0.08, cy + s * 0.2); x.lineTo(cx - s * 0.06, cy + s * 0.22); x.fill();
+  const hl = x.createRadialGradient(cx - s * 0.1, cy - s * 0.45, 0, cx - s * 0.1, cy - s * 0.45, s * 0.3); hl.addColorStop(0, 'rgba(255,255,255,.18)'); hl.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = hl; x.fillRect(cx - s, cy - s, s * 2, s * 2);
+  x.restore();
+}
+// 전체 화면 마무리: 비네팅 · 필름 노이즈 · 주사선 · 지직거리는 화면 찢김
+let _noise = null, _scan = null;
+function noiseCanvas() { if (_noise) return _noise; const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d'); const id = x.createImageData(256, 256); for (let i = 0; i < id.data.length; i += 4) { const v = Math.random() * 255; id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = 255; } x.putImageData(id, 0, 0); return (_noise = c); }
+function scanCanvas() { if (_scan) return _scan; const c = document.createElement('canvas'); c.width = 4; c.height = 4; const x = c.getContext('2d'); x.fillStyle = 'rgba(0,0,0,.28)'; x.fillRect(0, 0, 4, 2); return (_scan = c); }
+function post(x, w, h, t) {
+  const vg = x.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.28, w / 2, h / 2, Math.max(w, h) * 0.75); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.88)'); x.fillStyle = vg; x.fillRect(0, 0, w, h);
+  x.save(); x.globalAlpha = 0.16; x.globalCompositeOperation = 'overlay'; const n = noiseCanvas(); const ox = -R() * 256, oy = -R() * 256; for (let yy = oy; yy < h; yy += 256) for (let xx = ox; xx < w; xx += 256) x.drawImage(n, xx, yy); x.restore();
+  x.save(); x.fillStyle = x.createPattern(scanCanvas(), 'repeat'); x.fillRect(0, 0, w, h); x.restore();
+  if (R() < 0.4) for (let i = 0; i < 3; i++) { const sy = R() * h, shh = 6 + R() * 36, dx = (R() - 0.5) * 70; x.drawImage(x.canvas, 0, sy, w, shh, dx, sy, w, shh); }
+  if (t < 0.06) { x.fillStyle = `rgba(255,255,255,${0.7 * (1 - t / 0.06)})`; x.fillRect(0, 0, w, h); }
 }
 function veins(x, cx, cy, s, n = 18, c = 'rgba(80,0,0,.6)') {
   x.strokeStyle = c; x.lineWidth = 2;
@@ -25,14 +47,24 @@ function veins(x, cx, cy, s, n = 18, c = 'rgba(80,0,0,.6)') {
 function hollowEyes(x, cx, cy, s, t, pupil = true, blood = true) {
   for (const sd of [-1, 1]) {
     const ex = cx + sd * s * 0.25, ey = cy - s * 0.15;
+    // 붉게 짓무른 눈가 → 텅 빈 눈구멍
+    const rg = x.createRadialGradient(ex, ey, s * 0.08, ex, ey, s * 0.22); rg.addColorStop(0, 'rgba(60,0,0,.7)'); rg.addColorStop(1, 'rgba(60,0,0,0)'); x.fillStyle = rg; x.fillRect(ex - s * 0.25, ey - s * 0.25, s * 0.5, s * 0.5);
     ell(x, ex, ey, s * 0.13, s * (0.17 + t * 0.05), '#000', sd * 0.2);
-    if (pupil) ell(x, ex + sd * 3, ey + 4, s * 0.025, s * 0.025, '#e8e8e0');
-    if (blood) { x.fillStyle = '#5a0000'; x.fillRect(ex - 4, ey + s * 0.12, 8, s * (0.3 + t * 0.6)); }
+    if (pupil) { const pg = x.createRadialGradient(ex + sd * 3, ey + 4, 0, ex + sd * 3, ey + 4, s * 0.06); pg.addColorStop(0, '#ffffff'); pg.addColorStop(0.3, '#e8e8e0'); pg.addColorStop(1, 'rgba(200,220,220,0)'); x.fillStyle = pg; x.fillRect(ex - s * 0.08, ey - s * 0.08, s * 0.16, s * 0.16); }
+    if (blood) { x.fillStyle = '#5a0000'; x.beginPath(); x.moveTo(ex - 5, ey + s * 0.12); x.quadraticCurveTo(ex + sd * 6, ey + s * (0.3 + t * 0.3), ex - 2, ey + s * (0.42 + t * 0.6)); x.lineTo(ex + 4, ey + s * 0.12); x.fill(); ell(x, ex - 2, ey + s * (0.42 + t * 0.6), 5, 7, '#5a0000'); }
   }
 }
 function mouth(x, cx, cy, s, t, teeth = true) {
-  ell(x, cx, cy, s * (0.15 + t * 0.12), s * (0.2 + t * 0.25), '#000');
-  if (teeth) { x.fillStyle = '#d8d0b8'; for (let i = 0; i < 8; i++) x.fillRect(cx - s * 0.13 + i * s * 0.035, cy - s * 0.17, s * 0.02, s * 0.06); }
+  const mw = s * (0.15 + t * 0.12), mh = s * (0.2 + t * 0.25);
+  ell(x, cx, cy, mw * 1.12, mh * 1.08, 'rgba(70,10,15,.85)');
+  ell(x, cx, cy, mw, mh, '#000');
+  if (teeth) {
+    // 들쭉날쭉 누런 이 + 잇몸
+    x.fillStyle = '#5a1018'; x.fillRect(cx - mw * 0.9, cy - mh * 0.92, mw * 1.8, s * 0.03);
+    for (let i = 0; i < 9; i++) { const tx = cx - mw * 0.82 + i * (mw * 1.64 / 8), th = s * (0.04 + ((i * 7) % 5) * 0.012); x.fillStyle = i % 3 ? '#d8d0b8' : '#c8b890'; x.beginPath(); x.moveTo(tx - s * 0.014, cy - mh * 0.88); x.lineTo(tx + s * 0.014, cy - mh * 0.88); x.lineTo(tx + s * 0.006, cy - mh * 0.88 + th); x.lineTo(tx - s * 0.008, cy - mh * 0.88 + th * 0.9); x.fill(); }
+  }
+  // 입가로 흐르는 검붉은 침
+  x.strokeStyle = 'rgba(80,0,0,.8)'; x.lineWidth = 3; x.beginPath(); x.moveTo(cx + mw * 0.6, cy + mh * 0.7); x.quadraticCurveTo(cx + mw * 0.7, cy + mh * 1.6, cx + mw * 0.55, cy + mh * (2 + t)); x.stroke();
 }
 function dark(x, w, h, a = 0.85) { x.fillStyle = `rgba(0,0,0,${a})`; x.fillRect(0, 0, w, h); }
 
@@ -295,6 +327,7 @@ export function jumpscare(type, audio) {
       const t = Math.min(1, (now - start) / dur);
       x.clearRect(0, 0, c.width, c.height);
       draw(x, c.width, c.height, t);
+      post(x, c.width, c.height, t);
       x.fillStyle = `rgba(150,0,0,${0.1 + Math.random() * 0.15})`; x.fillRect(0, 0, c.width, c.height);
       c.style.transform = `translate(${(Math.random() - 0.5) * 30}px,${(Math.random() - 0.5) * 30}px)`;
       if (t < 1) requestAnimationFrame(frame);

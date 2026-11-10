@@ -436,3 +436,111 @@ body.in-lobby #vignette:not(.danger) { background: none; }
 .bal-weights { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 10px 0; }
 .bal-w { min-width: 54px; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,.25); background: rgba(40,30,20,.8); color: #fff; font-weight: 800; }
 .bal-w.on { background: #c9a24a; color: #1a1008; }
+
+/* ───────── 조사 문서: 편지 · 쪽지 · 포스터 · 전단 · 사진 · 장부를 실제 종이처럼 ───────── */
+:root {
+  --hand: 'Nanum Pen Script', 'Gaegu', cursive;
+  --kid: 'Gaegu', 'Nanum Pen Script', cursive;
+  --type: 'Nanum Myeongjo', serif;
+  --bold: 'Do Hyeon', 'Gowun Dodum', sans-serif;
+  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .32  0 0 0 0 .22  0 0 0 0 .1  0 0 0 .2 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+.modal-card.doc-mode { width: min(660px, 95vw); background: radial-gradient(ellipse at 50% -10%, #3e2c22, #140e0b 65%), #120e0c; border-color: rgba(255, 220, 170, .14); }
+.modal-card.doc-mode #modalText { display: none; }
+.modal-card.doc-mode #modalBody { margin-top: 6px; }
+.doc-wrap { display: flex; flex-direction: column; gap: 14px; align-items: center; padding: 6px 2px 4px; }
+.doc-caption { align-self: stretch; font-family: var(--story); font-size: 14px; color: #c2b6a4; font-style: italic; line-height: 1.65; white-space: pre-wrap; padding: 0 8px; border-left: 2px solid rgba(232, 193, 112, .35); }
+.doc-holder { position: relative; width: 100%; transform: rotate(var(--tilt, 0deg)); filter: drop-shadow(0 12px 18px rgba(0, 0, 0, .65)) drop-shadow(0 2px 2px rgba(0, 0, 0, .45)); animation: docIn .35s ease-out; }
+@keyframes docIn { from { opacity: 0; transform: translateY(14px) rotate(calc(var(--tilt, 0deg) - 2deg)) scale(.97); } }
+.doc-sheet { position: relative; padding: 30px 30px 36px; color: #2b2119; background-color: #efe5cc; background-image: var(--grain), radial-gradient(ellipse at 20% 10%, rgba(255, 255, 255, .35), transparent 50%), radial-gradient(ellipse at 100% 100%, rgba(110, 70, 20, .22), transparent 55%), radial-gradient(ellipse at 0% 100%, rgba(110, 70, 20, .16), transparent 45%); overflow: hidden; }
+.doc-text { position: relative; z-index: 1; }
+.doc-head { font-family: var(--type); font-weight: 800; font-size: 19px; text-align: center; margin-bottom: 14px; letter-spacing: 1px; line-height: 1.4; }
+.doc-p { white-space: pre-wrap; line-height: 1.75; font-size: 16px; margin: 0 0 12px; font-family: var(--type); }
+.doc-p:last-child { margin-bottom: 0; }
+.doc-aside { font-style: italic; opacity: .72; font-size: 14px; font-family: var(--story) !important; }
+.doc-deco i { position: absolute; display: block; pointer-events: none; z-index: 2; font-style: normal; }
+.doc-deco .stain { width: 130px; height: 130px; border-radius: 50%; transform: translate(-50%, -50%); background: radial-gradient(circle, transparent 50%, rgba(120, 72, 24, .22) 57%, rgba(120, 72, 24, .07) 63%, transparent 69%); }
+.doc-deco .tape { top: -4px; left: 50%; width: 120px; height: 30px; transform: translateX(-50%) rotate(-3deg); background: linear-gradient(90deg, rgba(240, 232, 200, .5), rgba(250, 245, 220, .62), rgba(240, 232, 200, .5)); box-shadow: 0 1px 2px rgba(0, 0, 0, .18); clip-path: polygon(3% 0, 97% 4%, 100% 50%, 96% 100%, 2% 96%, 0 40%); }
+.doc-deco .pin { top: 12px; width: 15px; height: 15px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ff9a9a, #c01414 55%, #500 100%); box-shadow: 2px 3px 3px rgba(0, 0, 0, .45); }
+.doc-deco .pin-l { left: 14px; } .doc-deco .pin-r { right: 14px; }
+.doc-deco .fold { left: 0; right: 0; top: 50%; height: 3px; background: linear-gradient(180deg, rgba(0, 0, 0, .07), rgba(255, 255, 255, .45), rgba(0, 0, 0, .05)); }
+.doc-deco .stamp { right: 20px; top: 16px; padding: 3px 10px; border: 3px solid rgba(186, 26, 26, .7); color: rgba(186, 26, 26, .72); font-family: var(--bold); font-size: 19px; letter-spacing: 2px; transform: rotate(-12deg); border-radius: 6px; mix-blend-mode: multiply; }
+
+/* 편지: 연한 줄이 그어진 편지지 + 손글씨 */
+.doc-letter .doc-sheet { background-color: #f3ebd6; background-image: var(--grain), repeating-linear-gradient(180deg, transparent 0 33px, rgba(70, 100, 170, .2) 33px 34px), radial-gradient(ellipse at 100% 100%, rgba(110, 70, 20, .22), transparent 55%); padding: 34px 34px 40px; }
+.doc-letter .doc-head { font-family: var(--hand); font-weight: 400; font-size: 30px; text-align: left; margin-bottom: 8px; }
+.doc-letter .doc-p { font-family: var(--hand); font-size: 24px; line-height: 34px; margin-bottom: 34px; color: #1f2a4a; }
+/* 쪽지: 노트에서 찢어 낸 한 장 (빨간 여백선) */
+.doc-note .doc-holder { width: min(460px, 100%); }
+.doc-note .doc-sheet { background-color: #f4ecc0; background-image: var(--grain), linear-gradient(90deg, transparent 40px, rgba(200, 40, 40, .4) 40px 42px, transparent 42px), repeating-linear-gradient(180deg, transparent 0 31px, rgba(60, 110, 170, .22) 31px 32px); padding: 36px 26px 34px 56px; }
+.doc-note .doc-head, .doc-note .doc-p { font-family: var(--hand); font-weight: 400; font-size: 24px; line-height: 32px; text-align: left; }
+.doc-note .doc-p { margin-bottom: 32px; color: #22201c; }
+/* 일기·일지: 스프링 공책 */
+.doc-diary .doc-sheet { background-color: #f6f0e0; background-image: var(--grain), radial-gradient(circle at 16px 50%, #1c1612 5px, transparent 6px), repeating-linear-gradient(180deg, transparent 0 31px, rgba(80, 110, 160, .2) 31px 32px); background-size: auto, 100% 34px, auto; padding: 34px 28px 34px 46px; }
+.doc-diary .doc-head { font-family: var(--hand); font-weight: 400; font-size: 28px; text-align: left; border-bottom: 2px solid rgba(160, 40, 40, .4); padding-bottom: 4px; }
+.doc-diary .doc-p { font-family: var(--hand); font-size: 23px; line-height: 32px; margin-bottom: 32px; color: #2a2230; }
+/* 아이 그림·그림일기 */
+.doc-drawing .doc-sheet { background-color: #fbf7ec; padding: 18px 22px 26px; }
+.doc-drawing .doc-pic { width: 100%; height: auto; display: block; border: 1px solid rgba(0, 0, 0, .08); margin-bottom: 14px; }
+.doc-drawing .doc-head, .doc-drawing .doc-p { font-family: var(--kid); font-weight: 700; font-size: 19px; line-height: 1.7; text-align: left; color: #2a3a6a; }
+/* 장부·명부·서류: 명조 + 칸 줄 + 도장 */
+.doc-ledger .doc-sheet { background-color: #f1ecdf; background-image: var(--grain), repeating-linear-gradient(180deg, transparent 0 27px, rgba(40, 40, 40, .12) 27px 28px); }
+.doc-ledger .doc-head { border-bottom: 3px double rgba(40, 30, 20, .6); padding-bottom: 8px; text-align: left; padding-right: 90px; }
+.doc-ledger .doc-p { font-size: 15.5px; line-height: 28px; letter-spacing: .2px; }
+/* 포스터 · 전단 */
+.doc-poster .doc-sheet, .doc-flyer .doc-sheet { padding: 40px 30px 34px; text-align: center; }
+.doc-poster .doc-head, .doc-flyer .doc-head { font-family: var(--bold); font-weight: 400; font-size: 30px; letter-spacing: 2px; margin-bottom: 16px; }
+.doc-poster .doc-p, .doc-flyer .doc-p { font-family: var(--ui); font-size: 16.5px; }
+.doc-flyer .doc-sheet { background-color: #dcd5c0; }
+.doc-flyer .doc-p { text-shadow: 0 0 1.5px rgba(30, 20, 10, .55); }
+.doc-poster.theme-clown .doc-sheet { background-color: #1e0c2c; color: #ffe8b8; background-image: var(--grain), repeating-conic-gradient(from 0deg at 50% 0%, rgba(255, 211, 106, .1) 0 8deg, transparent 8deg 16deg); border: 6px solid #ffd36a; }
+.doc-poster.theme-clown .doc-head { color: #ffd36a; text-shadow: 3px 3px 0 #a0101e; }
+.doc-poster.theme-west .doc-sheet, .doc-board.theme-west .doc-text { background-color: #dcc493; }
+.doc-poster.theme-west .doc-head { font-size: 36px; color: #3a1a0a; }
+.doc-poster.theme-camp .doc-sheet { background-color: #fff4cc; border: 5px dashed #7ed07a; }
+.doc-poster.theme-camp .doc-head { color: #2a6a3a; }
+.doc-poster.theme-hospital .doc-sheet { background-color: #eef1ee; border-top: 26px solid #2a6a5a; }
+.doc-poster.theme-hospital .doc-head { color: #1a3a32; }
+/* 신문 */
+.doc-news .doc-sheet { background-color: #d8d2c2; background-image: var(--grain), radial-gradient(ellipse at 90% 90%, rgba(120, 80, 30, .3), transparent 55%); }
+.doc-news .doc-head { font-size: 25px; border-top: 3px solid #2a2420; border-bottom: 1px solid #2a2420; padding: 6px 0; }
+.doc-news .doc-p { font-size: 15px; line-height: 1.7; text-align: justify; }
+@media (min-width: 560px) { .doc-news .doc-text > .doc-p { column-count: 2; column-gap: 22px; column-rule: 1px solid rgba(0, 0, 0, .2); } }
+/* 게시판: 코르크판 위에 꽂은 종이 */
+.doc-board .doc-sheet { background-color: #9a6a3c; background-image: var(--grain), radial-gradient(rgba(60, 30, 10, .35) 1px, transparent 1.5px); background-size: auto, 7px 7px; padding: 34px 24px 26px; border: 10px solid #4a3020; }
+.doc-board .doc-text { background: #f2ead8; padding: 22px 20px; box-shadow: 0 4px 8px rgba(0, 0, 0, .45); transform: rotate(-.8deg); }
+.doc-board .doc-p { font-family: var(--ui); }
+/* 사진 (폴라로이드) + 뒷면 메모 */
+.doc-photo .doc-holder { width: min(400px, 100%); }
+.doc-photo .doc-sheet { background: #f7f4ec; padding: 14px 14px 46px; }
+.doc-photo .doc-pic, .doc-portrait .doc-pic { width: 100%; height: auto; display: block; }
+.doc-back { width: min(520px, 100%); background: #ece4cf; background-image: var(--grain); padding: 18px 22px; box-shadow: 0 8px 16px rgba(0, 0, 0, .5); transform: rotate(.6deg); color: #2a2018; }
+.doc-back .doc-p { font-family: var(--hand); font-size: 22px; line-height: 1.5; margin-bottom: 10px; }
+/* 초상화 · 무신도: 금박 액자 */
+.doc-portrait .doc-holder { width: min(340px, 100%); }
+.doc-portrait .doc-sheet { padding: 0; border: 16px solid transparent; border-image: linear-gradient(135deg, #f0d48a, #8a6420 30%, #e8c170 50%, #6a4a14 75%, #d8b060) 1; box-shadow: inset 0 0 0 3px #3a2a10; background: #140c08; }
+/* 족자 · 부적: 한지 + 위아래 나무 축 */
+.doc-scroll .doc-holder { width: min(440px, 100%); }
+.doc-scroll .doc-sheet { background-color: #ead8ae; background-image: var(--grain), repeating-linear-gradient(80deg, rgba(150, 110, 50, .06) 0 2px, transparent 2px 9px); padding: 44px 34px; text-align: center; border-left: 10px solid #6a1a14; border-right: 10px solid #6a1a14; }
+.doc-scroll .doc-sheet::before, .doc-scroll .doc-sheet::after { content: ''; position: absolute; left: 0; right: 0; height: 14px; background: linear-gradient(180deg, #4a2a14, #2a160a); border-radius: 7px; }
+.doc-scroll .doc-sheet::before { top: 0; } .doc-scroll .doc-sheet::after { bottom: 0; }
+.doc-scroll .doc-head, .doc-scroll .doc-p { font-family: var(--type); font-weight: 800; font-size: 17px; line-height: 2; color: #1a120c; }
+/* 비석 · 묘비 · 기념패: 돌에 새긴 글씨 */
+.doc-stone .doc-holder { width: min(480px, 100%); }
+.doc-stone .doc-sheet { background-color: #6a6a64; background-image: var(--grain), radial-gradient(ellipse at 30% 20%, rgba(255, 255, 255, .18), transparent 60%), radial-gradient(ellipse at 80% 90%, rgba(40, 60, 30, .45), transparent 50%); color: #2a2a26; border-radius: 40px 40px 6px 6px; text-align: center; padding: 40px 30px; }
+.doc-stone .doc-head, .doc-stone .doc-p { font-family: var(--type); font-weight: 800; font-size: 17px; color: #262622; text-shadow: 1px 1px 0 rgba(255, 255, 255, .22), -1px -1px 0 rgba(0, 0, 0, .45); }
+/* 칠판 */
+.doc-chalk .doc-sheet { background-color: #24402f; background-image: var(--grain), radial-gradient(ellipse at 40% 40%, rgba(255, 255, 255, .06), transparent 60%); border: 14px solid #5a3f28; color: #f2f0e6; }
+.doc-chalk .doc-head, .doc-chalk .doc-p { font-family: var(--kid); font-size: 21px; color: #f0eee4; text-shadow: 0 0 2px rgba(255, 255, 255, .45); }
+/* 설계도 · 배선도 */
+.doc-blueprint .doc-sheet { background-color: #1d3f6e; background-image: linear-gradient(rgba(255, 255, 255, .1) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, .1) 1px, transparent 1px); background-size: 22px 22px; color: #e8f0ff; border: 2px solid rgba(255, 255, 255, .35); }
+.doc-blueprint .doc-head, .doc-blueprint .doc-p { color: #e8f0ff; font-family: var(--ui); }
+/* 약병 라벨 */
+.doc-label .doc-holder { width: min(420px, 100%); }
+.doc-label .doc-sheet { background: #fbfaf4; border: 4px double #b01a1a; border-radius: 6px; text-align: center; }
+@media (max-width: 520px) {
+  .doc-sheet { padding: 24px 18px 28px; }
+  .doc-letter .doc-p, .doc-note .doc-p, .doc-diary .doc-p { font-size: 21px; }
+  .doc-note .doc-sheet { padding-left: 50px; }
+  .doc-poster .doc-head, .doc-flyer .doc-head { font-size: 25px; }
+}

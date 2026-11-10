@@ -39,11 +39,17 @@ function drawEye(x, cx, side, look) {
     ell(x, cx, EY, rx, ry, '#fff');
     const g = x.createLinearGradient(0, EY - ry, 0, EY + ry); g.addColorStop(0, D); g.addColorStop(0.35, ec); g.addColorStop(1, '#ffffff');
     ell(x, cx, EY + 2, rx * 0.86, ry * 0.9, g);
+    // 홍채 안쪽 반짝이는 무늬
+    x.strokeStyle = 'rgba(255,255,255,.22)'; x.lineWidth = 2; for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; x.beginPath(); x.moveTo(cx + Math.cos(a) * rx * 0.45, EY + 2 + Math.sin(a) * ry * 0.48); x.lineTo(cx + Math.cos(a) * rx * 0.78, EY + 2 + Math.sin(a) * ry * 0.82); x.stroke(); }
     ell(x, cx, EY + 2, rx * 0.42, ry * 0.45, D);
     ell(x, cx - rx * 0.32, EY - ry * 0.35, rx * 0.3, ry * 0.26, '#fff');
     ell(x, cx + rx * 0.3, EY + ry * 0.42, rx * 0.14, ry * 0.12, '#fff');
+    ell(x, cx + rx * 0.05, EY - ry * 0.52, rx * 0.08, ry * 0.07, 'rgba(255,255,255,.85)');
     x.strokeStyle = D; x.lineWidth = 6; x.beginPath(); x.ellipse(cx, EY, rx + 2, ry + 2, 0, Math.PI * 1.08, Math.PI * 1.92); x.stroke();
+    // 위 속눈썹 두 가닥 + 아래 속눈썹
     x.lineWidth = 4; x.beginPath(); x.moveTo(cx + side * rx * 0.9, EY - ry * 0.6); x.lineTo(cx + side * (rx + 10), EY - ry * 0.95); x.stroke();
+    x.lineWidth = 3.5; x.beginPath(); x.moveTo(cx + side * rx * 0.62, EY - ry * 0.88); x.lineTo(cx + side * (rx * 0.75 + 4), EY - ry * 1.22); x.stroke();
+    x.lineWidth = 2.5; x.strokeStyle = 'rgba(42,30,34,.55)'; x.beginPath(); x.ellipse(cx, EY + 1, rx * 0.9, ry * 0.98, 0, Math.PI * 0.3, Math.PI * 0.7); x.stroke();
   };
   switch (e) {
     case 'big': bigEye(30, 38); break;
@@ -52,6 +58,7 @@ function drawEye(x, cx, side, look) {
     case 'cat': ell(x, cx, EY, 28, 34, ec); x.fillStyle = D; x.beginPath(); x.ellipse(cx, EY, 6, 28, 0, 0, Math.PI * 2); x.fill(); ell(x, cx - 9, EY - 12, 6, 6, '#fff'); x.strokeStyle = D; x.lineWidth = 5; x.beginPath(); x.ellipse(cx, EY, 29, 35, 0, 0, Math.PI * 2); x.stroke(); break;
     case 'smile': x.strokeStyle = D; x.lineWidth = 10; x.beginPath(); x.arc(cx, EY + 14, 24, Math.PI * 1.15, Math.PI * 1.85); x.stroke(); break;
     case 'closed': x.strokeStyle = D; x.lineWidth = 9; x.beginPath(); x.arc(cx, EY - 6, 24, Math.PI * 0.15, Math.PI * 0.85); x.stroke(); break;
+    case 'blink': x.strokeStyle = D; x.lineWidth = 8; x.beginPath(); x.moveTo(cx - 26, EY + 2); x.quadraticCurveTo(cx, EY + 12, cx + 26, EY + 2); x.stroke(); x.lineWidth = 4; x.beginPath(); x.moveTo(cx + side * 24, EY + 3); x.lineTo(cx + side * 33, EY - 3); x.stroke(); break;
     case 'sleepy': x.strokeStyle = D; x.lineWidth = 9; x.beginPath(); x.moveTo(cx - 26, EY + 4); x.quadraticCurveTo(cx, EY + 16, cx + 26, EY + 4); x.stroke(); x.lineWidth = 4; x.beginPath(); x.moveTo(cx - 24, EY - 6); x.lineTo(cx + 24, EY - 6); x.stroke(); break;
     case 'wink': if (side < 0) { ell(x, cx, EY, 20, 25, D); ell(x, cx - 6, EY - 8, 7, 7, '#fff'); } else { x.strokeStyle = D; x.lineWidth = 9; x.beginPath(); x.moveTo(cx - 22, EY - 16); x.lineTo(cx + 18, EY); x.lineTo(cx - 22, EY + 16); x.stroke(); } break;
     case 'star': star(x, cx, EY, 32, ec === D ? '#f1c40f' : ec); star(x, cx - 6, EY - 6, 9, '#fff'); break;
@@ -90,7 +97,11 @@ function drawMouth(x, m) {
 function drawCheeks(x, c) {
   for (const s of [-1, 1]) {
     const cx = CX + s * 150, cy = 296;
-    if (c === 'blush') { const g = x.createRadialGradient(cx, cy, 2, cx, cy, 34); g.addColorStop(0, 'rgba(255,120,150,.75)'); g.addColorStop(1, 'rgba(255,120,150,0)'); x.fillStyle = g; x.fillRect(cx - 40, cy - 30, 80, 60); }
+    if (c === 'blush') {
+      x.save(); x.translate(cx, cy); x.scale(1.35, 0.85); const g = x.createRadialGradient(0, 0, 2, 0, 0, 34); g.addColorStop(0, 'rgba(255,120,150,.8)'); g.addColorStop(1, 'rgba(255,120,150,0)'); x.fillStyle = g; x.fillRect(-40, -34, 80, 68); x.restore();
+      // 볼터치 위 짧은 빗금 세 개 (만화풍 홍조)
+      x.strokeStyle = 'rgba(255,90,120,.55)'; x.lineWidth = 3; x.lineCap = 'round'; for (let i = -1; i <= 1; i++) { x.beginPath(); x.moveTo(cx + i * 12 - 4, cy + 6); x.lineTo(cx + i * 12 + 4, cy - 6); x.stroke(); }
+    }
     if (c === 'freckles') for (let i = 0; i < 6; i++) ell(x, cx - 16 + (i % 3) * 14, cy - 6 + Math.floor(i / 3) * 12 + (i % 2) * 4, 3.2, 3.2, '#b0704a');
     if (c === 'hearts') heart(x, cx, cy, 11, '#ff6b8a');
     if (c === 'swirl') { x.strokeStyle = '#ff7f9f'; x.lineWidth = 4; x.beginPath(); for (let a = 0; a < Math.PI * 4; a += 0.2) x.lineTo(cx + Math.cos(a) * (2 + a * 2.4), cy + Math.sin(a) * (2 + a * 2.4)); x.stroke(); }
@@ -132,9 +143,11 @@ export function drawFace(canvas, look, img) {
     return;
   }
   // 치비 비율: 이목구비를 크게
-  x.save(); x.translate(256, 250); x.scale(1.4, 1.4); x.translate(-256, -250);
+  x.save(); x.translate(256, 252); x.scale(1.55, 1.55); x.translate(-256, -250);
   drawCheeks(x, look.cheeks);
   for (const s of [-1, 1]) { drawEye(x, CX + s * EX, s, look); drawBrow(x, CX + s * EX, s, look.brows); }
+  // 작은 콩알 코 (빨간 코 · 마스크를 쓰면 생략)
+  if (look.extra !== 'clown' && look.extra !== 'mask') { ell(x, CX, MY - 34, 7, 5, 'rgba(200,110,110,.55)'); ell(x, CX - 2, MY - 36, 2.5, 2, 'rgba(255,255,255,.6)'); }
   drawMouth(x, look.mouth);
   drawExtra(x, look.extra);
   x.restore();
@@ -144,7 +157,8 @@ export function drawFace(canvas, look, img) {
 export function createAvatar(look) {
   look = { ...DEFAULT_LOOK, ...look };
   const g = new THREE.Group();
-  const skin = mat(look.body);
+  // 피부는 아주 살짝 스스로 빛나게: 어두운 맵에서도 얼굴이 뭉개지지 않고 말랑해 보인다
+  const skin = mat(look.body, { roughness: 0.55, emissive: look.body, emissiveIntensity: 0.07 });
   const accent = mat(look.accent);
   const dark = mat('#231a1f');
   const white = mat('#ffffff');
@@ -161,14 +175,21 @@ export function createAvatar(look) {
   for (const s of [-1, 1]) {
     const pivot = new THREE.Group(); pivot.position.set(0.12 * s, 0.3, 0);
     const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.085, 0.12, 4, 10), mat(O.legs)); leg.position.y = -0.14; pivot.add(leg);
-    const shoe = new THREE.Mesh(new THREE.SphereGeometry(0.095, 12, 8), mat(O.shoes)); shoe.scale.set(1, 0.6, 1.35); shoe.position.set(0, -0.27, 0.03); pivot.add(shoe);
+    const shoe = new THREE.Mesh(new THREE.SphereGeometry(0.095, 16, 10), mat(O.shoes, { roughness: 0.45 })); shoe.scale.set(1, 0.6, 1.35); shoe.position.set(0, -0.27, 0.03); pivot.add(shoe);
+    // 신발 밑창 + 앞코 반짝임
+    const sole = new THREE.Mesh(new THREE.CylinderGeometry(0.094, 0.098, 0.022, 16), mat('#f4efe6', { roughness: 0.8 })); sole.scale.set(1, 1, 1.35); sole.position.set(0, -0.3, 0.03); pivot.add(sole);
+    const shine = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 6), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.55 })); shine.position.set(-0.03 * s, -0.24, 0.13); pivot.add(shine);
     rig.add(pivot); legs.push(pivot);
   }
   const arms = [];
   for (const s of [-1, 1]) {
     const pivot = new THREE.Group(); pivot.position.set(0.3 * s, 0.68, 0);
     const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.16, 4, 10), mat(O.sleeve)); arm.position.set(0.03 * s, -0.13, 0); arm.rotation.z = 0.35 * s; pivot.add(arm);
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.068, 12, 8), skin); hand.position.set(0.08 * s, -0.27, 0); pivot.add(hand);
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.068, 14, 10), skin); hand.position.set(0.08 * s, -0.27, 0); pivot.add(hand);
+    // 벙어리장갑 같은 엄지
+    const thumb = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), skin); thumb.position.set(0.06 * s, -0.24, 0.05); pivot.add(thumb);
+    // 소매 끝 단 (옷 색보다 살짝 밝게)
+    const cuff = new THREE.Mesh(new THREE.TorusGeometry(0.066, 0.016, 6, 14), mat(a2(O.sleeve))); cuff.position.set(0.068 * s, -0.222, 0); cuff.rotation.order = 'ZXY'; cuff.rotation.set(Math.PI / 2, 0, 0.35 * s); pivot.add(cuff);
     rig.add(pivot); arms.push(pivot);
   }
   addOutfit(rig, look, O);
@@ -188,8 +209,11 @@ export function createAvatar(look) {
   );
   faceMesh.renderOrder = 2;
   inner.add(faceMesh);
-  let photoImg = null, curExpr = null;
-  const redraw = () => { drawFace(fc, curExpr ? { ...look, ...EXPR[curExpr] } : look, photoImg); ftex.needsUpdate = true; };
+  let photoImg = null, curExpr = null, blinking = false;
+  const redraw = () => { const l = curExpr ? { ...look, ...EXPR[curExpr] } : look; drawFace(fc, blinking ? { ...l, eyes: 'blink' } : l, photoImg); ftex.needsUpdate = true; };
+  // 눈 깜빡임: 눈을 뜬 표정일 때만 (웃는 눈 · 감은 눈 · 사진 얼굴은 그대로)
+  const BLINKABLE = new Set(['dot', 'big', 'sparkle', 'teary', 'cat', 'star', 'heart', 'angry']);
+  const setBlink = (on) => { if (on === blinking) return; const e = (curExpr && EXPR[curExpr]?.eyes) || look.eyes; if (on && (look.photoOn || !BLINKABLE.has(e))) return; blinking = on; redraw(); };
   redraw();
   if (look.photoOn && look.photo) {
     const img = new Image();
@@ -207,8 +231,8 @@ export function createAvatar(look) {
   blob.rotation.x = -Math.PI / 2; blob.position.y = 0.015; g.add(blob);
 
   g.traverse((o) => { if (o.isMesh && o !== blob && o !== faceMesh) o.castShadow = true; });
-  g.userData = { rig, legs, arms, head, phase: Math.random() * 6, blob, crouch: 0, expr: null, accFx,
-    setExpr: (e) => { curExpr = e && EXPR[e] ? e : null; redraw(); } };
+  g.userData = { rig, legs, arms, head, torso, phase: Math.random() * 6, blob, crouch: 0, expr: null, accFx, blinkT: 1 + Math.random() * 3, setBlink,
+    setExpr: (e) => { curExpr = e && EXPR[e] ? e : null; blinking = false; redraw(); } };
   return g;
 }
 
@@ -501,6 +525,9 @@ function addHair(inner, head, l, m) {
     case 'spiky': back(Math.PI * 0.55); for (let i = 0; i < 9; i++) { const c = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.28, 6), m); const a = (i / 9) * Math.PI * 2; c.position.set(Math.cos(a) * 0.26, 0.36, Math.sin(a) * 0.26 - 0.03); c.rotation.set(Math.sin(a) * 0.7, 0, -Math.cos(a) * 0.7); inner.add(c); } bangs(Math.PI * 0.34, true); break;
     case 'bowl': back(Math.PI * 0.6); bangs(Math.PI * 0.42); break;
   }
+  // 정수리의 동그란 머릿결 광택 (천사링)
+  const hl = new THREE.Mesh(seg(0.4485, FRONT - 0.85, 1.7, Math.PI * 0.16, Math.PI * 0.04), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.22, depthWrite: false }));
+  hl.renderOrder = 1; inner.add(hl);
 }
 
 function addEars(head, l, skin, accent) {
@@ -661,6 +688,9 @@ export function animateAvatar(g, dt, moving, t, crouch = false, emote = null, et
   head.rotation.set(0, 0, moving ? Math.sin(u.phase * 0.5) * 0.05 : Math.sin(t * 1.3 + u.phase) * 0.04);
   head.scale.setScalar(1);
   if (u.accFx) u.accFx(t, moving);
+  // 숨쉬기 (몸통이 아주 살짝 부풀었다 줄어든다) + 눈 깜빡임
+  if (u.torso) u.torso.scale.set(1 + Math.sin(t * 2.2 + u.phase) * 0.012, 1 + Math.sin(t * 2.2 + u.phase) * 0.02, 1);
+  if (u.setBlink) { u.blinkT -= dt; if (u.blinkT < 0) { u.blinkOn = !u.blinkOn; u.setBlink(u.blinkOn); u.blinkT = u.blinkOn ? 0.13 : 2.4 + Math.random() * 3.2; } }
   if (emote && (!moving || emote === 'jump')) {
     const w = Math.sin(et * 10);
     switch (emote) {
