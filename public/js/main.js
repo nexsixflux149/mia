@@ -1793,7 +1793,8 @@ function openRank(tab) {
       if (!rows.length) { list.appendChild(el('div', 'muted', '아직 기록이 없어요. 처음부터 클리어하면 첫 기록이 됩니다!')); return; }
       rows.forEach((r, i) => {
         const row = el('div', 'rank-row' + (r.names.includes(S.myName) ? ' me' : ''));
-        row.append(el('span', 'rank-no', ['🥇', '🥈', '🥉'][i] || String(i + 1)), el('span', 'rank-names', r.names.join(', ')), el('span', 'rank-time', fmtMs(r.ms)), el('span', 'rank-meta', `${FEAR_SHORT[r.fear] ?? ''}${r.ending === 'true' ? ' · 진엔딩' : ''} · 💡${r.hints ?? '-'}`));
+        row.append(el('span', 'rank-no', ['🥇', '🥈', '🥉'][i] || String(i + 1)), el('span', 'rank-names', r.names.join(', ')), el('span', 'rank-time', fmtMs(r.ms)), el('span', 'rank-meta', `${FEAR_SHORT[r.fear] ?? ''} · 💡${r.hints ?? '-'}`));
+        if (r.ending === 'true') { const tb = el('span', 'rank-true', '🏅 진'); tb.title = '진엔딩으로 클리어'; row.querySelector('.rank-names').append(' ', tb); }
         list.appendChild(row);
       });
     };

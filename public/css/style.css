@@ -553,3 +553,5 @@ body.mobile #gameTimer { width: 96px; right: 10px; bottom: 296px; font-size: 12p
 body.mobile .abtn.shout { bottom: 326px; }
 @media (orientation: landscape) and (max-height: 500px) { body.mobile #gameTimer { right: 70px; bottom: 250px; } body.mobile .abtn.shout { bottom: 276px; right: 89px; } }
 #hintUsed { font-size: 12px; margin-top: 4px; }
+/* 랭킹: 진엔딩 표시 */
+.rank-true { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 8px; background: rgba(255,211,106,.18); border: 1px solid rgba(255,211,106,.6); color: #ffe08a; font-size: 12px; font-weight: 800; white-space: nowrap; }
