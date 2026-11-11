@@ -547,13 +547,6 @@ export function buildLobby(scene) {
   ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; root.add(ground);
   const plaza = new THREE.Mesh(new THREE.CircleGeometry(16.5, 56), new THREE.MeshStandardMaterial({ map: (() => { const t = groundTex('#6a625c', 0.14); t.repeat.set(5, 5); return t; })(), roughness: 1 }));
   plaza.rotation.x = -Math.PI / 2; plaza.position.y = 0.01; plaza.receiveShadow = true; root.add(plaza);
-  // 관문으로 이어지는 빛나는 길
-  for (const th of LOBBY_THEMES) {
-    const dx = th.x, dz = th.z - 5, len = Math.hypot(dx, dz) - 3;
-    const path = new THREE.Mesh(new THREE.PlaneGeometry(0.12, len), new THREE.MeshBasicMaterial({ color: th.color, transparent: true, opacity: 0.55 }));
-    path.rotation.x = -Math.PI / 2; path.rotation.z = Math.atan2(dx, -dz) * -1; path.position.set(dx / 2 * (len / Math.hypot(dx, dz)), 0.02, 5 + dz / 2 * (len / Math.hypot(dx, dz)));
-    root.add(path);
-  }
 
   const add = (p) => { const g = place(root, p); const f = footOf(p, g); if (f) colliders.push(f); return g; };
   for (let i = 0; i < 18; i++) { const a = (i / 18) * Math.PI * 2 + 0.09; add({ t: i % 3 ? 'pine' : 'tree', x: Math.cos(a) * 19.5, z: Math.sin(a) * 19.5, color: ['#c9a8ff', '#ffb7c9', '#9ad0ff'][i % 3] }); }
