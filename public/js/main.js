@@ -309,14 +309,14 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyH' && S.room === 'game') socket.emit('game:hint');
   if (e.code === 'KeyJ') openJournal();
   if (e.code === 'KeyM') { SET.minimap = !SET.minimap; saveSettings(); }
-  if (e.code === 'KeyC') { S.crouch = !S.crouch; updateStatus(); }
+  if (e.code === 'KeyC' && !e.repeat && !S.crouch) { S.crouch = true; updateStatus(); } // C 를 누르고 있는 동안만 웅크린다
   if (e.code === 'KeyG') sendPing();
   if (e.code === 'KeyQ') sendCallout();
   if (e.code === 'KeyR') cam.yaw = me.ry + Math.PI;
   if (/^Digit[1-9]$/.test(e.code)) { const i = Number(e.code.slice(5)) - 1; if (S.inv[i]) primaryItem(S.inv[i], i); }
 });
-addEventListener('keyup', (e) => { keys[e.code] = false; });
-addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+addEventListener('keyup', (e) => { keys[e.code] = false; if (e.code === 'KeyC' && S.crouch) { S.crouch = false; updateStatus(); } });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; if (S.crouch) { S.crouch = false; updateStatus(); } });
 
 let drag = null;
 canvas.addEventListener('pointerdown', (e) => {
@@ -1879,7 +1879,7 @@ $('#helpBtn').onclick = () => {
     return;
   }
   const k = el('div', 'keys');
-  [['W A S D / 방향키', '이동'], ['Shift', '달리기 (발소리 때문에 귀신이 멀리서도 알아챈다)'], ['C', '웅크리기 (느리지만 귀신에게 덜 들킨다)'], ['V (누르고 있기)', '조심조심 걷기 — 아주 느리지만 귀신이 절대 눈치채지 못한다'], ['마우스 드래그 · 휠', '시점 회전 · 확대/축소'], ['R', '카메라를 캐릭터 뒤로'], ['클릭 / E', '조사 · 줍기 · 풀기 (멀리 있으면 자동으로 다가감)'], ['Space', '점프'], ['X', '감정표현 (춤·인사·엎드리기·놀래키기 등)'], ['F', '손전등 켜기/끄기'], ['T', '부적 태우기 (귀신 20초 퇴치)'], ['1 ~ 9', '아이템 바로 사용 (자물쇠 창에서는 버튼 입력)'], ['아이템 우클릭', '조합 · 파티원에게 건네기'], ['J', '수첩 — 본 단서가 자동 기록됨'], ['H', '힌트'], ['G / 휠 클릭', '마우스 위치를 파티원에게 찍어 주기'], ['Q', '외치기 — "어이!" "여기야!" 하며 내 위치를 바닥 파형과 지도로 알리기'], ['M', '미니맵 켜기/끄기'], ['💖 (접속자 목록·캐릭터 클릭)', '친구에게 하트 보내기'], ['Enter · Tab', '채팅 · 전체/파티 전환']].forEach(([a, b]) => { k.append(el('kbd', null, a), el('span', null, b)); });
+  [['W A S D / 방향키', '이동'], ['Shift', '달리기 (발소리 때문에 귀신이 멀리서도 알아챈다)'], ['C (누르고 있기)', '웅크리기 — 그 자리에서 방향만 돌리며 귀신에게 덜 들킨다. 떼면 일어선다'], ['V (누르고 있기)', '조심조심 걷기 — 아주 느리지만 귀신이 절대 눈치채지 못한다'], ['마우스 드래그 · 휠', '시점 회전 · 확대/축소'], ['R', '카메라를 캐릭터 뒤로'], ['클릭 / E', '조사 · 줍기 · 풀기 (멀리 있으면 자동으로 다가감)'], ['Space', '점프'], ['X', '감정표현 (춤·인사·엎드리기·놀래키기 등)'], ['F', '손전등 켜기/끄기'], ['T', '부적 태우기 (귀신 20초 퇴치)'], ['1 ~ 9', '아이템 바로 사용 (자물쇠 창에서는 버튼 입력)'], ['아이템 우클릭', '조합 · 파티원에게 건네기'], ['J', '수첩 — 본 단서가 자동 기록됨'], ['H', '힌트'], ['G / 휠 클릭', '마우스 위치를 파티원에게 찍어 주기'], ['Q', '외치기 — "어이!" "여기야!" 하며 내 위치를 바닥 파형과 지도로 알리기'], ['M', '미니맵 켜기/끄기'], ['💖 (접속자 목록·캐릭터 클릭)', '친구에게 하트 보내기'], ['Enter · Tab', '채팅 · 전체/파티 전환']].forEach(([a, b]) => { k.append(el('kbd', null, a), el('span', null, b)); });
   const tip = el('p', 'muted', '귀신 공략: 소사는 소리에 민감하고, 하얀 여자는 손전등을 비추는 동안 움직이지 못합니다. 이장과 무당은 등 뒤로 나타납니다. 협동 장치는 서로 다른 두 사람이 8초 안에 눌러야 하며, 혼자일 땐 한쪽만 눌러도 됩니다.');
   const w = el('div'); w.append(k, tip);
   openModal('조작법', '', w);
