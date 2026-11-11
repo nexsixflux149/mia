@@ -198,7 +198,8 @@ function updateLabels() {
     l.sprite.position.set(l.owner.position.x, l.owner.position.y + l.y + lift, l.owner.position.z);
   }
 }
-const cam = { yaw: 0, pitch: 0.55, dist: 7 };
+const CAM_MAX = 14; // 가장 멀리 줌아웃한 거리 — 로비·챕터에 들어갈 때마다 여기서 시작
+const cam = { yaw: 0, pitch: 0.55, dist: CAM_MAX };
 let myAvatar = null;
 const me = { x: 0, z: 5, ry: Math.PI, moving: false };
 if (window.__dbg) Object.assign(window.__dbg, { S, cam, me, scene, camera, renderer }); // ?debug 일 때만 (테스트용)
@@ -236,6 +237,7 @@ function enterLobby(pos) {
   disposeWorld(scene, S.world);
   S.world = buildLobby(scene);
   S.room = 'lobby'; S.chapter = null; S.dark = false; S.objState = {}; S.mount = null; S.perch = null; me.y = 0;
+  cam.dist = CAM_MAX; // 항상 최대 줌아웃으로 시작
   me.x = pos.x; me.z = pos.z;
   removeGhost(); clearOthers(); clearPings();
   $('#placeTitle').textContent = '미아 광장';
@@ -252,6 +254,7 @@ function enterChapter(state, showIntro = true) {
   disposeWorld(scene, S.world);
   const ch = state.chapter;
   S.chapter = ch; S.room = 'game'; S.mount = null; S.perch = null; me.y = 0; closeThemePop(); noticeBox.classList.add('hidden');
+  cam.dist = CAM_MAX; // 항상 최대 줌아웃으로 시작
   S.world = buildChapter(scene, ch, S.scenario?.id);
   S.objState = state.objects; S.dark = state.dark;
   me.x = ch.spawn[0] + (Math.random() - 0.5); me.z = ch.spawn[1];
@@ -332,7 +335,7 @@ canvas.addEventListener('pointermove', (e) => {
 });
 canvas.addEventListener('pointerup', (e) => { if (drag && drag.moved <= 5 && drag.btn === 0) onClick(e); drag = null; });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-canvas.addEventListener('wheel', (e) => { cam.dist = Math.max(2.5, Math.min(14, cam.dist + e.deltaY * 0.006)); }, { passive: true });
+canvas.addEventListener('wheel', (e) => { cam.dist = Math.max(2.5, Math.min(CAM_MAX, cam.dist + e.deltaY * 0.006)); }, { passive: true });
 
 const ray = new THREE.Raycaster();
 const ndc = new THREE.Vector2();
@@ -2056,7 +2059,7 @@ applyMobile(); addEventListener('resize', applyMobile);
   // 두 손가락으로 확대/축소
   const tp = new Map(); let pinch = null;
   canvas.addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') tp.set(e.pointerId, e); if (tp.size === 2) { const [a, b] = [...tp.values()]; pinch = { d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), dist: cam.dist }; } });
-  canvas.addEventListener('pointermove', (e) => { if (!tp.has(e.pointerId)) return; tp.set(e.pointerId, e); if (pinch && tp.size === 2) { const [a, b] = [...tp.values()]; const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); cam.dist = Math.max(2.5, Math.min(14, pinch.dist * pinch.d / Math.max(20, d))); } });
+  canvas.addEventListener('pointermove', (e) => { if (!tp.has(e.pointerId)) return; tp.set(e.pointerId, e); if (pinch && tp.size === 2) { const [a, b] = [...tp.values()]; const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); cam.dist = Math.max(2.5, Math.min(CAM_MAX, pinch.dist * pinch.d / Math.max(20, d))); } });
   const tend = (e) => { tp.delete(e.pointerId); if (tp.size < 2) pinch = null; };
   canvas.addEventListener('pointerup', tend); canvas.addEventListener('pointercancel', tend);
 
