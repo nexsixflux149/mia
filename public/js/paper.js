@@ -133,9 +133,8 @@ export function renderDoc(title, text, hint = {}, theme = 'gwimun') {
   holder.style.setProperty('--tilt', `${((seed % 7) - 3) * 0.35}deg`);
   const sheet = el('div', 'doc-sheet'); holder.appendChild(sheet);
   if (['note', 'letter', 'poster', 'flyer', 'drawing', 'diary', 'news'].includes(style) && seed % 3 !== 0) sheet.style.clipPath = tornClip(seed, style === 'note' ? 'top' : 'bottom');
-  // 얼룩 · 테이프 · 압정 · 접힌 자국
+  // 테이프 · 압정 · 접힌 자국 (동그란 얼룩은 글씨를 가려서 뺐다)
   const deco = el('div', 'doc-deco');
-  if ((seed % 2 === 0 || style === 'letter') && !pictureOnly) { const st = el('i', 'stain'); st.style.left = `${55 + (seed % 30)}%`; st.style.top = `${50 + (seed % 35)}%`; deco.appendChild(st); }
   if (['note', 'drawing', 'photo'].includes(style)) deco.appendChild(el('i', 'tape'));
   if (['poster', 'flyer', 'board', 'news'].includes(style)) { deco.appendChild(el('i', 'pin pin-l')); deco.appendChild(el('i', 'pin pin-r')); }
   if (['letter', 'flyer', 'news'].includes(style)) deco.appendChild(el('i', 'fold'));
