@@ -250,6 +250,7 @@ function enterLobby(pos) {
   renderParty();
 }
 function enterChapter(state, showIntro = true) {
+  setGameClock(state.elapsed, state.timed); setHintsUsed(state.hintsUsed ?? 0);
   if (state.fear != null) { S.fear = state.fear; if (state.scenario) S.scenario = state.scenario; updateFearBadge(); }
   disposeWorld(scene, S.world);
   const ch = state.chapter;
@@ -285,6 +286,16 @@ function applyObjState() {
   }
 }
 function applyDark() { for (const c of S.world?.ceiling || []) { c.light.intensity = S.dark ? 0 : c.base; c.tube.material.emissiveIntensity = S.dark ? 0 : 1; } }
+// 실시간 진행 타이머 (서버 시계 기준 경과 시간으로 맞춘다) · 힌트 사용 수
+function setGameClock(elapsed, timed) { if (elapsed == null) return; S.clock = { base: performance.now() - elapsed, stop: null, timed: timed ?? S.clock?.timed ?? true }; }
+function setHintsUsed(n) { if (n == null) return; S.hintsUsed = n; $('#hintUsed').textContent = `💡 사용한 힌트 ${n}개`; }
+const fmtClock = (ms) => { const d = Math.floor(ms / 100); const m = Math.floor(d / 600), s = Math.floor((d % 600) / 10); return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${d % 10}`; };
+function updateGameTimer() {
+  const t = $('#gameTimer'); const show = S.room === 'game' && !!S.clock;
+  t.classList.toggle('hidden', !show); if (!show) return;
+  const ms = S.clock.stop ?? performance.now() - S.clock.base;
+  t.textContent = `⏱ ${fmtClock(Math.max(0, ms))}${S.clock.timed ? '' : ' *'}`;
+}
 function setObjective(ob, relics) {
   if (!ob) return;
   $('#objText').textContent = ob.text;
@@ -866,6 +877,7 @@ function loop() {
   updateLabels(); updateHearts(dt);
   const inLobby = S.room === 'lobby';
   if (inLobby !== S._lobbyCls) { S._lobbyCls = inLobby; document.body.classList.toggle('in-lobby', inLobby); }
+  updateGameTimer();
   fx.render(t, { danger: S.danger, mode: inLobby ? 'lobby' : 'game' });
   renderer.autoClear = false; renderer.clearDepth(); renderer.render(overlay, camera); renderer.autoClear = true;
 }
@@ -971,6 +983,7 @@ socket.on('game:start', async (st) => {
 });
 socket.on('game:chapter', (st) => { closeModal(); S.storyQueue = []; closeStory(true); fadeTransition(() => enterChapter(st, true)); });
 socket.on('game:sync', (st) => {
+  setHintsUsed(st.hintsUsed); if (st.elapsed != null && S.clock && !S.clock.stop) setGameClock(st.elapsed);
   if (st.fear != null && st.fear !== S.fear) { S.fear = st.fear; updateFearBadge(); }
   S.objState = st.objects; applyObjState();
   if (S.dark !== st.dark) { S.dark = st.dark; applyDark(); if (st.dark) audio.play('power'); }
@@ -1034,6 +1047,7 @@ socket.on('game:caught', ({ x, z, by, type }) => {
 });
 socket.on('game:coopPulse', () => audio.play('creak'));
 socket.on('game:ending', (e) => {
+  if (S.clock) S.clock.stop = e.ms ?? (performance.now() - S.clock.base);
   closeModal(); S.storyQueue = []; closeStory(true);
   addJournal(e.title, e.text, 'story');
   setTimeout(async () => {
@@ -1042,7 +1056,7 @@ socket.on('game:ending', (e) => {
     const icons = e.icons || ['👟', '🃏', '🎀', '🌀', '🔮', '➰', '🏷️'];
     $('#endRelics').textContent = icons.map((ic, i) => (i < e.relics ? ic : '·')).join(' ') + `   (${e.relics}/${e.total || 7})`;
     let tm = $('#endTime'); if (!tm) { tm = el('div', 'end-time'); tm.id = 'endTime'; $('#endRelics').after(tm); }
-    tm.textContent = e.ms ? `⏱ 클리어 시간 ${fmtMs(e.ms)}${e.full ? ' — 🏆 랭킹에 기록되었습니다' : ' (이어하기는 랭킹에 기록되지 않아요)'}` : '';
+    tm.textContent = e.ms ? `⏱ 클리어 시간 ${fmtMs(e.ms)} · 💡 힌트 ${e.hints ?? 0}개${e.full ? ' — 🏆 랭킹에 기록되었습니다' : ' (이어하기는 랭킹에 기록되지 않아요)'}` : '';
     $('#ending').classList.remove('hidden');
     audio.ambient(null); audio.play(e.type === 'true' || S.fear === 0 ? 'bell' : 'scream');
   }, 1200);
@@ -1758,7 +1772,7 @@ socket.on('lobby:notice', ({ text }) => {
 
 // ─────────────────────────── 랭킹
 const FEAR_SHORT = { 0: '왕초보', 1: '순한맛', 2: '보통', 3: '매운맛' };
-const fmtMs = (ms) => { const s = Math.round(ms / 1000); return `${Math.floor(s / 60)}분 ${String(s % 60).padStart(2, '0')}초`; };
+const fmtMs = (ms) => { const d = Math.round(ms / 100); const m = Math.floor(d / 600), s = (d % 600) / 10; return `${m}분 ${s.toFixed(1).padStart(4, '0')}초`; }; // 0.1초 단위
 function openRank(tab) {
   // 창은 바로 띄우고, 서버 응답이 오면 채운다 (응답이 없으면 안내)
   const holder = el('div', 'rank'); holder.appendChild(el('div', 'muted', '랭킹을 불러오는 중…'));
@@ -1779,7 +1793,7 @@ function openRank(tab) {
       if (!rows.length) { list.appendChild(el('div', 'muted', '아직 기록이 없어요. 처음부터 클리어하면 첫 기록이 됩니다!')); return; }
       rows.forEach((r, i) => {
         const row = el('div', 'rank-row' + (r.names.includes(S.myName) ? ' me' : ''));
-        row.append(el('span', 'rank-no', ['🥇', '🥈', '🥉'][i] || String(i + 1)), el('span', 'rank-names', r.names.join(', ')), el('span', 'rank-time', fmtMs(r.ms)), el('span', 'rank-meta', `${FEAR_SHORT[r.fear] ?? ''}${r.ending === 'true' ? ' · 진엔딩' : ''}`));
+        row.append(el('span', 'rank-no', ['🥇', '🥈', '🥉'][i] || String(i + 1)), el('span', 'rank-names', r.names.join(', ')), el('span', 'rank-time', fmtMs(r.ms)), el('span', 'rank-meta', `${FEAR_SHORT[r.fear] ?? ''}${r.ending === 'true' ? ' · 진엔딩' : ''} · 💡${r.hints ?? '-'}`));
         list.appendChild(row);
       });
     };

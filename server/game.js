@@ -100,8 +100,10 @@ export class GameInstance {
   relicCount() { return this.sc.relics.filter((r) => this.flags.has(r)).length; }
   scenarioInfo() { return { id: this.sc.id, title: this.sc.title, relicName: this.sc.relicName, difficulty: this.sc.difficulty || 3, relicTotal: this.sc.relics.length, relicIcons: relicIcons(this.sc), cine: this.sc.cine }; }
 
+  hintsUsed() { return Object.values(this.hintLevel).reduce((a, b) => a + b, 0); }
   fullState() {
     return {
+      elapsed: Date.now() - this.startedAt, hintsUsed: this.hintsUsed(), timed: this.startChapter === 0,
       chapterIdx: this.chapterIdx,
       chapter: this.clientChapter(),
       objects: this.objState(),
@@ -115,7 +117,7 @@ export class GameInstance {
   }
 
   syncAll() {
-    this.emit('game:sync', { objects: this.objState(), objective: this.objective(), dark: this.dark, relics: this.relicCount() });
+    this.emit('game:sync', { objects: this.objState(), objective: this.objective(), dark: this.dark, relics: this.relicCount(), hintsUsed: this.hintsUsed(), elapsed: Date.now() - this.startedAt });
   }
 
   // ───── 효과 적용
@@ -388,8 +390,8 @@ export class GameInstance {
     const all = relics >= this.sc.relics.length;
     const end = all ? this.sc.endings.true : this.sc.endings.normal;
     const ms = Date.now() - this.startedAt, full = this.startChapter === 0;
-    this.emit('game:ending', { ...end, relics, type: all ? 'true' : 'normal', total: this.sc.relics.length, icons: relicIcons(this.sc), cine: all ? this.sc.cine.true : this.sc.cine.normal, ms, full });
-    this.onEnd?.({ ms, full, type: all ? 'true' : 'normal' });
+    this.emit('game:ending', { ...end, relics, type: all ? 'true' : 'normal', total: this.sc.relics.length, icons: relicIcons(this.sc), cine: all ? this.sc.cine.true : this.sc.cine.normal, ms, full, hints: this.hintsUsed() });
+    this.onEnd?.({ ms, full, type: all ? 'true' : 'normal', hints: this.hintsUsed() });
   }
 
   // 매 틱마다 호출 — 귀신 AI

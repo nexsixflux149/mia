@@ -544,3 +544,12 @@ body.in-lobby #vignette:not(.danger) { background: none; }
   .doc-note .doc-sheet { padding-left: 50px; }
   .doc-poster .doc-head, .doc-flyer .doc-head { font-size: 25px; }
 }
+
+/* 실시간 진행 타이머: 미니맵 바로 위 */
+#gameTimer { position: absolute; right: 14px; bottom: 242px; width: 180px; text-align: center; padding: 4px 0; border-radius: 10px; background: rgba(8,6,10,.75); border: 1px solid var(--line); font: 700 17px/1.2 ui-monospace, 'Consolas', monospace; color: #ffe9a8; letter-spacing: .5px; z-index: 6; pointer-events: none; }
+#gameTimer.hidden { display: none; }
+@media (max-width: 900px) { #gameTimer { width: 130px; bottom: 192px; font-size: 14px; } }
+body.mobile #gameTimer { width: 96px; right: 10px; bottom: 296px; font-size: 12px; padding: 3px 0; }
+body.mobile .abtn.shout { bottom: 326px; }
+@media (orientation: landscape) and (max-height: 500px) { body.mobile #gameTimer { right: 70px; bottom: 250px; } body.mobile .abtn.shout { bottom: 276px; right: 89px; } }
+#hintUsed { font-size: 12px; margin-top: 4px; }

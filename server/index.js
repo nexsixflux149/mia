@@ -41,7 +41,7 @@ const saveHearts = () => persist(DATA_DIR, 'hearts', hearts);
 const lanIps = () => Object.values(os.networkInterfaces()).flat().filter((i) => i && i.family === 'IPv4' && !i.internal).map((i) => i.address);
 // ───── 랭킹 (테마별 클리어 시간, 처음부터 시작한 판만)
 const saveRanks = () => persist(DATA_DIR, 'ranks', ranks, true);
-const fmtTime = (ms) => { const s = Math.round(ms / 1000); return `${Math.floor(s / 60)}분 ${String(s % 60).padStart(2, '0')}초`; };
+const fmtTime = (ms) => { const d = Math.round(ms / 100); const m = Math.floor(d / 600), s = (d % 600) / 10; return `${m}분 ${s.toFixed(1).padStart(4, '0')}초`; }; // 0.1초 단위
 // 로비에 있는 사람에게만 보이는 전체 공지
 const partyLabel = (names) => (names.length > 1 ? `${names[0]} 외 ${names.length - 1}명` : names[0] || '누군가');
 const lobbyNotice = (text) => io.to('lobby').emit('lobby:notice', { text });
@@ -254,7 +254,7 @@ io.on('connection', (sock) => {
   // 랭킹 조회: 테마별 상위 10개
   sock.on('rank:get', (ack) => {
     const out = {};
-    for (const s of Object.values(SCENARIOS)) out[s.id] = (ranks[s.id] || []).slice(0, 10).map((r) => ({ names: r.names, ms: r.ms, fear: r.fear, ending: r.ending, at: r.at }));
+    for (const s of Object.values(SCENARIOS)) out[s.id] = (ranks[s.id] || []).slice(0, 10).map((r) => ({ names: r.names, ms: r.ms, fear: r.fear, ending: r.ending, at: r.at, hints: r.hints ?? null }));
     if (typeof ack === 'function') ack(out);
   });
   // 파티장이 테마·공포도·챕터를 바꾸면 파티원에게도 보여 준다
@@ -308,15 +308,15 @@ io.on('connection', (sock) => {
     const inst = new GameInstance({
       id: instId, io, party, players, chapter, fear, scenario: sc.id,
       onChapter: (idx) => { if ((saves[saveName] ?? 0) < idx) { saves[saveName] = idx; save(); } },
-      onEnd: ({ ms, full, type } = {}) => {
+      onEnd: ({ ms, full, type, hints = 0 } = {}) => {
         saves[saveName] = sc.chapters.length - 1; saves[saveName + ':clear'] = 1; save();
         const names = party.members.map((id) => players.get(id)?.name).filter(Boolean);
         if (full && ms > 0) {
           const list = (ranks[sc.id] ||= []);
-          list.push({ names, ms, fear, ending: type, at: Date.now() });
+          list.push({ names, ms, fear, ending: type, at: Date.now(), hints });
           list.sort((a, b) => a.ms - b.ms); ranks[sc.id] = list.slice(0, 50); saveRanks();
         }
-        lobbyNotice(`🏆 ${partyLabel(names)} 님이 '${sc.short}' 테마를 클리어했습니다!${full && ms ? ` (${fmtTime(ms)})` : ''}`);
+        lobbyNotice(`🏆 ${partyLabel(names)} 님이 '${sc.short}' 테마를 클리어했습니다!${full && ms ? ` (${fmtTime(ms)} · 힌트 ${hints}개)` : ''}`);
       },
     });
     // 이어하기: 앞 챕터에서 얻었어야 할 핵심 아이템 지급
