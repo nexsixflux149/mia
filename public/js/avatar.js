@@ -166,8 +166,8 @@ export function createAvatar(look) {
 
   const rig = new THREE.Group();
   g.add(rig);
-  // 2.5등신: 머리(지름 약 0.8) 아래로 몸통·팔은 1.12배 키워 올리고, 다리는 길게 늘린다
-  const SD = { body: 1.12, hip: 0.74, head: 1.6 };
+  // 1등신: 머리(지름 약 0.8)가 키의 대부분. 몸통·팔은 0.55배로 작게 머리 밑에 붙이고, 다리는 짧고 통통하게
+  const SD = { body: 0.55, hip: 0.16, head: 0.6 };
   const upper = new THREE.Group(); upper.scale.setScalar(SD.body); upper.position.y = SD.head - 1.08 * SD.body; rig.add(upper);
 
   // 몸통 · 다리 · 팔 (옷 색은 의상이 정한다)
@@ -178,10 +178,8 @@ export function createAvatar(look) {
   for (const s of [-1, 1]) {
     // 엉덩이 높이에서 땅까지 내려오는 긴 다리 (허벅지 · 무릎 · 종아리 · 신발)
     const H = SD.hip; const pivot = new THREE.Group(); pivot.position.set(0.12 * s, H, 0);
-    const thigh = new THREE.Mesh(new THREE.CapsuleGeometry(0.095, H * 0.36, 8, 24), mat(O.legs)); thigh.position.y = -H * 0.27; pivot.add(thigh);
-    const knee = new THREE.Mesh(new THREE.SphereGeometry(0.088, 32, 22), mat(O.legs)); knee.position.y = -H * 0.5; pivot.add(knee);
-    const calf = new THREE.Mesh(new THREE.CapsuleGeometry(0.082, H * 0.3, 8, 24), mat(O.legs)); calf.position.y = -H * 0.72; pivot.add(calf);
-    const shoe = new THREE.Mesh(new THREE.SphereGeometry(0.105, 45, 29), mat(O.shoes, { roughness: 0.45 })); shoe.scale.set(1, 0.6, 1.4); shoe.position.set(0, -H + 0.05, 0.035); pivot.add(shoe);
+    const thigh = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.02, 8, 24), mat(O.legs)); thigh.position.y = -H * 0.4; pivot.add(thigh);
+    const shoe = new THREE.Mesh(new THREE.SphereGeometry(0.095, 32, 20), mat(O.shoes, { roughness: 0.45 })); shoe.scale.set(1, 0.6, 1.4); shoe.position.set(0, -H + 0.05, 0.035); pivot.add(shoe);
     // 신발 밑창 + 앞코 반짝임
     const sole = new THREE.Mesh(new THREE.CylinderGeometry(0.104, 0.108, 0.024, 28), mat('#f4efe6', { roughness: 0.8 })); sole.scale.set(1, 1, 1.4); sole.position.set(0, -H + 0.012, 0.035); pivot.add(sole);
     const shine = new THREE.Mesh(new THREE.SphereGeometry(0.024, 19, 13), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.55 })); shine.position.set(-0.03 * s, -H + 0.085, 0.15); pivot.add(shine);
@@ -199,7 +197,7 @@ export function createAvatar(look) {
     upper.add(pivot); arms.push(pivot);
   }
   // 허리 아래: 다리와 몸통 사이 엉덩이 (반바지처럼 옷 아랫단 색)
-  const hips = new THREE.Mesh(new THREE.SphereGeometry(0.25, 51, 32, 0, Math.PI * 2, Math.PI * 0.35, Math.PI * 0.65), mat(O.legs)); hips.scale.set(1, 0.7, 0.95); hips.position.y = SD.hip + 0.05; rig.add(hips);
+  const hips = new THREE.Mesh(new THREE.SphereGeometry(0.25, 51, 32, 0, Math.PI * 2, Math.PI * 0.35, Math.PI * 0.65), mat(O.legs)); hips.scale.set(0.55, 0.4, 0.55); hips.position.y = SD.hip + 0.03; rig.add(hips);
   addOutfit(upper, look, O);
   const accFx = addAccessory(upper, arms, look);
 
@@ -693,7 +691,7 @@ export function animateAvatar(g, dt, moving, t, crouch = false, emote = null, et
   L[0].rotation.set(s * 0.7, 0, 0); L[1].rotation.set(-s * 0.7, 0, 0);
   A[0].rotation.set(-s * 0.6, 0, 0); A[1].rotation.set(s * 0.6, 0, 0);
   u.crouch += ((crouch ? 1 : 0) - u.crouch) * Math.min(1, dt * 10);
-  let y = (moving ? Math.abs(Math.sin(u.phase)) * 0.07 : Math.sin(t * 2 + u.phase) * 0.012) - u.crouch * 0.3;
+  let y = (moving ? Math.abs(Math.sin(u.phase)) * 0.07 : Math.sin(t * 2 + u.phase) * 0.012) - u.crouch * 0.08;
   // 웅크리면 무릎을 굽힌다
   if (u.crouch > 0.01) { L[0].rotation.x -= u.crouch * 0.9; L[1].rotation.x -= u.crouch * 0.9; }
   let rx = u.crouch * 0.25, ry = 0, rz = 0;
@@ -715,8 +713,8 @@ export function animateAvatar(g, dt, moving, t, crouch = false, emote = null, et
       }
       case 'spin': ry = et * 9; A[0].rotation.z = -1.4; A[1].rotation.z = 1.4; y = 0.05; break;
       case 'jump': { const k = Math.min(1, et / 0.7); y = Math.sin(Math.PI * k) * 0.9; A[0].rotation.z = -2.6 * Math.sin(Math.PI * k); A[1].rotation.z = 2.6 * Math.sin(Math.PI * k); L[0].rotation.x = -0.5 * Math.sin(Math.PI * k); L[1].rotation.x = -0.5 * Math.sin(Math.PI * k); break; }
-      case 'lie': rx = 1.45; y = 0.3; A[0].rotation.x = -2.8; A[1].rotation.x = -2.8; L[0].rotation.x = Math.sin(et * 4) * 0.4 + 0.2; L[1].rotation.x = -Math.sin(et * 4) * 0.4 + 0.2; head.rotation.x = -0.6; break;
-      case 'sit': y = -0.31; L[0].rotation.x = -1.5; L[1].rotation.x = -1.5; A[0].rotation.x = -0.4; A[1].rotation.x = -0.4; head.rotation.z = Math.sin(t * 1.2) * 0.08; break;
+      case 'lie': rx = 1.45; y = 0.42; A[0].rotation.x = -2.8; A[1].rotation.x = -2.8; L[0].rotation.x = Math.sin(et * 4) * 0.4 + 0.2; L[1].rotation.x = -Math.sin(et * 4) * 0.4 + 0.2; head.rotation.x = -0.6; break;
+      case 'sit': y = 0.27; L[0].rotation.x = -1.5; L[1].rotation.x = -1.5; A[0].rotation.x = -0.4; A[1].rotation.x = -0.4; head.rotation.z = Math.sin(t * 1.2) * 0.08; break;
       case 'clap': { const c = Math.abs(Math.sin(et * 12)); A[0].rotation.x = -1.3; A[1].rotation.x = -1.3; A[0].rotation.z = -0.2 - c * 0.5; A[1].rotation.z = 0.2 + c * 0.5; y = c * 0.03; break; }
       case 'heart': A[0].rotation.z = -2.7; A[1].rotation.z = 2.7; A[0].rotation.x = -0.3; A[1].rotation.x = -0.3; head.rotation.z = Math.sin(et * 3) * 0.15; y = Math.abs(Math.sin(et * 3)) * 0.05; break;
       case 'boo': { const k = Math.min(1, et / 0.25); A[0].rotation.z = -2.5 * k; A[1].rotation.z = 2.5 * k; A[0].rotation.x = -0.8 * k; A[1].rotation.x = -0.8 * k; rx = 0.35 * k; head.scale.setScalar(1 + 0.25 * k * (et < 0.8 ? 1 : 0)); y = 0.15 * k; break; }
@@ -726,7 +724,7 @@ export function animateAvatar(g, dt, moving, t, crouch = false, emote = null, et
   }
   rig.position.y = y; rig.rotation.set(rx, ry, rz);
   // 손전등: 웅크리면 몸이 앞으로 숙여져 빛이 몸 안에 갇히므로, 몸보다 앞·아래로 옮긴다
-  if (g.userData.spot) { g.userData.spot.position.set(0, 1.35 - u.crouch * 0.45, 0.3 + u.crouch * 0.4); g.userData.beam?.position.copy(g.userData.spot.position); }
+  if (g.userData.spot) { g.userData.spot.position.set(0, 0.62 - u.crouch * 0.12, 0.42 + u.crouch * 0.2); g.userData.beam?.position.copy(g.userData.spot.position); }
   // 감정표현 중에는 표정도 바뀐다
   const want = emote && (!moving || emote === 'jump') ? emote : null;
   if (u.expr !== want) { u.expr = want; u.setExpr?.(want); }
