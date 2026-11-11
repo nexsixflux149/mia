@@ -902,7 +902,7 @@ export function buildProp(p) {
         else if (art === 'camp') { x.fillStyle = '#2a4a6a'; x.fillRect(0, 0, w, h); x.fillStyle = '#1a3a1a'; for (let i = 0; i < 5; i++) { x.beginPath(); x.moveTo(i * 22, 128); x.lineTo(i * 22 + 12, 70 + (i % 2) * 10); x.lineTo(i * 22 + 24, 128); x.fill(); } x.fillStyle = '#f8f0c8'; x.beginPath(); x.arc(70, 26, 9, 0, 7); x.fill(); }
         else { x.fillStyle = ['#6a1e1e', '#2e4a2a', '#1e3a5a'][k]; x.fillRect(0, 0, w, h); x.fillStyle = '#d8b878'; x.beginPath(); x.arc(48, 40, 16, 0, 7); x.fill(); x.fillStyle = '#c8a058'; x.fillRect(32, 58, 32, 50); x.strokeStyle = '#e8c870'; x.lineWidth = 3; x.strokeRect(4, 4, w - 8, h - 8); }
         const vg = x.createRadialGradient(48, 64, 20, 48, 64, 90); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.5)'); x.fillStyle = vg; x.fillRect(0, 0, w, h);
-      }, 'wf' + art + k), 0, -h2 / 2 - 0.05, 0.032);
+      }, 'wf' + art + k), 0, 0, 0.032); // 그림 가운데를 액자 가운데(높이 0)에 맞춘다
       DECO_ONLY(g); if (p.tilt) g.rotation.z = p.tilt; break;
     }
     case 'talisman': {
