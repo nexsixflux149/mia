@@ -72,7 +72,7 @@ $('#randomBtn').onclick = () => {
 };
 
 const pv = { renderer: new THREE.WebGLRenderer({ canvas: $('#preview'), antialias: true, alpha: true }), scene: new THREE.Scene(), cam: new THREE.PerspectiveCamera(32, 300 / 380, 0.1, 50), av: null, rot: 0, drag: null };
-pv.cam.position.set(0, 1.0, 4.4); pv.cam.lookAt(0, 0.82, 0); // 2등신 전신이 다 보이게
+pv.cam.position.set(0, 0.82, 3.6); pv.cam.lookAt(0, 0.62, 0); // 1.5등신 전신이 다 보이게
 pv.scene.add(new THREE.HemisphereLight('#fff', '#655', 2.0));
 const pvd = new THREE.DirectionalLight('#fff', 1.6); pvd.position.set(2, 3, 3); pv.scene.add(pvd);
 const pvr = new THREE.DirectionalLight('#ffb3c7', 1.2); pvr.position.set(-3, 2, -2); pv.scene.add(pvr);
@@ -211,14 +211,14 @@ function makeAvatar(id, name, lk, isMe) {
   setTag(g, name, isMe ? '#ffe08a' : '#fff');
   g.userData.name = name; g.userData.id = id;
   const spot = new THREE.SpotLight('#fff4dc', 0, 24, 0.55, 0.5, 1.2);
-  spot.position.set(0, 1.05, 0.35);
+  spot.position.set(0, 0.78, 0.4);
   const tgt = new THREE.Object3D(); tgt.position.set(0, 0.2, 5); g.add(tgt); spot.target = tgt;
   g.add(spot); g.userData.spot = spot;
   const beam = makeBeam(); beam.position.copy(spot.position); beam.visible = false; g.add(beam); g.userData.beam = beam;
   scene.add(g);
   return g;
 }
-function setTag(g, name, color) { if (g.userData.tag) removeLabel(g.userData.tag); g.userData.tag = addLabel(g, textSprite(name, { size: 30, color, bg: 'rgba(10,8,12,.72)', stroke: 'rgba(0,0,0,.85)' }), 1.85); }
+function setTag(g, name, color) { if (g.userData.tag) removeLabel(g.userData.tag); g.userData.tag = addLabel(g, textSprite(name, { size: 30, color, bg: 'rgba(10,8,12,.72)', stroke: 'rgba(0,0,0,.85)' }), 1.5); }
 function setLight(g, on) { g.userData.spot.intensity = on ? 160 : 0; g.userData.beam.visible = false; } // 빛줄기 효과는 눈부셔서 표시하지 않는다
 function rebuildMyAvatar() {
   removeAvatar(myAvatar);
@@ -228,7 +228,7 @@ function rebuildMyAvatar() {
 function setBubble(g, text) {
   if (g.userData.bubble) removeLabel(g.userData.bubble);
   const b = textSprite(text, { size: 30, bg: '#f6efe2', color: '#140c10', maxW: 380, border: '#3a2a30', tail: true });
-  addLabel(g, b, 2.3 + b.scale.y / 2); g.userData.bubble = b;
+  addLabel(g, b, 1.95 + b.scale.y / 2); g.userData.bubble = b;
   clearTimeout(g.userData.bt); g.userData.bt = setTimeout(() => { if (g.userData.bubble === b) { removeLabel(b); g.userData.bubble = null; } }, 6000);
 }
 
@@ -653,7 +653,7 @@ function wallPull(out, from, dir, hitDist, ty) {
   out.set(from.x + (hx / hl) * off, Math.min(S.world?.outdoor ? 99 : 3.15, ty + 1.9), from.z + (hz / hl) * off);
 }
 function updateCamera(dt) {
-  const tx = me.x, ty = (S.crouch ? 0.85 : 1.1) + (me.y || 0), tz = me.z;
+  const tx = me.x, ty = (S.crouch ? 0.65 : 0.8) + (me.y || 0), tz = me.z;
   camGoal.set(tx + Math.sin(cam.yaw) * Math.cos(cam.pitch) * cam.dist, ty + Math.sin(cam.pitch) * cam.dist, tz + Math.cos(cam.yaw) * Math.cos(cam.pitch) * cam.dist);
   // 실내에서는 카메라가 천장 위로 올라가 화면이 까매지지 않게
   if (S.world && !S.world.outdoor) camGoal.y = Math.min(camGoal.y, 3.15);
@@ -943,7 +943,7 @@ function updateThemeBubble() {
   const dx = -near.x, dz = 6 - near.z, dl = Math.hypot(dx, dz) || 1;
   const anchor = new THREE.Object3D(); anchor.position.set(near.x + (dx / dl) * 1.6, 0, near.z + (dz / dl) * 1.6); S.world.root.add(anchor); S.themeAnchor = anchor;
   S.themeBubble = themeBubbleSprite(info);
-  addLabel(anchor, S.themeBubble, 2.2 + S.themeBubble.scale.y / 2);
+  addLabel(anchor, S.themeBubble, 1.85 + S.themeBubble.scale.y / 2);
   // 파티장이라면 스토리 선택도 이 테마로 맞춰 준다
   const sel = $('#scenarioSel');
   if (sel && !sel.disabled && [...sel.options].some((o) => o.value === near.id) && sel.value !== near.id) { sel.value = near.id; sel.onchange?.(); }
