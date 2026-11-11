@@ -48,7 +48,7 @@ const SanitizeShader = {
     void main(){
       vec4 c = texture2D(tDiffuse, vUv);
       vec3 x = c.rgb;
-      if (bad(x.r) || bad(x.g) || bad(x.b)) x = vec3(1.0);
+      if (bad(x.r) || bad(x.g) || bad(x.b)) x = vec3(0.0); // 잘못된 값은 눈부신 흰색 대신 어둡게
       gl_FragColor = vec4(clamp(x, 0.0, 12.0), 1.0);
     }`,
 };

@@ -707,7 +707,7 @@ function updateNearest(t) {
   }
   for (const [id, ent] of Object.entries(S.world.objects)) {
     const on = id === S.nearest;
-    if (ent.hl !== on) { ent.hl = on; ent.group.traverse((m) => { if (m.isMesh && m.material.emissive) { m.material.userData.e0 ??= m.material.emissive.clone(); m.material.userData.i0 ??= m.material.emissiveIntensity; if (on) { m.material.emissive.set('#3a2a10'); m.material.emissiveIntensity = 1; } else { m.material.emissive.copy(m.material.userData.e0); m.material.emissiveIntensity = m.material.userData.i0; } } }); }
+    if (ent.hl !== on) { ent.hl = on; ent.group.traverse((m) => { if (m.isMesh && m.material.emissive) { const ud = m.material.userData; if (typeof ud.e0hex !== 'number') ud.e0hex = Number.isFinite(m.material.emissive.r + m.material.emissive.g + m.material.emissive.b) ? m.material.emissive.getHex() : 0; if (!Number.isFinite(ud.i0)) ud.i0 = Number.isFinite(m.material.emissiveIntensity) ? m.material.emissiveIntensity : 1; if (on) { m.material.emissive.set('#3a2a10'); m.material.emissiveIntensity = 1; } else { m.material.emissive.setHex(ud.e0hex); m.material.emissiveIntensity = ud.i0; } } }); }
   }
   const p = $('#prompt');
   if (S.nearest && !S.modalOpen && !S.storyOpen) {
