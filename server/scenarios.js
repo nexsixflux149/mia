@@ -173,8 +173,8 @@ for (const [sid, [idx, obj]] of Object.entries(LORE)) {
   const [x, z] = freeSpot(ch); ch.objects.push({ ...obj, x, z });
 }
 
-// ───── 모든 챕터 맵을 1.3배로 넓힌다 (방 크기·벽·소품·물건·시작 위치·귀신 위치를 같은 비율로)
-const MAP_SCALE = 1.3;
+// ───── 모든 챕터 맵을 1.15배로 넓힌다 (방 크기·벽·소품·물건·시작 위치·귀신 위치를 같은 비율로)
+const MAP_SCALE = 1.15;
 const sc2 = (v) => Math.round(v * MAP_SCALE * 100) / 100;
 function enlarge(ch) {
   if (ch._scaled) return; ch._scaled = true;

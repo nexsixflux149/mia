@@ -42,6 +42,7 @@ const S = {
   fear: 2, em: '', emT: 0, eid: 0, labels: [], hearts: 0, flyHearts: [],
 };
 const SET = Object.assign({ volume: 0.8, voice: 1, sens: 1, quality: (matchMedia('(pointer: coarse)').matches || innerWidth < 760) ? 'medium' : 'high', brightness: 1, minimap: true }, store.get('gwimun-settings', {}));
+if (SET.quality === 'low') SET.quality = 'medium'; // '낮음'은 없어졌다 → 보통
 
 // ─────────────────────────── 꾸미기
 let look = { ...DEFAULT_LOOK, ...store.get('gwimun-look', {}) };
@@ -173,7 +174,8 @@ renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.15;
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = false; // 그림자 효과 끔 (눈부심·무거움)
+THREE.Texture.DEFAULT_ANISOTROPY = Math.min(16, renderer.capabilities.getMaxAnisotropy()); // 비스듬히 보이는 바닥·벽 무늬도 선명하게
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 220);
@@ -200,7 +202,7 @@ const cam = { yaw: 0, pitch: 0.55, dist: 7 };
 let myAvatar = null;
 const me = { x: 0, z: 5, ry: Math.PI, moving: false };
 if (window.__dbg) Object.assign(window.__dbg, { S, cam, me, scene, camera, renderer }); // ?debug 일 때만 (테스트용)
-const fill = new THREE.PointLight('#ffe9d0', 4, 6, 1.6);
+const fill = new THREE.PointLight('#ffe9d0', 2.6, 14, 1.2);
 scene.add(fill);
 
 function makeAvatar(id, name, lk, isMe) {
@@ -211,13 +213,12 @@ function makeAvatar(id, name, lk, isMe) {
   spot.position.set(0, 1.0, 0.25);
   const tgt = new THREE.Object3D(); tgt.position.set(0, 0.2, 5); g.add(tgt); spot.target = tgt;
   g.add(spot); g.userData.spot = spot;
-  if (isMe && SET.quality === 'high') { spot.castShadow = true; spot.shadow.mapSize.set(512, 512); spot.shadow.bias = -0.003; spot.shadow.camera.near = 0.3; }
   const beam = makeBeam(); beam.position.copy(spot.position); beam.visible = false; g.add(beam); g.userData.beam = beam;
   scene.add(g);
   return g;
 }
 function setTag(g, name, color) { if (g.userData.tag) removeLabel(g.userData.tag); g.userData.tag = addLabel(g, textSprite(name, { size: 30, color, bg: 'rgba(10,8,12,.72)', stroke: 'rgba(0,0,0,.85)' }), 1.95); }
-function setLight(g, on) { g.userData.spot.intensity = on ? 160 : 0; g.userData.beam.visible = on && SET.quality !== 'low'; }
+function setLight(g, on) { g.userData.spot.intensity = on ? 160 : 0; g.userData.beam.visible = false; } // 빛줄기 효과는 눈부셔서 표시하지 않는다
 function rebuildMyAvatar() {
   removeAvatar(myAvatar);
   myAvatar = makeAvatar(S.me, S.myName, look, true);
@@ -842,8 +843,9 @@ function loop() {
     netSend(dt);
     S.world.update?.(t, dt);
     updateThemeBubble();
-    fill.position.set(me.x, 1.8, me.z);
-    fill.intensity = S.room === 'lobby' ? 0 : 4;
+    // 보조광: 머리 위가 아니라 카메라 쪽에서 넓게 비춰 캐릭터 머리가 하얗게 빛나지 않게 한다
+    fill.position.copy(camera.position); fill.position.y = Math.min(fill.position.y, 3.8);
+    fill.intensity = S.room === 'lobby' ? 2.2 : 2.6;
     if (clickRing.material.opacity > 0) { clickRing.material.opacity -= dt * 1.5; clickRing.scale.multiplyScalar(1 + dt * 1.5); }
     const now = performance.now();
     for (const p of S.pings) { p.m.material.opacity = 0.35 + Math.sin(t * 8) * 0.25; if (now > p.until) { scene.remove(p.m); overlay.remove(p.label); } }
@@ -1839,7 +1841,7 @@ $('#settingsBtn').onclick = () => {
   row('음성채팅 볼륨', range('voice', 0, 1, 0.05));
   row('마우스 감도', range('sens', 0.3, 2.5, 0.05));
   row('밝기', range('brightness', 0.6, 1.8, 0.05));
-  const q = el('select'); [['high', '높음 (고화질 · 손전등 그림자)'], ['medium', '보통 (고화질)'], ['low', '낮음 (가벼움)']].forEach(([v, t]) => { const o = el('option', null, t); o.value = v; q.appendChild(o); });
+  const q = el('select'); [['high', '높음 (가장 선명)'], ['medium', '보통 (선명 · 가벼움)']].forEach(([v, t]) => { const o = el('option', null, t); o.value = v; q.appendChild(o); });
   q.value = SET.quality; q.onchange = () => { SET.quality = q.value; fx.setQuality(SET.quality); saveSettings(); rebuildMyAvatar(); };
   row('그래픽 품질', q);
   const btns = el('div', 'set-btns');

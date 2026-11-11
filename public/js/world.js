@@ -161,7 +161,8 @@ function themedGroundTex(style, color) {
 }
 
 // 떠다니는 입자 — 셰이더에서 움직여 CPU 부담이 없다
-function particleField(kind, W, D, H = 3.4) {
+const CEIL_H = 4.6; // 실내 천장 높이
+function particleField(kind, W, D, H = CEIL_H) {
   const conf = {
     ash: { n: 260, col: '#c8c8c0', size: 0.05, fall: 0.12, sway: 0.25, tw: 0.2, op: 0.5 },
     mist: { n: 220, col: '#a8c8d8', size: 0.07, fall: -0.03, sway: 0.5, tw: 0.4, op: 0.35 },
@@ -521,18 +522,14 @@ export function buildLobby(scene) {
   setPropTheme('lobby');
   const root = new THREE.Group();
   const colliders = [];
-  // 맑은 아침 하늘 (로비만 낮 시간대)
-  scene.background = new THREE.Color('#5aa8f0');
-  scene.fog = new THREE.Fog('#8cc4f4', 48, 140);
-  root.add(skyDome('#0a3aa8', '#2f8ae6', 0, false));
-  const sunDisc = new THREE.Mesh(new THREE.SphereGeometry(4, 24, 16), new THREE.MeshBasicMaterial({ color: '#fff6c8', fog: false }));
-  sunDisc.position.set(-38, 50, -55); root.add(sunDisc);
-  const halo = new THREE.Mesh(new THREE.SphereGeometry(7, 24, 16), new THREE.MeshBasicMaterial({ color: '#fff3b0', transparent: true, opacity: 0.25, fog: false, depthWrite: false }));
-  halo.position.copy(sunDisc.position); root.add(halo);
+  // 핏빛 달이 뜬 한밤의 폐놀이공원
+  scene.background = new THREE.Color('#05050b');
+  scene.fog = new THREE.Fog('#0a0a14', 30, 120);
+  root.add(skyDome('#020208', '#1a1222', 700, 'red'));
   // 구름: 하얀 구슬 덩어리들이 하늘을 천천히 돈다
   const clouds = new THREE.Group(); root.add(clouds);
-  const cMat = new THREE.MeshBasicMaterial({ color: '#ffffff', fog: false, transparent: true, opacity: 0.96 });
-  const cMat2 = new THREE.MeshBasicMaterial({ color: '#e4eefa', fog: false, transparent: true, opacity: 0.96 });
+  const cMat = new THREE.MeshBasicMaterial({ color: '#1c1822', fog: false, transparent: true, opacity: 0.85 });
+  const cMat2 = new THREE.MeshBasicMaterial({ color: '#2a1a24', fog: false, transparent: true, opacity: 0.85 });
   for (let i = 0; i < 16; i++) {
     const c = new THREE.Group(); const a = (i / 16) * Math.PI * 2 + Math.random() * 0.3, r = 42 + Math.random() * 30;
     c.position.set(Math.cos(a) * r, 20 + Math.random() * 16, Math.sin(a) * r);
@@ -541,15 +538,14 @@ export function buildLobby(scene) {
     c.userData.ph = Math.random() * 6; clouds.add(c);
   }
 
-  const hemi = new THREE.HemisphereLight('#ffffff', '#7aa06a', 1.7); root.add(hemi);
-  const sun = new THREE.DirectionalLight('#fff2dc', 2.6); sun.position.set(-14, 22, -10); sun.castShadow = true;
-  sun.shadow.mapSize.set(1536, 1536); Object.assign(sun.shadow.camera, { left: -36, right: 36, top: 36, bottom: -36, far: 90 });
+  const hemi = new THREE.HemisphereLight('#7a80b8', '#1a1014', 1.15); root.add(hemi);
+  const sun = new THREE.DirectionalLight('#c08a9a', 0.9); sun.position.set(-30, 42, -60); // 붉은 달빛
   root.add(sun);
 
-  const gt = groundTex('#6fbf5a', 0.1); gt.repeat.set(18, 18);
+  const gt = groundTex('#3a4a32', 0.12); gt.repeat.set(18, 18);
   const ground = new THREE.Mesh(new THREE.CircleGeometry(46, 72), new THREE.MeshStandardMaterial({ map: gt, roughness: 1 }));
   ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; root.add(ground);
-  const plaza = new THREE.Mesh(new THREE.CircleGeometry(16.5, 56), new THREE.MeshStandardMaterial({ map: (() => { const t = groundTex('#b8b0a8', 0.12); t.repeat.set(5, 5); return t; })(), roughness: 1 }));
+  const plaza = new THREE.Mesh(new THREE.CircleGeometry(16.5, 56), new THREE.MeshStandardMaterial({ map: (() => { const t = groundTex('#6a625c', 0.14); t.repeat.set(5, 5); return t; })(), roughness: 1 }));
   plaza.rotation.x = -Math.PI / 2; plaza.position.y = 0.01; plaza.receiveShadow = true; root.add(plaza);
   // 관문으로 이어지는 빛나는 길
   for (const th of LOBBY_THEMES) {
@@ -562,6 +558,7 @@ export function buildLobby(scene) {
   const add = (p) => { const g = place(root, p); const f = footOf(p, g); if (f) colliders.push(f); return g; };
   for (let i = 0; i < 18; i++) { const a = (i / 18) * Math.PI * 2 + 0.09; add({ t: i % 3 ? 'pine' : 'tree', x: Math.cos(a) * 19.5, z: Math.sin(a) * 19.5, color: ['#c9a8ff', '#ffb7c9', '#9ad0ff'][i % 3] }); }
   const outer = buildOuterPark(root, colliders, add);
+  buildLobbyHorror(root, colliders);
   add({ t: 'bench', x: -6, z: 7, r: 30 }); add({ t: 'bench', x: 6, z: 7, r: -30 });
   for (const s of [-1, 1]) { add({ t: 'lamp', x: 13 * s, z: 4.5, noLight: true }); add({ t: 'lamp', x: 6.5 * s, z: 16, noLight: true }); }
   const park = buildPark(root, colliders, add);
@@ -598,6 +595,76 @@ export function buildLobby(scene) {
     });
   };
   return { root, colliders, walls: [], objects: {}, flickers: [], ceiling: [], update, bounds: 32, outdoor: true, themes: LOBBY_THEMES, exhibits, interactives: [...park.interactives, ...outer.interactives], rides: park.rides };
+}
+
+// ───── 로비 공포 장식: 바닥의 핏자국 · 벽 낙서("살려줘" "무서워" …) · 핏빛 손자국
+const BLOOD_WORDS = ['살려줘', '무서워', '도망쳐', '뒤를 봐', '여기서 나가', '나 좀 꺼내줘', '엄마', '그것이 온다', '눈 감지 마', '다음은 너야'];
+function bloodTex(seed) {
+  const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d');
+  let s = seed * 9301 + 49297; const R = () => ((s = (s * 9301 + 49297) % 233280) / 233280);
+  const blob = (cx, cy, r, a) => { x.fillStyle = `rgba(${90 + R() * 40 | 0},0,${R() * 8 | 0},${a})`; x.beginPath(); for (let k = 0; k <= 18; k++) { const an = (k / 18) * Math.PI * 2, rr = r * (0.7 + R() * 0.5); x.lineTo(cx + Math.cos(an) * rr, cy + Math.sin(an) * rr); } x.fill(); };
+  blob(128, 128, 46 + R() * 22, 0.9);
+  for (let i = 0; i < 26; i++) { const an = R() * Math.PI * 2, d = 50 + R() * 70; blob(128 + Math.cos(an) * d, 128 + Math.sin(an) * d, 3 + R() * 10, 0.85); }
+  for (let i = 0; i < 5; i++) { const an = R() * Math.PI * 2; x.strokeStyle = 'rgba(110,0,0,.85)'; x.lineWidth = 3 + R() * 6; x.lineCap = 'round'; x.beginPath(); x.moveTo(128, 128); x.lineTo(128 + Math.cos(an) * (70 + R() * 50), 128 + Math.sin(an) * (70 + R() * 50)); x.stroke(); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+function graffitiTex(word, seed) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 320; const x = c.getContext('2d');
+  let s = seed * 7919 + 13; const R = () => ((s = (s * 9301 + 49297) % 233280) / 233280);
+  // 금 가고 얼룩진 콘크리트
+  x.fillStyle = '#4a4744'; x.fillRect(0, 0, 512, 320);
+  for (let i = 0; i < 900; i++) { const v = 50 + R() * 40 | 0; x.fillStyle = `rgba(${v},${v - 3},${v - 6},.5)`; x.fillRect(R() * 512, R() * 320, 2 + R() * 4, 2 + R() * 4); }
+  x.strokeStyle = 'rgba(20,18,16,.6)'; x.lineWidth = 2; for (let i = 0; i < 4; i++) { x.beginPath(); let px = R() * 512, py = R() * 320; x.moveTo(px, py); for (let k = 0; k < 6; k++) { px += (R() - 0.5) * 80; py += R() * 50; x.lineTo(px, py); } x.stroke(); }
+  for (let i = 0; i < 6; i++) { x.fillStyle = 'rgba(30,26,20,.25)'; x.fillRect(R() * 512, 0, 6 + R() * 20, 320); } // 빗물 얼룩
+  // 핏빛 손자국
+  for (let i = 0; i < 3 + (R() * 3 | 0); i++) {
+    const hx = 30 + R() * 450, hy = 30 + R() * 240, sc = 0.7 + R() * 0.5; x.save(); x.translate(hx, hy); x.rotate((R() - 0.5) * 0.8); x.scale(sc, sc); x.fillStyle = 'rgba(120,0,0,.8)';
+    x.beginPath(); x.ellipse(0, 16, 15, 18, 0, 0, Math.PI * 2); x.fill(); for (let f = 0; f < 5; f++) { x.beginPath(); x.ellipse(-14 + f * 7, -8 - (f === 0 ? -8 : Math.abs(f - 2) * -2 + 6), 3.5, f === 0 ? 8 : 11, f === 0 ? -0.6 : 0, 0, Math.PI * 2); x.fill(); }
+    x.fillRect(-4, 30, 3, 20 + R() * 30); x.restore();
+  }
+  // 흘러내리는 글씨
+  const col = R() < 0.75 ? '#9a0a0a' : '#111';
+  x.save(); x.translate(256, 165); x.rotate((R() - 0.5) * 0.18);
+  const fs = Math.min(130, 460 / Math.max(2, word.length * 0.95)); x.font = `900 ${fs}px "Nanum Myeongjo", serif`; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillStyle = col; x.shadowColor = 'rgba(0,0,0,.5)'; x.shadowBlur = 6; x.fillText(word, 0, 0); x.shadowBlur = 0;
+  const w = x.measureText(word).width;
+  for (let i = 0; i < 18; i++) { const dx = -w / 2 + R() * w, len = 20 + R() * 90; x.fillStyle = col; x.fillRect(dx, fs * 0.25, 2 + R() * 4, len); x.beginPath(); x.arc(dx + 2, fs * 0.25 + len, 3 + R() * 2, 0, Math.PI * 2); x.fill(); }
+  x.restore();
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+function buildLobbyHorror(root, colliders) {
+  // 바닥 핏자국 (광장 · 길 · 산책로 곳곳)
+  const decals = [[2.5, 6], [-4, 3], [6, -2], [-9, -4], [10, 4], [-2, -9], [3, 12], [-12, 9], [14, -9], [0, 20], [-20, 6], [21, -6], [-15, -16], [16, 16], [-26, -2], [27, 3], [5, -25], [-6, 27], [9, 8.5], [-7.5, 11]];
+  const dGeo = new THREE.PlaneGeometry(1, 1);
+  decals.forEach(([x, z], i) => {
+    const m = new THREE.Mesh(dGeo, new THREE.MeshStandardMaterial({ map: bloodTex(i + 1), transparent: true, depthWrite: false, roughness: 0.3, polygonOffset: true, polygonOffsetFactor: -2 }));
+    m.rotation.x = -Math.PI / 2; m.rotation.z = i * 1.7; m.scale.setScalar(1.4 + (i % 4) * 0.6); m.position.set(x, 0.03, z); m.userData.noOcc = true; root.add(m);
+  });
+  // 끌고 간 핏자국 (광장 가운데를 가로질러 숲 쪽으로)
+  for (let k = 0; k < 14; k++) {
+    const m = new THREE.Mesh(dGeo, new THREE.MeshStandardMaterial({ map: bloodTex(40 + k), transparent: true, depthWrite: false, opacity: 0.8, polygonOffset: true, polygonOffsetFactor: -2 }));
+    m.rotation.x = -Math.PI / 2; m.scale.set(0.9, 1.6, 1); m.position.set(-1 + k * 1.6, 0.031, 2 + k * 1.1); m.rotation.z = -0.95; root.add(m);
+  }
+  // 낙서 벽: 반쯤 무너진 콘크리트 담 (광장 바깥, 롤러코스터 안쪽 둘레)
+  const conc = new THREE.MeshStandardMaterial({ color: '#4a4744', roughness: 0.95 });
+  const spots = [0.35, 0.95, 1.6, 2.25, 2.9, 3.55, 4.2, 5.0, 5.5, 6.05];
+  spots.forEach((a, i) => {
+    const r = 23.6, x = Math.cos(a) * r, z = Math.sin(a) * r;
+    const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = Math.atan2(-x, -z); root.add(g);
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(3.4, 2.3, 0.28), conc); wall.position.y = 1.15; g.add(wall);
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 2.3), new THREE.MeshStandardMaterial({ map: graffitiTex(BLOOD_WORDS[i % BLOOD_WORDS.length], i + 3), roughness: 0.9 }));
+    face.position.set(0, 1.15, 0.145); g.add(face);
+    const chunk = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.5, 0.3), conc); chunk.position.set(1.6, 2.35, 0); chunk.rotation.z = 0.5; g.add(chunk); // 깨진 윗부분
+    for (let k = 0; k < 3; k++) { const rb = new THREE.Mesh(new THREE.DodecahedronGeometry(0.15 + k * 0.05), conc); rb.position.set(-1 + k * 0.9, 0.12, 0.5); g.add(rb); }
+    colliders.push({ x, z, hw: 1.5, hd: 1.5 });
+  });
+  // 바닥에 피로 쓴 글씨 하나 (광장 가운데 앞)
+  const fc = document.createElement('canvas'); fc.width = 512; fc.height = 256; const fx2 = fc.getContext('2d');
+  fx2.font = '900 150px "Nanum Myeongjo", serif'; fx2.textAlign = 'center'; fx2.textBaseline = 'middle'; fx2.fillStyle = 'rgba(130,0,0,.88)'; fx2.fillText('살려줘', 256, 120);
+  for (let i = 0; i < 14; i++) { fx2.fillRect(70 + i * 27, 160, 3, 20 + (i * 37) % 60); }
+  const ft = new THREE.CanvasTexture(fc); ft.colorSpace = THREE.SRGBColorSpace;
+  const fw = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 2.3), new THREE.MeshStandardMaterial({ map: ft, transparent: true, depthWrite: false, roughness: 0.3, polygonOffset: true, polygonOffsetFactor: -3 }));
+  fw.rotation.x = -Math.PI / 2; fw.position.set(0, 0.035, 9.8); root.add(fw);
 }
 
 function ringColliders(r) {
@@ -754,7 +821,7 @@ export function buildChapter(scene, ch, themeId = 'gwimun') {
     const ft = themedFloorTex(room[1], ch.floor || '#3a2a1c'); ft.repeat.set(W / 3, D / 3);
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshStandardMaterial({ map: ft, roughness: room[1] === 'checker' || room[1] === 'metal' ? 0.55 : 0.9, metalness: room[1] === 'metal' ? 0.3 : 0 }));
     floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; root.add(floor);
-    const H = 3.4, T = 0.3;
+    const H = CEIL_H, T = 0.3;
     const wt = themedWallTex(room[0], ch.wall || '#5b5446');
     const baseM = new THREE.MeshStandardMaterial({ color: { hospital: '#2a3a34', clown: '#3a0a1a', kimono: '#1a100a', doll: '#2a160e' }[themeId] || '#1e1610', roughness: 0.8 });
     const crownM = new THREE.MeshStandardMaterial({ color: sh(ch.wall || '#5b5446', -0.15), roughness: 0.8 });
@@ -784,8 +851,8 @@ export function buildChapter(scene, ch, themeId = 'gwimun') {
     const lk = step / 6, lBase = 7 * Math.pow(lk, 1.3);
     for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
       const x = -W / 2 + (W / nx) * (i + 0.5), z = -D / 2 + (D / nz) * (j + 0.5);
-      const l = new THREE.PointLight(lightCol, lBase, 11 * lk, 1.6); l.position.set(x, 3.0, z); root.add(l);
-      const fx = new THREE.Group(); fx.position.set(x, 3.4, z); root.add(fx);
+      const l = new THREE.PointLight(lightCol, lBase, 11 * lk, 1.6); l.position.set(x, CEIL_H - 0.4, z); root.add(l);
+      const fx = new THREE.Group(); fx.position.set(x, CEIL_H, z); root.add(fx);
       let tube;
       const hang = (len) => { const c = new THREE.Mesh(fixGeo.cord, darkM); c.scale.y = len / 0.4; c.position.y = -len / 2; fx.add(c); };
       switch (TH.fixture) {
@@ -822,8 +889,8 @@ export function buildChapter(scene, ch, themeId = 'gwimun') {
           case 'cow_skull_w': { const g = deco({ t: 'cow_skull', ...P, y: 2.2, ...out(0.1) }); g.rotation.order = 'YXZ'; g.rotation.set(-Math.PI / 2 + 0.3, sd.r * DEG, 0); break; }
           case 'poster_w': deco({ t: 'poster', ...P, y: 1.7, label: pick(R, LABELS[themeId] || ['안내']) }); break;
           case 'neon': deco({ t: 'neon_sign', ...P, y: 2.6, text: pick(R, ['HA HA HA', 'SMILE', 'ENCORE', 'CIRCUS']), color: pick(R, ['#ff3a8a', '#3ad8ff', '#ffd23a']) }); break;
-          case 'drape': deco({ t: 'drape', ...P, y: 3.3, w: 1.6, h: 3.1, color: pick(R, ['#7a0a1a', '#4a0a3a']), ...out(0.06) }); break;
-          case 'seaweed': deco({ t: 'seaweed', ...P, y: 3.3, ...out(0.1) }); break;
+          case 'drape': deco({ t: 'drape', ...P, y: CEIL_H - 0.1, w: 1.6, h: CEIL_H - 0.3, color: pick(R, ['#7a0a1a', '#4a0a3a']), ...out(0.06) }); break;
+          case 'seaweed': deco({ t: 'seaweed', ...P, y: CEIL_H - 0.1, ...out(0.1) }); break;
           case 'sconce': deco({ t: 'sconce', ...P, y: 2.1, color: TH.light }); break;
           case 'talisman': { const n = 1 + Math.floor(R() * 3); for (let k = 0; k < n; k++) deco({ t: 'talisman', ...P, y: 2.2 - k * 0.05, x: x + (sd.n[1] ? k * 0.22 : 0), z: z + (sd.n[0] ? k * 0.22 : 0) }); break; }
           case 'handprints': deco({ t: 'handprints', ...P, y: 1.2 + R() * 0.6 }); break;
@@ -844,10 +911,10 @@ export function buildChapter(scene, ch, themeId = 'gwimun') {
         for (let s = 0; s < segs; s++) {
           const u = -sd.len / 2 + (s + 0.5) * (sd.len / segs); const [x0, z0] = sd.at(u);
           const x = x0 + sd.n[0] * 0.2, z = z0 + sd.n[1] * 0.2; const len = sd.len / segs - 0.8;
-          if (TH.edge === 'pipe_run') deco({ t: 'pipe_run', x, z, y: 3.15, r: sd.r, len, drip: themeId === 'ophelia', color: themeId === 'hospital' ? '#8a948e' : '#5a5048' });
-          else if (TH.edge === 'shimenawa') { if (R() < 0.6) deco({ t: 'shimenawa', x, z, y: 3.1, r: sd.r, len: Math.min(len, 4) }); }
-          else if (TH.edge === 'bunting') { if (R() < 0.7) deco({ t: 'bunting', x, z, y: 3.15, r: sd.r, len, colors: ['#ff8a5a', '#5ab0ff', '#ffd36a', '#7ed07a'] }); }
-          else deco({ t: 'string_lights', x, z, y: 3.2, r: sd.r, len, sag: 0.4 });
+          if (TH.edge === 'pipe_run') deco({ t: 'pipe_run', x, z, y: CEIL_H - 0.25, r: sd.r, len, drip: themeId === 'ophelia', color: themeId === 'hospital' ? '#8a948e' : '#5a5048' });
+          else if (TH.edge === 'shimenawa') { if (R() < 0.6) deco({ t: 'shimenawa', x, z, y: CEIL_H - 0.3, r: sd.r, len: Math.min(len, 4) }); }
+          else if (TH.edge === 'bunting') { if (R() < 0.7) deco({ t: 'bunting', x, z, y: CEIL_H - 0.25, r: sd.r, len, colors: ['#ff8a5a', '#5ab0ff', '#ffd36a', '#7ed07a'] }); }
+          else deco({ t: 'string_lights', x, z, y: CEIL_H - 0.2, r: sd.r, len, sag: 0.4 });
         }
       }
     }
@@ -919,7 +986,7 @@ export function buildChapter(scene, ch, themeId = 'gwimun') {
   // 떠다니는 입자 (먼지 · 재 · 반딧불 · 꽃잎 · 색종이 …)
   let pk = ch.outdoor ? TH.particles : ({ camp: 'motes', kimono: 'motes', ophelia: 'mist' }[themeId] || TH.particles);
   if (ch.rain) pk = null;
-  const dust = pk ? particleField(pk, ch.outdoor ? W + 4 : W - 0.5, ch.outdoor ? D + 4 : D - 0.5, ch.outdoor ? 6 : 3.3) : null;
+  const dust = pk ? particleField(pk, ch.outdoor ? W + 4 : W - 0.5, ch.outdoor ? D + 4 : D - 0.5, ch.outdoor ? 6 : CEIL_H - 0.1) : null;
   if (dust) root.add(dust);
 
   scene.add(root);

@@ -72,22 +72,23 @@ export class FX {
     // 휴대폰은 고해상도 화면이라 픽셀이 너무 많다 — '높음'도 1.5배까지만
     const mobile = matchMedia('(pointer: coarse)').matches;
     // '보통'도 '높음'과 같은 선명도(해상도)로 그린다. 차이는 그림자 품질 정도
-    const pr = q === 'low' ? 1 : Math.min(mobile ? 1.5 : 2, devicePixelRatio);
-    this.bloom.enabled = q !== 'low';
+    // 선명하게: 휴대폰 '보통' 1.5배 · '높음' 2배, PC 는 화면 그대로(최대 2배). 빛 번짐·그림자는 눈부셔서 끈다
+    if (q === 'low') q = this.quality = 'medium';
+    const pr = Math.min(mobile ? (q === 'high' ? 2 : 1.5) : 2, Math.max(1, devicePixelRatio));
+    this.bloom.enabled = false;
     this.r.setPixelRatio(pr);
     this.composer.setPixelRatio(pr);
-    this.r.shadowMap.enabled = q !== 'low';
+    this.r.shadowMap.enabled = false;
     this.resize();
   }
   resize() { this.r.setSize(innerWidth, innerHeight); this.composer.setSize(innerWidth, innerHeight); this.bloom.resolution.set(innerWidth / 2, innerHeight / 2); }
   render(t, { danger = 0, mode = 'game' } = {}) {
-    if (this.quality === 'low') { this.r.render(this.scene, this.camera); return; }
     const u = this.horror.uniforms;
     u.time.value = t;
     u.danger.value += (danger - u.danger.value) * 0.08;
     u.brightness.value = this.brightness;
     if (mode === 'lobby') { u.grain.value = 0; u.vignette.value = 0; u.desat.value = 0; this.bloom.strength = 0.3; this.bloom.threshold = 1.15; }
-    else { u.grain.value = 0; u.vignette.value = 1; u.desat.value = 0.2; this.bloom.strength = 0.65; this.bloom.threshold = 1.05; }
+    else { u.grain.value = 0.04; u.vignette.value = 1; u.desat.value = 0.2; this.bloom.strength = 0.65; this.bloom.threshold = 1.05; }
     this.composer.render();
   }
 }

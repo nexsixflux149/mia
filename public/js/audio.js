@@ -105,15 +105,11 @@ export class AudioFX {
     const c = this.ctx; const g = c.createGain(); g.gain.value = 0; g.connect(this.master);
     const nodes = [];
     if (mode === 'lobby') {
-      // 포근한 오르골 패드
-      [261.6, 329.6, 392, 523.2].forEach((f, i) => { const o = c.createOscillator(); o.type = 'triangle'; o.frequency.value = f; const og = c.createGain(); og.gain.value = 0.025; const lfo = c.createOscillator(); lfo.frequency.value = 0.15 + i * 0.07; const lg = c.createGain(); lg.gain.value = 0.02; lfo.connect(lg).connect(og.gain); o.connect(og).connect(g); o.start(); lfo.start(); nodes.push(o, lfo); });
+      // 로비: 잔잔한 LOFI 비트 (자작곡) — 먼지 낀 레코드 잡음 위로 느린 붐뱁 드럼 · 로즈 피아노 화음 · 둥근 베이스
       g.gain.linearRampToValueAtTime(0.6, this.t + 2);
-      // 로비 테마: 포근한 오르골 멜로디 (자작곡) 반복
-      const N = { C5: 523.3, D5: 587.3, E5: 659.3, F5: 698.5, G5: 784, A5: 880, B4: 493.9, C6: 1046.5, G4: 392 };
-      const tune = ['E5', 'G5', 'C6', 'G5', 'A5', 'G5', 'E5', '-', 'F5', 'E5', 'D5', 'G4', 'C5', '-', 'E5', 'D5', 'C5', 'E5', 'G5', 'A5', 'G5', '-', 'F5', 'D5', 'B4', 'D5', 'C5', '-', '-', '-'];
-      let step = 0;
-      clearInterval(this.lobbyTimer);
-      this.lobbyTimer = setInterval(() => { if (this.mode !== 'lobby') return clearInterval(this.lobbyTimer); const n = tune[step++ % tune.length]; if (n !== '-') { this.tone(N[n], 1.1, { type: 'sine', gain: 0.05, release: 1.0 }); this.tone(N[n] * 2, 0.6, { type: 'sine', gain: 0.012, release: 0.5 }); } if (step % 8 === 1) this.tone(130.8, 1.6, { type: 'triangle', gain: 0.04, release: 1.4 }); }, 420);
+      const vin = c.createBufferSource(); vin.buffer = this.noiseBuf; vin.loop = true; const vf = c.createBiquadFilter(); vf.type = 'bandpass'; vf.frequency.value = 3200; vf.Q.value = 0.6;
+      const vg = c.createGain(); vg.gain.value = 0.012; vin.connect(vf).connect(vg).connect(g); vin.start(); nodes.push(vin);
+      this.lofiScore();
     } else {
       // 낮은 드론 + 바람
       [41, 55.2, 82.5].forEach((f, i) => { const o = c.createOscillator(); o.type = i === 1 ? 'sawtooth' : 'sine'; o.frequency.value = f; o.detune.value = Math.random() * 20; const og = c.createGain(); og.gain.value = i === 1 ? 0.02 : 0.08; const flt = c.createBiquadFilter(); flt.type = 'lowpass'; flt.frequency.value = 220; o.connect(flt).connect(og).connect(g); o.start(); nodes.push(o); });
@@ -155,6 +151,46 @@ export class AudioFX {
 
   // 삐에로 배경음악 (자작곡): 바람 빠진 증기 오르간이 연주하는 느리고 비뚤어진 왈츠.
   // 쿵-짝-짝 반주 위로 반음씩 미끄러지는 멜로디. 한 바퀴 돌 때마다 음이 조금씩 더 어긋난다.
+  // ───── 로비 LOFI: 80 BPM 스윙 붐뱁 + 로즈 피아노 9화음 진행 (Dm9 → G13 → Cmaj9 → Am9) + 레코드 바늘 튀는 소리
+  lofiScore() {
+    clearInterval(this.scoreTimer);
+    if (this.tuneBus) { const old = this.tuneBus; old.gain.linearRampToValueAtTime(0, this.t + 1.2); setTimeout(() => old.disconnect(), 1500); }
+    const c = this.ctx;
+    const bus = c.createGain(); bus.gain.value = 0; bus.gain.linearRampToValueAtTime(1, this.t + 3);
+    const warm = c.createBiquadFilter(); warm.type = 'lowpass'; warm.frequency.value = 3200; warm.Q.value = 0.4; // 테이프처럼 따뜻하게
+    bus.connect(warm).connect(this.master); this.tuneBus = bus;
+    const bpm = 80, N = 16, stepDur = 60 / bpm / 4, swing = stepDur * 0.22;
+    const hz = (m) => 440 * Math.pow(2, (m - 69) / 12);
+    const CH = [[50, 53, 57, 60, 64], [43, 53, 59, 64, 69], [48, 52, 55, 59, 62], [45, 55, 60, 64, 71]]; // Dm9 G13 Cmaj9 Am9
+    const ROOT = [38, 31, 36, 33];
+    const PENTA = [62, 65, 67, 69, 72, 74, 77];
+    const K = 'x......x..x.....', S = '....x.......x...', H = 'x.x.x.x.x.x.x.xx';
+    const st = { step: 0, next: this.t + 0.3, mel: 69 };
+    this.score = st;
+    const rhodes = (m, at, d, v) => { const f = hz(m); this.tone(f, d, { at, type: 'sine', gain: 0.03 * v, attack: 0.015, release: d * 0.85, detune: (Math.random() - 0.5) * 8 }); this.tone(f * 2, d * 0.5, { at, type: 'triangle', gain: 0.006 * v, attack: 0.01, release: d * 0.4 }); };
+    const schedule = (i, time) => {
+      const k = i % N, bar = Math.floor(i / N); const at = time - this.t + (k % 2 ? swing : 0); if (at < 0) return;
+      const ch = CH[bar % 4], root = ROOT[bar % 4];
+      if (K[k] === 'x') { this.tone(120, 0.3, { at, type: 'sine', gain: 0.24, slide: 45, release: 0.26 }); }
+      if (S[k] === 'x') { this.noise(0.16, { at, freq: 1500, q: 0.7, gain: 0.07, release: 0.14 }); this.tone(200, 0.07, { at, type: 'triangle', gain: 0.03 }); }
+      if (H[k] === 'x') this.noise(0.04, { at, freq: 7200, q: 1.2, gain: k % 4 === 2 ? 0.02 : 0.012, release: 0.03 });
+      if (k === 0) ch.forEach((m, j) => rhodes(m, at + j * 0.018, stepDur * 10, 1));       // 살짝 흩뿌리듯 치는 화음
+      if (k === 10) ch.slice(1).forEach((m, j) => rhodes(m, at + j * 0.015, stepDur * 5, 0.6));
+      if (k === 0 || k === 7 || k === 10) this.tone(hz(root), stepDur * (k === 0 ? 6 : 3), { at, type: 'sine', gain: 0.09, attack: 0.01, release: stepDur * 2 });
+      // 가끔 흘러나오는 펜타토닉 선율 (홀수 마디 8분음표마다 확률적으로)
+      if (bar % 2 === 1 && k % 2 === 0 && Math.random() < 0.38) {
+        const idx = Math.max(0, Math.min(PENTA.length - 1, PENTA.indexOf(st.mel) + (Math.random() < 0.5 ? -1 : 1) * (1 + (Math.random() < 0.3 ? 1 : 0))));
+        st.mel = PENTA[idx] ?? 69; this.tone(hz(st.mel), stepDur * 3, { at, type: 'triangle', gain: 0.018, attack: 0.02, release: stepDur * 2.5 });
+      }
+      if (Math.random() < 0.25) this.noise(0.012, { at: at + Math.random() * stepDur, freq: 2000 + Math.random() * 4000, q: 2, gain: 0.03 + Math.random() * 0.04 }); // 레코드 바늘 튀는 소리
+    };
+    this.scoreTimer = setInterval(() => {
+      if (!this.ctx || this.score !== st || this.mode !== 'lobby') return clearInterval(this.scoreTimer);
+      const main = this.master; this.master = bus;
+      try { while (st.next < this.t + 0.25) { schedule(st.step, st.next); st.step++; st.next += stepDur; } } finally { this.master = main; }
+    }, 60);
+  }
+
   // ───── 테마 배경음악 엔진: 오디오 시계 기준으로 0.25초 앞까지 미리 예약해 박자가 흔들리지 않게 한다
   horrorScore(mode) {
     clearInterval(this.scoreTimer);
