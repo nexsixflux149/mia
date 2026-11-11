@@ -508,6 +508,51 @@ export class Cinema {
     ];
   }
 
+  // ── 해피니스 랜드 (놀이공원)
+  buildPark(looks) {
+    return this.set('park', (g) => {
+      g.position.set(-3200, 0, 0);
+      const gr = new THREE.Mesh(new THREE.PlaneGeometry(80, 60), new THREE.MeshStandardMaterial({ color: '#221a22', roughness: 1 })); gr.rotation.x = -Math.PI / 2; g.add(gr);
+      this.parkWheel = this.prop(g, { t: 'ferris_wheel', x: 10, z: -14, r2: 7 });
+      this.parkCarousel = this.prop(g, { t: 'carousel_big', x: 0, z: -4, r2: 3.2 });
+      this.prop(g, { t: 'drop_tower', x: -11, z: -12, h: 14 }); this.parkDrop = this.prop(g, { t: 'drop_car', x: -11, z: -12, y: 10 });
+      this.prop(g, { t: 'turnstile', x: -2, z: 8 }); this.prop(g, { t: 'turnstile', x: 2, z: 8 }); this.prop(g, { t: 'lantern_string', x: 0, z: 4, len: 18 });
+      this.parkHappy = this.prop(g, { t: 'mascot_statue', x: 5, z: 4, r: -40, s: 1.4 });
+      const KID = ['#ff8fab', '#e8c13a', '#9ab7d8', '#2fbf71', '#ffb0e0', '#b39dff'];
+      this.parkKids = KID.map((c, i) => { const a = createAvatar({ outfit: 'plain', accent: c, hair: ['twintail', 'short', 'bob', 'spiky', 'ponytail', 'bowl'][i], hairColor: '#2b1d16', ears: 'none', eyes: 'sparkle', mouth: 'open', body: '#ffe0cc', hat: i === 1 ? 'cap' : 'none' }); a.position.set(-3.5 + i * 1.4, 0, 1.5); a.scale.setScalar(0.8); g.add(a); return a; });
+      this.parkVip = createAvatar({ outfit: 'blazer', hair: 'short', hairColor: '#111', ears: 'none', eyes: 'smile', mouth: 'grin', body: '#ffe0cc', hat: 'crown', accent: '#c0262d' }); this.parkVip.position.set(0, 0, 3.2); this.parkVip.scale.setScalar(0.82); g.add(this.parkVip);
+      this.parkCrew = (looks.length ? looks : [{}]).slice(0, 4).map((l, i) => { const a = createAvatar(l); a.position.set(-2 + i * 1.2, 0, 14); a.rotation.y = Math.PI; g.add(a); return a; });
+      this.parkFire = new THREE.PointLight('#ff6a20', 0, 30, 1.6); this.parkFire.position.set(-2, 3, -6); g.add(this.parkFire);
+      this.parkHemi = new THREE.HemisphereLight('#a080b0', '#1a0a14', 0.9); g.add(this.parkHemi);
+      const moon = new THREE.DirectionalLight('#c8b0ff', 0.6); moon.position.set(-8, 14, 8); g.add(moon);
+    });
+  }
+  parkShots(kind, looks) {
+    const A = () => this.audio;
+    this.buildPark(looks);
+    const X = -3200;
+    const spinRides = (c, t) => { c.parkCarousel.rotation.y = t * 0.3; if (c.parkWheel.userData.wheel) c.parkWheel.userData.wheel.rotation.z = t * 0.08; c.parkDrop.position.y = 10 - Math.max(0, Math.sin(t * 0.6)) * 9; };
+    if (kind === 'park_intro') return [
+      { dur: 9, caption: '2026년 7월 7일, 밤 11시 59분.\n20년 전 문을 닫은 놀이공원, 해피니스 랜드.', setup: (c) => { c.show('park'); c.night(0.03, '#0c0610'); c.parkKids.forEach((a) => (a.visible = false)); c.parkVip.visible = false; c.parkFire.intensity = 0; A()?.ambient('park'); },
+        update: (c, t, k, dt) => { spinRides(c, t); c.parkCrew.forEach((a) => { a.position.z = 14 - t * 0.6; animateAvatar(a, dt, true, t); }); c.look(X + 4 - k * 4, 2.4, 22 - k * 5, X, 3, -4); } },
+      { dur: 10, sepia: true, caption: '2006년 7월 7일. 새 놀이기구 스카이드롭 개장 전야.\n특별 시승단 어린이 여섯 명이 초대되었다. 그리고 — 한 명 더.', setup: (c) => { c.show('park'); c.scene.background = new THREE.Color('#d8c0a8'); c.scene.fog = new THREE.Fog('#d8c0a8', 20, 80); c.parkCrew.forEach((a) => (a.visible = false)); c.parkKids.forEach((a) => (a.visible = true)); c.parkVip.visible = true; A()?.ambient(null); A()?.play('jackbox'); },
+        update: (c, t, k, dt) => { spinRides(c, t); c.parkKids.forEach((a, i) => animateAvatar(a, dt, false, t, false, i % 2 ? 'jump' : 'wave', t + i)); animateAvatar(c.parkVip, dt, false, t, false, 'dance', t); c.look(X + 2, 1.5, 9 - k * 1.5, X, 0.9, 2); } },
+      { dur: 8, caption: '그날 밤 아이 여섯이 죽었다.\n모두가 사고라고 했다.', capAt: 1.2, setup: (c) => { c.show('park'); c.night(0.05, '#1a0404'); c.parkKids.forEach((a) => (a.visible = false)); c.parkVip.visible = false; A()?.play(c.fear >= 2 ? 'scream_child' : 'whisper'); },
+        update: (c, t, k) => { spinRides(c, t * 3); c.parkFire.intensity = 22 + Math.random() * 22; c.look(X - 4, 2 + k * 3, 6, X - 10, 6 + k * 4, -12); } },
+      { dur: 5, setup: (c) => { c.show(); c.scene.background = new THREE.Color('#000'); c.title('해피니스 랜드', '— 폐장하지 않는 밤 —'); A()?.play(c.fear >= 2 ? 'sting' : 'calliope_far'); } },
+    ];
+    if (kind === 'park_true') return [
+      { dur: 11, caption: '"찾았다, 태민아. 이제 너도 나와."\n여섯 아이가 손을 흔들며 회전목마에 올랐다.', setup: (c) => { c.show('park'); c.scene.background = new THREE.Color('#ffd8c0'); c.scene.fog = new THREE.Fog('#ffd8c0', 20, 90); c.parkHemi.intensity = 2.2; c.parkFire.intensity = 0; c.parkCrew.forEach((a) => (a.visible = false)); c.parkKids.forEach((a, i) => { a.visible = true; a.rotation.y = 0; }); c.parkVip.visible = true; c.parkVip.position.set(0, 0, 5); c.parkVip.rotation.y = Math.PI; A()?.play('musicbox'); },
+        update: (c, t, k, dt) => { c.parkCarousel.rotation.y = t * 0.25; c.parkKids.forEach((a, i) => { a.position.z = 1.5 - Math.min(t, 6) * 0.5; animateAvatar(a, dt, t < 6, t, false, t >= 6 ? 'wave' : null, t); a.visible = t < 9.5 || i % 2; }); animateAvatar(c.parkVip, dt, false, t, false, 'bow', t); c.look(X, 2, 12 - k * 2, X, 1.2, -2); } },
+      { dur: 5, setup: (c) => { c.show(); c.scene.background = new THREE.Color('#000'); c.title('폐장', '20년 만의 진실 — 여섯 아이와 정비공 한 명의 이름'); A()?.play('bell'); } },
+    ];
+    return [
+      { dur: 8, caption: '일주일 뒤, 편집실 앞으로 소포가 왔다.\n내년 7월 7일 입장권 일곱 장. 당신들의 이름이 적혀 있다.', setup: (c) => { c.show('park'); c.night(0.05, '#0a0408'); c.parkKids.forEach((a) => (a.visible = false)); c.parkVip.visible = false; c.parkFire.intensity = 0; A()?.ambient('horror'); },
+        update: (c, t, k, dt) => { spinRides(c, t); c.parkCrew.forEach((a) => { a.visible = true; animateAvatar(a, dt, false, t, false, 'shiver', t); }); c.look(X, 1.8, 18 - k * 3, X, 1.3, 13); } },
+      { dur: 5, setup: (c) => { c.show(); c.scene.background = new THREE.Color('#000'); c.title('다음 손님', '아이들의 물건을 모두 찾으면, 다른 결말이…'); A()?.play(c.fear >= 2 ? 'giggle' : 'whisper'); } },
+    ];
+  }
+
   // ── 삐에로 (블루문 서커스)
   buildClown(looks) {
     return this.set('clown', (g) => {
@@ -606,6 +651,7 @@ export class Cinema {
     if (kind.startsWith('west')) return this.westShots(kind, looks);
     if (kind.startsWith('kimono')) return this.kimonoShots(kind, looks);
     if (kind.startsWith('clown')) return this.clownShots(kind, looks);
+    if (kind.startsWith('park')) return this.parkShots(kind, looks);
     if (kind === 'prologue') {
       this.buildRoad(); this.buildSchool(); this.buildCircle(); this.buildStop(looks);
       return [

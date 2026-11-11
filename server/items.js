@@ -208,6 +208,18 @@ Object.assign(ITEMS, {
   antidote: { name: '백야정 해독제', icon: '💉', use: null, desc: '갈색 앰풀 다섯 개. "투여 금지 (원장 지시)". 해독제는 처음부터 있었다.' },
   battery: { name: '건전지 두 개', icon: '🔋', use: null, desc: '무전기에서 나온 새 건전지. 캠코더에 맞을 것 같다.' },
 });
+// ── 해피니스 랜드
+Object.assign(ITEMS, {
+  park_ticket: { name: '해피니스 랜드 입장권', icon: '🎫', use: null, desc: '2006년 7월 7일 날짜가 찍힌 입장권. 회전문에 넣을 수 있다.' },
+  pjs_letter: { name: '박정수의 편지', icon: '✉️', use: null, desc: '"11시 50분, 회장님 차가 거울 미궁 쪽에서 크레인을 불렀습니다."' },
+  park_relic_1: { name: '지우의 별 머리끈', icon: '⭐', use: null, relic: true, desc: '반짝이는 별 모양 머리끈. 꼬리표 "1번 김지우".' },
+  park_relic_2: { name: '도현이의 야구모자', icon: '🧢', use: null, relic: true, desc: '챙 안쪽에 "2번 이도현". 노란 말 안장 위에 있었다.' },
+  park_relic_3: { name: '서아의 크레파스', icon: '🖍️', use: null, relic: true, desc: '몽당 크레파스 한 통. 안에 "비밀 미궁 생일 파티" 그림.' },
+  park_relic_4: { name: '준호의 게임기', icon: '🎮', use: null, relic: true, desc: '마지막 저장 21:41 — "미궁 탈출 연습".' },
+  park_relic_5: { name: '하린이의 풍선 팔찌', icon: '🎈', use: null, relic: true, desc: '분홍 풍선 모양 팔찌. 안쪽에 "5번 정하린".' },
+  park_relic_6: { name: '민규의 호루라기', icon: '📯', use: null, relic: true, desc: '입에 물던 자리가 닳았다. 숨바꼭질 끝을 알리는 호루라기.' },
+  park_relic_7: { name: '태민이의 생일 초대장', icon: '👑', use: null, relic: true, desc: '"거울 미궁 비밀 개장! 7월 7일 밤 9시 반 — 술래는 나. 문은 내가 잠근다!"' },
+});
 // ── 삐에로 (블루문 서커스)
 Object.assign(ITEMS, {
   tent_key: { name: '거울의 집 열쇠', icon: '🗝️', use: null, desc: '곰인형 배 속에서 나온 열쇠. 꼬리표: "거울의 집 — 단장 외 출입 금지"' },

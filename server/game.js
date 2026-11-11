@@ -66,6 +66,8 @@ export class GameInstance {
       walls: c.walls || [], props: c.props || [], intro: c.intro,
       objects: c.objects.map((o) => ({
         id: o.id, t: o.t, x: o.x, z: o.z, r: o.r || 0, y: o.y, label: o.label, kind: o.kind, color: o.color, len: o.len,
+        // 모양 · 움직임 정보 (크기 s · 높이 h · 반지름 r2 · 열림 · 거울 물결 · 핏자국 · 폭 · 켜짐 · 회전 속도 · 움직이는 맵 anim · 풀면 움직이기 moveOnDone)
+        s: o.s, h: o.h, r2: o.r2, open: o.open, wave: o.wave, blood: o.blood, w: o.w, on: o.on === true ? true : undefined, speed: o.speed, anim: o.anim, moveOnDone: o.moveOnDone,
         input: o.lock?.input, buttons: o.lock?.buttons, inputLen: o.lock?.len, notes: o.lock?.notes,
       })),
     };
@@ -83,6 +85,7 @@ export class GameInstance {
     return st;
   }
   isDone(o) {
+    if (o.doneFlag) return this.flags.has(o.doneFlag); // 다른 퍼즐(협동 등)이 풀리면 '완료'로 보고 움직이게 한다
     if (o.kind === 'lock') return this.flags.has('solved:' + o.id);
     if (o.kind === 'use') return (this.counters[o.id] || 0) >= (o.use?.times || 1);
     if (o.kind === 'examine' && o.once && o.on) return this.flags.has('seen:' + o.id);

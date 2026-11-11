@@ -272,7 +272,7 @@ function enterChapter(state, showIntro = true) {
   $('#lookBtn').classList.add('hidden');
   setObjective(state.objective, state.relics);
   applyObjState(); applyDark();
-  audio.ambient({ gwimun: ch.rain ? 'rain' : 'gwimun', ophelia: 'ship', doll: 'doll', hospital: 'hospital', camp: 'camp', west: 'west', kimono: 'kimono', clown: 'clown' }[S.scenario?.id] || 'horror');
+  audio.ambient({ gwimun: ch.rain ? 'rain' : 'gwimun', ophelia: 'ship', doll: 'doll', hospital: 'hospital', camp: 'camp', west: 'west', kimono: 'kimono', clown: 'clown', park: 'park' }[S.scenario?.id] || 'horror');
   renderer.toneMappingExposure = 1.7;
   if (showIntro && ch.intro) { queueStory({ ...ch.intro, sound: 'story' }); addJournal(ch.intro.title, ch.intro.text, 'story'); }
   if (!document.body.classList.contains('mobile') && !store.get('gwimun-tutorial', false)) { store.set('gwimun-tutorial', true); setTimeout(() => toast('팁: F 손전등 · C 웅크리기(귀신에게 덜 들킴) · G 위치 찍기 · J 수첩'), 4000); }
@@ -824,11 +824,11 @@ function drawMinimap(dt, t) {
   mm.classList.toggle('hidden', !SET.minimap || !S.world);
   mmT += dt; if (mmT < 0.15 || !SET.minimap || !S.world) return; mmT = 0;
   const W = mm.width, H = mm.height; mmx.clearRect(0, 0, W, H);
-  const size = S.room === 'lobby' ? [68, 68] : S.world.size || [26, 22];
+  const size = S.room === 'lobby' ? [60, 60] : S.world.size || [26, 22];
   const sc = (Math.min(W, H) - 16) / Math.max(size[0], size[1]);
   const P = (x, z) => [W / 2 + x * sc, H / 2 + z * sc];
   mmx.strokeStyle = 'rgba(255,255,255,.25)'; mmx.lineWidth = 1;
-  if (S.room === 'lobby') { mmx.beginPath(); mmx.arc(W / 2, H / 2, 32 * sc, 0, Math.PI * 2); mmx.stroke(); mmx.fillStyle = 'rgba(63,143,200,.8)'; { const [px2, pz2] = P(0, -27.5); mmx.beginPath(); mmx.arc(px2, pz2, 4.6 * sc, 0, Math.PI * 2); mmx.fill(); } mmx.strokeStyle = 'rgba(255,63,108,.55)'; mmx.lineWidth = 2; mmx.beginPath(); mmx.arc(W / 2, H / 2, 22 * sc, 0, Math.PI * 2); mmx.stroke(); const fp = S.world.rides?.coaster?.front(); if (fp) { const [cx2, cz2] = P(fp.x, fp.z); mmx.fillStyle = '#ff3f6c'; mmx.beginPath(); mmx.arc(cx2, cz2, 4, 0, Math.PI * 2); mmx.fill(); } }
+  if (S.room === 'lobby') { mmx.beginPath(); mmx.arc(W / 2, H / 2, 28.5 * sc, 0, Math.PI * 2); mmx.stroke(); mmx.fillStyle = 'rgba(63,143,200,.8)'; { const [px2, pz2] = P(0, -25.6); mmx.beginPath(); mmx.arc(px2, pz2, 4.6 * sc, 0, Math.PI * 2); mmx.fill(); } mmx.strokeStyle = 'rgba(255,63,108,.55)'; mmx.lineWidth = 2; mmx.beginPath(); mmx.arc(W / 2, H / 2, 22 * sc, 0, Math.PI * 2); mmx.stroke(); const fp = S.world.rides?.coaster?.front(); if (fp) { const [cx2, cz2] = P(fp.x, fp.z); mmx.fillStyle = '#ff3f6c'; mmx.beginPath(); mmx.arc(cx2, cz2, 4, 0, Math.PI * 2); mmx.fill(); } }
   else {
     mmx.strokeRect(W / 2 - size[0] / 2 * sc, H / 2 - size[1] / 2 * sc, size[0] * sc, size[1] * sc);
     mmx.fillStyle = 'rgba(200,190,170,.35)';
@@ -901,6 +901,8 @@ const THEME_INFO = {
     story: '2003년 여름 캠프 마지막 밤, 담력 시험을 떠난 반딧불 조 아이 넷이 돌아오지 않았다. 문 닫은 수련원 호숫가에는 가을에도 반딧불이 뜬다. 처음 방탈출을 해 본다면 여기서부터.' },
   west: { title: '🤠 레드 메사 — 교수대 마을', tag: '서부 웨스턴 · 유령 마을 · 누명 · 4챕터 · 약 2~3시간', color: '#ff9a50',
     story: '1887년, 애리조나 은광 마을. 은행 강도의 누명을 쓰고 목매달린 떠돌이 잭 모로우. 그날 밤 모래폭풍이 마을을 삼켰다. 140년째 교수대의 밧줄이 바람 없이 흔들린다.' },
+  park: { title: '🎡 해피니스 랜드 — 폐장하지 않는 밤', tag: '폐놀이공원 · 움직이는 놀이기구 · 3중 반전 · 10챕터 · 끝판왕 · 약 5~6시간', color: '#ffb0e0',
+    story: '2006년 7월 7일 밤, 새 놀이기구 스카이드롭 시운전 중 어린이 여섯 명이 숨졌다. 정비공의 실수라고 했다. 20년이 지난 지금도 매년 7월 7일 자정이면 문 닫은 놀이공원의 불이 켜지고, 토끼 해피가 다정하게 손님을 맞는다. 모든 것이 거짓말이었다.' },
   clown: { title: '🎪 삐에로 — 블루문 서커스의 마지막 앵콜', tag: '폐유원지 · 서커스 · 누명 · 7챕터 · 난이도 최상 · 약 4~5시간', color: '#ff2a6a',
     story: '1998년 성탄 전야, 블루문 서커스의 고별 공연 중 여덟 살 은별이가 사라졌다. 단장은 "광대가 아이를 데려갔다"고 했다. 28년째 성탄 전야 밤 8시면, 문 닫은 유원지의 빈 천막에서 왈츠가 흐른다. 관객석에서 웃는 삐에로는 — 뽀삐가 아니다.' },
   kimono: { title: '🏮 츠바키야 — 붉은 동백의 밤', tag: '일본풍 여관 · 기모노 · 혼례의 밤 · 4챕터 · 약 2~3시간', color: '#ff5a7a',
@@ -1376,6 +1378,16 @@ function openSlide(l) {
 }
 function slideArt(kind, n) {
   const c = document.createElement('canvas'); c.width = c.height = 300; const x = c.getContext('2d');
+  if (kind === 'park') { // 2006.07.07 21:40 거울 미궁 입구 — 아이 일곱, 맨 앞 왕관 쓴 아이가 열쇠를 든다
+    const g = x.createLinearGradient(0, 0, 0, 300); g.addColorStop(0, '#2a1a2a'); g.addColorStop(1, '#4a3a3a'); x.fillStyle = g; x.fillRect(0, 0, 300, 300);
+    for (let i = 0; i < 6; i++) { x.fillStyle = `rgba(200,220,240,${0.15 + (i % 2) * 0.1})`; x.fillRect(10 + i * 48, 40, 40, 150); }
+    x.fillStyle = '#ffd36a'; x.font = 'bold 18px sans-serif'; x.fillText('거울 미궁 OPEN', 80, 30);
+    const kids = [[40, '#ff8fab'], [80, '#e8c13a'], [120, '#9ab7d8'], [160, '#2fbf71'], [200, '#ffb0e0'], [240, '#b39dff']];
+    kids.forEach(([cx, c]) => { x.fillStyle = c; x.fillRect(cx - 14, 200, 28, 50); x.fillStyle = '#f1d4b8'; x.beginPath(); x.arc(cx, 186, 14, 0, 7); x.fill(); x.fillStyle = '#2a1a10'; x.fillRect(cx - 14, 172, 28, 8); });
+    x.fillStyle = '#c0262d'; x.fillRect(136, 214, 28, 56); x.fillStyle = '#f1d4b8'; x.beginPath(); x.arc(150, 200, 15, 0, 7); x.fill(); x.fillStyle = '#ffd36a'; x.beginPath(); x.moveTo(136, 186); x.lineTo(141, 176); x.lineTo(146, 184); x.lineTo(150, 172); x.lineTo(154, 184); x.lineTo(159, 176); x.lineTo(164, 186); x.fill(); x.fillRect(168, 222, 14, 4);
+    x.fillStyle = 'rgba(255,120,40,.25)'; x.fillRect(0, 260, 300, 40); x.fillStyle = '#ffe9a8'; x.font = 'bold 16px serif'; x.fillText('2006.07.07  21:40', 80, 290);
+    return c.toDataURL();
+  }
   if (kind === 'clown') { // 블루문 서커스 단체 사진: 줄무늬 천막 앞 단장 · 삐에로 · 목말 탄 아이
     for (let i = 0; i < 10; i++) { x.fillStyle = i % 2 ? '#a0141e' : '#efe6d6'; x.fillRect(i * 30, 0, 30, 300); }
     x.fillStyle = 'rgba(30,10,20,.35)'; x.fillRect(0, 0, 300, 300); x.fillStyle = '#3a2418'; x.fillRect(0, 238, 300, 62);

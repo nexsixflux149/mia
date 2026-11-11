@@ -436,7 +436,28 @@ export function createGhost(type = 'woman') {
     const blob = new THREE.Mesh(GG('gblob', () => new THREE.CircleGeometry(0.45, 18)), GG('gblobm', () => new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: 0.45, depthWrite: false })));
     blob.rotation.x = -Math.PI / 2; blob.position.y = 0.02; g.add(blob);
   }
-  const light = new THREE.PointLight(type === 'mudang' ? '#ff4a3a' : type === 'sailor' ? '#5a9aff' : type === 'doll' ? '#ffd0e0' : type === 'clown' ? '#ff3a6a' : type === 'ringmaster' ? '#ffb030' : type === 'gasmask' ? '#a8ff9a' : type === 'scarecrow' ? '#ff8a30' : '#8899ff', 2.2, 4.5, 2); light.position.y = 1.5; g.add(light); u.light = light; if (type === 'shadow') { light.color.set('#000'); light.distance = 0.01; }
+  if (type === 'mascot') {
+    // 해피 토끼 탈: 사람만 한 토끼 인형 탈, 단추 눈 하나는 떨어졌고, 꿰맨 웃음 틈으로 사람 눈이 보인다
+    const fur = M('#d8d2c8', { roughness: 1 }), dirty = M('#7a6a5a', { roughness: 1 });
+    const bodyM = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 0.7, 10, 24), fur); bodyM.position.y = 1.05; body.add(bodyM);
+    const belly = new THREE.Mesh(new THREE.SphereGeometry(0.32, 24, 16), M('#ece6dc')); belly.scale.set(1, 1.2, 0.5); belly.position.set(0, 1.0, 0.3); body.add(belly);
+    for (let i = 0; i < 6; i++) { const b = new THREE.Mesh(new THREE.CircleGeometry(0.05 + (i % 3) * 0.03, 12), M('#5a0a0a', { side: THREE.DoubleSide })); b.position.set((i % 2 ? 0.15 : -0.12) + i * 0.02, 0.7 + i * 0.12, 0.44); body.add(b); }
+    P.legs = [-1, 1].map((s) => { const l = limb(0.5, 0.13, fur); l.position.set(0.18 * s, 0.5, 0); body.add(l); const foot = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 12), fur); foot.scale.set(1, 0.5, 1.6); foot.position.set(0, -0.5, 0.1); l.add(foot); return l; });
+    const head = new THREE.Group(); head.position.y = 2.05; body.add(head); P.head = head;
+    const hd = new THREE.Mesh(new THREE.SphereGeometry(0.42, 32, 24), fur); hd.scale.set(1, 0.95, 0.95); head.add(hd);
+    for (const s of [-1, 1]) { const ear = new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.75, 6, 14), s > 0 ? dirty : fur); ear.position.set(0.18 * s, 0.7, -0.05); ear.rotation.z = s > 0 ? -1.0 : -0.12; head.add(ear); }
+    const btn = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.04, 20), M('#0a0a0a', { roughness: 0.3 })); btn.rotation.x = Math.PI / 2; btn.position.set(-0.15, 0.06, 0.39); head.add(btn);
+    const hole = new THREE.Mesh(new THREE.CircleGeometry(0.07, 16), new THREE.MeshBasicMaterial({ color: '#000' })); hole.position.set(0.15, 0.06, 0.405); head.add(hole);
+    const realEye = new THREE.Mesh(new THREE.SphereGeometry(0.025, 10, 8), new THREE.MeshBasicMaterial({ color: '#e8e0c8' })); realEye.position.set(0.15, 0.06, 0.39); head.add(realEye); P.realEye = realEye;
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 8), M('#c8808a')); nose.position.set(0, -0.04, 0.41); head.add(nose);
+    const grin = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.014, 6, 24, Math.PI), M('#2a1008')); grin.rotation.z = Math.PI; grin.position.set(0, -0.12, 0.38); head.add(grin);
+    const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.03, 0.02), new THREE.MeshBasicMaterial({ color: '#000' })); mouth.position.set(0, -0.2, 0.37); head.add(mouth); P.mouth = mouth;
+    for (let i = 0; i < 8; i++) { const st = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.06, 0.01), M('#2a1008')); st.position.set(-0.15 + i * 0.043, -0.2, 0.38); head.add(st); }
+    P.arms = [-1, 1].map((s) => { const a = limb(0.75, 0.11, fur); a.position.set(0.46 * s, 1.5, 0); body.add(a); const paw = new THREE.Mesh(new THREE.SphereGeometry(0.13, 14, 10), fur); paw.position.y = -0.78; a.add(paw); return a; });
+    const str = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 1.3, 4), M('#ddd')); str.position.y = -0.2; P.arms[1].add(str);
+    const bal = new THREE.Mesh(new THREE.SphereGeometry(0.22, 18, 14), M('#d02a3a', { roughness: 0.3, emissive: '#300', emissiveIntensity: 0.4 })); bal.scale.y = 1.2; bal.position.y = 0.5; P.arms[1].add(bal);
+  }
+  const light = new THREE.PointLight(type === 'mascot' ? '#ffb0c0' : type === 'mudang' ? '#ff4a3a' : type === 'sailor' ? '#5a9aff' : type === 'doll' ? '#ffd0e0' : type === 'clown' ? '#ff3a6a' : type === 'ringmaster' ? '#ffb030' : type === 'gasmask' ? '#a8ff9a' : type === 'scarecrow' ? '#ff8a30' : '#8899ff', 2.2, 4.5, 2); light.position.y = 1.5; g.add(light); u.light = light; if (type === 'shadow') { light.color.set('#000'); light.distance = 0.01; }
   // 주변 검은 안개
   const fogTex = fogTexture();
   u.fog = [];
@@ -555,6 +576,14 @@ export function animateGhost(g, dt, t, st, distToMe) {
     P.legs[0].rotation.x = sn * 0.4; P.legs[1].rotation.x = -sn * 0.4;
     P.arms[0].rotation.x = -0.8; P.arms[1].rotation.x = hunting ? -1.3 : sn * 0.2;
     P.head.scale.setScalar(1 + Math.sin(tt * 2.2) * 0.025); // 쉭… 쉭… 숨쉬는 마스크
+  }
+  if (u.type === 'mascot') {
+    const sp = hunting ? 6 : 2.2; const sn = Math.sin(tt * sp);
+    P.legs[0].rotation.x = sn * 0.5; P.legs[1].rotation.x = -sn * 0.5;
+    u.body.position.y = Math.abs(sn) * (hunting ? 0.1 : 0.03);
+    P.arms[0].rotation.x = hunting ? -1.5 + Math.sin(tt * 3) * 0.15 : -0.1; P.arms[1].rotation.x = -0.4;
+    P.head.rotation.y = hunting ? 0 : Math.sin(tt * 0.5) * 0.9; // 고개를 끝까지 돌려 두리번거린다
+    P.realEye.position.x = 0.15 + Math.sin(tt * 3) * 0.02;
   }
   u.light.intensity = (hunting ? 3 : 1.6) * (0.7 + Math.random() * 0.4);
   for (const f of u.fog) { f.position.y += dt * 0.25; if (f.position.y > 2) f.position.y = 0.2; f.material.opacity = 0.5 * (1 - f.position.y / 2.2); }

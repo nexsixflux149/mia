@@ -7,6 +7,7 @@ import { CAMP_CHAPTERS, CAMP_ENDINGS } from './camp.js';
 import { WEST_CHAPTERS, WEST_ENDINGS } from './west.js';
 import { KIMONO_CHAPTERS, KIMONO_ENDINGS } from './kimono.js';
 import { CLOWN_CHAPTERS, CLOWN_ENDINGS } from './clown.js';
+import { PARK_CHAPTERS, PARK_ENDINGS } from './park.js';
 import { ITEMS } from './items.js';
 
 export const SCENARIOS = {
@@ -89,6 +90,16 @@ export const SCENARIOS = {
     saveKey: (name) => 'clown:' + name,
     carry: (ch) => [...(ch >= 3 && ch <= 4 ? ['trapeze_hook'] : []), ...(ch >= 3 ? ['ledger'] : []), ...(ch >= 4 ? ['insurance'] : []), ...(ch >= 6 ? ['lighter'] : [])],
     startItems: () => ['talisman', 'talisman'],
+  },
+  park: {
+    id: 'park', title: '해피니스 랜드 — 폐장하지 않는 밤', short: '해피니스 랜드',
+    desc: '폐놀이공원 · 움직이는 놀이기구 · 3중 반전 · 10챕터 · 끝판왕 · 약 5~6시간', difficulty: 6,
+    chapters: PARK_CHAPTERS, endings: PARK_ENDINGS,
+    relics: ['park_relic_1', 'park_relic_2', 'park_relic_3', 'park_relic_4', 'park_relic_5', 'park_relic_6', 'park_relic_7'], relicName: '아이들의 물건',
+    cine: { intro: 'park_intro', true: 'park_true', normal: 'park_normal' },
+    saveKey: (name) => 'park:' + name,
+    carry: () => [],
+    startItems: () => ['talisman', 'talisman', 'talisman'],
   },
 };
 
@@ -173,8 +184,8 @@ for (const [sid, [idx, obj]] of Object.entries(LORE)) {
   const [x, z] = freeSpot(ch); ch.objects.push({ ...obj, x, z });
 }
 
-// ───── 모든 챕터 맵을 1.15배로 넓힌다 (방 크기·벽·소품·물건·시작 위치·귀신 위치를 같은 비율로)
-const MAP_SCALE = 1.15;
+// ───── 챕터 맵 확대 비율 (1.0 = 원래 크기) (방 크기·벽·소품·물건·시작 위치·귀신 위치를 같은 비율로)
+const MAP_SCALE = 1.0;
 const sc2 = (v) => Math.round(v * MAP_SCALE * 100) / 100;
 function enlarge(ch) {
   if (ch._scaled) return; ch._scaled = true;

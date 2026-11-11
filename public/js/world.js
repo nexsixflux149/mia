@@ -272,6 +272,7 @@ export const LOBBY_THEMES = [
   { id: 'hospital', color: '#9affc8', glow: '#0a3a24', label: '🏥 백야 요양병원' },
   { id: 'west', color: '#ff9a50', glow: '#4a2008', label: '🤠 레드 메사' },
   { id: 'camp', color: '#ffd76a', glow: '#4a3008', label: '🏕️ 반딧불 캠프' },
+  { id: 'park', color: '#ffb0e0', glow: '#3a0a2a', label: '🎡 해피니스 랜드' },
 ];
 LOBBY_THEMES.forEach((th, k, all) => { const a = Math.PI + (k / (all.length - 1)) * Math.PI; th.x = +(Math.cos(a) * 15).toFixed(2); th.z = +(Math.sin(a) * 15).toFixed(2); });
 
@@ -322,6 +323,9 @@ function buildExhibit(root, colliders, th) {
   } else if (th.id === 'camp') {
     P({ t: 'tent', x: -2.2, z: 0.2, r: 25, color: '#e8c13a' }, 0.75); P({ t: 'campfire', x: 1.6, z: 1.5 }, 0.9);
     P({ t: 'fireflies', x: 0, z: 0.8 }, 1); P({ t: 'canoe', x: 2.5, z: -0.2, r: -20 }, 0.6);
+  } else if (th.id === 'park') {
+    P({ t: 'mascot_statue', x: -2.2, z: 0.4, r: 20, s: 0.6 }, 1); P({ t: 'teacup', x: 2.3, z: 0.4, color: '#ff9ad0' }, 0.7);
+    spin.push(P({ t: 'balloon_stand', x: 1.2, z: 1.8 }, 0.6));
   } else if (th.id === 'clown') {
     P({ t: 'jack_box', x: -2.2, z: 0.5, r: 20 }, 0.9); P({ t: 'balloon_stand', x: 2.3, z: 0.3 }, 0.8);
     spin.push(P({ t: 'unicycle', x: 1.3, z: 1.7, r: -20 }, 0.9));
@@ -573,7 +577,7 @@ export function buildLobby(scene) {
     for (let k = 0; k < n; k++) { const a = Math.random() * Math.PI * 2, r = 17 + Math.random() * 27; m4.makeRotationZ((Math.random() - 0.5) * 0.5); m4.setPosition(Math.cos(a) * r, 0.15, Math.sin(a) * r); grass.setMatrixAt(k, m4); }
     root.add(grass);
   }
-  colliders.push(...ringColliders(34));
+  colliders.push(...ringColliders(30.5));
   scene.add(root);
   const update = (t) => {
     park.update(t); outer.update(t);
@@ -587,7 +591,7 @@ export function buildLobby(scene) {
       e.spin.forEach((s) => (s.rotation.z = Math.sin(t * 1.2 + i) * 0.15));
     });
   };
-  return { root, colliders, walls: [], objects: {}, flickers: [], ceiling: [], update, bounds: 32, outdoor: true, themes: LOBBY_THEMES, exhibits, interactives: [...park.interactives, ...outer.interactives], rides: park.rides };
+  return { root, colliders, walls: [], objects: {}, flickers: [], ceiling: [], update, bounds: 28.5, outdoor: true, themes: LOBBY_THEMES, exhibits, interactives: [...park.interactives, ...outer.interactives], rides: park.rides };
 }
 
 // ───── 로비 공포 장식: 바닥의 핏자국 · 벽 낙서("살려줘" "무서워" …) · 핏빛 손자국
@@ -670,7 +674,7 @@ function ringColliders(r) {
 function buildOuterPark(root, colliders, add) {
   const anim = []; const inter = [];
   // 둘레 산책로 (반지름 27)
-  const ring = new THREE.Mesh(new THREE.RingGeometry(25.6, 28.4, 96), new THREE.MeshStandardMaterial({ map: (() => { const t = groundTex('#d8c8a8', 0.12); t.repeat.set(30, 2); return t; })(), roughness: 1 }));
+  const ring = new THREE.Mesh(new THREE.RingGeometry(24.6, 27, 96), new THREE.MeshStandardMaterial({ map: (() => { const t = groundTex('#d8c8a8', 0.12); t.repeat.set(30, 2); return t; })(), roughness: 1 }));
   ring.rotation.x = -Math.PI / 2; ring.position.y = 0.012; ring.receiveShadow = true; root.add(ring);
   // 광장에서 산책로로 이어지는 네 갈래 길
   for (const a of [Math.PI / 4, (3 * Math.PI) / 4, (5 * Math.PI) / 4, (7 * Math.PI) / 4]) {
@@ -679,7 +683,7 @@ function buildOuterPark(root, colliders, add) {
   }
   // 북쪽: 연못 + 분수
   {
-    const cx = 0, cz = -27.5;
+    const cx = 0, cz = -25.6;
     const water = new THREE.Mesh(new THREE.CircleGeometry(4.6, 40), new THREE.MeshStandardMaterial({ color: '#3f8fc8', roughness: 0.15, metalness: 0.3, emissive: '#0a3050', emissiveIntensity: 0.4 }));
     water.rotation.x = -Math.PI / 2; water.position.set(cx, 0.06, cz); root.add(water);
     const rim = new THREE.Mesh(new THREE.TorusGeometry(4.7, 0.28, 8, 48), new THREE.MeshStandardMaterial({ color: '#d8d0c4', roughness: 0.8 })); rim.rotation.x = -Math.PI / 2; rim.position.set(cx, 0.12, cz); root.add(rim);
@@ -703,31 +707,31 @@ function buildOuterPark(root, colliders, add) {
     heads.forEach((h, i) => (h.count = cnt[i])); root.add(stem, ...heads);
     colliders.push({ x: cx, z: cz, hw: w / 2, hd: d / 2 });
   };
-  flowerBed(-30, -9, 3, 6, 1); flowerBed(-30, 9, 3, 6, 4); flowerBed(30, -9, 3, 6, 7); flowerBed(30, 9, 3, 6, 2);
-  flowerBed(-9, 30.5, 6, 2.4, 5); flowerBed(9, 30.5, 6, 2.4, 3);
+  flowerBed(-27, -9, 3, 6, 1); flowerBed(-27, 9, 3, 6, 4); flowerBed(27, -9, 3, 6, 7); flowerBed(27, 9, 3, 6, 2);
+  flowerBed(-9, 27.6, 6, 2.4, 5); flowerBed(9, 27.6, 6, 2.4, 3);
   // 동쪽: 먹자골목 (포장마차 + 풍선)
-  [[24, -14, -110], [27.5, -4, -90], [27.5, 4, -90], [24, 14, -70]].forEach(([x, z, r]) => add({ t: 'stall', x, z, r }));
-  add({ t: 'popcorn_cart', x: 22.5, z: 0, r: -90 });
-  add({ t: 'balloon_stand', x: 23, z: -8.5 });
+  [[22.4, -13, -110], [25.6, -4, -90], [25.6, 4, -90], [22.4, 13, -70]].forEach(([x, z, r]) => add({ t: 'stall', x, z, r }));
+  add({ t: 'popcorn_cart', x: 21.6, z: 0, r: -90 });
+  add({ t: 'balloon_stand', x: 21.8, z: -8.5 });
   // 서쪽: 야외 무대 + 피크닉 잔디
   {
-    const g = new THREE.Group(); g.position.set(-28, 0, 0); g.rotation.y = Math.PI / 2; root.add(g);
+    const g = new THREE.Group(); g.position.set(-25.8, 0, 0); g.rotation.y = Math.PI / 2; root.add(g);
     const deck = new THREE.Mesh(new THREE.BoxGeometry(8, 0.6, 4), new THREE.MeshStandardMaterial({ color: '#8a5a3a', roughness: 0.8 })); deck.position.y = 0.3; deck.receiveShadow = true; deck.castShadow = true; g.add(deck);
     const back = new THREE.Mesh(new THREE.BoxGeometry(8, 4, 0.2), new THREE.MeshStandardMaterial({ color: '#5a2a6a' })); back.position.set(0, 2.6, -1.9); g.add(back);
     const curtainM = new THREE.MeshStandardMaterial({ color: '#c0262d', roughness: 0.9 });
     for (const s of [-1, 1]) { const c = new THREE.Mesh(new THREE.BoxGeometry(1.2, 3.6, 0.25), curtainM); c.position.set(s * 3.4, 2.4, -1.6); g.add(c); }
-    const sign = textSprite('🎤 야외 무대 · 올라가서 춤춰요!', { size: 28, bg: 'rgba(60,10,50,.85)', color: '#ffe08a', border: '#ff8fd0' }); sign.position.set(-28, 5.2, 0); root.add(sign);
+    const sign = textSprite('🎤 야외 무대 · 올라가서 춤춰요!', { size: 28, bg: 'rgba(60,10,50,.85)', color: '#ffe08a', border: '#ff8fd0' }); sign.position.set(-25.8, 5.2, 0); root.add(sign);
     const bulbs = [];
     for (let i = 0; i < 14; i++) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), new THREE.MeshBasicMaterial({ color: ['#fff2a8', '#ff9ad0', '#9ad0ff'][i % 3] })); b.position.set(-3.6 + i * 0.55, 4.7, -1.75); g.add(b); bulbs.push(b); }
     anim.push((t) => bulbs.forEach((b, i) => (b.visible = Math.sin(t * 4 + i) > -0.3)));
-    colliders.push({ x: -28, z: 0, hw: 2.1, hd: 4.1, perch: 'stage' });
-    inter.push({ id: 'stage', kind: 'climb', x: -25.6, z: 0, r: 2.2, label: '야외 무대', verb: '올라가기', perch: { x: -28, z: 0, hw: 1.8, hd: 3.7, y: 0.62, id: 'stage' } });
+    colliders.push({ x: -25.8, z: 0, hw: 2.1, hd: 4.1, perch: 'stage' });
+    inter.push({ id: 'stage', kind: 'climb', x: -23.4, z: 0, r: 2.2, label: '야외 무대', verb: '올라가기', perch: { x: -25.8, z: 0, hw: 1.8, hd: 3.7, y: 0.62, id: 'stage' } });
   }
-  [[-22.5, -12], [-22.5, 12]].forEach(([x, z]) => add({ t: 'bench', x, z, r: 90 }));
+  [[-21.2, -12], [-21.2, 12]].forEach(([x, z]) => add({ t: 'bench', x, z, r: 90 }));
   // 산책로 가로등 + 벤치
-  for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2 + 0.2; add({ t: 'lamp', x: Math.cos(a) * 29.2, z: Math.sin(a) * 29.2, noLight: true }); }
+  for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2 + 0.2; add({ t: 'lamp', x: Math.cos(a) * 27.6, z: Math.sin(a) * 27.6, noLight: true }); }
   // 바깥 숲 (걸어서 닿지 않는 경계 너머 풍경)
-  for (let i = 0; i < 44; i++) { const a = (i / 44) * Math.PI * 2, r = 36 + (i % 3) * 2.5; const g = place(root, { t: i % 4 ? 'pine' : 'tree', x: Math.cos(a) * r, z: Math.sin(a) * r, color: ['#c9a8ff', '#ffb7c9', '#9ad0ff'][i % 3] }); g.scale.setScalar(1.2 + (i % 5) * 0.15); }
+  for (let i = 0; i < 44; i++) { const a = (i / 44) * Math.PI * 2, r = 32.5 + (i % 3) * 2.5; const g = place(root, { t: i % 4 ? 'pine' : 'tree', x: Math.cos(a) * r, z: Math.sin(a) * r, color: ['#c9a8ff', '#ffb7c9', '#9ad0ff'][i % 3] }); g.scale.setScalar(1.2 + (i % 5) * 0.15); }
   return { interactives: inter, update: (t) => anim.forEach((f) => f(t)) };
 }
 
@@ -933,9 +937,23 @@ export function buildChapter(scene, ch, themeId = 'gwimun') {
     for (let i = 0; i < Math.round((W * D) / 40); i++) { const x = (R() - 0.5) * (W - 2), z = (R() - 0.5) * (D - 2); if (Math.abs(x) < 1.6 || !free(x, z, 0.2)) continue; const kind = pick(R, extra); deco({ t: kind, x, z, r: R() * 360, glow: themeId === 'camp' ? '#6aff9a' : undefined, colors: themeId === 'kimono' ? ['#c0202a', '#8a1a20', '#e8a0a8'] : undefined, r2: 2.4, n: 20 }); }
   }
 
+  // 움직이는 맵: 소품에 anim 을 달면 계속 움직인다
+  //   spin {speed}      제자리 회전 (회전목마 · 찻잔)
+  //   swing {amp,speed} 진자처럼 흔들림 (바이킹 · 매달린 인형)
+  //   bob {amp,speed}   위아래로 오르내림 (자이로드롭 · 떠다니는 풍선)
+  //   orbit {r,speed}   원을 그리며 돈다 (퍼레이드 차량 · 범퍼카)
+  const animate = (g, p) => {
+    if (g.userData.wheel) { const w = g.userData.wheel, sp = g.userData.spinWheel ?? 0.08; anims.push((t) => { w.rotation.z = t * sp; w.children.forEach((c) => { if (c.isGroup) c.rotation.z = -w.rotation.z; }); }); } // 관람차: 바퀴는 돌고 칸은 늘 아래로 매달린다
+    const a = p.anim; if (!a) return; const x0 = g.position.x, y0 = g.position.y, z0 = g.position.z, r0 = g.rotation.y, ph = a.phase ?? (p.x * 0.7 + p.z * 0.3);
+    if (a.type === 'spin') anims.push((t) => { g.rotation.y = r0 + t * (a.speed ?? 0.5); });
+    else if (a.type === 'swing') anims.push((t) => { g.rotation[a.axis || 'z'] = Math.sin(t * (a.speed ?? 1) + ph) * (a.amp ?? 0.6); });
+    else if (a.type === 'bob') anims.push((t) => { const k = a.drop ? (Math.sin(t * (a.speed ?? 0.5) + ph) > 0.7 ? -1 : Math.sin(t * (a.speed ?? 0.5) + ph)) : Math.sin(t * (a.speed ?? 1) + ph); g.position.y = y0 + (k * 0.5 + 0.5) * (a.amp ?? 1); });
+    else if (a.type === 'orbit') anims.push((t) => { const an = t * (a.speed ?? 0.3) + ph; g.position.x = (a.cx ?? 0) + Math.cos(an) * a.r; g.position.z = (a.cz ?? 0) + Math.sin(an) * a.r; g.rotation.y = -an + (a.face ?? 0); });
+  };
   for (const p of ch.props || []) {
-    const g = place(root, p); const f = footOf(p, g); if (f) colliders.push(f);
+    const g = place(root, p); const f = p.anim?.type === 'orbit' ? null : footOf(p, g); if (f) colliders.push(f);
     if (g.userData.flicker) flickers.push(g.userData.flicker);
+    animate(g, p);
   }
 
   const objects = {};
@@ -960,6 +978,9 @@ export function buildChapter(scene, ch, themeId = 'gwimun') {
       entry.hit = hit;
     }
     if (f) { f.objId = o.id; colliders.push(f); }
+    // 풀면 움직이는 물건: moveOnDone {dx,dy,dz,ry,dur} — 문이 열리고, 기계가 내려오고, 상자가 올라간다
+    if (o.moveOnDone) entry.mv = { from: g.position.clone(), r0: g.rotation.y, k: 0 };
+    animate(g, o);
     objects[o.id] = entry;
   }
 
@@ -1004,6 +1025,11 @@ export function buildChapter(scene, ch, themeId = 'gwimun') {
       const fl = e.group.userData.flag; if (fl) fl.rotation.y = Math.sin(t * 2 + e.data.x) * 0.3;
       const bl = e.group.userData.blink; if (bl) bl.intensity = Math.sin(t * 5) > 0.3 ? 5 : 0.2;
       if (e.group.userData.swing) e.group.rotation.z = Math.sin(t * 1.6) * 0.12;
+      if (e.mv && e.done && e.mv.k < 1) {
+        const m = e.data.moveOnDone; e.mv.k = Math.min(1, e.mv.k + dt / (m.dur || 2)); const k = 1 - Math.pow(1 - e.mv.k, 3);
+        e.group.position.set(e.mv.from.x + (m.dx || 0) * k, e.mv.from.y + (m.dy || 0) * k, e.mv.from.z + (m.dz || 0) * k); e.group.rotation.y = e.mv.r0 + (m.ry || 0) * k;
+        if (e.foot && m.clear && e.mv.k >= 1) { e.foot.hw = 0; e.foot.hd = 0; } // 다 움직이면 길을 막지 않는다
+      }
     }
   };
 

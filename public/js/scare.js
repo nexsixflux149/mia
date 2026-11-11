@@ -71,6 +71,19 @@ function dark(x, w, h, a = 0.85) { x.fillStyle = `rgba(0,0,0,${a})`; x.fillRect(
 // ── 22종
 const SCARES = {
   // ── 새 놀래키기 ──
+  // 토끼 탈: 화면 가득 꿰맨 웃음, 떨어진 단추 눈 구멍 속에서 사람의 눈이 본다
+  mascot(x, w, h, t) {
+    dark(x, w, h, 0.97); const cx = w / 2 + (R() - 0.5) * 16, cy = h / 2 + 20, s = Math.min(w, h) * (0.42 + t * 0.28);
+    for (const sx of [-1, 1]) { x.save(); x.translate(cx + sx * s * 0.35, cy - s * 0.9); x.rotate(sx * (sx > 0 ? 0.9 : 0.15)); ell(x, 0, -s * 0.5, s * 0.16, s * 0.6, sx > 0 ? '#7a6a5a' : '#d8d2c8'); x.restore(); }
+    ell(x, cx, cy, s * 0.62, s * 0.58, '#d8d2c8');
+    for (let i = 0; i < 120; i++) { x.fillStyle = `rgba(90,80,70,${R() * 0.3})`; x.fillRect(cx + (R() - 0.5) * s * 1.2, cy + (R() - 0.5) * s * 1.1, 3, 3); }
+    ell(x, cx - s * 0.22, cy - s * 0.1, s * 0.1, s * 0.1, '#050505'); ell(x, cx - s * 0.25, cy - s * 0.13, s * 0.025, s * 0.025, '#fff');
+    ell(x, cx + s * 0.22, cy - s * 0.1, s * 0.1, s * 0.1, '#000'); ell(x, cx + s * 0.22 + (R() - 0.5) * 6, cy - s * 0.1, s * 0.05, s * 0.035, '#e8e0c8'); ell(x, cx + s * 0.22 + (R() - 0.5) * 6, cy - s * 0.1, s * 0.018, s * 0.03, '#2a1a10');
+    ell(x, cx, cy + s * 0.05, s * 0.06, s * 0.05, '#c8808a');
+    const op = s * (0.02 + t * 0.12); ell(x, cx, cy + s * 0.28, s * 0.3, op, '#000');
+    x.strokeStyle = '#2a1008'; x.lineWidth = 4; for (let i = 0; i < 9; i++) { const px = cx - s * 0.26 + i * s * 0.065; x.beginPath(); x.moveTo(px, cy + s * 0.28 - op - 6); x.lineTo(px, cy + s * 0.28 + op + 6); x.stroke(); }
+    for (let i = 0; i < 6; i++) { x.fillStyle = 'rgba(110,0,0,.8)'; x.fillRect(cx - s * 0.2 + i * s * 0.08, cy + s * 0.3 + op, 3, 20 + R() * s * 0.3); }
+  },
   // 삐에로: 화면 가득 하얀 분칠 얼굴, 귀까지 찢어진 붉은 웃음, 뾰족한 이
   clown(x, w, h, t) {
     dark(x, w, h, 0.97); const cx = w / 2 + (R() - 0.5) * 24, cy = h / 2 + (R() - 0.5) * 24, s = Math.min(w, h) * (0.45 + t * 0.3);
@@ -298,6 +311,7 @@ const POOLS = {
   camp: ['child', 'drowned', 'handprints', 'faces', 'eye', 'shadow', 'longneck', 'writing', 'smiles', 'crawler'],
   west: ['hang', 'faces', 'shadow', 'eye', 'skull', 'longneck', 'writing', 'ringmaster', 'tv'],
   kimono: ['face', 'faceless', 'longneck', 'upside', 'hands', 'eye', 'writing', 'faces', 'crawler', 'tv'],
+  park: ['mascot', 'mascot', 'balloons', 'jackbox', 'child', 'smiles', 'tv', 'crawler', 'marionette', 'faces', 'hands'],
   clown: ['clown', 'jackbox', 'balloons', 'marionette', 'ringmaster', 'smiles', 'clown', 'crawler', 'tv', 'teeth'],
 };
 export const SCARE_TYPES = Object.keys(SCARES).filter((k) => k !== 'clownHead');
@@ -310,7 +324,7 @@ export function pickScare(type, scenario = 'gwimun') {
   return SCARES[type] ? type : pool[0];
 }
 
-const SOUND = { clown: 'clown_laugh', jackbox: 'jackbox', balloons: 'pop', marionette: 'creak', crawler: 'scream', ringmaster: 'growl', smiles: 'giggle', tv: 'glitch', eye: 'growl', teeth: 'growl', static: 'glitch', writing: 'glitch', eyes: 'growl', skull: 'scream', drowned: 'scream_wet', doll: 'scream_child', child: 'scream_child', faceless: 'sting', shadow: 'growl', mirror: 'glass', handprints: 'bang', hang: 'creak', blood: 'scream' };
+const SOUND = { mascot: 'scream_child', clown: 'clown_laugh', jackbox: 'jackbox', balloons: 'pop', marionette: 'creak', crawler: 'scream', ringmaster: 'growl', smiles: 'giggle', tv: 'glitch', eye: 'growl', teeth: 'growl', static: 'glitch', writing: 'glitch', eyes: 'growl', skull: 'scream', drowned: 'scream_wet', doll: 'scream_child', child: 'scream_child', faceless: 'sting', shadow: 'growl', mirror: 'glass', handprints: 'bang', hang: 'creak', blood: 'scream' };
 
 export function jumpscare(type, audio) {
   const c = cv();

@@ -19,6 +19,7 @@ const THEMES = {
     abc: 'E4 F2 A2 | B4 A4 | c4 B2 A2 | F6 E2 | A4 B2 c2 | e4 c4 | B2 A2 F2 E2 | E8' },
 };
 THEMES.rain = THEMES.gwimun;
+THEMES.park = { key: {}, unit: 2, abc: "E2 A2 B2 c2 | B4 A4 | G2 F2 E2 ^D2 | E8 | A2 c2 e2 d2 | c4 B4 | A2 ^G2 F2 ^G2 | A8 | e2 d2 c2 B2 | c2 A2 F4 | E2 ^G2 B2 d2 | c8" };
 
 // ───── 긴장감 있는 테마 배경음악 (자작곡): 드럼 · 반복 베이스 · 불협화음 현악 · 선율이 함께 연주된다.
 // 16칸(=한 마디, 16분음표) 패턴. x=치기 · .=쉼. 베이스 칸의 숫자/문자는 근음에서 몇 반음 위(0~9, a=10, b=11).
@@ -42,6 +43,8 @@ const SCORES = {
   clown: { bpm: 96, steps: 12, root: 45, kick: 'kick', snare: 'oompah', hat: 'hat', tom: 'drum', lead: 'clown', leadVoice: 'calliope', accent: 'honk',
     K: 'x...........', T: '..........xx', H: '..x...x...x.', S: '....x...x...', bass: '0...........', stab: 'x...........', prog: [0, 0, 7, 7, 0, 5, 7, 0] },
 };
+SCORES.park = { bpm: 62, root: 45, kick: 'kick', snare: 'clap', hat: 'tick', tom: 'drum', lead: 'park', leadVoice: 'musicbox', accent: 'whisper',
+  K: 'x.......x.......', T: '..........x...x.', H: 'x...x...x...x...', S: '....x.......x...', bass: '0...0...1...0...', stab: 'x.......x.......', prog: [0, 0, 1, 0, 0, -2, 1, -1] };
 SCORES.rain = SCORES.gwimun;
 THEMES.clown = { key: {}, unit: 4, abc: "e z ^d | e z c | B z A | ^G z z | A B c | d z c | B z ^G | A z z | e f e | ^d e z | c' z b | a z z | f e d | c B A | ^G B E | A z z" };
 // 아주 작은 ABC 해석기: 음이름(C~B, c~b), 옥타브(' ,), 임시표(^ _ =), 길이(2, 3, /2, 3/2), 쉼표 z
@@ -129,6 +132,7 @@ export class AudioFX {
         camp: ['wind', 'giggle', 'crawl', 'whisper', 'wave', 'creak', 'giggle', 'drip'],
         west: ['wind', 'wind', 'creak', 'bell', 'whisper', 'knock', 'chain'],
         kimono: ['gayageum', 'gong', 'whisper', 'wind', 'giggle', 'creak', 'drip'],
+        park: ['calliope_far', 'giggle', 'whisper', 'creak', 'pop', 'musicbox_far', 'giggle', 'wind'],
         clown: ['honk', 'clown_laugh', 'giggle', 'creak', 'pop', 'whisper', 'jackbox', 'calliope_far'],
       }[mode] || ['creak', 'whisper', 'knock'];
       this.horrorTimer = setInterval(() => { if (!this.mode || this.mode === 'lobby') return clearInterval(this.horrorTimer); if (Math.random() < 0.75) this.play(EV[Math.floor(Math.random() * EV.length)]); }, mode === 'doll' || mode === 'gwimun' ? 6000 : 7500);
