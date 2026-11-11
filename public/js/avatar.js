@@ -663,7 +663,7 @@ export const EXPR = {
   wave: { eyes: 'smile', mouth: 'open', brows: 'soft' },
   dance: { eyes: 'star', mouth: 'grin', brows: 'soft', cheeks: 'blush' },
   spin: { eyes: 'dizzy', mouth: 'o', brows: 'worried' },
-  jump: { eyes: 'sparkle', mouth: 'open', brows: 'soft' },
+  // jump: 점프할 때는 표정(눈)을 바꾸지 않는다
   lie: { eyes: 'sleepy', mouth: 'cat', brows: 'soft' },
   sit: { eyes: 'closed', mouth: 'smile', brows: 'soft', cheeks: 'blush' },
   clap: { eyes: 'smile', mouth: 'grin', brows: 'soft' },

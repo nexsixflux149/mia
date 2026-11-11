@@ -511,6 +511,12 @@ function updateMove(dt) {
     if (S.pendingInteract) { const ent = S.world.objects[S.pendingInteract]; if (ent && distTo(ent) <= reach(ent) - 0.2) { const id = S.pendingInteract; S.pendingInteract = null; S.moveTarget = null; interact(id); } }
     if (S.moveTarget && d > 0.15) { vx = dx / d; vz = dz / d; } else S.moveTarget = null;
   }
+  // 웅크린 동안에는 걷지 않고 그 자리에서 방향만 돌린다
+  if (S.crouch && (vx || vz)) {
+    S.moveTarget = null; S.pendingInteract = null;
+    const diff = wrapAng(Math.atan2(vx, vz) - me.ry); me.ry = wrapAng(me.ry + diff * Math.min(1, dt * 12));
+    vx = 0; vz = 0;
+  }
   me.moving = !!(vx || vz) && !blocked;
   if (S.em) { S.emT += dt; const d = EMOTE_DUR[S.em]; if ((me.moving && S.em !== 'jump') || (d && S.emT > d)) S.em = ''; }
   if (me.moving) {
