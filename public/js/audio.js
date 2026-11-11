@@ -5,13 +5,13 @@
 const THEMES = {
   gwimun: { title: '서하리의 밤', key: {}, eighth: 0.33, rest: [10, 18], voice: 'gayageum',
     abc: 'A3 c2 d e3 d2 c | A3 G2 A c3 A3 | e3 g2 e d3 c2 A | G3 A2 c A6 | c3 d2 e g3 e2 d | e3 d2 c A3 G3 | A3 c2 d e2 d c2 A | A12' },
-  ship: { title: '안개 속 뱃노래', key: {}, eighth: 0.4, rest: [9, 16], voice: 'accordion',
+  ship: { title: '안개 속 뱃노래', key: { B: -1 }, eighth: 0.4, rest: [9, 16], voice: 'accordion',
     abc: 'D2 F A2 G | F2 E D3 | C2 E G2 F | E3 C3 | D2 F A2 d | c2 A G3 | F2 E D2 C | D6' },
   doll: { title: '클라라의 오르골', key: { F: 1 }, eighth: 0.375, rest: [8, 14], voice: 'musicbox',
     abc: "B2 e2 g2 | f2 e2 B2 | c2 e2 a2 | g4 f2 | e2 g2 b2 | a2 g2 e2 | ^d2 f2 a2 | g4 z2 | B2 e2 g2 | f2 e2 B2 | c2 B2 A2 | G2 F2 E2 | ^D2 F2 A2 | B2 A2 F2 | E6 | E4 z2" },
   hospital: { title: '7병동 자장가', key: { B: -1, E: -1, A: -1 }, eighth: 0.6, rest: [12, 20], voice: 'lullaby',
     abc: 'G4 E2 F2 | G4 c4 | B4 A2 G2 | F8 | E4 D2 C2 | D4 G4 | =B,4 C2 D2 | C8' },
-  camp: { title: '모닥불 노래', key: { F: 1 }, eighth: 0.42, rest: [10, 16], voice: 'guitar',
+  camp: { title: '모닥불 노래', key: { B: -1, E: -1 }, eighth: 0.42, rest: [10, 16], voice: 'guitar',
     abc: 'D2 G2 B2 G2 | A2 B2 c2 A2 | B2 d2 c2 B2 | A6 D2 | G2 B2 d2 B2 | c2 e2 d2 c2 | B2 A2 F2 A2 | G8' },
   west: { title: '교수대의 하모니카', key: {}, eighth: 0.43, rest: [10, 18], voice: 'harmonica',
     abc: 'E2 A2 c3 B | A4 E4 | D2 F2 A3 G | E8 | E2 A2 c2 e2 | d3 c B2 A2 | G2 B2 E2 ^G2 | A8' },
@@ -24,22 +24,22 @@ THEMES.rain = THEMES.gwimun;
 // 16칸(=한 마디, 16분음표) 패턴. x=치기 · .=쉼. 베이스 칸의 숫자/문자는 근음에서 몇 반음 위(0~9, a=10, b=11).
 // 구성: 도입 4마디 → 그루브 8마디 → 절정 8마디 → 숨 고르기 4마디 → 반복. 귀신이 쫓아오면 바로 절정.
 const SCORES = {
-  gwimun: { bpm: 84, root: 45, kick: 'taiko', snare: 'deok', hat: 'rim', tom: 'drum', lead: 'gwimun', leadVoice: 'gayageum', accent: 'gong',
+  gwimun: { bpm: 70, root: 45, kick: 'taiko', snare: 'deok', hat: 'rim', tom: 'drum', lead: 'gwimun', leadVoice: 'gayageum', accent: 'gong',
     K: 'x.....x...x.....', T: '....x.......x.x.', H: '..x...x...x...x.', S: '', bass: '0.....0...0..3..', stab: 'x.........x.....', prog: [0, 0, 1, 0, 0, 0, -2, -1] },
-  ship: { bpm: 76, root: 38, kick: 'kick', snare: 'snare', hat: 'hat', tom: 'timpani', lead: 'ship', leadVoice: 'accordion', accent: 'foghorn',
+  ship: { bpm: 64, root: 38, kick: 'kick', snare: 'snare', hat: 'hat', tom: 'timpani', lead: 'ship', leadVoice: 'accordion', accent: 'foghorn',
     K: 'x.......x.......', T: '......x.......xx', H: '..x...x...x...x.', S: '....x.......x...', bass: '0.0.0.0.0.0.1.0.', stab: 'x.......x.....x.', prog: [0, 0, -2, -2, 0, 0, 1, 1] },
-  doll: { bpm: 88, root: 40, kick: 'kick', snare: 'pizz', hat: 'tick', tom: 'drum', lead: 'doll', leadVoice: 'musicbox', accent: 'glass',
+  doll: { bpm: 72, root: 40, kick: 'kick', snare: 'pizz', hat: 'tick', tom: 'drum', lead: 'doll', leadVoice: 'musicbox', accent: 'glass',
     K: 'x.......x.......', T: '..............x.', H: 'x.x.x.x.x.x.x.x.', S: '....x.......x...', bass: '0...7...0...6...', stab: 'x...x...x...x...', prog: [0, 0, -1, -1, 0, 0, 1, -1] },
-  hospital: { bpm: 70, root: 36, kick: 'heart', snare: 'clap', hat: 'beep', tom: 'drum', lead: 'hospital', leadVoice: 'lullaby', accent: 'flatline',
+  hospital: { bpm: 58, root: 36, kick: 'heart', snare: 'clap', hat: 'beep', tom: 'drum', lead: 'hospital', leadVoice: 'lullaby', accent: 'flatline',
     K: 'x..x....x..x....', T: '', H: '.......x.......x', S: '....x.......x...', bass: '0.......0...1...', stab: 'x.......x...x...', prog: [0, 0, 0, 1, 0, 0, -1, 1] },
-  camp: { bpm: 86, root: 43, kick: 'kick', snare: 'snare', hat: 'shaker', tom: 'drum', lead: 'camp', leadVoice: 'guitar', accent: 'whisper',
+  camp: { bpm: 70, root: 43, kick: 'kick', snare: 'snare', hat: 'shaker', tom: 'drum', lead: 'camp', leadVoice: 'guitar', accent: 'whisper',
     K: 'x...x...x...x...', T: '..x...x...x..xx.', H: 'xxxxxxxxxxxxxxxx', S: '....x.......x...', bass: '0.0.0.0.3.3.2.2.', stab: 'x.......x.......', prog: [0, 0, -2, -1, 0, 0, -4, -1] },
-  west: { bpm: 90, root: 45, kick: 'kick', snare: 'snare', hat: 'hat', tom: 'drum', lead: 'west', leadVoice: 'harmonica', accent: 'whip',
+  west: { bpm: 74, root: 45, kick: 'kick', snare: 'snare', hat: 'hat', tom: 'drum', lead: 'west', leadVoice: 'harmonica', accent: 'whip',
     K: 'x..x..x.x..x..x.', T: '..............xx', H: '..x...x...x...x.', S: '....x.......x...', bass: '0..0..0.5..5..3.', stab: 'x.......x..x....', prog: [0, 0, -2, 1, 0, 0, -2, -1] },
-  kimono: { bpm: 78, root: 40, kick: 'taiko', snare: 'deok', hat: 'rim', tom: 'drum', lead: 'kimono', leadVoice: 'koto', accent: 'gong',
+  kimono: { bpm: 64, root: 40, kick: 'taiko', snare: 'deok', hat: 'rim', tom: 'drum', lead: 'kimono', leadVoice: 'koto', accent: 'gong',
     K: 'x.......x.......', T: 'x...x..x..x.x...', H: '..x.x...x...x.x.', S: '', bass: '0.......1.......', stab: 'x.......x.x.....', prog: [0, 0, 1, 0, 0, 0, 1, 3] },
   // 삐에로: 3/4 왈츠 (12칸 = 한 마디)
-  clown: { bpm: 120, steps: 12, root: 45, kick: 'kick', snare: 'oompah', hat: 'hat', tom: 'drum', lead: 'clown', leadVoice: 'calliope', accent: 'honk',
+  clown: { bpm: 96, steps: 12, root: 45, kick: 'kick', snare: 'oompah', hat: 'hat', tom: 'drum', lead: 'clown', leadVoice: 'calliope', accent: 'honk',
     K: 'x...........', T: '..........xx', H: '..x...x...x.', S: '....x...x...', bass: '0...........', stab: 'x...........', prog: [0, 0, 7, 7, 0, 5, 7, 0] },
 };
 SCORES.rain = SCORES.gwimun;
@@ -191,6 +191,13 @@ export class AudioFX {
     }, 60);
   }
 
+  // 어두운 잔향: 3.5초 동안 서서히 사라지는 잡음으로 만든 공간 울림 (한 번 만들어 재사용)
+  darkVerb() {
+    if (this._verb) return this._verb;
+    const c = this.ctx, len = Math.floor(c.sampleRate * 3.5), b = c.createBuffer(2, len, c.sampleRate);
+    for (let ch = 0; ch < 2; ch++) { const d = b.getChannelData(ch); let lp = 0; for (let i = 0; i < len; i++) { lp = lp * 0.82 + (Math.random() * 2 - 1) * 0.18; d[i] = lp * Math.pow(1 - i / len, 2.6); } }
+    return (this._verb = b);
+  }
   // ───── 테마 배경음악 엔진 — 한 바퀴가 약 2~3분인 긴 곡. 매 바퀴 구성 순서 · 드럼 패턴 · 화음 진행 · 선율이 조금씩 달라져
   //       같은 부분이 그대로 반복되지 않는다. 오디오 시계 기준으로 미리 예약해 박자가 흔들리지 않는다.
   horrorScore(mode) {
@@ -199,7 +206,12 @@ export class AudioFX {
     const N = sc.steps || 16, stepDur = 60 / sc.bpm / 4;
     const th = THEMES[sc.lead]; const lead = th ? parseAbc(th.abc, th.key) : []; const unit = th?.unit || 2;
     if (this.tuneBus) { const old = this.tuneBus; old.gain.linearRampToValueAtTime(0, this.t + 1.2); setTimeout(() => old.disconnect(), 1500); }
-    const bus = this.ctx.createGain(); bus.gain.value = 0; bus.gain.linearRampToValueAtTime(1, this.t + 4); bus.connect(this.master); this.tuneBus = bus;
+    const bus = this.ctx.createGain(); bus.gain.value = 0; bus.gain.linearRampToValueAtTime(1, this.t + 4); this.tuneBus = bus;
+    // 어둡게: 고음을 깎아 먹먹하게 하고, 넓은 폐건물 같은 긴 잔향을 섞는다
+    const dark = this.ctx.createBiquadFilter(); dark.type = 'lowpass'; dark.frequency.value = 1700; dark.Q.value = 0.5;
+    const verb = this.ctx.createConvolver(); verb.buffer = this.darkVerb();
+    const wet = this.ctx.createGain(); wet.gain.value = 0.42; const dry = this.ctx.createGain(); dry.gain.value = 0.85;
+    bus.connect(dark); dark.connect(dry).connect(this.master); dark.connect(verb).connect(wet).connect(this.master);
     const hz = (m) => 440 * Math.pow(2, (m - 69) / 12);
     // 선율에 쓰인 음(음계)을 모아 두고, 즉흥 변주는 이 음계 안에서만 움직인다
     const pcs = [...new Set(lead.filter((n) => n.midi != null).map((n) => n.midi % 12))].sort((a, b) => a - b);
@@ -233,7 +245,7 @@ export class AudioFX {
         case 'deok': this.noise(0.07, { at, freq: 2700, q: 2, gain: 0.14 * v }); break;
         case 'pizz': this.tone(hz(sc.root + 24 + this.scoreShift), 0.22, { at, type: 'triangle', gain: 0.055 * v, attack: 0.003, release: 0.2 }); break;
         case 'oompah': [0, 3, 7].forEach((k) => this.tone(hz(sc.root + 12 + k + this.scoreShift), 0.18, { at, type: 'square', gain: 0.011 * v, release: 0.13 })); break;
-        case 'hat': this.noise(0.04, { at, freq: 8500, q: 1, gain: 0.03 * v, release: 0.035 }); break;
+        case 'hat': this.noise(0.04, { at, freq: 6000, q: 1, gain: 0.02 * v, release: 0.035 }); break;
         case 'tick': this.noise(0.025, { at, freq: 3300, q: 9, gain: 0.06 * v }); break;
         case 'rim': this.noise(0.045, { at, freq: 2400, q: 3, gain: 0.06 * v }); break;
         case 'beep': this.tone(1320, 0.08, { at, type: 'square', gain: 0.015 * v, release: 0.04 }); break;
@@ -255,7 +267,7 @@ export class AudioFX {
       switch (voice) {
         case 'gayageum': this.tone(f, d + 0.6, { at, type: 'triangle', gain: 0.05 * v, attack: 0.004, release: d + 0.55, slide: f * 0.985 }); break;
         case 'accordion': this.tone(f, d, { at, type: 'square', gain: 0.013 * v, attack: 0.06, release: d * 0.6 }); this.tone(f * 1.005, d, { at, type: 'sawtooth', gain: 0.009 * v, attack: 0.06, release: d * 0.6 }); break;
-        case 'musicbox': this.tone(f * 2, 1, { at, type: 'triangle', gain: 0.034 * v, attack: 0.002, release: 0.95 }); break;
+        case 'musicbox': this.tone(f, 1.2, { at, type: 'triangle', gain: 0.03 * v, attack: 0.002, release: 0.95 }); break;
         case 'lullaby': this.tone(f, d * 1.3, { at, type: 'sine', gain: 0.045 * v, attack: 0.1, release: d, detune: (Math.random() - 0.5) * 40 }); break;
         case 'guitar': this.tone(f, d + 0.4, { at, type: 'triangle', gain: 0.045 * v, attack: 0.003, release: d + 0.35 }); break;
         case 'harmonica': this.tone(f, d, { at, type: 'square', gain: 0.015 * v, attack: 0.04, release: d * 0.7 }); this.tone(f, d, { at, type: 'sawtooth', gain: 0.008 * v, attack: 0.04, release: d * 0.7, detune: 14 }); break;
@@ -303,15 +315,16 @@ export class AudioFX {
         const semi = parseInt(b, 16) + (sec === 'groove2' && rnd() < 0.2 ? 12 : 0); const f = hz(root + semi); const d = sec === 'fog' ? stepDur * 14 : stepDur * 1.8;
         this.tone(f, d, { at, type: 'sawtooth', gain: 0.024 * lvl, release: d * 0.8 }); this.tone(f / 2, d, { at, type: 'sine', gain: 0.065 * lvl, release: d * 0.8 });
       }
+      if (k === 0) [-12, -6].forEach((s2) => this.tone(hz(root + s2), stepDur * N * 1.1, { at, type: 'sawtooth', gain: sec === 'intro' || sec === 'fog' ? 0.016 : 0.011, attack: stepDur * 3, release: stepDur * 5 }));
       // 불협화음 현악: 쌓기 후반 · 절정
-      if ((sec === 'peak' || (sec === 'build' && sb >= sn / 2)) && on(sc.stab, k)) [12, 13, 18].forEach((s2) => this.tone(hz(root + s2), stepDur * 2, { at, type: 'sawtooth', gain: 0.016, release: stepDur * 1.7, detune: (Math.random() - 0.5) * 10 }));
+      if ((sec === 'peak' || (sec === 'build' && sb >= sn / 2)) && on(sc.stab, k)) [0, 1, 6, 12].forEach((s2) => this.tone(hz(root + s2), stepDur * 2.4, { at, type: 'sawtooth', gain: 0.018, release: stepDur * 1.7, detune: (Math.random() - 0.5) * 10 }));
       // 길게 깔리는 현악 (안개 · 쉼 · 끝맺음)
       if ((sec === 'fog' || sec === 'hush' || sec === 'outro') && k === 0) [0, 7, 13].forEach((s2, j) => this.tone(hz(root + 12 + s2), stepDur * N * 1.05, { at, type: 'sawtooth', gain: 0.006 + (j === 2 ? 0.002 : 0), attack: stepDur * 4, release: stepDur * 6 }));
       // 선율 (도입 · 끝맺음 제외). 절정은 한 옥타브 위
       if (sec !== 'intro' && sec !== 'outro') {
         if (st.lw <= 0 && lead.length) {
           const n = leadPick(sec); st.lw = n.len;
-          if (n.midi != null) leadNote(hz(n.midi + (sec === 'peak' ? 12 : 0) + this.scoreShift), n.len * stepDur, at, sc.leadVoice, sec === 'fog' || sec === 'hush' ? 0.7 : 1);
+          if (n.midi != null) leadNote(hz(n.midi + (sec === 'peak' || sec === 'fog' ? -12 : 0) + this.scoreShift), n.len * stepDur, at, sc.leadVoice, sec === 'fog' || sec === 'hush' ? 0.7 : 1);
         }
         st.lw--;
       } else { st.lw = 0; }
