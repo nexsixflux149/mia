@@ -13,8 +13,11 @@ const GC = new Map();
 export const geo = (key, make) => { let g = GC.get(key); if (!g) { g = make(); g.userData.shared = true; GC.set(key, g); } return g; };
 const r3 = (v) => Math.round(v * 1000) / 1000;
 const boxG = (w, h, d) => geo(`b${r3(w)},${r3(h)},${r3(d)}`, () => new THREE.BoxGeometry(w, h, d));
-const cylG = (rt, rb, h, seg) => geo(`c${r3(rt)},${r3(rb)},${r3(h)},${seg}`, () => new THREE.CylinderGeometry(rt, rb, h, seg));
-const sphG = (r, ws = 16, hs = 12) => geo(`s${r3(r)},${ws},${hs}`, () => new THREE.SphereGeometry(r, ws, hs));
+// 폴리곤 디테일: PC 는 둥근 부품을 약 1.7배 촘촘하게, 휴대폰은 1.25배 (모양은 같고 더 매끈하다)
+const DETAIL = (typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches) ? 1.25 : 1.7;
+const dseg = (n) => Math.max(n, Math.round(n * DETAIL));
+const cylG = (rt, rb, h, seg) => { seg = dseg(seg); return geo(`c${r3(rt)},${r3(rb)},${r3(h)},${seg}`, () => new THREE.CylinderGeometry(rt, rb, h, seg)); };
+const sphG = (r, ws = 16, hs = 12) => { ws = dseg(ws); hs = dseg(hs); return geo(`s${r3(r)},${ws},${hs}`, () => new THREE.SphereGeometry(r, ws, hs)); };
 // 아주 작은 조각은 그림자를 드리우지 않는다 (그림자 패스 비용 절감, 모습은 그대로)
 function B(g, w, h, d, c, x = 0, y = 0, z = 0, o) {
   const m = new THREE.Mesh(boxG(w, h, d), typeof c === 'string' ? M(c, o) : c);

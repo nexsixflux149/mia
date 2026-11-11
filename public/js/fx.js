@@ -9,11 +9,11 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 const HorrorShader = {
   uniforms: {
     tDiffuse: { value: null }, time: { value: 0 }, grain: { value: 0.06 }, vignette: { value: 1.0 },
-    danger: { value: 0 }, desat: { value: 0.15 }, brightness: { value: 1 },
+    danger: { value: 0 }, desat: { value: 0.15 }, brightness: { value: 1 }, grade: { value: 1 },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float time, grain, vignette, danger, desat, brightness; varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform float time, grain, vignette, danger, desat, brightness, grade; varying vec2 vUv;
     float rnd(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
     void main(){
       vec2 uv = vUv;
@@ -28,6 +28,11 @@ const HorrorShader = {
       col.b = texture2D(tDiffuse, uv - c * ca).b;
       float l = dot(col, vec3(0.299,0.587,0.114));
       col = mix(col, vec3(l), desat);
+      // 공포 게임 색보정: 대비를 올리고(S자 곡선) 어두운 곳은 차갑게 · 밝은 곳은 바랜 누런빛
+      vec3 sc = clamp(col, 0.0, 1.0); col = mix(col, sc * sc * (3.0 - 2.0 * sc), 0.4 * grade);
+      float lg = dot(col, vec3(0.299,0.587,0.114));
+      col = mix(col, col * vec3(0.8, 0.93, 0.95), grade * (1.0 - lg) * 0.8);
+      col = mix(col, col * vec3(1.02, 0.98, 0.86), grade * lg * 0.5);
       col.r += danger * 0.08 * (0.6 + 0.4 * sin(time * 6.0));
       col *= brightness;
       float v = smoothstep(0.85, 0.2, length(c) * (1.0 + 0.35 * danger));
@@ -87,8 +92,8 @@ export class FX {
     u.time.value = t;
     u.danger.value += (danger - u.danger.value) * 0.08;
     u.brightness.value = this.brightness;
-    if (mode === 'lobby') { u.grain.value = 0; u.vignette.value = 0; u.desat.value = 0; this.bloom.strength = 0.3; this.bloom.threshold = 1.15; }
-    else { u.grain.value = 0.04; u.vignette.value = 1; u.desat.value = 0.2; this.bloom.strength = 0.65; this.bloom.threshold = 1.05; }
+    if (mode === 'lobby') { u.grain.value = 0; u.vignette.value = 0; u.desat.value = 0.1; u.grade.value = 0.6; this.bloom.strength = 0.3; this.bloom.threshold = 1.15; }
+    else { u.grain.value = 0.04; u.vignette.value = 1; u.desat.value = 0.32; u.grade.value = 1; this.bloom.strength = 0.65; this.bloom.threshold = 1.05; }
     this.composer.render();
   }
 }

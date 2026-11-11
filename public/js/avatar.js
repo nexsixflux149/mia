@@ -166,45 +166,55 @@ export function createAvatar(look) {
 
   const rig = new THREE.Group();
   g.add(rig);
+  // 2.5등신: 머리(지름 약 0.8) 아래로 몸통·팔은 1.12배 키워 올리고, 다리는 길게 늘린다
+  const SD = { body: 1.12, hip: 0.74, head: 1.6 };
+  const upper = new THREE.Group(); upper.scale.setScalar(SD.body); upper.position.y = SD.head - 1.08 * SD.body; rig.add(upper);
 
   // 몸통 · 다리 · 팔 (옷 색은 의상이 정한다)
   const O = outfitColors(look);
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.27, 0.22, 6, 16), mat(O.top));
-  torso.position.y = 0.52; rig.add(torso);
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.27, 0.22, 12, 32), mat(O.top));
+  torso.position.y = 0.52; upper.add(torso);
   const legs = [];
   for (const s of [-1, 1]) {
-    const pivot = new THREE.Group(); pivot.position.set(0.12 * s, 0.3, 0);
-    const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.085, 0.12, 4, 10), mat(O.legs)); leg.position.y = -0.14; pivot.add(leg);
-    const shoe = new THREE.Mesh(new THREE.SphereGeometry(0.095, 16, 10), mat(O.shoes, { roughness: 0.45 })); shoe.scale.set(1, 0.6, 1.35); shoe.position.set(0, -0.27, 0.03); pivot.add(shoe);
+    // 엉덩이 높이에서 땅까지 내려오는 긴 다리 (허벅지 · 무릎 · 종아리 · 신발)
+    const H = SD.hip; const pivot = new THREE.Group(); pivot.position.set(0.12 * s, H, 0);
+    const thigh = new THREE.Mesh(new THREE.CapsuleGeometry(0.095, H * 0.36, 8, 24), mat(O.legs)); thigh.position.y = -H * 0.27; pivot.add(thigh);
+    const knee = new THREE.Mesh(new THREE.SphereGeometry(0.088, 32, 22), mat(O.legs)); knee.position.y = -H * 0.5; pivot.add(knee);
+    const calf = new THREE.Mesh(new THREE.CapsuleGeometry(0.082, H * 0.3, 8, 24), mat(O.legs)); calf.position.y = -H * 0.72; pivot.add(calf);
+    const shoe = new THREE.Mesh(new THREE.SphereGeometry(0.105, 45, 29), mat(O.shoes, { roughness: 0.45 })); shoe.scale.set(1, 0.6, 1.4); shoe.position.set(0, -H + 0.05, 0.035); pivot.add(shoe);
     // 신발 밑창 + 앞코 반짝임
-    const sole = new THREE.Mesh(new THREE.CylinderGeometry(0.094, 0.098, 0.022, 16), mat('#f4efe6', { roughness: 0.8 })); sole.scale.set(1, 1, 1.35); sole.position.set(0, -0.3, 0.03); pivot.add(sole);
-    const shine = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 6), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.55 })); shine.position.set(-0.03 * s, -0.24, 0.13); pivot.add(shine);
+    const sole = new THREE.Mesh(new THREE.CylinderGeometry(0.104, 0.108, 0.024, 28), mat('#f4efe6', { roughness: 0.8 })); sole.scale.set(1, 1, 1.4); sole.position.set(0, -H + 0.012, 0.035); pivot.add(sole);
+    const shine = new THREE.Mesh(new THREE.SphereGeometry(0.024, 19, 13), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.55 })); shine.position.set(-0.03 * s, -H + 0.085, 0.15); pivot.add(shine);
     rig.add(pivot); legs.push(pivot);
   }
   const arms = [];
   for (const s of [-1, 1]) {
     const pivot = new THREE.Group(); pivot.position.set(0.3 * s, 0.68, 0);
-    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.16, 4, 10), mat(O.sleeve)); arm.position.set(0.03 * s, -0.13, 0); arm.rotation.z = 0.35 * s; pivot.add(arm);
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.068, 14, 10), skin); hand.position.set(0.08 * s, -0.27, 0); pivot.add(hand);
+    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.2, 8, 24), mat(O.sleeve)); arm.position.set(0.035 * s, -0.15, 0); arm.rotation.z = 0.32 * s; pivot.add(arm);
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.07, 38, 26), skin); hand.position.set(0.09 * s, -0.31, 0); pivot.add(hand);
     // 벙어리장갑 같은 엄지
-    const thumb = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), skin); thumb.position.set(0.06 * s, -0.24, 0.05); pivot.add(thumb);
+    const thumb = new THREE.Mesh(new THREE.SphereGeometry(0.031, 22, 16), skin); thumb.position.set(0.07 * s, -0.28, 0.05); pivot.add(thumb);
     // 소매 끝 단 (옷 색보다 살짝 밝게)
-    const cuff = new THREE.Mesh(new THREE.TorusGeometry(0.066, 0.016, 6, 14), mat(a2(O.sleeve))); cuff.position.set(0.068 * s, -0.222, 0); cuff.rotation.order = 'ZXY'; cuff.rotation.set(Math.PI / 2, 0, 0.35 * s); pivot.add(cuff);
-    rig.add(pivot); arms.push(pivot);
+    const cuff = new THREE.Mesh(new THREE.TorusGeometry(0.068, 0.017, 16, 38), mat(a2(O.sleeve))); cuff.position.set(0.078 * s, -0.258, 0); cuff.rotation.order = 'ZXY'; cuff.rotation.set(Math.PI / 2, 0, 0.32 * s); pivot.add(cuff);
+    upper.add(pivot); arms.push(pivot);
   }
-  addOutfit(rig, look, O);
-  const accFx = addAccessory(rig, arms, look);
+  // 허리 아래: 다리와 몸통 사이 엉덩이 (반바지처럼 옷 아랫단 색)
+  const hips = new THREE.Mesh(new THREE.SphereGeometry(0.25, 51, 32, 0, Math.PI * 2, Math.PI * 0.35, Math.PI * 0.65), mat(O.legs)); hips.scale.set(1, 0.7, 0.95); hips.position.y = SD.hip + 0.05; rig.add(hips);
+  addOutfit(upper, look, O);
+  const accFx = addAccessory(upper, arms, look);
 
   // 머리
-  const head = new THREE.Group(); head.position.y = 1.08; rig.add(head);
+  const head = new THREE.Group(); head.position.y = SD.head; rig.add(head);
   const inner = new THREE.Group(); inner.scale.set(1.08, 0.95, 1); head.add(inner);
-  inner.add(new THREE.Mesh(new THREE.SphereGeometry(0.42, 32, 24), skin));
+  inner.add(new THREE.Mesh(new THREE.SphereGeometry(0.42, 64, 48), skin));
+  // 목
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 0.16, 38), skin); neck.position.y = -0.4; head.add(neck);
 
   // 얼굴 텍스처
   const fc = document.createElement('canvas'); fc.width = fc.height = 512;
   const ftex = new THREE.CanvasTexture(fc); ftex.colorSpace = THREE.SRGBColorSpace; ftex.anisotropy = 4;
   const faceMesh = new THREE.Mesh(
-    new THREE.SphereGeometry(0.423, 40, 32, Math.PI / 2 - 0.9, 1.8, Math.PI / 2 - 0.75, 1.5),
+    new THREE.SphereGeometry(0.423, 64, 48, Math.PI / 2 - 0.9, 1.8, Math.PI / 2 - 0.75, 1.5),
     new THREE.MeshStandardMaterial({ map: ftex, transparent: true, roughness: 0.6, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 })
   );
   faceMesh.renderOrder = 2;
@@ -227,7 +237,7 @@ export function createAvatar(look) {
   else addOutfitHeadwear(head, look);
 
   // 발밑 그림자
-  const blob = new THREE.Mesh(new THREE.CircleGeometry(0.42, 20), new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: 0.35, depthWrite: false }));
+  const blob = new THREE.Mesh(new THREE.CircleGeometry(0.42, 40), new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: 0.35, depthWrite: false }));
   blob.rotation.x = -Math.PI / 2; blob.position.y = 0.015; g.add(blob);
 
   g.traverse((o) => { if (o.isMesh && o !== blob && o !== faceMesh) o.castShadow = true; });
@@ -285,95 +295,95 @@ function outfitColors(l) {
 
 function addOutfit(rig, l, O) {
   const add = (geo, c, x, y, z, rx = 0, ry = 0, rz = 0, o) => { const m = new THREE.Mesh(geo, mat(c, o)); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); rig.add(m); return m; };
-  const skirt = (c, top, bot, h, y) => add(new THREE.CylinderGeometry(top, bot, h, 20, 1, true), c, 0, y, 0, 0, 0, 0, { side: THREE.DoubleSide });
+  const skirt = (c, top, bot, h, y) => add(new THREE.CylinderGeometry(top, bot, h, 32, 1, true), c, 0, y, 0, 0, 0, 0, { side: THREE.DoubleSide });
   switch (l.outfit) {
     case 'cowboy':
       for (const s of [-1, 1]) add(new THREE.BoxGeometry(0.16, 0.34, 0.05), '#6a4426', 0.11 * s, 0.56, 0.24);
       add(new THREE.BoxGeometry(0.58, 0.06, 0.5), '#3a2414', 0, 0.36, 0); add(new THREE.BoxGeometry(0.1, 0.07, 0.03), '#d8b04a', 0, 0.36, 0.26, 0, 0, 0, { metalness: 0.8 });
-      add(new THREE.TorusGeometry(0.16, 0.03, 6, 16), '#c0262d', 0, 0.8, 0.12, Math.PI / 2 - 0.4);
+      add(new THREE.TorusGeometry(0.16, 0.03, 10, 26), '#c0262d', 0, 0.8, 0.12, Math.PI / 2 - 0.4);
       break;
     case 'kimono':
       skirt(l.accent, 0.27, 0.34, 0.5, 0.3);
-      add(new THREE.CylinderGeometry(0.29, 0.29, 0.14, 20), '#f2e6c8', 0, 0.56, 0);
+      add(new THREE.CylinderGeometry(0.29, 0.29, 0.14, 32), '#f2e6c8', 0, 0.56, 0);
       add(new THREE.BoxGeometry(0.3, 0.12, 0.08), '#f2e6c8', 0, 0.56, -0.28);
       for (const s of [-1, 1]) add(new THREE.BoxGeometry(0.03, 0.3, 0.02), '#ffffff', 0.05 * s, 0.72, 0.26, 0, 0, 0.5 * s);
       for (const s of [-1, 1]) add(new THREE.BoxGeometry(0.06, 0.26, 0.24), l.accent, 0.38 * s, 0.5, 0);
       break;
-    case 'plain': add(new THREE.SphereGeometry(0.2, 16, 12), l.body, 0, 0.5, 0.15).scale.set(1, 1.05, 0.55); break;
+    case 'plain': add(new THREE.SphereGeometry(0.2, 26, 19), l.body, 0, 0.5, 0.15).scale.set(1, 1.05, 0.55); break;
     case 'clown':
       skirt('#f6f2ea', 0.3, 0.42, 0.42, 0.32);
       for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2; add(new THREE.CircleGeometry(0.035, 10), ['#d6303a', '#2f5fd0', '#ffd36a'][i % 3], Math.sin(a) * 0.3, 0.42 + (i % 3) * 0.12, Math.cos(a) * 0.3, 0, a, 0, { side: THREE.DoubleSide }); }
-      add(new THREE.TorusGeometry(0.27, 0.07, 6, 18), '#ffffff', 0, 0.84, 0, Math.PI / 2);
-      for (let i = 0; i < 3; i++) add(new THREE.SphereGeometry(0.035, 8, 6), '#d6303a', 0, 0.72 - i * 0.12, 0.28);
+      add(new THREE.TorusGeometry(0.27, 0.07, 10, 29), '#ffffff', 0, 0.84, 0, Math.PI / 2);
+      for (let i = 0; i < 3; i++) add(new THREE.SphereGeometry(0.035, 13, 10), '#d6303a', 0, 0.72 - i * 0.12, 0.28);
       break;
     case 'ringmaster':
       add(new THREE.BoxGeometry(0.18, 0.36, 0.03), '#ffd36a', 0, 0.6, 0.27, 0, 0, 0, { metalness: 0.4 });
-      for (let i = 0; i < 4; i++) add(new THREE.SphereGeometry(0.02, 6, 4), '#ffd36a', 0.12, 0.74 - i * 0.09, 0.28, 0, 0, 0, { metalness: 0.9 });
+      for (let i = 0; i < 4; i++) add(new THREE.SphereGeometry(0.02, 10, 6), '#ffd36a', 0.12, 0.74 - i * 0.09, 0.28, 0, 0, 0, { metalness: 0.9 });
       add(new THREE.BoxGeometry(0.46, 0.4, 0.04), '#7a0814', 0, 0.2, -0.3, 0.25);
       add(new THREE.BoxGeometry(0.12, 0.05, 0.03), '#111', 0, 0.8, 0.27);
       break;
     case 'magician':
       add(new THREE.BoxGeometry(0.16, 0.34, 0.03), '#f4f4f0', 0, 0.62, 0.27);
       add(new THREE.BoxGeometry(0.12, 0.05, 0.03), '#c0262d', 0, 0.8, 0.28);
-      add(new THREE.CylinderGeometry(0.3, 0.52, 0.85, 20, 1, true, Math.PI * 0.6, Math.PI * 0.8), '#121218', 0, 0.42, -0.02, 0, 0, 0, { side: THREE.DoubleSide });
-      add(new THREE.CylinderGeometry(0.29, 0.5, 0.8, 20, 1, true, Math.PI * 0.62, Math.PI * 0.76), '#7a0a2a', 0, 0.42, 0, 0, 0, 0, { side: THREE.DoubleSide });
+      add(new THREE.CylinderGeometry(0.3, 0.52, 0.85, 32, 1, true, Math.PI * 0.6, Math.PI * 0.8), '#121218', 0, 0.42, -0.02, 0, 0, 0, { side: THREE.DoubleSide });
+      add(new THREE.CylinderGeometry(0.29, 0.5, 0.8, 32, 1, true, Math.PI * 0.62, Math.PI * 0.76), '#7a0a2a', 0, 0.42, 0, 0, 0, 0, { side: THREE.DoubleSide });
       break;
     case 'knight':
-      add(new THREE.CylinderGeometry(0.3, 0.3, 0.42, 18), '#c8ccd4', 0, 0.6, 0, 0, 0, 0, { metalness: 0.8, roughness: 0.25 });
+      add(new THREE.CylinderGeometry(0.3, 0.3, 0.42, 29), '#c8ccd4', 0, 0.6, 0, 0, 0, 0, { metalness: 0.8, roughness: 0.25 });
       add(new THREE.BoxGeometry(0.2, 0.22, 0.03), '#c0262d', 0, 0.6, 0.3);
       add(new THREE.BoxGeometry(0.04, 0.16, 0.035), '#ffd36a', 0, 0.62, 0.315, 0, 0, 0, { metalness: 0.8 }); add(new THREE.BoxGeometry(0.12, 0.04, 0.035), '#ffd36a', 0, 0.65, 0.315, 0, 0, 0, { metalness: 0.8 });
-      for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.13, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), '#c8ccd4', 0.33 * s, 0.76, 0, 0, 0, 0.4 * s, { metalness: 0.8, roughness: 0.25 });
+      for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.13, 19, 13, 0, Math.PI * 2, 0, Math.PI / 2), '#c8ccd4', 0.33 * s, 0.76, 0, 0, 0, 0.4 * s, { metalness: 0.8, roughness: 0.25 });
       skirt('#9aa0aa', 0.28, 0.36, 0.2, 0.3);
       break;
     case 'princess':
       skirt(l.accent, 0.27, 0.56, 0.6, 0.27);
       skirt('#fff0f6', 0.4, 0.58, 0.12, 0.27);
-      for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; add(new THREE.SphereGeometry(0.025, 6, 4), '#ffd36a', Math.sin(a) * 0.5, 0.3, Math.cos(a) * 0.5, 0, 0, 0, { metalness: 0.8 }); }
-      for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.09, 10, 8), '#fff0f6', 0.3 * s, 0.8, 0);
-      add(new THREE.SphereGeometry(0.035, 8, 6), '#ff8fd0', 0, 0.72, 0.28, 0, 0, 0, { emissive: '#ff4fb0', emissiveIntensity: 0.5 });
+      for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; add(new THREE.SphereGeometry(0.025, 10, 6), '#ffd36a', Math.sin(a) * 0.5, 0.3, Math.cos(a) * 0.5, 0, 0, 0, { metalness: 0.8 }); }
+      for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.09, 16, 13), '#fff0f6', 0.3 * s, 0.8, 0);
+      add(new THREE.SphereGeometry(0.035, 13, 10), '#ff8fd0', 0, 0.72, 0.28, 0, 0, 0, { emissive: '#ff4fb0', emissiveIntensity: 0.5 });
       break;
     case 'gothic':
       skirt('#16101a', 0.27, 0.5, 0.58, 0.28);
       for (let i = 0; i < 3; i++) skirt(i % 2 ? '#2a1a2a' : '#4a0a1a', 0.42 + i * 0.03, 0.5 + i * 0.03, 0.05, 0.3 + i * 0.06);
-      add(new THREE.TorusGeometry(0.26, 0.04, 6, 18), '#e8e0f0', 0, 0.83, 0, Math.PI / 2);
+      add(new THREE.TorusGeometry(0.26, 0.04, 10, 29), '#e8e0f0', 0, 0.83, 0, Math.PI / 2);
       add(new THREE.BoxGeometry(0.03, 0.12, 0.015), '#c0c4cc', 0, 0.62, 0.285, 0, 0, 0, { metalness: 0.8 }); add(new THREE.BoxGeometry(0.08, 0.025, 0.015), '#c0c4cc', 0, 0.65, 0.287, 0, 0, 0, { metalness: 0.8 });
       break;
     case 'wizard':
       skirt('#2a3a8a', 0.28, 0.48, 0.6, 0.27);
       for (let i = 0; i < 9; i++) { const a = (i * 2.4) % (Math.PI * 2); add(new THREE.OctahedronGeometry(0.03), '#ffd36a', Math.sin(a) * 0.38, 0.3 + (i % 3) * 0.15, Math.cos(a) * 0.38, 0, 0, 0, { emissive: '#ffcc33', emissiveIntensity: 0.8 }); }
-      add(new THREE.CylinderGeometry(0.3, 0.3, 0.06, 18), '#ffd36a', 0, 0.56, 0, 0, 0, 0, { metalness: 0.6 });
+      add(new THREE.CylinderGeometry(0.3, 0.3, 0.06, 29), '#ffd36a', 0, 0.56, 0, 0, 0, 0, { metalness: 0.6 });
       break;
     case 'idol':
       add(new THREE.BoxGeometry(0.5, 0.06, 0.34), '#ffd36a', 0, 0.84, 0, 0, 0, 0, { metalness: 0.6, emissive: '#aa8800', emissiveIntensity: 0.3 });
       for (let i = 0; i < 12; i++) add(new THREE.CircleGeometry(0.02, 6), ['#ff8fd0', '#9ad0ff', '#ffffff'][i % 3], -0.15 + (i % 4) * 0.1, 0.5 + Math.floor(i / 4) * 0.1, 0.285, 0, 0, 0, { emissive: '#ffffff', emissiveIntensity: 0.5, metalness: 0.8 });
       skirt('#1c1c24', 0.27, 0.36, 0.2, 0.3);
-      add(new THREE.BoxGeometry(0.03, 0.1, 0.03), '#333', 0.12, 0.92, 0.22); add(new THREE.SphereGeometry(0.03, 8, 6), '#333', 0.12, 0.98, 0.24);
+      add(new THREE.BoxGeometry(0.03, 0.1, 0.03), '#333', 0.12, 0.92, 0.22); add(new THREE.SphereGeometry(0.03, 13, 10), '#333', 0.12, 0.98, 0.24);
       break;
     case 'hiphop':
       add(new THREE.BoxGeometry(0.56, 0.08, 0.4), '#f2f2f2', 0, 0.28, 0);
-      add(new THREE.TorusGeometry(0.17, 0.02, 6, 18), '#ffd36a', 0, 0.68, 0.16, Math.PI / 2 - 0.5, 0, 0, { metalness: 0.9, roughness: 0.2 });
-      add(new THREE.CylinderGeometry(0.05, 0.05, 0.02, 12), '#ffd36a', 0, 0.55, 0.29, Math.PI / 2, 0, 0, { metalness: 0.9 });
+      add(new THREE.TorusGeometry(0.17, 0.02, 10, 29), '#ffd36a', 0, 0.68, 0.16, Math.PI / 2 - 0.5, 0, 0, { metalness: 0.9, roughness: 0.2 });
+      add(new THREE.CylinderGeometry(0.05, 0.05, 0.02, 19), '#ffd36a', 0, 0.55, 0.29, Math.PI / 2, 0, 0, { metalness: 0.9 });
       break;
     case 'explorer':
       for (const s of [-1, 1]) add(new THREE.BoxGeometry(0.1, 0.1, 0.04), '#a8946a', 0.12 * s, 0.62, 0.27);
       add(new THREE.BoxGeometry(0.58, 0.07, 0.48), '#5a4020', 0, 0.36, 0); add(new THREE.BoxGeometry(0.06, 0.6, 0.02), '#5a4020', 0.08, 0.6, 0.28, 0, 0, 0.6);
-      add(new THREE.CylinderGeometry(0.06, 0.06, 0.1, 12), '#3a3a40', 0.24, 0.4, 0.22, Math.PI / 2, 0, 0); add(new THREE.CircleGeometry(0.05, 12), '#cfe8ff', 0.24, 0.4, 0.275);
+      add(new THREE.CylinderGeometry(0.06, 0.06, 0.1, 19), '#3a3a40', 0.24, 0.4, 0.22, Math.PI / 2, 0, 0); add(new THREE.CircleGeometry(0.05, 12), '#cfe8ff', 0.24, 0.4, 0.275);
       break;
     case 'bee':
-      for (let i = 0; i < 3; i++) add(new THREE.CylinderGeometry(0.295, 0.295, 0.07, 20), '#1a1a1a', 0, 0.4 + i * 0.16, 0);
-      for (const s of [-1, 1]) { const w = add(new THREE.SphereGeometry(0.2, 12, 8), '#e8f4ff', 0.2 * s, 0.7, -0.32, 0, 0, 0, { transparent: true, opacity: 0.6 }); w.scale.set(0.5, 1, 0.2); w.rotation.z = 0.5 * s; }
-      add(new THREE.ConeGeometry(0.06, 0.16, 8), '#1a1a1a', 0, 0.32, -0.3, -1.6, 0, 0);
+      for (let i = 0; i < 3; i++) add(new THREE.CylinderGeometry(0.295, 0.295, 0.07, 32), '#1a1a1a', 0, 0.4 + i * 0.16, 0);
+      for (const s of [-1, 1]) { const w = add(new THREE.SphereGeometry(0.2, 19, 13), '#e8f4ff', 0.2 * s, 0.7, -0.32, 0, 0, 0, { transparent: true, opacity: 0.6 }); w.scale.set(0.5, 1, 0.2); w.rotation.z = 0.5 * s; }
+      add(new THREE.ConeGeometry(0.06, 0.16, 13), '#1a1a1a', 0, 0.32, -0.3, -1.6, 0, 0);
       break;
     case 'panda':
-      add(new THREE.SphereGeometry(0.2, 16, 12), '#ffffff', 0, 0.52, 0.15).scale.set(1, 1.05, 0.55);
-      add(new THREE.CylinderGeometry(0.3, 0.3, 0.16, 18), '#1a1a1e', 0, 0.78, 0);
-      add(new THREE.SphereGeometry(0.08, 10, 8), '#1a1a1e', 0, 0.3, -0.3);
+      add(new THREE.SphereGeometry(0.2, 26, 19), '#ffffff', 0, 0.52, 0.15).scale.set(1, 1.05, 0.55);
+      add(new THREE.CylinderGeometry(0.3, 0.3, 0.16, 29), '#1a1a1e', 0, 0.78, 0);
+      add(new THREE.SphereGeometry(0.08, 16, 13), '#1a1a1e', 0, 0.3, -0.3);
       break;
     case 'sailor':
       add(new THREE.BoxGeometry(0.46, 0.2, 0.05), '#1f2f5a', 0, 0.74, -0.24);
       for (const s of [-1, 1]) add(new THREE.BoxGeometry(0.08, 0.26, 0.04), '#1f2f5a', 0.1 * s, 0.66, 0.25, 0.25, 0, 0.5 * s);
-      add(new THREE.ConeGeometry(0.06, 0.12, 4), '#d6303a', 0, 0.6, 0.29, Math.PI, 0, 0);
-      for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.05, 8, 6), '#d6303a', 0.05 * s, 0.67, 0.28).scale.set(1.3, 0.7, 0.5);
+      add(new THREE.ConeGeometry(0.06, 0.12, 6), '#d6303a', 0, 0.6, 0.29, Math.PI, 0, 0);
+      for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.05, 13, 10), '#d6303a', 0.05 * s, 0.67, 0.28).scale.set(1.3, 0.7, 0.5);
       skirt('#1f2f5a', 0.27, 0.4, 0.22, 0.33);
       for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; add(new THREE.BoxGeometry(0.01, 0.2, 0.02), '#16224a', Math.sin(a) * 0.34, 0.33, Math.cos(a) * 0.34, 0, a, 0); }
       break;
@@ -381,13 +391,13 @@ function addOutfit(rig, l, O) {
       add(new THREE.BoxGeometry(0.16, 0.22, 0.03), '#f5f5f2', 0, 0.62, 0.26);
       add(new THREE.BoxGeometry(0.05, 0.2, 0.02), '#a3262d', 0, 0.6, 0.285);
       add(new THREE.BoxGeometry(0.08, 0.06, 0.02), '#e8c170', -0.15, 0.62, 0.25, 0, 0, 0, { metalness: 0.6 });
-      for (let i = 0; i < 2; i++) add(new THREE.SphereGeometry(0.018, 8, 6), '#e8c170', 0.09, 0.5 - i * 0.08, 0.27, 0, 0, 0, { metalness: 0.7 });
+      for (let i = 0; i < 2; i++) add(new THREE.SphereGeometry(0.018, 13, 10), '#e8c170', 0.09, 0.5 - i * 0.08, 0.27, 0, 0, 0, { metalness: 0.7 });
       break;
     case 'hanbok':
-      add(new THREE.CylinderGeometry(0.29, 0.29, 0.12, 20), a2(l.accent), 0, 0.64, 0);
+      add(new THREE.CylinderGeometry(0.29, 0.29, 0.12, 32), a2(l.accent), 0, 0.64, 0);
       add(new THREE.BoxGeometry(0.04, 0.22, 0.02), '#c0262d', 0.07, 0.56, 0.28, 0, 0, 0.2);
       skirt(l.accent === '#ff8fab' ? '#4a6cd4' : '#c0262d', 0.28, 0.48, 0.58, 0.29);
-      add(new THREE.CylinderGeometry(0.06, 0.08, 0.04, 12), '#e8c170', 0.3, 0.58, 0);
+      add(new THREE.CylinderGeometry(0.06, 0.08, 0.04, 19), '#e8c170', 0.3, 0.58, 0);
       break;
     case 'shaman':
       skirt('#c0262d', 0.28, 0.46, 0.5, 0.27);
@@ -400,7 +410,7 @@ function addOutfit(rig, l, O) {
       break;
     case 'priest':
       skirt('#17171c', 0.27, 0.42, 0.58, 0.28);
-      add(new THREE.CylinderGeometry(0.15, 0.15, 0.04, 16), '#ffffff', 0, 0.82, 0);
+      add(new THREE.CylinderGeometry(0.15, 0.15, 0.04, 26), '#ffffff', 0, 0.82, 0);
       add(new THREE.BoxGeometry(0.03, 0.12, 0.015), '#e8c170', 0, 0.55, 0.285, 0, 0, 0, { metalness: 0.8 });
       add(new THREE.BoxGeometry(0.08, 0.025, 0.015), '#e8c170', 0, 0.57, 0.287, 0, 0, 0, { metalness: 0.8 });
       break;
@@ -417,10 +427,10 @@ function addOutfit(rig, l, O) {
       skirt('#1c1c24', 0.27, 0.42, 0.26, 0.31);
       add(new THREE.BoxGeometry(0.3, 0.38, 0.02), '#ffffff', 0, 0.36, 0.3);
       add(new THREE.BoxGeometry(0.26, 0.04, 0.03), '#ffffff', 0, 0.82, 0.18);
-      add(new THREE.ConeGeometry(0.06, 0.1, 4), '#ffffff', 0, 0.74, 0.27, Math.PI);
+      add(new THREE.ConeGeometry(0.06, 0.1, 6), '#ffffff', 0, 0.74, 0.27, Math.PI);
       break;
     case 'hoodie': {
-      const hood = add(new THREE.SphereGeometry(0.24, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), '#3b2a5c', 0, 0.78, -0.2, -1.2, 0, 0); hood.scale.set(1.2, 1, 0.7);
+      const hood = add(new THREE.SphereGeometry(0.24, 26, 16, 0, Math.PI * 2, 0, Math.PI / 2), '#3b2a5c', 0, 0.78, -0.2, -1.2, 0, 0); hood.scale.set(1.2, 1, 0.7);
       add(new THREE.BoxGeometry(0.3, 0.12, 0.03), '#2e2048', 0, 0.42, 0.27);
       add(new THREE.CylinderGeometry(0.01, 0.01, 0.16), '#f2f2f2', -0.06, 0.66, 0.27); add(new THREE.CylinderGeometry(0.01, 0.01, 0.16), '#f2f2f2', 0.06, 0.66, 0.27);
       add(new THREE.CircleGeometry(0.06, 16), '#ff4d6d', 0.12, 0.62, 0.275);
@@ -429,59 +439,59 @@ function addOutfit(rig, l, O) {
     case 'police':
       add(new THREE.BoxGeometry(0.06, 0.08, 0.02), '#e8c170', 0.12, 0.66, 0.27, 0, 0, 0, { metalness: 0.8 });
       add(new THREE.BoxGeometry(0.56, 0.05, 0.36), '#111', 0, 0.38, 0);
-      for (let i = 0; i < 3; i++) add(new THREE.SphereGeometry(0.018, 8, 6), '#e8c170', 0, 0.68 - i * 0.1, 0.275, 0, 0, 0, { metalness: 0.8 });
+      for (let i = 0; i < 3; i++) add(new THREE.SphereGeometry(0.018, 13, 10), '#e8c170', 0, 0.68 - i * 0.1, 0.275, 0, 0, 0, { metalness: 0.8 });
       break;
     case 'doctor':
-      add(new THREE.CylinderGeometry(0.29, 0.38, 0.5, 18, 1, true), '#f7f9fb', 0, 0.2, 0, 0, 0, 0, { side: THREE.DoubleSide });
+      add(new THREE.CylinderGeometry(0.29, 0.38, 0.5, 29, 1, true), '#f7f9fb', 0, 0.2, 0, 0, 0, 0, { side: THREE.DoubleSide });
       add(new THREE.BoxGeometry(0.14, 0.24, 0.02), '#7ab0d8', 0, 0.6, 0.27);
-      { const st = add(new THREE.TorusGeometry(0.11, 0.012, 6, 16, Math.PI), '#333', 0, 0.75, 0.24); st.rotation.z = Math.PI; }
+      { const st = add(new THREE.TorusGeometry(0.11, 0.012, 10, 26, Math.PI), '#333', 0, 0.75, 0.24); st.rotation.z = Math.PI; }
       break;
     case 'chef':
       add(new THREE.BoxGeometry(0.34, 0.4, 0.02), '#f2f2ee', 0, 0.3, 0.29);
-      for (let i = 0; i < 2; i++) for (const sx of [-1, 1]) add(new THREE.SphereGeometry(0.02, 8, 6), '#333', 0.07 * sx, 0.7 - i * 0.1, 0.275);
-      add(new THREE.ConeGeometry(0.06, 0.1, 6), '#d6303a', 0, 0.78, 0.25, Math.PI);
+      for (let i = 0; i < 2; i++) for (const sx of [-1, 1]) add(new THREE.SphereGeometry(0.02, 13, 10), '#333', 0.07 * sx, 0.7 - i * 0.1, 0.275);
+      add(new THREE.ConeGeometry(0.06, 0.1, 10), '#d6303a', 0, 0.78, 0.25, Math.PI);
       break;
     case 'firefighter':
-      for (const y of [0.4, 0.62]) add(new THREE.CylinderGeometry(0.285, 0.285, 0.04, 18), '#e8e04a', 0, y, 0, 0, 0, 0, { emissive: '#665', emissiveIntensity: 0.6 });
+      for (const y of [0.4, 0.62]) add(new THREE.CylinderGeometry(0.285, 0.285, 0.04, 29), '#e8e04a', 0, y, 0, 0, 0, 0, { emissive: '#665', emissiveIntensity: 0.6 });
       add(new THREE.BoxGeometry(0.3, 0.36, 0.12), '#5a5a5e', 0, 0.48, -0.3);
       break;
     case 'pirate':
       add(new THREE.BoxGeometry(0.56, 0.08, 0.36), '#8a2a1a', 0, 0.42, 0);
       for (const sx of [-1, 1]) add(new THREE.BoxGeometry(0.1, 0.3, 0.03), '#2a1a10', 0.15 * sx, 0.6, 0.26, 0, 0, 0.2 * sx);
-      add(new THREE.CylinderGeometry(0.03, 0.03, 0.03, 10), '#e8c170', 0, 0.42, 0.19, Math.PI / 2, 0, 0, { metalness: 0.8 });
+      add(new THREE.CylinderGeometry(0.03, 0.03, 0.03, 16), '#e8c170', 0, 0.42, 0.19, Math.PI / 2, 0, 0, { metalness: 0.8 });
       break;
     case 'witch':
       skirt('#2a1a3a', 0.28, 0.48, 0.58, 0.28);
       add(new THREE.BoxGeometry(0.08, 0.08, 0.02), '#9b59b6', 0, 0.66, 0.28, 0, 0, Math.PI / 4, { emissive: '#9b59b6', emissiveIntensity: 0.6 });
       break;
     case 'vampire': {
-      const cape = add(new THREE.CylinderGeometry(0.3, 0.55, 0.85, 20, 1, true, Math.PI * 0.6, Math.PI * 0.8), '#7a0a14', 0, 0.42, -0.02, 0, 0, 0, { side: THREE.DoubleSide });
-      add(new THREE.CylinderGeometry(0.34, 0.3, 0.16, 18, 1, true, Math.PI * 0.55, Math.PI * 0.9), '#111', 0, 0.82, 0, 0, 0, 0, { side: THREE.DoubleSide });
+      const cape = add(new THREE.CylinderGeometry(0.3, 0.55, 0.85, 32, 1, true, Math.PI * 0.6, Math.PI * 0.8), '#7a0a14', 0, 0.42, -0.02, 0, 0, 0, { side: THREE.DoubleSide });
+      add(new THREE.CylinderGeometry(0.34, 0.3, 0.16, 29, 1, true, Math.PI * 0.55, Math.PI * 0.9), '#111', 0, 0.82, 0, 0, 0, 0, { side: THREE.DoubleSide });
       add(new THREE.BoxGeometry(0.1, 0.18, 0.02), '#f2f2f2', 0, 0.66, 0.27);
-      add(new THREE.SphereGeometry(0.03, 8, 6), '#c0262d', 0, 0.73, 0.28, 0, 0, 0, { emissive: '#600', emissiveIntensity: 0.6 });
+      add(new THREE.SphereGeometry(0.03, 13, 10), '#c0262d', 0, 0.73, 0.28, 0, 0, 0, { emissive: '#600', emissiveIntensity: 0.6 });
       break;
     }
     case 'mummy':
-      for (let i = 0; i < 9; i++) { const b = add(new THREE.TorusGeometry(0.28, 0.025, 4, 18), '#d8ceb4', 0, 0.3 + i * 0.07, 0); b.rotation.set(Math.PI / 2 + (i % 2 ? 0.15 : -0.15), 0, 0); }
+      for (let i = 0; i < 9; i++) { const b = add(new THREE.TorusGeometry(0.28, 0.025, 6, 29), '#d8ceb4', 0, 0.3 + i * 0.07, 0); b.rotation.set(Math.PI / 2 + (i % 2 ? 0.15 : -0.15), 0, 0); }
       break;
     case 'astronaut':
       add(new THREE.BoxGeometry(0.24, 0.16, 0.04), '#c8ccd4', 0, 0.6, 0.27);
-      for (let i = 0; i < 3; i++) add(new THREE.SphereGeometry(0.018, 8, 6), ['#d6303a', '#2fbf71', '#3b7dd8'][i], -0.06 + i * 0.06, 0.62, 0.3, 0, 0, 0, { emissive: ['#d6303a', '#2fbf71', '#3b7dd8'][i], emissiveIntensity: 1.5 });
+      for (let i = 0; i < 3; i++) add(new THREE.SphereGeometry(0.018, 13, 10), ['#d6303a', '#2fbf71', '#3b7dd8'][i], -0.06 + i * 0.06, 0.62, 0.3, 0, 0, 0, { emissive: ['#d6303a', '#2fbf71', '#3b7dd8'][i], emissiveIntensity: 1.5 });
       add(new THREE.BoxGeometry(0.4, 0.45, 0.18), '#e8e8ec', 0, 0.42, -0.3);
       add(new THREE.CircleGeometry(0.05, 12), '#3b7dd8', -0.18, 0.7, 0.26);
       break;
     case 'ninja':
-      add(new THREE.CylinderGeometry(0.29, 0.29, 0.06, 18), '#c0262d', 0, 0.42, 0);
+      add(new THREE.CylinderGeometry(0.29, 0.29, 0.06, 29), '#c0262d', 0, 0.42, 0);
       { const sw = add(new THREE.BoxGeometry(0.04, 0.7, 0.04), '#333', 0.1, 0.65, -0.3, 0, 0, 0.6); add(new THREE.BoxGeometry(0.1, 0.03, 0.06), '#c9a24a', 0.0, 0.5, -0.3, 0, 0, 0.6); }
       break;
     case 'santa':
-      add(new THREE.CylinderGeometry(0.3, 0.3, 0.08, 18), '#f4f4f0', 0, 0.28, 0);
+      add(new THREE.CylinderGeometry(0.3, 0.3, 0.08, 29), '#f4f4f0', 0, 0.28, 0);
       add(new THREE.BoxGeometry(0.06, 0.4, 0.02), '#f4f4f0', 0, 0.5, 0.275);
       add(new THREE.BoxGeometry(0.56, 0.06, 0.36), '#111', 0, 0.42, 0); add(new THREE.BoxGeometry(0.1, 0.08, 0.02), '#e8c170', 0, 0.42, 0.19, 0, 0, 0, { metalness: 0.8 });
       break;
     case 'raincoat':
-      add(new THREE.CylinderGeometry(0.29, 0.4, 0.35, 18, 1, true), '#f2c81a', 0, 0.2, 0, 0, 0, 0, { side: THREE.DoubleSide, roughness: 0.25 });
-      for (let i = 0; i < 3; i++) add(new THREE.SphereGeometry(0.02, 8, 6), '#c89a10', 0, 0.68 - i * 0.12, 0.275);
+      add(new THREE.CylinderGeometry(0.29, 0.4, 0.35, 29, 1, true), '#f2c81a', 0, 0.2, 0, 0, 0, 0, { side: THREE.DoubleSide, roughness: 0.25 });
+      for (let i = 0; i < 3; i++) add(new THREE.SphereGeometry(0.02, 13, 10), '#c89a10', 0, 0.68 - i * 0.12, 0.275);
       break;
     case 'tracksuit':
       for (const sx of [-1, 1]) add(new THREE.BoxGeometry(0.02, 0.45, 0.02), '#f2f2f2', 0.27 * sx, 0.5, 0.05);
@@ -489,20 +499,20 @@ function addOutfit(rig, l, O) {
       add(new THREE.BoxGeometry(0.01, 0.3, 0.01), '#d8d8d8', 0, 0.58, 0.28);
       break;
     case 'dino':
-      add(new THREE.SphereGeometry(0.2, 16, 12), '#d8f0c8', 0, 0.5, 0.15).scale.set(1, 1.05, 0.55);
-      { const tail = add(new THREE.ConeGeometry(0.14, 0.5, 10), '#5fbf6a', 0, 0.3, -0.42, -1.2, 0, 0); }
-      for (let i = 0; i < 4; i++) add(new THREE.ConeGeometry(0.05, 0.1, 4), '#f28a3a', 0, 0.75 - i * 0.12, -0.27 - i * 0.02, -0.6, 0, 0);
+      add(new THREE.SphereGeometry(0.2, 26, 19), '#d8f0c8', 0, 0.5, 0.15).scale.set(1, 1.05, 0.55);
+      { const tail = add(new THREE.ConeGeometry(0.14, 0.5, 16), '#5fbf6a', 0, 0.3, -0.42, -1.2, 0, 0); }
+      for (let i = 0; i < 4; i++) add(new THREE.ConeGeometry(0.05, 0.1, 6), '#f28a3a', 0, 0.75 - i * 0.12, -0.27 - i * 0.02, -0.6, 0, 0);
       break;
     case 'pajama':
-      add(new THREE.SphereGeometry(0.2, 16, 12), '#fff1e6', 0, 0.5, 0.15).scale.set(1, 1.05, 0.55);
-      add(new THREE.SphereGeometry(0.07, 10, 8), O.top, 0, 0.36, -0.27);
-      for (let i = 0; i < 3; i++) add(new THREE.SphereGeometry(0.02, 8, 6), '#fff', 0, 0.7 - i * 0.1, 0.27);
+      add(new THREE.SphereGeometry(0.2, 26, 19), '#fff1e6', 0, 0.5, 0.15).scale.set(1, 1.05, 0.55);
+      add(new THREE.SphereGeometry(0.07, 16, 13), O.top, 0, 0.36, -0.27);
+      for (let i = 0; i < 3; i++) add(new THREE.SphereGeometry(0.02, 13, 10), '#fff', 0, 0.7 - i * 0.1, 0.27);
       break;
   }
 }
 const a2 = (c) => '#' + new THREE.Color(c).lerp(new THREE.Color('#ffffff'), 0.45).getHexString();
 
-function seg(r, phiS, phiL, thS, thL) { return new THREE.SphereGeometry(r, 32, 16, phiS, phiL, thS, thL); }
+function seg(r, phiS, phiL, thS, thL) { return new THREE.SphereGeometry(r, 51, 26, phiS, phiL, thS, thL); }
 const FRONT = Math.PI / 2;
 function addHair(inner, head, l, m) {
   if (l.hair === 'none') return;
@@ -512,17 +522,17 @@ function addHair(inner, head, l, m) {
   const bangs = (low, wavy) => {
     const b = add(seg(0.447, FRONT - 0.9, 1.8, Math.PI * 0.26, low - Math.PI * 0.26));
     // 앞머리 끝을 둥글게 (작은 구 몇 개)
-    if (wavy) for (let i = -2; i <= 2; i++) { const a = FRONT + i * 0.32; const th = low - 0.05; const r = 0.445; const t = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), m); t.position.set(-Math.cos(a) * Math.sin(th) * r, Math.cos(th) * r, Math.sin(a) * Math.sin(th) * r); t.scale.set(1, 0.7, 0.5); inner.add(t); }
+    if (wavy) for (let i = -2; i <= 2; i++) { const a = FRONT + i * 0.32; const th = low - 0.05; const r = 0.445; const t = new THREE.Mesh(new THREE.SphereGeometry(0.055, 16, 13), m); t.position.set(-Math.cos(a) * Math.sin(th) * r, Math.cos(th) * r, Math.sin(a) * Math.sin(th) * r); t.scale.set(1, 0.7, 0.5); inner.add(t); }
     return b;
   };
   switch (l.hair) {
     case 'short': back(Math.PI * 0.55); bangs(Math.PI * 0.36, true); break;
     case 'bob': back(Math.PI * 0.72); bangs(Math.PI * 0.4); for (const s of [-1, 1]) { const sd = add(new THREE.CapsuleGeometry(0.1, 0.22, 4, 10), s * 0.38, -0.12, 0.05); sd.scale.z = 0.7; } break;
     case 'long': back(Math.PI * 0.7); bangs(Math.PI * 0.38); { const p = add(new THREE.CapsuleGeometry(0.3, 0.5, 6, 12), 0, -0.45, -0.2); p.scale.set(1.15, 1, 0.45); } for (const s of [-1, 1]) add(new THREE.CapsuleGeometry(0.08, 0.5, 4, 8), s * 0.38, -0.3, 0.05); break;
-    case 'twintail': back(Math.PI * 0.6); bangs(Math.PI * 0.38, true); for (const s of [-1, 1]) { const t = add(new THREE.CapsuleGeometry(0.11, 0.42, 6, 10), s * 0.55, -0.22, -0.08); t.rotation.z = 0.3 * s; const tie = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), mat(l.accent)); tie.position.set(s * 0.47, 0.08, -0.08); inner.add(tie); } break;
+    case 'twintail': back(Math.PI * 0.6); bangs(Math.PI * 0.38, true); for (const s of [-1, 1]) { const t = add(new THREE.CapsuleGeometry(0.11, 0.42, 6, 10), s * 0.55, -0.22, -0.08); t.rotation.z = 0.3 * s; const tie = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 13), mat(l.accent)); tie.position.set(s * 0.47, 0.08, -0.08); inner.add(tie); } break;
     case 'ponytail': back(Math.PI * 0.6); bangs(Math.PI * 0.36); { const t = add(new THREE.CapsuleGeometry(0.12, 0.42, 6, 10), 0, -0.05, -0.5); t.rotation.x = 0.5; } break;
-    case 'bun': back(Math.PI * 0.55); bangs(Math.PI * 0.34); add(new THREE.SphereGeometry(0.17, 16, 12), 0, 0.46, -0.08); break;
-    case 'spiky': back(Math.PI * 0.55); for (let i = 0; i < 9; i++) { const c = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.28, 6), m); const a = (i / 9) * Math.PI * 2; c.position.set(Math.cos(a) * 0.26, 0.36, Math.sin(a) * 0.26 - 0.03); c.rotation.set(Math.sin(a) * 0.7, 0, -Math.cos(a) * 0.7); inner.add(c); } bangs(Math.PI * 0.34, true); break;
+    case 'bun': back(Math.PI * 0.55); bangs(Math.PI * 0.34); add(new THREE.SphereGeometry(0.17, 26, 19), 0, 0.46, -0.08); break;
+    case 'spiky': back(Math.PI * 0.55); for (let i = 0; i < 9; i++) { const c = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.28, 10), m); const a = (i / 9) * Math.PI * 2; c.position.set(Math.cos(a) * 0.26, 0.36, Math.sin(a) * 0.26 - 0.03); c.rotation.set(Math.sin(a) * 0.7, 0, -Math.cos(a) * 0.7); inner.add(c); } bangs(Math.PI * 0.34, true); break;
     case 'bowl': back(Math.PI * 0.6); bangs(Math.PI * 0.42); break;
   }
   // 정수리의 동그란 머릿결 광택 (천사링)
@@ -533,31 +543,31 @@ function addHair(inner, head, l, m) {
 function addEars(head, l, skin, accent) {
   const add = (geo, m, x, y, z) => { const e = new THREE.Mesh(geo, m); e.position.set(x, y, z); head.add(e); return e; };
   for (const s of [-1, 1]) {
-    if (l.ears === 'bear') { const e = add(new THREE.SphereGeometry(0.12, 14, 10), skin, 0.31 * s, 0.31, -0.02); e.scale.z = 0.6; const i = new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 8), accent); i.position.z = 0.05; i.scale.z = 0.4; e.add(i); }
+    if (l.ears === 'bear') { const e = add(new THREE.SphereGeometry(0.12, 22, 16), skin, 0.31 * s, 0.31, -0.02); e.scale.z = 0.6; const i = new THREE.Mesh(new THREE.SphereGeometry(0.07, 19, 13), accent); i.position.z = 0.05; i.scale.z = 0.4; e.add(i); }
     if (l.ears === 'bunny') { const e = add(new THREE.CapsuleGeometry(0.075, 0.32, 4, 10), skin, 0.15 * s, 0.52, -0.04); e.rotation.z = -0.15 * s; const i = new THREE.Mesh(new THREE.CapsuleGeometry(0.04, 0.24, 4, 8), accent); i.position.z = 0.04; i.scale.z = 0.5; e.add(i); }
-    if (l.ears === 'cat' || l.ears === 'fox') { const e = add(new THREE.ConeGeometry(l.ears === 'fox' ? 0.14 : 0.12, l.ears === 'fox' ? 0.3 : 0.2, 4), skin, 0.25 * s, 0.4, 0); e.rotation.z = -0.35 * s; const i = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.12, 4), accent); i.position.set(0, -0.02, 0.04); e.add(i); }
-    if (l.ears === 'devil') { const e = add(new THREE.ConeGeometry(0.06, 0.22, 10), mat('#7a1020'), 0.2 * s, 0.44, 0.05); e.rotation.z = -0.4 * s; }
+    if (l.ears === 'cat' || l.ears === 'fox') { const e = add(new THREE.ConeGeometry(l.ears === 'fox' ? 0.14 : 0.12, l.ears === 'fox' ? 0.3 : 0.2, 6), skin, 0.25 * s, 0.4, 0); e.rotation.z = -0.35 * s; const i = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.12, 6), accent); i.position.set(0, -0.02, 0.04); e.add(i); }
+    if (l.ears === 'devil') { const e = add(new THREE.ConeGeometry(0.06, 0.22, 16), mat('#7a1020'), 0.2 * s, 0.44, 0.05); e.rotation.z = -0.4 * s; }
   }
 }
 
 function addHat(head, l, accent, white) {
   const add = (geo, m, x, y, z) => { const e = new THREE.Mesh(geo, m); e.position.set(x, y, z); head.add(e); return e; };
   switch (l.hat) {
-    case 'beanie': add(new THREE.SphereGeometry(0.455, 24, 14, 0, Math.PI * 2, 0, Math.PI / 2.2), accent, 0, 0.06, 0); add(new THREE.SphereGeometry(0.09, 12, 10), white, 0, 0.52, 0); add(new THREE.TorusGeometry(0.44, 0.04, 8, 24), accent, 0, 0.12, 0).rotation.x = Math.PI / 2; break;
-    case 'ribbon': for (const s of [-1, 1]) { const w = add(new THREE.ConeGeometry(0.1, 0.18, 10), accent, 0.24 + 0.09 * s, 0.35, 0.08); w.rotation.z = (Math.PI / 2) * s; } add(new THREE.SphereGeometry(0.05, 10, 8), accent, 0.24, 0.35, 0.08); break;
-    case 'sprout': add(new THREE.CylinderGeometry(0.012, 0.012, 0.16), mat('#5fa44a'), 0, 0.48, 0); for (const s of [-1, 1]) { const lf = add(new THREE.SphereGeometry(0.07, 10, 8), mat('#7dcc5a'), 0.06 * s, 0.57, 0); lf.scale.set(1, 0.4, 0.6); lf.rotation.z = 0.5 * s; } break;
-    case 'cap': add(new THREE.SphereGeometry(0.45, 24, 14, 0, Math.PI * 2, 0, Math.PI / 2.4), accent, 0, 0.05, 0); add(new THREE.CylinderGeometry(0.22, 0.22, 0.03, 20, 1, false, -Math.PI / 2, Math.PI), accent, 0, 0.17, 0.3); break;
-    case 'halo': { const h = add(new THREE.TorusGeometry(0.22, 0.03, 8, 24), mat('#ffe58a', { emissive: '#ffd34d', emissiveIntensity: 1.5 }), 0, 0.62, 0); h.rotation.x = Math.PI / 2; break; }
-    case 'crown': add(new THREE.CylinderGeometry(0.17, 0.17, 0.1, 10, 1, true), mat('#f1c40f', { metalness: 0.7, roughness: 0.3, side: THREE.DoubleSide }), 0, 0.45, 0); for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2; add(new THREE.ConeGeometry(0.04, 0.1, 6), mat('#f1c40f', { metalness: 0.7 }), Math.cos(a) * 0.16, 0.54, Math.sin(a) * 0.16); } break;
-    case 'tophat': add(new THREE.CylinderGeometry(0.42, 0.42, 0.03, 28), mat('#16141a'), 0, 0.36, 0); add(new THREE.CylinderGeometry(0.24, 0.25, 0.42, 24), mat('#16141a'), 0, 0.58, 0); add(new THREE.CylinderGeometry(0.255, 0.255, 0.07, 24), accent, 0, 0.42, 0); break;
-    case 'beret': { const b = add(new THREE.SphereGeometry(0.4, 22, 12), accent, 0.06, 0.36, -0.02); b.scale.set(1.05, 0.28, 1.05); b.rotation.z = -0.22; add(new THREE.CylinderGeometry(0.015, 0.02, 0.07, 6), accent, 0.1, 0.46, 0); break; }
-    case 'headphones': { const band = add(new THREE.TorusGeometry(0.47, 0.035, 8, 24, Math.PI), mat('#2a2a30'), 0, 0.02, 0); for (const s of [-1, 1]) { const c = add(new THREE.CylinderGeometry(0.13, 0.13, 0.09, 18), accent, 0.47 * s, 0.0, 0); c.rotation.z = Math.PI / 2; add(new THREE.CylinderGeometry(0.09, 0.09, 0.1, 14), mat('#1a1a1e'), 0.49 * s, 0, 0).rotation.z = Math.PI / 2; } break; }
-    case 'catband': { add(new THREE.TorusGeometry(0.44, 0.02, 6, 24, Math.PI), mat('#1a1a1e'), 0, 0.04, 0.04); for (const s of [-1, 1]) { const e = add(new THREE.ConeGeometry(0.11, 0.2, 4), mat('#1a1a1e'), 0.24 * s, 0.44, 0.04); e.rotation.z = -0.4 * s; const i = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.11, 4), accent); i.position.set(0, -0.02, 0.04); e.add(i); } break; }
-    case 'tiara': { const tr = add(new THREE.TorusGeometry(0.3, 0.018, 6, 24, Math.PI), mat('#e8e8f0', { metalness: 0.9, roughness: 0.2 }), 0, 0.3, 0.12); tr.rotation.x = -0.5; for (let i = -1; i <= 1; i++) add(new THREE.OctahedronGeometry(i ? 0.035 : 0.055), mat(i ? '#9ad0ff' : '#ff6b9a', { metalness: 0.4, roughness: 0.1, emissive: i ? '#2a5a8a' : '#8a1a3a', emissiveIntensity: 0.6 }), i * 0.16, 0.5 - Math.abs(i) * 0.05, 0.22 - Math.abs(i) * 0.03); break; }
-    case 'strawhat': add(new THREE.CylinderGeometry(0.64, 0.66, 0.03, 30), mat('#e8cf8a'), 0, 0.3, 0); add(new THREE.CylinderGeometry(0.29, 0.32, 0.22, 24), mat('#e8cf8a'), 0, 0.4, 0); add(new THREE.CylinderGeometry(0.325, 0.325, 0.06, 24), mat('#c0262d'), 0, 0.33, 0); break;
-    case 'frog': { const h = add(new THREE.SphereGeometry(0.47, 24, 14, 0, Math.PI * 2, 0, Math.PI / 2.2), mat('#5fbf5a'), 0, 0.03, -0.02); for (const s of [-1, 1]) { add(new THREE.SphereGeometry(0.1, 14, 10), white, 0.18 * s, 0.48, 0.14); add(new THREE.SphereGeometry(0.05, 10, 8), mat('#111'), 0.18 * s, 0.5, 0.23); } break; }
-    case 'mushroom': { const c = add(new THREE.SphereGeometry(0.5, 24, 14, 0, Math.PI * 2, 0, Math.PI / 2), mat('#d6303a'), 0, 0.18, 0); c.scale.set(1.15, 0.75, 1.15); for (let i = 0; i < 7; i++) { const a = i * 0.9, r = i ? 0.33 : 0; add(new THREE.SphereGeometry(0.06, 10, 8), white, Math.cos(a) * r, 0.5 - (r > 0 ? 0.12 : 0), Math.sin(a) * r).scale.y = 0.4; } break; }
-    case 'flower': for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2; add(new THREE.SphereGeometry(0.05, 8, 6), mat('#ffb3c7'), 0.28 + Math.cos(a) * 0.06, 0.3 + Math.sin(a) * 0.06, 0.18); } add(new THREE.SphereGeometry(0.04, 8, 6), mat('#ffd43b'), 0.28, 0.3, 0.2); break;
+    case 'beanie': add(new THREE.SphereGeometry(0.455, 38, 22, 0, Math.PI * 2, 0, Math.PI / 2.2), accent, 0, 0.06, 0); add(new THREE.SphereGeometry(0.09, 19, 16), white, 0, 0.52, 0); add(new THREE.TorusGeometry(0.44, 0.04, 13, 38), accent, 0, 0.12, 0).rotation.x = Math.PI / 2; break;
+    case 'ribbon': for (const s of [-1, 1]) { const w = add(new THREE.ConeGeometry(0.1, 0.18, 16), accent, 0.24 + 0.09 * s, 0.35, 0.08); w.rotation.z = (Math.PI / 2) * s; } add(new THREE.SphereGeometry(0.05, 16, 13), accent, 0.24, 0.35, 0.08); break;
+    case 'sprout': add(new THREE.CylinderGeometry(0.012, 0.012, 0.16), mat('#5fa44a'), 0, 0.48, 0); for (const s of [-1, 1]) { const lf = add(new THREE.SphereGeometry(0.07, 16, 13), mat('#7dcc5a'), 0.06 * s, 0.57, 0); lf.scale.set(1, 0.4, 0.6); lf.rotation.z = 0.5 * s; } break;
+    case 'cap': add(new THREE.SphereGeometry(0.45, 38, 22, 0, Math.PI * 2, 0, Math.PI / 2.4), accent, 0, 0.05, 0); add(new THREE.CylinderGeometry(0.22, 0.22, 0.03, 32, 1, false, -Math.PI / 2, Math.PI), accent, 0, 0.17, 0.3); break;
+    case 'halo': { const h = add(new THREE.TorusGeometry(0.22, 0.03, 13, 38), mat('#ffe58a', { emissive: '#ffd34d', emissiveIntensity: 1.5 }), 0, 0.62, 0); h.rotation.x = Math.PI / 2; break; }
+    case 'crown': add(new THREE.CylinderGeometry(0.17, 0.17, 0.1, 16, 1, true), mat('#f1c40f', { metalness: 0.7, roughness: 0.3, side: THREE.DoubleSide }), 0, 0.45, 0); for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2; add(new THREE.ConeGeometry(0.04, 0.1, 10), mat('#f1c40f', { metalness: 0.7 }), Math.cos(a) * 0.16, 0.54, Math.sin(a) * 0.16); } break;
+    case 'tophat': add(new THREE.CylinderGeometry(0.42, 0.42, 0.03, 28), mat('#16141a'), 0, 0.36, 0); add(new THREE.CylinderGeometry(0.24, 0.25, 0.42, 38), mat('#16141a'), 0, 0.58, 0); add(new THREE.CylinderGeometry(0.255, 0.255, 0.07, 38), accent, 0, 0.42, 0); break;
+    case 'beret': { const b = add(new THREE.SphereGeometry(0.4, 35, 19), accent, 0.06, 0.36, -0.02); b.scale.set(1.05, 0.28, 1.05); b.rotation.z = -0.22; add(new THREE.CylinderGeometry(0.015, 0.02, 0.07, 10), accent, 0.1, 0.46, 0); break; }
+    case 'headphones': { const band = add(new THREE.TorusGeometry(0.47, 0.035, 13, 38, Math.PI), mat('#2a2a30'), 0, 0.02, 0); for (const s of [-1, 1]) { const c = add(new THREE.CylinderGeometry(0.13, 0.13, 0.09, 29), accent, 0.47 * s, 0.0, 0); c.rotation.z = Math.PI / 2; add(new THREE.CylinderGeometry(0.09, 0.09, 0.1, 22), mat('#1a1a1e'), 0.49 * s, 0, 0).rotation.z = Math.PI / 2; } break; }
+    case 'catband': { add(new THREE.TorusGeometry(0.44, 0.02, 10, 38, Math.PI), mat('#1a1a1e'), 0, 0.04, 0.04); for (const s of [-1, 1]) { const e = add(new THREE.ConeGeometry(0.11, 0.2, 6), mat('#1a1a1e'), 0.24 * s, 0.44, 0.04); e.rotation.z = -0.4 * s; const i = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.11, 6), accent); i.position.set(0, -0.02, 0.04); e.add(i); } break; }
+    case 'tiara': { const tr = add(new THREE.TorusGeometry(0.3, 0.018, 10, 38, Math.PI), mat('#e8e8f0', { metalness: 0.9, roughness: 0.2 }), 0, 0.3, 0.12); tr.rotation.x = -0.5; for (let i = -1; i <= 1; i++) add(new THREE.OctahedronGeometry(i ? 0.035 : 0.055), mat(i ? '#9ad0ff' : '#ff6b9a', { metalness: 0.4, roughness: 0.1, emissive: i ? '#2a5a8a' : '#8a1a3a', emissiveIntensity: 0.6 }), i * 0.16, 0.5 - Math.abs(i) * 0.05, 0.22 - Math.abs(i) * 0.03); break; }
+    case 'strawhat': add(new THREE.CylinderGeometry(0.64, 0.66, 0.03, 30), mat('#e8cf8a'), 0, 0.3, 0); add(new THREE.CylinderGeometry(0.29, 0.32, 0.22, 38), mat('#e8cf8a'), 0, 0.4, 0); add(new THREE.CylinderGeometry(0.325, 0.325, 0.06, 38), mat('#c0262d'), 0, 0.33, 0); break;
+    case 'frog': { const h = add(new THREE.SphereGeometry(0.47, 38, 22, 0, Math.PI * 2, 0, Math.PI / 2.2), mat('#5fbf5a'), 0, 0.03, -0.02); for (const s of [-1, 1]) { add(new THREE.SphereGeometry(0.1, 22, 16), white, 0.18 * s, 0.48, 0.14); add(new THREE.SphereGeometry(0.05, 16, 13), mat('#111'), 0.18 * s, 0.5, 0.23); } break; }
+    case 'mushroom': { const c = add(new THREE.SphereGeometry(0.5, 38, 22, 0, Math.PI * 2, 0, Math.PI / 2), mat('#d6303a'), 0, 0.18, 0); c.scale.set(1.15, 0.75, 1.15); for (let i = 0; i < 7; i++) { const a = i * 0.9, r = i ? 0.33 : 0; add(new THREE.SphereGeometry(0.06, 16, 13), white, Math.cos(a) * r, 0.5 - (r > 0 ? 0.12 : 0), Math.sin(a) * r).scale.y = 0.4; } break; }
+    case 'flower': for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2; add(new THREE.SphereGeometry(0.05, 13, 10), mat('#ffb3c7'), 0.28 + Math.cos(a) * 0.06, 0.3 + Math.sin(a) * 0.06, 0.18); } add(new THREE.SphereGeometry(0.04, 13, 10), mat('#ffd43b'), 0.28, 0.3, 0.2); break;
   }
 }
 // ───────────────────────── 몸 장신구 (목·등·손). 움직임이 필요한 것은 함수로 돌려준다.
@@ -565,13 +575,13 @@ function addAccessory(rig, arms, l) {
   if (!l.acc || l.acc === 'none') return null;
   const add = (geo, m, x, y, z, parent = rig) => { const e = new THREE.Mesh(geo, typeof m === 'string' ? mat(m) : m); e.position.set(x, y, z); e.castShadow = true; parent.add(e); return e; };
   const gold = mat('#e8c170', { metalness: 0.8, roughness: 0.3 });
-  const neck = (r = 0.285, y = 0.75) => { const t = add(new THREE.TorusGeometry(r, 0.012, 6, 28), gold, 0, y, 0.02); t.rotation.x = Math.PI / 2 - 0.3; return t; };
+  const neck = (r = 0.285, y = 0.75) => { const t = add(new THREE.TorusGeometry(r, 0.012, 10, 45), gold, 0, y, 0.02); t.rotation.x = Math.PI / 2 - 0.3; return t; };
   switch (l.acc) {
-    case 'necklace': for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2; add(new THREE.SphereGeometry(0.034, 8, 6), mat('#f6f2ea', { roughness: 0.2, metalness: 0.1 }), Math.sin(a) * 0.29, 0.76 - Math.max(0, Math.cos(a)) * 0.1, Math.cos(a) * 0.28 + 0.02); } break;
+    case 'necklace': for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2; add(new THREE.SphereGeometry(0.034, 13, 10), mat('#f6f2ea', { roughness: 0.2, metalness: 0.1 }), Math.sin(a) * 0.29, 0.76 - Math.max(0, Math.cos(a)) * 0.1, Math.cos(a) * 0.28 + 0.02); } break;
     case 'pendant': { neck(); add(new THREE.BoxGeometry(0.035, 0.15, 0.025), gold, 0, 0.56, 0.29); add(new THREE.BoxGeometry(0.1, 0.035, 0.025), gold, 0, 0.59, 0.29); break; }
-    case 'bell': { const c = add(new THREE.TorusGeometry(0.29, 0.04, 8, 28), mat('#d6303a'), 0, 0.76, 0.01); c.rotation.x = Math.PI / 2 - 0.15; add(new THREE.SphereGeometry(0.07, 14, 10), gold, 0, 0.66, 0.31); add(new THREE.BoxGeometry(0.07, 0.01, 0.02), mat('#5a3a10'), 0, 0.645, 0.375); break; }
-    case 'scarf': { const c = add(new THREE.TorusGeometry(0.29, 0.08, 10, 24), mat(l.accent), 0, 0.77, 0.01); c.rotation.x = Math.PI / 2; const tl = add(new THREE.BoxGeometry(0.14, 0.34, 0.06), mat(l.accent), 0.13, 0.5, 0.3); tl.rotation.z = 0.12; add(new THREE.BoxGeometry(0.145, 0.035, 0.065), white(), 0.115, 0.37, 0.3); break; }
-    case 'bowtie': { for (const s of [-1, 1]) { const w = add(new THREE.ConeGeometry(0.07, 0.14, 4), mat(l.accent), 0.075 * s, 0.72, 0.31); w.rotation.z = (Math.PI / 2) * s; } add(new THREE.SphereGeometry(0.035, 8, 6), mat(l.accent), 0, 0.72, 0.33); break; }
+    case 'bell': { const c = add(new THREE.TorusGeometry(0.29, 0.04, 13, 45), mat('#d6303a'), 0, 0.76, 0.01); c.rotation.x = Math.PI / 2 - 0.15; add(new THREE.SphereGeometry(0.07, 22, 16), gold, 0, 0.66, 0.31); add(new THREE.BoxGeometry(0.07, 0.01, 0.02), mat('#5a3a10'), 0, 0.645, 0.375); break; }
+    case 'scarf': { const c = add(new THREE.TorusGeometry(0.29, 0.08, 16, 38), mat(l.accent), 0, 0.77, 0.01); c.rotation.x = Math.PI / 2; const tl = add(new THREE.BoxGeometry(0.14, 0.34, 0.06), mat(l.accent), 0.13, 0.5, 0.3); tl.rotation.z = 0.12; add(new THREE.BoxGeometry(0.145, 0.035, 0.065), white(), 0.115, 0.37, 0.3); break; }
+    case 'bowtie': { for (const s of [-1, 1]) { const w = add(new THREE.ConeGeometry(0.07, 0.14, 6), mat(l.accent), 0.075 * s, 0.72, 0.31); w.rotation.z = (Math.PI / 2) * s; } add(new THREE.SphereGeometry(0.035, 13, 10), mat(l.accent), 0, 0.72, 0.33); break; }
     case 'backpack': { add(new THREE.BoxGeometry(0.42, 0.46, 0.2), mat(l.accent, { roughness: 0.7 }), 0, 0.58, -0.33); add(new THREE.BoxGeometry(0.3, 0.16, 0.06), mat(l.accent), 0, 0.45, -0.45); for (const s of [-1, 1]) add(new THREE.BoxGeometry(0.05, 0.42, 0.04), mat('#2a2a30'), 0.15 * s, 0.6, 0.24).rotation.x = 0.12; break; }
     case 'wings': case 'batwings': {
       const bat = l.acc === 'batwings';
@@ -582,7 +592,7 @@ function addAccessory(rig, arms, l) {
       const ws = [-1, 1].map((s) => { const piv = new THREE.Group(); piv.position.set(0.06 * s, 0.72, -0.26); rig.add(piv); const w = new THREE.Mesh(new THREE.ShapeGeometry(shape), m); w.scale.set(s, 1, 1); w.castShadow = true; piv.add(w); piv.userData.s = s; return piv; });
       return (t) => ws.forEach((p) => (p.rotation.y = p.userData.s * (0.3 + Math.sin(t * (bat ? 7 : 3.2)) * 0.2)));
     }
-    case 'cape': { const c = add(new THREE.CylinderGeometry(0.29, 0.46, 0.78, 18, 1, true, Math.PI - 1.25, 2.5), mat(l.accent === '#ffffff' ? '#8e1c17' : l.accent, { side: THREE.DoubleSide, roughness: 0.6 }), 0, 0.48, -0.02); const col = add(new THREE.TorusGeometry(0.29, 0.03, 6, 20), gold, 0, 0.76, 0.01); col.rotation.x = Math.PI / 2; return (t, moving) => { c.rotation.x = moving ? -0.18 + Math.sin(t * 9) * 0.04 : Math.sin(t * 1.5) * 0.02; }; }
+    case 'cape': { const c = add(new THREE.CylinderGeometry(0.29, 0.46, 0.78, 29, 1, true, Math.PI - 1.25, 2.5), mat(l.accent === '#ffffff' ? '#8e1c17' : l.accent, { side: THREE.DoubleSide, roughness: 0.6 }), 0, 0.48, -0.02); const col = add(new THREE.TorusGeometry(0.29, 0.03, 10, 32), gold, 0, 0.76, 0.01); col.rotation.x = Math.PI / 2; return (t, moving) => { c.rotation.x = moving ? -0.18 + Math.sin(t * 9) * 0.04 : Math.sin(t * 1.5) * 0.02; }; }
     case 'tail': {
       const piv = new THREE.Group(); piv.position.set(0, 0.32, -0.24); rig.add(piv);
       const curve = new THREE.CatmullRomCurve3([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0.02, -0.2), new THREE.Vector3(0, 0.2, -0.32), new THREE.Vector3(0.04, 0.42, -0.28)]);
@@ -591,23 +601,23 @@ function addAccessory(rig, arms, l) {
     }
     case 'balloon': {
       const piv = new THREE.Group(); piv.position.set(0.38, 0.42, 0.05); rig.add(piv);
-      add(new THREE.CylinderGeometry(0.004, 0.004, 1.35, 4), mat('#eeeeee'), 0.06, 0.68, 0, piv).rotation.z = -0.09;
-      const b = add(new THREE.SphereGeometry(0.2, 18, 14), mat(l.accent, { roughness: 0.25, emissive: l.accent, emissiveIntensity: 0.25 }), 0.12, 1.5, 0, piv); b.scale.y = 1.15; b.castShadow = false;
-      add(new THREE.ConeGeometry(0.03, 0.05, 6), mat(l.accent), 0.12, 1.26, 0, piv).rotation.x = Math.PI;
+      add(new THREE.CylinderGeometry(0.004, 0.004, 1.35, 6), mat('#eeeeee'), 0.06, 0.68, 0, piv).rotation.z = -0.09;
+      const b = add(new THREE.SphereGeometry(0.2, 29, 22), mat(l.accent, { roughness: 0.25, emissive: l.accent, emissiveIntensity: 0.25 }), 0.12, 1.5, 0, piv); b.scale.y = 1.15; b.castShadow = false;
+      add(new THREE.ConeGeometry(0.03, 0.05, 10), mat(l.accent), 0.12, 1.26, 0, piv).rotation.x = Math.PI;
       return (t, moving) => { piv.rotation.z = Math.sin(t * 1.4) * 0.08 + (moving ? 0.12 : 0); piv.rotation.x = moving ? 0.25 : Math.sin(t * 1.1) * 0.05; };
     }
     case 'teddy': {
       const g = new THREE.Group(); g.position.set(0.02, 0.52, 0.3); rig.add(g); const fur = mat('#a0652e'), lite = mat('#e8c9a0');
-      add(new THREE.SphereGeometry(0.11, 12, 10), fur, 0, 0, 0, g).scale.set(1, 1.1, 0.85); add(new THREE.SphereGeometry(0.09, 12, 10), fur, 0, 0.16, 0.02, g);
-      add(new THREE.SphereGeometry(0.04, 8, 6), lite, 0, 0.14, 0.1, g); for (const s of [-1, 1]) { add(new THREE.SphereGeometry(0.035, 8, 6), fur, 0.07 * s, 0.24, 0, g); add(new THREE.SphereGeometry(0.012, 6, 4), mat('#111'), 0.035 * s, 0.18, 0.09, g); }
+      add(new THREE.SphereGeometry(0.11, 19, 16), fur, 0, 0, 0, g).scale.set(1, 1.1, 0.85); add(new THREE.SphereGeometry(0.09, 19, 16), fur, 0, 0.16, 0.02, g);
+      add(new THREE.SphereGeometry(0.04, 13, 10), lite, 0, 0.14, 0.1, g); for (const s of [-1, 1]) { add(new THREE.SphereGeometry(0.035, 13, 10), fur, 0.07 * s, 0.24, 0, g); add(new THREE.SphereGeometry(0.012, 10, 6), mat('#111'), 0.035 * s, 0.18, 0.09, g); }
       for (const s of [-1, 1]) arms[(s + 1) / 2].children[0].rotation.x = -0.9;
       break;
     }
     case 'lantern': {
       const h = arms[0]; const g = new THREE.Group(); g.position.set(-0.08, -0.33, 0.04); h.add(g);
-      add(new THREE.CylinderGeometry(0.004, 0.004, 0.1, 4), mat('#333'), 0, 0.02, 0, g);
-      add(new THREE.SphereGeometry(0.1, 14, 10), mat('#ff5a3a', { emissive: '#ff6a2a', emissiveIntensity: 1.6, transparent: true, opacity: 0.92 }), 0, -0.1, 0, g).scale.y = 1.25;
-      for (const y of [0.03, -0.23]) add(new THREE.CylinderGeometry(0.05, 0.05, 0.03, 10), mat('#2a1a10'), 0, y - 0.1 + 0.1, 0, g);
+      add(new THREE.CylinderGeometry(0.004, 0.004, 0.1, 6), mat('#333'), 0, 0.02, 0, g);
+      add(new THREE.SphereGeometry(0.1, 22, 16), mat('#ff5a3a', { emissive: '#ff6a2a', emissiveIntensity: 1.6, transparent: true, opacity: 0.92 }), 0, -0.1, 0, g).scale.y = 1.25;
+      for (const y of [0.03, -0.23]) add(new THREE.CylinderGeometry(0.05, 0.05, 0.03, 16), mat('#2a1a10'), 0, y - 0.1 + 0.1, 0, g);
       return (t, moving) => { g.rotation.x = Math.sin(t * (moving ? 10 : 2)) * 0.25; };
     }
   }
@@ -616,39 +626,39 @@ function addAccessory(rig, arms, l) {
 const white = () => mat('#f4f4f0');
 function addOutfitHeadwear(head, l) {
   const add = (geo, c, x, y, z, o) => { const e = new THREE.Mesh(geo, mat(c, o)); e.position.set(x, y, z); head.add(e); return e; };
-  if (l.outfit === 'reaper') { add(new THREE.CylinderGeometry(0.62, 0.62, 0.02, 32), '#0d0d10', 0, 0.3, 0, { transparent: true, opacity: 0.85 }); add(new THREE.CylinderGeometry(0.2, 0.24, 0.3, 20), '#0d0d10', 0, 0.45, 0); }
-  if (l.outfit === 'shaman') { add(new THREE.CylinderGeometry(0.3, 0.42, 0.2, 20), '#c0262d', 0, 0.42, 0); }
+  if (l.outfit === 'reaper') { add(new THREE.CylinderGeometry(0.62, 0.62, 0.02, 32), '#0d0d10', 0, 0.3, 0, { transparent: true, opacity: 0.85 }); add(new THREE.CylinderGeometry(0.2, 0.24, 0.3, 32), '#0d0d10', 0, 0.45, 0); }
+  if (l.outfit === 'shaman') { add(new THREE.CylinderGeometry(0.3, 0.42, 0.2, 32), '#c0262d', 0, 0.42, 0); }
   if (l.outfit === 'nurse') { add(new THREE.BoxGeometry(0.34, 0.12, 0.2), '#ffffff', 0, 0.42, 0.06); add(new THREE.BoxGeometry(0.08, 0.025, 0.01), '#d6303a', 0, 0.43, 0.165); add(new THREE.BoxGeometry(0.025, 0.08, 0.01), '#d6303a', 0, 0.43, 0.165); }
-  if (l.outfit === 'detective') { add(new THREE.CylinderGeometry(0.5, 0.5, 0.025, 28), '#5a3a22', 0, 0.3, 0); add(new THREE.CylinderGeometry(0.28, 0.31, 0.22, 20), '#6b4a2e', 0, 0.42, 0); add(new THREE.CylinderGeometry(0.312, 0.312, 0.05, 20), '#2a1a10', 0, 0.34, 0); }
-  if (l.outfit === 'cowboy') { add(new THREE.CylinderGeometry(0.62, 0.62, 0.03, 28), '#8a5a2a', 0, 0.3, 0).scale.z = 0.85; add(new THREE.CylinderGeometry(0.26, 0.3, 0.28, 20), '#8a5a2a', 0, 0.45, 0); add(new THREE.CylinderGeometry(0.305, 0.305, 0.05, 20), '#3a2414', 0, 0.36, 0); }
-  if (l.outfit === 'kimono') { add(new THREE.CylinderGeometry(0.12, 0.16, 0.18, 14), l.hairColor || '#1a1414', 0, 0.42, -0.16); for (const s of [-1, 1]) { const p = add(new THREE.CylinderGeometry(0.012, 0.012, 0.4, 6), '#d8b04a', 0.12 * s, 0.46, -0.1, { metalness: 0.8 }); p.rotation.z = Math.PI / 2 - 0.3 * s; } add(new THREE.SphereGeometry(0.07, 10, 8), '#d02a34', 0.2, 0.46, -0.06); }
+  if (l.outfit === 'detective') { add(new THREE.CylinderGeometry(0.5, 0.5, 0.025, 28), '#5a3a22', 0, 0.3, 0); add(new THREE.CylinderGeometry(0.28, 0.31, 0.22, 32), '#6b4a2e', 0, 0.42, 0); add(new THREE.CylinderGeometry(0.312, 0.312, 0.05, 32), '#2a1a10', 0, 0.34, 0); }
+  if (l.outfit === 'cowboy') { add(new THREE.CylinderGeometry(0.62, 0.62, 0.03, 28), '#8a5a2a', 0, 0.3, 0).scale.z = 0.85; add(new THREE.CylinderGeometry(0.26, 0.3, 0.28, 32), '#8a5a2a', 0, 0.45, 0); add(new THREE.CylinderGeometry(0.305, 0.305, 0.05, 32), '#3a2414', 0, 0.36, 0); }
+  if (l.outfit === 'kimono') { add(new THREE.CylinderGeometry(0.12, 0.16, 0.18, 22), l.hairColor || '#1a1414', 0, 0.42, -0.16); for (const s of [-1, 1]) { const p = add(new THREE.CylinderGeometry(0.012, 0.012, 0.4, 10), '#d8b04a', 0.12 * s, 0.46, -0.1, { metalness: 0.8 }); p.rotation.z = Math.PI / 2 - 0.3 * s; } add(new THREE.SphereGeometry(0.07, 16, 13), '#d02a34', 0.2, 0.46, -0.06); }
   if (l.outfit === 'maid') { add(new THREE.BoxGeometry(0.5, 0.06, 0.08), '#ffffff', 0, 0.36, 0.08).rotation.x = -0.4; }
-  if (l.outfit === 'pajama') { const h = add(new THREE.SphereGeometry(0.47, 24, 14, 0, Math.PI * 2, 0, Math.PI / 2.1), l.accent, 0, 0.02, -0.04); for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.11, 12, 10), l.accent, 0.3 * s, 0.36, -0.04); }
-  if (l.outfit === 'police') { add(new THREE.CylinderGeometry(0.38, 0.36, 0.14, 20), '#1f2f5a', 0, 0.38, 0); add(new THREE.CylinderGeometry(0.26, 0.26, 0.03, 20, 1, false, -Math.PI / 2, Math.PI), '#111', 0, 0.32, 0.22); add(new THREE.BoxGeometry(0.08, 0.08, 0.02), '#e8c170', 0, 0.42, 0.37, { metalness: 0.8 }); }
-  if (l.outfit === 'chef') { add(new THREE.CylinderGeometry(0.3, 0.28, 0.22, 18), '#fbfbf8', 0, 0.42, 0); add(new THREE.SphereGeometry(0.36, 16, 10), '#fbfbf8', 0, 0.6, 0).scale.y = 0.55; }
-  if (l.outfit === 'firefighter') { add(new THREE.SphereGeometry(0.47, 22, 12, 0, Math.PI * 2, 0, Math.PI / 2.2), '#c0262d', 0, 0.06, 0, { roughness: 0.3 }); add(new THREE.CylinderGeometry(0.55, 0.55, 0.03, 24), '#a01a20', 0, 0.12, -0.05); add(new THREE.BoxGeometry(0.12, 0.14, 0.03), '#e8c170', 0, 0.4, 0.42, { metalness: 0.8 }); }
-  if (l.outfit === 'pirate') { const h = add(new THREE.CylinderGeometry(0.45, 0.5, 0.18, 3), '#1a1418', 0, 0.42, 0); h.rotation.y = Math.PI; add(new THREE.CircleGeometry(0.06, 12), '#f2f2f2', 0, 0.44, 0.27); }
-  if (l.outfit === 'witch') { add(new THREE.CylinderGeometry(0.6, 0.6, 0.03, 28), '#2a1a3a', 0, 0.32, 0); const c = add(new THREE.ConeGeometry(0.3, 0.75, 20), '#2a1a3a', 0, 0.7, -0.03); c.rotation.x = -0.2; add(new THREE.CylinderGeometry(0.3, 0.3, 0.06, 20), '#9b59b6', 0, 0.38, 0); }
+  if (l.outfit === 'pajama') { const h = add(new THREE.SphereGeometry(0.47, 38, 22, 0, Math.PI * 2, 0, Math.PI / 2.1), l.accent, 0, 0.02, -0.04); for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.11, 19, 16), l.accent, 0.3 * s, 0.36, -0.04); }
+  if (l.outfit === 'police') { add(new THREE.CylinderGeometry(0.38, 0.36, 0.14, 32), '#1f2f5a', 0, 0.38, 0); add(new THREE.CylinderGeometry(0.26, 0.26, 0.03, 32, 1, false, -Math.PI / 2, Math.PI), '#111', 0, 0.32, 0.22); add(new THREE.BoxGeometry(0.08, 0.08, 0.02), '#e8c170', 0, 0.42, 0.37, { metalness: 0.8 }); }
+  if (l.outfit === 'chef') { add(new THREE.CylinderGeometry(0.3, 0.28, 0.22, 29), '#fbfbf8', 0, 0.42, 0); add(new THREE.SphereGeometry(0.36, 26, 16), '#fbfbf8', 0, 0.6, 0).scale.y = 0.55; }
+  if (l.outfit === 'firefighter') { add(new THREE.SphereGeometry(0.47, 35, 19, 0, Math.PI * 2, 0, Math.PI / 2.2), '#c0262d', 0, 0.06, 0, { roughness: 0.3 }); add(new THREE.CylinderGeometry(0.55, 0.55, 0.03, 38), '#a01a20', 0, 0.12, -0.05); add(new THREE.BoxGeometry(0.12, 0.14, 0.03), '#e8c170', 0, 0.4, 0.42, { metalness: 0.8 }); }
+  if (l.outfit === 'pirate') { const h = add(new THREE.CylinderGeometry(0.45, 0.5, 0.18, 5), '#1a1418', 0, 0.42, 0); h.rotation.y = Math.PI; add(new THREE.CircleGeometry(0.06, 12), '#f2f2f2', 0, 0.44, 0.27); }
+  if (l.outfit === 'witch') { add(new THREE.CylinderGeometry(0.6, 0.6, 0.03, 28), '#2a1a3a', 0, 0.32, 0); const c = add(new THREE.ConeGeometry(0.3, 0.75, 32), '#2a1a3a', 0, 0.7, -0.03); c.rotation.x = -0.2; add(new THREE.CylinderGeometry(0.3, 0.3, 0.06, 32), '#9b59b6', 0, 0.38, 0); }
   if (l.outfit === 'vampire') { /* 맨머리 + 망토 깃 */ }
-  if (l.outfit === 'mummy') { for (let i = 0; i < 5; i++) { const b = add(new THREE.TorusGeometry(0.44, 0.025, 4, 22), '#d8ceb4', 0, 0.3 - i * 0.06, 0); b.rotation.set(Math.PI / 2 + (i % 2 ? 0.25 : -0.25), 0, 0); } }
-  if (l.outfit === 'astronaut') { add(new THREE.SphereGeometry(0.56, 24, 18), '#cfe8ff', 0, 0, 0.02, { transparent: true, opacity: 0.25, roughness: 0.05, metalness: 0.3 }); add(new THREE.TorusGeometry(0.42, 0.05, 8, 24), '#c8ccd4', 0, -0.4, 0).rotation.x = Math.PI / 2; }
-  if (l.outfit === 'ninja') { const m = add(new THREE.SphereGeometry(0.455, 24, 14, 0, Math.PI * 2, 0, Math.PI), '#16161c', 0, 0, 0); m.scale.set(1.06, 0.97, 1.02); m.material.side = THREE.BackSide; add(new THREE.BoxGeometry(0.5, 0.06, 0.06), '#c0262d', 0, 0.2, 0.36); }
-  if (l.outfit === 'santa') { const c = add(new THREE.ConeGeometry(0.42, 0.6, 20), '#c0262d', 0.08, 0.6, 0); c.rotation.z = -0.4; add(new THREE.TorusGeometry(0.4, 0.07, 8, 22), '#f4f4f0', 0, 0.32, 0).rotation.x = Math.PI / 2; add(new THREE.SphereGeometry(0.09, 10, 8), '#f4f4f0', 0.32, 0.82, 0); }
-  if (l.outfit === 'raincoat') { const h = add(new THREE.SphereGeometry(0.5, 22, 14, 0, Math.PI * 2, 0, Math.PI / 1.6), '#f2c81a', 0, 0.02, -0.06, { roughness: 0.25 }); h.rotation.x = 0.45; h.position.z = -0.12; }
+  if (l.outfit === 'mummy') { for (let i = 0; i < 5; i++) { const b = add(new THREE.TorusGeometry(0.44, 0.025, 6, 35), '#d8ceb4', 0, 0.3 - i * 0.06, 0); b.rotation.set(Math.PI / 2 + (i % 2 ? 0.25 : -0.25), 0, 0); } }
+  if (l.outfit === 'astronaut') { add(new THREE.SphereGeometry(0.56, 38, 29), '#cfe8ff', 0, 0, 0.02, { transparent: true, opacity: 0.25, roughness: 0.05, metalness: 0.3 }); add(new THREE.TorusGeometry(0.42, 0.05, 13, 38), '#c8ccd4', 0, -0.4, 0).rotation.x = Math.PI / 2; }
+  if (l.outfit === 'ninja') { const m = add(new THREE.SphereGeometry(0.455, 38, 22, 0, Math.PI * 2, 0, Math.PI), '#16161c', 0, 0, 0); m.scale.set(1.06, 0.97, 1.02); m.material.side = THREE.BackSide; add(new THREE.BoxGeometry(0.5, 0.06, 0.06), '#c0262d', 0, 0.2, 0.36); }
+  if (l.outfit === 'santa') { const c = add(new THREE.ConeGeometry(0.42, 0.6, 32), '#c0262d', 0.08, 0.6, 0); c.rotation.z = -0.4; add(new THREE.TorusGeometry(0.4, 0.07, 13, 35), '#f4f4f0', 0, 0.32, 0).rotation.x = Math.PI / 2; add(new THREE.SphereGeometry(0.09, 16, 13), '#f4f4f0', 0.32, 0.82, 0); }
+  if (l.outfit === 'raincoat') { const h = add(new THREE.SphereGeometry(0.5, 35, 22, 0, Math.PI * 2, 0, Math.PI / 1.6), '#f2c81a', 0, 0.02, -0.06, { roughness: 0.25 }); h.rotation.x = 0.45; h.position.z = -0.12; }
   if (l.outfit === 'tracksuit') { add(new THREE.BoxGeometry(0.62, 0.07, 0.04), '#f2f2f2', 0, 0.22, 0.32); }
-  if (l.outfit === 'dino') { add(new THREE.SphereGeometry(0.5, 24, 14, 0, Math.PI * 2, 0, Math.PI / 2.1), '#5fbf6a', 0, 0.02, -0.05); for (let i = 0; i < 4; i++) add(new THREE.ConeGeometry(0.07, 0.16, 4), '#f28a3a', 0, 0.52 - i * 0.02, -0.05 - i * 0.14); for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.06, 10, 8), '#ffffff', 0.18 * s, 0.4, 0.3); }
-  if (l.outfit === 'clown') { for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.17, 12, 10), '#ff4a1a', 0.42 * s, 0.05, -0.05).scale.set(0.9, 1.1, 1.3); const c = add(new THREE.ConeGeometry(0.16, 0.42, 14), '#2f5fd0', 0.1, 0.62, 0); c.rotation.z = -0.3; add(new THREE.SphereGeometry(0.06, 10, 8), '#ffd36a', 0.18, 0.84, 0); }
-  if (l.outfit === 'ringmaster') { add(new THREE.CylinderGeometry(0.5, 0.5, 0.025, 28), '#0a0a0e', 0, 0.36, 0); add(new THREE.CylinderGeometry(0.26, 0.26, 0.5, 22), '#0a0a0e', 0, 0.62, 0); add(new THREE.CylinderGeometry(0.265, 0.265, 0.08, 22), '#a0101e', 0, 0.42, 0); }
-  if (l.outfit === 'magician') { add(new THREE.CylinderGeometry(0.5, 0.5, 0.025, 28), '#121218', 0, 0.36, 0); add(new THREE.CylinderGeometry(0.25, 0.25, 0.46, 22), '#121218', 0, 0.6, 0); add(new THREE.CylinderGeometry(0.255, 0.255, 0.06, 22), '#7a0a2a', 0, 0.41, 0); const r = add(new THREE.SphereGeometry(0.07, 10, 8), '#ffffff', 0.18, 0.86, 0); r.scale.set(0.8, 1.2, 0.8); }
-  if (l.outfit === 'knight') { const h = add(new THREE.SphereGeometry(0.5, 24, 16, Math.PI / 2 + 0.95, Math.PI * 2 - 1.9, 0, Math.PI / 1.7), '#c8ccd4', 0, 0, -0.02, { metalness: 0.8, roughness: 0.25 }); h.material.side = THREE.DoubleSide; add(new THREE.BoxGeometry(0.06, 0.4, 0.06), '#c0262d', 0, 0.62, -0.1); const pl = add(new THREE.ConeGeometry(0.1, 0.4, 8), '#c0262d', 0, 0.68, -0.2); pl.rotation.x = -1.0; }
-  if (l.outfit === 'princess') { for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI - Math.PI / 2; add(new THREE.ConeGeometry(0.05, 0.16, 4), '#ffd36a', Math.sin(a) * 0.2, 0.52, Math.cos(a) * 0.2 - 0.05, { metalness: 0.9, roughness: 0.2 }); } add(new THREE.TorusGeometry(0.22, 0.025, 6, 20), '#ffd36a', 0, 0.45, -0.05, { metalness: 0.9 }).rotation.x = Math.PI / 2; add(new THREE.SphereGeometry(0.04, 8, 6), '#ff4fb0', 0, 0.54, 0.16, { emissive: '#ff2a90', emissiveIntensity: 0.8 }); }
-  if (l.outfit === 'gothic') { add(new THREE.BoxGeometry(0.46, 0.08, 0.12), '#16101a', 0, 0.42, 0.06).rotation.x = -0.3; for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.08, 10, 8), '#4a0a1a', 0.22 * s, 0.44, 0.06).scale.set(1.4, 0.8, 0.6); }
-  if (l.outfit === 'wizard') { add(new THREE.CylinderGeometry(0.6, 0.6, 0.03, 28), '#2a3a8a', 0, 0.32, 0); const c = add(new THREE.ConeGeometry(0.32, 0.85, 20), '#2a3a8a', 0, 0.75, -0.04); c.rotation.x = -0.25; for (let i = 0; i < 4; i++) add(new THREE.OctahedronGeometry(0.035), '#ffd36a', Math.sin(i * 1.7) * 0.18, 0.5 + i * 0.12, 0.12 - i * 0.05, { emissive: '#ffcc33', emissiveIntensity: 0.9 }); }
-  if (l.outfit === 'idol') { add(new THREE.TorusGeometry(0.46, 0.025, 6, 24, Math.PI), '#222', 0, 0.12, 0).rotation.y = Math.PI / 2; add(new THREE.CylinderGeometry(0.012, 0.012, 0.3, 6), '#222', 0.3, -0.15, 0.3).rotation.x = 1.0; add(new THREE.SphereGeometry(0.03, 8, 6), '#222', 0.18, -0.25, 0.42); }
-  if (l.outfit === 'hiphop') { const c = add(new THREE.SphereGeometry(0.47, 22, 12, 0, Math.PI * 2, 0, Math.PI / 2.3), l.accent, 0, 0.08, 0); c.rotation.y = Math.PI; add(new THREE.CylinderGeometry(0.28, 0.28, 0.03, 20, 1, false, -Math.PI / 2, Math.PI), l.accent, 0, 0.18, -0.38).rotation.y = Math.PI; }
-  if (l.outfit === 'explorer') { add(new THREE.CylinderGeometry(0.62, 0.62, 0.03, 28), '#c8b48a', 0, 0.3, 0); add(new THREE.SphereGeometry(0.34, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), '#c8b48a', 0, 0.3, 0); add(new THREE.CylinderGeometry(0.345, 0.345, 0.05, 20), '#5a4020', 0, 0.34, 0); }
-  if (l.outfit === 'bee') { add(new THREE.SphereGeometry(0.47, 24, 14, 0, Math.PI * 2, 0, Math.PI / 2.1), '#f2c81a', 0, 0.02, -0.04); for (const s of [-1, 1]) { const an = add(new THREE.CylinderGeometry(0.012, 0.012, 0.32, 6), '#1a1a1a', 0.14 * s, 0.6, 0); an.rotation.z = -0.35 * s; add(new THREE.SphereGeometry(0.05, 10, 8), '#1a1a1a', 0.2 * s, 0.75, 0); } }
-  if (l.outfit === 'panda') { add(new THREE.SphereGeometry(0.47, 24, 14, 0, Math.PI * 2, 0, Math.PI / 2.1), '#f8f8f6', 0, 0.02, -0.04); for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.12, 12, 10), '#1a1a1e', 0.3 * s, 0.38, -0.04); }
+  if (l.outfit === 'dino') { add(new THREE.SphereGeometry(0.5, 38, 22, 0, Math.PI * 2, 0, Math.PI / 2.1), '#5fbf6a', 0, 0.02, -0.05); for (let i = 0; i < 4; i++) add(new THREE.ConeGeometry(0.07, 0.16, 6), '#f28a3a', 0, 0.52 - i * 0.02, -0.05 - i * 0.14); for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.06, 16, 13), '#ffffff', 0.18 * s, 0.4, 0.3); }
+  if (l.outfit === 'clown') { for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.17, 19, 16), '#ff4a1a', 0.42 * s, 0.05, -0.05).scale.set(0.9, 1.1, 1.3); const c = add(new THREE.ConeGeometry(0.16, 0.42, 22), '#2f5fd0', 0.1, 0.62, 0); c.rotation.z = -0.3; add(new THREE.SphereGeometry(0.06, 16, 13), '#ffd36a', 0.18, 0.84, 0); }
+  if (l.outfit === 'ringmaster') { add(new THREE.CylinderGeometry(0.5, 0.5, 0.025, 28), '#0a0a0e', 0, 0.36, 0); add(new THREE.CylinderGeometry(0.26, 0.26, 0.5, 35), '#0a0a0e', 0, 0.62, 0); add(new THREE.CylinderGeometry(0.265, 0.265, 0.08, 35), '#a0101e', 0, 0.42, 0); }
+  if (l.outfit === 'magician') { add(new THREE.CylinderGeometry(0.5, 0.5, 0.025, 28), '#121218', 0, 0.36, 0); add(new THREE.CylinderGeometry(0.25, 0.25, 0.46, 35), '#121218', 0, 0.6, 0); add(new THREE.CylinderGeometry(0.255, 0.255, 0.06, 35), '#7a0a2a', 0, 0.41, 0); const r = add(new THREE.SphereGeometry(0.07, 16, 13), '#ffffff', 0.18, 0.86, 0); r.scale.set(0.8, 1.2, 0.8); }
+  if (l.outfit === 'knight') { const h = add(new THREE.SphereGeometry(0.5, 38, 26, Math.PI / 2 + 0.95, Math.PI * 2 - 1.9, 0, Math.PI / 1.7), '#c8ccd4', 0, 0, -0.02, { metalness: 0.8, roughness: 0.25 }); h.material.side = THREE.DoubleSide; add(new THREE.BoxGeometry(0.06, 0.4, 0.06), '#c0262d', 0, 0.62, -0.1); const pl = add(new THREE.ConeGeometry(0.1, 0.4, 13), '#c0262d', 0, 0.68, -0.2); pl.rotation.x = -1.0; }
+  if (l.outfit === 'princess') { for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI - Math.PI / 2; add(new THREE.ConeGeometry(0.05, 0.16, 6), '#ffd36a', Math.sin(a) * 0.2, 0.52, Math.cos(a) * 0.2 - 0.05, { metalness: 0.9, roughness: 0.2 }); } add(new THREE.TorusGeometry(0.22, 0.025, 10, 32), '#ffd36a', 0, 0.45, -0.05, { metalness: 0.9 }).rotation.x = Math.PI / 2; add(new THREE.SphereGeometry(0.04, 13, 10), '#ff4fb0', 0, 0.54, 0.16, { emissive: '#ff2a90', emissiveIntensity: 0.8 }); }
+  if (l.outfit === 'gothic') { add(new THREE.BoxGeometry(0.46, 0.08, 0.12), '#16101a', 0, 0.42, 0.06).rotation.x = -0.3; for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.08, 16, 13), '#4a0a1a', 0.22 * s, 0.44, 0.06).scale.set(1.4, 0.8, 0.6); }
+  if (l.outfit === 'wizard') { add(new THREE.CylinderGeometry(0.6, 0.6, 0.03, 28), '#2a3a8a', 0, 0.32, 0); const c = add(new THREE.ConeGeometry(0.32, 0.85, 32), '#2a3a8a', 0, 0.75, -0.04); c.rotation.x = -0.25; for (let i = 0; i < 4; i++) add(new THREE.OctahedronGeometry(0.035), '#ffd36a', Math.sin(i * 1.7) * 0.18, 0.5 + i * 0.12, 0.12 - i * 0.05, { emissive: '#ffcc33', emissiveIntensity: 0.9 }); }
+  if (l.outfit === 'idol') { add(new THREE.TorusGeometry(0.46, 0.025, 10, 38, Math.PI), '#222', 0, 0.12, 0).rotation.y = Math.PI / 2; add(new THREE.CylinderGeometry(0.012, 0.012, 0.3, 10), '#222', 0.3, -0.15, 0.3).rotation.x = 1.0; add(new THREE.SphereGeometry(0.03, 13, 10), '#222', 0.18, -0.25, 0.42); }
+  if (l.outfit === 'hiphop') { const c = add(new THREE.SphereGeometry(0.47, 35, 19, 0, Math.PI * 2, 0, Math.PI / 2.3), l.accent, 0, 0.08, 0); c.rotation.y = Math.PI; add(new THREE.CylinderGeometry(0.28, 0.28, 0.03, 32, 1, false, -Math.PI / 2, Math.PI), l.accent, 0, 0.18, -0.38).rotation.y = Math.PI; }
+  if (l.outfit === 'explorer') { add(new THREE.CylinderGeometry(0.62, 0.62, 0.03, 28), '#c8b48a', 0, 0.3, 0); add(new THREE.SphereGeometry(0.34, 29, 16, 0, Math.PI * 2, 0, Math.PI / 2), '#c8b48a', 0, 0.3, 0); add(new THREE.CylinderGeometry(0.345, 0.345, 0.05, 32), '#5a4020', 0, 0.34, 0); }
+  if (l.outfit === 'bee') { add(new THREE.SphereGeometry(0.47, 38, 22, 0, Math.PI * 2, 0, Math.PI / 2.1), '#f2c81a', 0, 0.02, -0.04); for (const s of [-1, 1]) { const an = add(new THREE.CylinderGeometry(0.012, 0.012, 0.32, 10), '#1a1a1a', 0.14 * s, 0.6, 0); an.rotation.z = -0.35 * s; add(new THREE.SphereGeometry(0.05, 16, 13), '#1a1a1a', 0.2 * s, 0.75, 0); } }
+  if (l.outfit === 'panda') { add(new THREE.SphereGeometry(0.47, 38, 22, 0, Math.PI * 2, 0, Math.PI / 2.1), '#f8f8f6', 0, 0.02, -0.04); for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.12, 19, 16), '#1a1a1e', 0.3 * s, 0.38, -0.04); }
   if (l.outfit === 'priest') { /* 맨머리 */ }
 }
 
@@ -683,7 +693,9 @@ export function animateAvatar(g, dt, moving, t, crouch = false, emote = null, et
   L[0].rotation.set(s * 0.7, 0, 0); L[1].rotation.set(-s * 0.7, 0, 0);
   A[0].rotation.set(-s * 0.6, 0, 0); A[1].rotation.set(s * 0.6, 0, 0);
   u.crouch += ((crouch ? 1 : 0) - u.crouch) * Math.min(1, dt * 10);
-  let y = (moving ? Math.abs(Math.sin(u.phase)) * 0.07 : Math.sin(t * 2 + u.phase) * 0.012) - u.crouch * 0.18;
+  let y = (moving ? Math.abs(Math.sin(u.phase)) * 0.07 : Math.sin(t * 2 + u.phase) * 0.012) - u.crouch * 0.3;
+  // 웅크리면 무릎을 굽힌다
+  if (u.crouch > 0.01) { L[0].rotation.x -= u.crouch * 0.9; L[1].rotation.x -= u.crouch * 0.9; }
   let rx = u.crouch * 0.25, ry = 0, rz = 0;
   head.rotation.set(0, 0, moving ? Math.sin(u.phase * 0.5) * 0.05 : Math.sin(t * 1.3 + u.phase) * 0.04);
   head.scale.setScalar(1);
@@ -703,8 +715,8 @@ export function animateAvatar(g, dt, moving, t, crouch = false, emote = null, et
       }
       case 'spin': ry = et * 9; A[0].rotation.z = -1.4; A[1].rotation.z = 1.4; y = 0.05; break;
       case 'jump': { const k = Math.min(1, et / 0.7); y = Math.sin(Math.PI * k) * 0.9; A[0].rotation.z = -2.6 * Math.sin(Math.PI * k); A[1].rotation.z = 2.6 * Math.sin(Math.PI * k); L[0].rotation.x = -0.5 * Math.sin(Math.PI * k); L[1].rotation.x = -0.5 * Math.sin(Math.PI * k); break; }
-      case 'lie': rx = 1.45; y = 0.28; A[0].rotation.x = -2.8; A[1].rotation.x = -2.8; L[0].rotation.x = Math.sin(et * 4) * 0.4 + 0.2; L[1].rotation.x = -Math.sin(et * 4) * 0.4 + 0.2; head.rotation.x = -0.6; break;
-      case 'sit': y = -0.27; L[0].rotation.x = -1.5; L[1].rotation.x = -1.5; A[0].rotation.x = -0.4; A[1].rotation.x = -0.4; head.rotation.z = Math.sin(t * 1.2) * 0.08; break;
+      case 'lie': rx = 1.45; y = 0.3; A[0].rotation.x = -2.8; A[1].rotation.x = -2.8; L[0].rotation.x = Math.sin(et * 4) * 0.4 + 0.2; L[1].rotation.x = -Math.sin(et * 4) * 0.4 + 0.2; head.rotation.x = -0.6; break;
+      case 'sit': y = -0.31; L[0].rotation.x = -1.5; L[1].rotation.x = -1.5; A[0].rotation.x = -0.4; A[1].rotation.x = -0.4; head.rotation.z = Math.sin(t * 1.2) * 0.08; break;
       case 'clap': { const c = Math.abs(Math.sin(et * 12)); A[0].rotation.x = -1.3; A[1].rotation.x = -1.3; A[0].rotation.z = -0.2 - c * 0.5; A[1].rotation.z = 0.2 + c * 0.5; y = c * 0.03; break; }
       case 'heart': A[0].rotation.z = -2.7; A[1].rotation.z = 2.7; A[0].rotation.x = -0.3; A[1].rotation.x = -0.3; head.rotation.z = Math.sin(et * 3) * 0.15; y = Math.abs(Math.sin(et * 3)) * 0.05; break;
       case 'boo': { const k = Math.min(1, et / 0.25); A[0].rotation.z = -2.5 * k; A[1].rotation.z = 2.5 * k; A[0].rotation.x = -0.8 * k; A[1].rotation.x = -0.8 * k; rx = 0.35 * k; head.scale.setScalar(1 + 0.25 * k * (et < 0.8 ? 1 : 0)); y = 0.15 * k; break; }
@@ -714,7 +726,7 @@ export function animateAvatar(g, dt, moving, t, crouch = false, emote = null, et
   }
   rig.position.y = y; rig.rotation.set(rx, ry, rz);
   // 손전등: 웅크리면 몸이 앞으로 숙여져 빛이 몸 안에 갇히므로, 몸보다 앞·아래로 옮긴다
-  if (g.userData.spot) { g.userData.spot.position.set(0, 1.0 - u.crouch * 0.35, 0.3 + u.crouch * 0.4); g.userData.beam?.position.copy(g.userData.spot.position); }
+  if (g.userData.spot) { g.userData.spot.position.set(0, 1.35 - u.crouch * 0.45, 0.3 + u.crouch * 0.4); g.userData.beam?.position.copy(g.userData.spot.position); }
   // 감정표현 중에는 표정도 바뀐다
   const want = emote && (!moving || emote === 'jump') ? emote : null;
   if (u.expr !== want) { u.expr = want; u.setExpr?.(want); }
