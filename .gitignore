@@ -9,3 +9,6 @@ data/
 .env.local
 .env
 도메인 터널 설정.txt
+
+# 소개 영상 (용량이 커서 저장소에는 올리지 않는다)
+promo/

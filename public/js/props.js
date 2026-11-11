@@ -957,7 +957,7 @@ export function buildProp(p) {
     case 'carousel_big': {
       const r2 = p.r2 || 3.2; C(g, r2, r2 + 0.1, 0.3, '#f4e8f0'); C(g, 0.3, 0.3, 3.2, '#ffd36a', 0, 0.3, 0, 16, { metalness: 0.6 });
       const roof = new THREE.Mesh(new THREE.ConeGeometry(r2 + 0.5, 1.4, 32, 1, true), M('#c0262d', { side: THREE.DoubleSide })); roof.position.y = 4.1; g.add(roof);
-      for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; const h = new THREE.Group(); h.position.set(Math.cos(a) * r2 * 0.72, 0, Math.sin(a) * r2 * 0.72); h.rotation.y = -a; g.add(h); C(h, 0.03, 0.03, 3.4, '#ffd36a', 0, 0.3, 0, 8, { metalness: 0.7 });
+      for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; const h = new THREE.Group(); h.position.set(Math.cos(a) * r2 * 0.72, 0, Math.sin(a) * r2 * 0.72); h.rotation.y = Math.PI - a; g.add(h); // 말머리가 진행 방향(위에서 볼 때 반시계)을 보게 C(h, 0.03, 0.03, 3.4, '#ffd36a', 0, 0.3, 0, 8, { metalness: 0.7 });
         B(h, 0.28, 0.32, 0.85, ['#fff', '#d8c8ff', '#ffd1e8', '#c8f0ff'][i % 4], 0, 1.05, 0); B(h, 0.2, 0.4, 0.24, ['#fff', '#d8c8ff', '#ffd1e8', '#c8f0ff'][i % 4], 0, 1.3, 0.45); B(h, 0.06, 0.28, 0.28, '#3a1a2a', 0, 1.4, 0.26); if (i % 3 === 0) S(h, 0.05, '#c00', 0.08, 1.62, 0.56); }
       for (let i = 0; i < 24; i++) { const a = (i / 24) * Math.PI * 2; S(g, 0.06, i % 2 ? '#fff2a8' : '#ff9ad0', Math.cos(a) * (r2 + 0.45), 3.45, Math.sin(a) * (r2 + 0.45), { emissive: '#ffcc66', emissiveIntensity: i % 5 ? 0.9 : 0 }); }
       break;
