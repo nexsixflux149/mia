@@ -233,7 +233,10 @@ function setBubble(g, text) {
 }
 
 // ─────────────────────────── 월드 전환
+// 화면이 바뀔 때(로비 · 챕터 · 영상 · 창) 눌려 있던 이동 입력을 모두 푼다 — 조이스틱이 숨겨지면 '손 뗌' 신호가 오지 않아 혼자 걷던 문제 방지
+function resetInput() { S.joy = null; S.moveTarget = null; S.pendingInteract = null; for (const k in keys) keys[k] = false; const kb = document.getElementById('joyKnob'); if (kb) kb.style.transform = ''; document.getElementById('joy')?.classList.remove('act'); }
 function enterLobby(pos) {
+  resetInput();
   disposeWorld(scene, S.world);
   S.world = buildLobby(scene);
   S.room = 'lobby'; S.chapter = null; S.dark = false; S.objState = {}; S.mount = null; S.perch = null; me.y = 0;
@@ -250,6 +253,7 @@ function enterLobby(pos) {
   renderParty();
 }
 function enterChapter(state, showIntro = true) {
+  resetInput();
   setGameClock(state.elapsed, state.timed); setHintsUsed(state.hintsUsed ?? 0);
   if (state.fear != null) { S.fear = state.fear; if (state.scenario) S.scenario = state.scenario; updateFearBadge(); }
   disposeWorld(scene, S.world);
@@ -978,7 +982,7 @@ socket.on('inv', (inv) => { const before = S.inv.length; S.inv = inv; if (!inv.i
 socket.on('game:start', async (st) => {
   closeModal(); S.fear = st.fear ?? 2;
   S.scenario = st.scenario || null; updateFearBadge();
-  if (st.chapterIdx === 0 && !S.skipPrologue) { await cinema.play(st.scenario?.cine?.intro || 'prologue', { looks: partyLooks(), audio, fear: S.fear }); }
+  if (st.chapterIdx === 0 && !S.skipPrologue) { resetInput(); await cinema.play(st.scenario?.cine?.intro || 'prologue', { looks: partyLooks(), audio, fear: S.fear }); }
   enterChapter(st, true);
 });
 socket.on('game:chapter', (st) => { closeModal(); S.storyQueue = []; closeStory(true); fadeTransition(() => enterChapter(st, true)); });
@@ -1051,7 +1055,7 @@ socket.on('game:ending', (e) => {
   closeModal(); S.storyQueue = []; closeStory(true);
   addJournal(e.title, e.text, 'story');
   setTimeout(async () => {
-    await cinema.play(e.cine || (e.type === 'true' ? 'ending_true' : 'ending_normal'), { looks: partyLooks(), audio, fear: S.fear });
+    resetInput(); await cinema.play(e.cine || (e.type === 'true' ? 'ending_true' : 'ending_normal'), { looks: partyLooks(), audio, fear: S.fear });
     $('#endTitle').textContent = e.title; $('#endText').textContent = e.text;
     const icons = e.icons || ['👟', '🃏', '🎀', '🌀', '🔮', '➰', '🏷️'];
     $('#endRelics').textContent = icons.map((ic, i) => (i < e.relics ? ic : '·')).join(' ') + `   (${e.relics}/${e.total || 7})`;
@@ -1078,6 +1082,7 @@ function openDoc(title, text, hint) {
   openModal(title, '', paper); $('#modal .modal-card').classList.add('doc-mode');
 }
 function openModal(title, text, bodyEl) {
+  resetInput();
   S.modalOpen = true; S.lockCtx = null; hideMenus();
   $('#modal .modal-card').classList.remove('doc-mode');
   $('#modalTitle').textContent = title || '';
@@ -1455,6 +1460,7 @@ function lockKey(e) {
 function queueStory(s) { S.storyQueue.push(s); if (!S.storyOpen) nextStory(); }
 let typeTimer = null;
 function nextStory() {
+  resetInput();
   const s = S.storyQueue.shift();
   if (!s) { S.storyOpen = false; $('#story').classList.add('hidden'); return; }
   S.storyOpen = true; closeModal();
@@ -2049,7 +2055,9 @@ applyMobile(); addEventListener('resize', applyMobile);
   joy.addEventListener('pointerdown', (e) => { e.preventDefault(); jid = e.pointerId; joy.setPointerCapture(jid); const r = joy.getBoundingClientRect(); jc = { x: r.left + r.width / 2, y: r.top + r.height / 2 }; jmove(e); joy.classList.add('act'); });
   joy.addEventListener('pointermove', (e) => { if (e.pointerId === jid) jmove(e); });
   const jend = (e) => { if (e.pointerId !== jid) return; jid = null; S.joy = null; knob.style.transform = ''; joy.classList.remove('act'); };
-  joy.addEventListener('pointerup', jend); joy.addEventListener('pointercancel', jend);
+  joy.addEventListener('pointerup', jend); joy.addEventListener('pointercancel', jend); joy.addEventListener('lostpointercapture', jend);
+  // 손가락이 조이스틱 밖에서 떨어져도 확실히 멈춘다
+  addEventListener('pointerup', (e) => { if (e.pointerId === jid) jend(e); }); addEventListener('pointercancel', (e) => { if (e.pointerId === jid) jend(e); });
 
   // 오른쪽 아래 행동 버튼
   const act = el('div'); act.id = 'mact';
