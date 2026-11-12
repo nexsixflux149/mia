@@ -37,7 +37,7 @@ const S = {
   others: new Map(), looks: new Map(), lookReq: new Set(),
   ghost: null, ghostState: null,
   moveTarget: null, pendingInteract: null,
-  crouch: false, run: false, pings: [], callouts: [], journal: store.get('gwimun-journal', []),
+  crouch: false, run: false, pings: [], callouts: [], journal: store.get('gwimun-journal', []).filter((j) => j && j.sc),
   mouse: { x: 0, y: 0 }, danger: 0, ghosts: new Map(),
   fear: 2, em: '', emT: 0, eid: 0, labels: [], hearts: 0, flyHearts: [],
 };
@@ -995,6 +995,7 @@ socket.on('inv', (inv) => { const before = S.inv.length; S.inv = inv; if (!inv.i
 socket.on('game:start', async (st) => {
   closeModal(); S.fear = st.fear ?? 2;
   S.scenario = st.scenario || null; updateFearBadge();
+  if (st.chapterIdx === 0 && (st.elapsed ?? 0) < 8000 && S.scenario?.id) resetJournalFor(S.scenario.id); // 처음부터 새로 시작
   if (st.chapterIdx === 0 && !S.skipPrologue) { resetInput(); await cinema.play(st.scenario?.cine?.intro || 'prologue', { looks: partyLooks(), audio, fear: S.fear }); }
   enterChapter(st, true);
 });
@@ -1505,14 +1506,22 @@ function closeStory(force) {
 $('#storyClose').onclick = () => closeStory();
 
 // ─────────────────────────── 수첩 (본 단서 자동 기록)
+// 테마마다 따로 적고, 같은 물건(같은 제목)은 한 번만 — 다시 읽으면 새 줄을 쌓지 않고 최신 내용으로 고친다
+const journalSc = () => S.scenario?.id || null;
 function addJournal(title, text, kind) {
   if (!text) return;
-  const ch = S.chapter?.title || '대기 광장';
-  if (S.journal.some((j) => j.title === title && j.text === text)) return;
-  S.journal.push({ ch, title, text, kind, t: Date.now() });
-  if (S.journal.length > 400) S.journal.shift();
+  const sc = journalSc(); if (!sc) return; // 로비에서 본 것은 적지 않는다
+  const ch = S.chapter?.title || '';
+  // 힌트는 같은 제목(힌트 1/3)이 목표마다 달라서 내용까지 같아야 같은 기록
+  const same = (j) => j.sc === sc && j.title === title && (kind === 'hint' ? j.text === text : j.kind !== 'hint');
+  const old = S.journal.find(same);
+  if (old) { if (old.text !== text && text.length >= old.text.length * 0.6) { old.text = text; old.ch = ch || old.ch; store.set('gwimun-journal', S.journal); } return; }
+  S.journal.push({ sc, ch, title, text, kind, t: Date.now() });
+  if (S.journal.length > 600) S.journal.shift();
   store.set('gwimun-journal', S.journal);
 }
+// 테마를 처음부터 새로 시작하면 그 테마의 지난 기록은 지운다 (이어하기는 그대로 둔다)
+function resetJournalFor(sc) { S.journal = S.journal.filter((j) => j.sc && j.sc !== sc); store.set('gwimun-journal', S.journal); }
 function openJournal() {
   const wrap = el('div');
   const q = el('input', 'journal-search'); q.placeholder = '🔍 검색 (예: 키, 생일, 시간표)';
@@ -1520,8 +1529,9 @@ function openJournal() {
   const render = () => {
     list.innerHTML = '';
     const term = q.value.trim();
-    const items = S.journal.filter((j) => !term || (j.title + j.text).includes(term)).slice().reverse();
-    if (!items.length) list.appendChild(el('div', 'muted', '아직 기록이 없습니다. 무언가를 살펴보면 여기에 자동으로 적힙니다.'));
+    const sc = journalSc();
+    const items = S.journal.filter((j) => j.sc === sc && (!term || (j.title + j.text).includes(term))).slice().reverse();
+    if (!items.length) list.appendChild(el('div', 'muted', sc ? '아직 기록이 없습니다. 무언가를 살펴보면 여기에 자동으로 적힙니다.' : '테마를 시작하면 살펴본 단서가 여기에 자동으로 적힙니다.'));
     for (const j of items) {
       const d = el('div', 'jentry' + (j.kind === 'hint' ? ' hint' : ''));
       d.append(el('div', 'jc', `${j.ch} · ${{ clue: '단서', story: '이야기', hint: '힌트', item: '아이템' }[j.kind] || ''}`), el('div', 'jt', j.title), el('div', 'jx', j.text));
@@ -1529,10 +1539,10 @@ function openJournal() {
     }
   };
   q.oninput = render; q.onkeydown = (e) => e.stopPropagation();
-  const clear = el('button', 'btn small', '수첩 비우기'); clear.onclick = () => askConfirm('수첩 비우기', '수첩 기록을 모두 지울까요?', '모두 지우기', () => { S.journal = []; store.set('gwimun-journal', []); });
+  const clear = el('button', 'btn small', '수첩 비우기'); clear.onclick = () => askConfirm('수첩 비우기', '이 테마의 수첩 기록을 모두 지울까요?', '모두 지우기', () => { resetJournalFor(journalSc()); render(); });
   wrap.append(q, list, clear);
   render();
-  openModal('📓 수첩 — 지금까지 본 단서', '살펴본 글, 이야기, 힌트가 자동으로 기록됩니다.', wrap);
+  openModal('📓 수첩' + (S.scenario?.title ? ' — ' + S.scenario.title.split(' — ')[0] : ''), '이 테마에서 살펴본 글, 이야기, 힌트가 한 번씩 자동으로 기록됩니다.', wrap);
 }
 
 // ─────────────────────────── 인벤토리 (클릭: 바로 사용 · 우클릭: 메뉴)
