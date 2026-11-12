@@ -66,6 +66,8 @@ const THEMES = {
     wallDeco: ['wall_frame', 'cow_skull_w', 'sconce', 'poster_w', 'wall_shelf'], floorDeco: ['bottles', 'debris', 'wagon_wheel', 'leaves'], edge: 'none', webs: true },
   kimono: { tint: '#aa5a6a', fog: '#0e0608', fogIn: '#0c0606', light: '#ffb890', fixture: 'paper', sky: ['#06030a', '#24101a'], moon: '#ffd8d0', particles: 'petals', border: 'bamboo', ground: 'moss',
     wallDeco: ['wall_frame', 'talisman', 'sconce', 'wall_frame'], floorDeco: ['candle_set', 'leaves', 'debris'], edge: 'shimenawa', webs: true },
+  mia: { tint: '#8a7a6a', fog: '#0a0806', fogIn: '#0a0806', light: '#ffe2b0', fixture: 'bulb', sky: ['#04040a', '#1a1622'], moon: '#fff2d8', particles: 'motes', border: 'none', ground: 'concrete',
+    wallDeco: ['wall_frame', 'poster_w', 'wall_shelf', 'clock_w'], floorDeco: ['leaves', 'toy_blocks', 'debris', 'teddy'], edge: 'none', webs: true },
   clown: { tint: '#9a5aaa', fog: '#0c0612', fogIn: '#0a0410', light: '#ffc8e0', fixture: 'bulb_color', sky: ['#06020c', '#2a0e2e'], moon: '#ffe0f0', particles: 'confetti', border: 'carnival', ground: 'dirt',
     wallDeco: ['wall_frame', 'neon', 'poster_w', 'drape', 'sconce'], floorDeco: ['debris', 'bottles', 'teddy', 'blood_smear'], edge: 'string_lights', webs: true },
 };
@@ -265,6 +267,7 @@ function skyDome(top, bottom, stars = 0, moon = false) {
 // ───────────────── 로비 (미아 — 다섯 개의 테마 관문이 있는 광장)
 export const LOBBY_THEMES = [
   { id: 'gwimun', color: '#ff3a2a', glow: '#5a0a08', label: '鬼門 귀문' },
+  { id: 'mia', color: '#ffe066', glow: '#3a3008', label: '🔰 달빛 문방구 (입문)' },
   { id: 'ophelia', color: '#4ad8ff', glow: '#06303e', label: '⚓ 오필리아호' },
   { id: 'doll', color: '#e08aff', glow: '#3a0a4a', label: '🎎 인형의 집' },
   { id: 'kimono', color: '#ff5a7a', glow: '#4a0818', label: '🏮 츠바키야' },
@@ -323,6 +326,9 @@ function buildExhibit(root, colliders, th) {
   } else if (th.id === 'camp') {
     P({ t: 'tent', x: -2.2, z: 0.2, r: 25, color: '#e8c13a' }, 0.75); P({ t: 'campfire', x: 1.6, z: 1.5 }, 0.9);
     P({ t: 'fireflies', x: 0, z: 0.8 }, 1); P({ t: 'canoe', x: 2.5, z: -0.2, r: -20 }, 0.6);
+  } else if (th.id === 'mia') {
+    P({ t: 'umbrella_stand', x: -2.2, z: 0.4 }, 1); P({ t: 'top', x: 2.2, z: 0.6 }, 1.4);
+    spin.push(P({ t: 'marble', x: 1.2, z: 1.8 }, 1.2));
   } else if (th.id === 'park') {
     P({ t: 'mascot_statue', x: -2.2, z: 0.4, r: 20, s: 0.6 }, 1); P({ t: 'teacup', x: 2.3, z: 0.4, color: '#ff9ad0' }, 0.7);
     spin.push(P({ t: 'balloon_stand', x: 1.2, z: 1.8 }, 0.6));
@@ -751,7 +757,7 @@ export function buildChapter(scene, ch, themeId = 'gwimun') {
 
   const amb = {
     night: ['#5a6a96', '#141418', 1.0], dark: ['#4a4a5c', '#101010', 0.4],
-    candle: ['#7a3828', '#100808', 0.45], abyss: ['#3a3a4c', '#080808', 0.3],
+    candle: ['#7a3828', '#100808', 0.45], dusk: ['#a8a0c8', '#2a2420', 1.9], shop: ['#c8a080', '#241810', 1.3], abyss: ['#3a3a4c', '#080808', 0.3],
   }[ch.ambient] || ['#333', '#000', 0.2];
   // 테마 색으로 은은하게 물들인 환경광 (밝기는 그대로)
   const skyC = new THREE.Color(amb[0]).lerp(new THREE.Color(TH.tint), 0.35), gndC = new THREE.Color(amb[1]).lerp(new THREE.Color(TH.tint).multiplyScalar(0.2), 0.3);

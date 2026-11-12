@@ -46,7 +46,12 @@ if (SET.quality === 'low') SET.quality = 'medium'; // '낮음'은 없어졌다 �
 
 // ─────────────────────────── 꾸미기
 let look = { ...DEFAULT_LOOK, ...store.get('gwimun-look', {}) };
-$('#nick').value = store.get('gwimun-nick', '');
+// 닉네임을 비워 두면 입장을 못 해서 그냥 나가 버린다 → 처음 온 사람에게는 무서운 닉네임을 미리 채워 둔다
+const RAND_NICK = () => ['겁쟁이', '떨리는', '도망치는', '숨은', '용감한', '길잃은', '소심한', '울보'][Math.random() * 8 | 0] + ['토끼', '고양이', '여우', '곰', '유령', '탐정', '인형', '미아'][Math.random() * 8 | 0] + (10 + (Math.random() * 90 | 0));
+$('#nick').value = store.get('gwimun-nick', '') || RAND_NICK();
+// 초대 링크(?p=코드)로 들어왔으면 입장하자마자 친구 파티에 들어간다
+const JOIN_CODE = new URLSearchParams(location.search).get('p');
+if (JOIN_CODE) history.replaceState(null, '', location.pathname);
 let editMode = false;
 const SWATCH = { body: SKIN, accent: ACCENT, hairColor: HAIRC, eyeColor: EYEC };
 function buildOptions() {
@@ -158,6 +163,7 @@ function enter() {
     pvLoop = false;
     rebuildMyAvatar();
     renderInv(); renderRoster(); renderParty(); loadShareInfo();
+    if (JOIN_CODE) socket.emit('party:joinCode', JOIN_CODE);
     toast(document.body.classList.contains('mobile') ? `환영합니다, ${S.myName} 님! 왼쪽 조이스틱으로 이동 · 화면을 끌어 시점 · 두 손가락으로 확대` : `환영합니다, ${S.myName} 님! WASD 이동 · 드래그로 시점 · ❔에서 조작법`);
   });
 }
@@ -272,7 +278,7 @@ function enterChapter(state, showIntro = true) {
   $('#lookBtn').classList.add('hidden');
   setObjective(state.objective, state.relics);
   applyObjState(); applyDark();
-  audio.ambient({ gwimun: ch.rain ? 'rain' : 'gwimun', ophelia: 'ship', doll: 'doll', hospital: 'hospital', camp: 'camp', west: 'west', kimono: 'kimono', clown: 'clown', park: 'park' }[S.scenario?.id] || 'horror');
+  audio.ambient({ gwimun: ch.rain ? 'rain' : 'gwimun', ophelia: 'ship', doll: 'doll', hospital: 'hospital', camp: 'camp', west: 'west', kimono: 'kimono', clown: 'clown', park: 'park', mia: 'mia' }[S.scenario?.id] || 'horror');
   renderer.toneMappingExposure = 1.7;
   if (showIntro && ch.intro) { queueStory({ ...ch.intro, sound: 'story' }); addJournal(ch.intro.title, ch.intro.text, 'story'); }
   if (!document.body.classList.contains('mobile') && !store.get('gwimun-tutorial', false)) { store.set('gwimun-tutorial', true); setTimeout(() => toast('팁: F 손전등 · C 웅크리기(귀신에게 덜 들킴) · G 위치 찍기 · J 수첩'), 4000); }
@@ -901,6 +907,8 @@ const THEME_INFO = {
     story: '2003년 여름 캠프 마지막 밤, 담력 시험을 떠난 반딧불 조 아이 넷이 돌아오지 않았다. 문 닫은 수련원 호숫가에는 가을에도 반딧불이 뜬다. 처음 방탈출을 해 본다면 여기서부터.' },
   west: { title: '🤠 레드 메사 — 교수대 마을', tag: '서부 웨스턴 · 유령 마을 · 누명 · 4챕터 · 약 2~3시간', color: '#ff9a50',
     story: '1887년, 애리조나 은광 마을. 은행 강도의 누명을 쓰고 목매달린 떠돌이 잭 모로우. 그날 밤 모래폭풍이 마을을 삼켰다. 140년째 교수대의 밧줄이 바람 없이 흔들린다.' },
+  mia: { title: '🔰 미아 — 달빛 문방구의 숨바꼭질', tag: '입문 · 골목 문방구 · 조작을 하나씩 배워요 · 3챕터 · 약 20~30분', color: '#ffe066',
+    story: '1996년 어린이날, 숨바꼭질을 하던 일곱 살 미아가 사라졌다. 30년이 지난 지금도 밤마다 문 닫은 문방구 앞에서 누군가 "미아야…" 하고 부른다. 처음 방탈출을 해 본다면 여기서 시작하세요.' },
   park: { title: '🎡 해피니스 랜드 — 폐장하지 않는 밤', tag: '폐놀이공원 · 움직이는 놀이기구 · 3중 반전 · 10챕터 · 끝판왕 · 약 5~6시간', color: '#ffb0e0',
     story: '2006년 7월 7일 밤, 새 놀이기구 스카이드롭 시운전 중 어린이 여섯 명이 숨졌다. 정비공의 실수라고 했다. 20년이 지난 지금도 매년 7월 7일 자정이면 문 닫은 놀이공원의 불이 켜지고, 토끼 해피가 다정하게 손님을 맞는다. 모든 것이 거짓말이었다.' },
   clown: { title: '🎪 삐에로 — 블루문 서커스의 마지막 앵콜', tag: '폐유원지 · 서커스 · 누명 · 7챕터 · 난이도 최상 · 약 4~5시간', color: '#ff2a6a',
@@ -1641,7 +1649,7 @@ function renderParty() {
   const sel = $('#chapterSel'); const prev = sel.value; sel.innerHTML = '';
   const scs = p?.scenarios || S.scenarios || [];
   const ssel = $('#scenarioSel');
-  const prevSc = ssel.value || store.get('gwimun-scenario', 'gwimun');
+  const prevSc = ssel.value || store.get('gwimun-scenario', 'mia');
   if (ssel.options.length !== scs.length) { ssel.innerHTML = ''; scs.forEach((x) => { const o = el('option', null, `🚪 ${x.title}  ${diffStars(x.difficulty || 3)}`); o.value = x.id; o.title = x.desc; ssel.appendChild(o); }); }
   if ([...ssel.options].some((o) => o.value === prevSc)) ssel.value = prevSc;
   const scInfo = scs.find((x) => x.id === ssel.value) || scs[0];
@@ -2002,8 +2010,16 @@ async function loadShareInfo() {
     const info = await (await fetch('/api/info')).json();
     const url = info.publicUrl || (location.hostname === 'localhost' || location.hostname === '127.0.0.1' ? (info.lan[0] || location.origin) : location.origin);
     $('#shareUrl').textContent = url;
-    $('#shareNote').textContent = info.publicUrl || location.protocol === 'https:' ? '이 주소를 친구에게 보내면 어디서든 접속할 수 있어요 (음성채팅 가능)' : '같은 와이파이의 친구만 접속 가능 · 인터넷 공유는 npm run share';
-    $('#shareCopy').onclick = async () => { try { await navigator.clipboard.writeText(url); toast('초대 주소를 복사했어요!'); } catch { const r = document.createRange(); r.selectNodeContents($('#shareUrl')); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast('주소를 길게 눌러 복사하세요.'); } };
+    $('#shareNote').textContent = info.publicUrl || location.protocol === 'https:' ? '이 링크로 들어온 친구는 바로 내 파티에 합류해요 (최대 4명 · 음성채팅 가능)' : '같은 와이파이의 친구만 접속 가능 · 인터넷 공유는 npm run share';
+    // 복사·공유 버튼: 내 파티 코드가 붙은 초대 링크를 만든다 (휴대폰은 카카오톡 등 공유 창을 연다)
+    $('#shareCopy').textContent = navigator.share && isMobileView() ? '공유' : '복사';
+    $('#shareCopy').onclick = () => socket.emit('party:link', async (res) => {
+      const link = url.replace(/\/$/, '') + '/?p=' + res.code;
+      $('#shareUrl').textContent = link;
+      if (res.full) toast('파티가 꽉 찼어요 (최대 4명).');
+      if (navigator.share && isMobileView()) { try { await navigator.share({ title: '미아 — 같이 방탈출 하자!', text: `${S.myName} 님이 공포 방탈출 파티에 초대했어요 👻`, url: link }); return; } catch {} }
+      try { await navigator.clipboard.writeText(link); toast('초대 링크를 복사했어요! 친구에게 보내면 바로 내 파티로 들어와요.'); } catch { const r = document.createRange(); r.selectNodeContents($('#shareUrl')); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast('링크를 길게 눌러 복사하세요.'); }
+    });
   } catch {}
 }
 

@@ -311,6 +311,7 @@ const POOLS = {
   camp: ['child', 'drowned', 'handprints', 'faces', 'eye', 'shadow', 'longneck', 'writing', 'smiles', 'crawler'],
   west: ['hang', 'faces', 'shadow', 'eye', 'skull', 'longneck', 'writing', 'ringmaster', 'tv'],
   kimono: ['face', 'faceless', 'longneck', 'upside', 'hands', 'eye', 'writing', 'faces', 'crawler', 'tv'],
+  mia: ['child', 'face', 'smiles', 'hands', 'writing', 'faces'],
   park: ['mascot', 'mascot', 'balloons', 'jackbox', 'child', 'smiles', 'tv', 'crawler', 'marionette', 'faces', 'hands'],
   clown: ['clown', 'jackbox', 'balloons', 'marionette', 'ringmaster', 'smiles', 'clown', 'crawler', 'tv', 'teeth'],
 };

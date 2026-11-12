@@ -19,6 +19,7 @@ const THEMES = {
     abc: 'E4 F2 A2 | B4 A4 | c4 B2 A2 | F6 E2 | A4 B2 c2 | e4 c4 | B2 A2 F2 E2 | E8' },
 };
 THEMES.rain = THEMES.gwimun;
+THEMES.mia = { key: {}, unit: 2, abc: "G2 E2 G2 E2 | G2 A2 G4 | E2 D2 E2 G2 | E8 | A2 G2 A2 c2 | A2 G2 E4 | D2 E2 G2 E2 | D8" };
 THEMES.park = { key: {}, unit: 2, abc: "E2 A2 B2 c2 | B4 A4 | G2 F2 E2 ^D2 | E8 | A2 c2 e2 d2 | c4 B4 | A2 ^G2 F2 ^G2 | A8 | e2 d2 c2 B2 | c2 A2 F4 | E2 ^G2 B2 d2 | c8" };
 
 // ───── 긴장감 있는 테마 배경음악 (자작곡): 드럼 · 반복 베이스 · 불협화음 현악 · 선율이 함께 연주된다.
@@ -43,6 +44,8 @@ const SCORES = {
   clown: { bpm: 96, steps: 12, root: 45, kick: 'kick', snare: 'oompah', hat: 'hat', tom: 'drum', lead: 'clown', leadVoice: 'calliope', accent: 'honk',
     K: 'x...........', T: '..........xx', H: '..x...x...x.', S: '....x...x...', bass: '0...........', stab: 'x...........', prog: [0, 0, 7, 7, 0, 5, 7, 0] },
 };
+SCORES.mia = { bpm: 58, root: 43, kick: 'kick', snare: 'snare', hat: 'tick', tom: 'drum', lead: 'mia', leadVoice: 'musicbox', accent: 'whisper',
+  K: 'x.......x.......', T: '................', H: '..x...x...x...x.', S: '........x.......', bass: '0.......2.......', stab: 'x...............', prog: [0, 0, -3, 0, 2, 0, -5, 0] };
 SCORES.park = { bpm: 62, root: 45, kick: 'kick', snare: 'clap', hat: 'tick', tom: 'drum', lead: 'park', leadVoice: 'musicbox', accent: 'whisper',
   K: 'x.......x.......', T: '..........x...x.', H: 'x...x...x...x...', S: '....x.......x...', bass: '0...0...1...0...', stab: 'x.......x.......', prog: [0, 0, 1, 0, 0, -2, 1, -1] };
 SCORES.rain = SCORES.gwimun;
@@ -132,6 +135,7 @@ export class AudioFX {
         camp: ['wind', 'giggle', 'crawl', 'whisper', 'wave', 'creak', 'giggle', 'drip'],
         west: ['wind', 'wind', 'creak', 'bell', 'whisper', 'knock', 'chain'],
         kimono: ['gayageum', 'gong', 'whisper', 'wind', 'giggle', 'creak', 'drip'],
+        mia: ['whisper', 'giggle', 'creak', 'wind', 'knock', 'giggle', 'drip', 'whisper'],
         park: ['calliope_far', 'giggle', 'whisper', 'creak', 'pop', 'musicbox_far', 'giggle', 'wind'],
         clown: ['honk', 'clown_laugh', 'giggle', 'creak', 'pop', 'whisper', 'jackbox', 'calliope_far'],
       }[mode] || ['creak', 'whisper', 'knock'];

@@ -251,6 +251,30 @@ io.on('connection', (sock) => {
   });
 
   sock.on('party:leave', () => { if (me) leaveParty(me); });
+  // 초대 링크: 링크를 받은 친구는 캐릭터만 만들면 바로 내 파티로 들어온다
+  sock.on('party:link', (ack) => {
+    if (!me || typeof ack !== 'function') return;
+    let party = parties.get(me.partyId);
+    if (!party) {
+      party = { id: 'p' + seq++, leader: me.id, members: [me.id], instId: null };
+      parties.set(party.id, party); me.partyId = party.id; syncParty(party); broadcastRoster();
+    }
+    party.code ||= Math.random().toString(36).slice(2, 8);
+    ack({ code: party.code, full: party.members.length >= MAX_PARTY });
+  });
+  sock.on('party:joinCode', (code) => {
+    if (!me || typeof code !== 'string') return;
+    const party = [...parties.values()].find((p) => p.code && p.code === code);
+    if (!party) return sock.emit('toast', { text: '초대 링크의 파티가 사라졌어요. 친구에게 새 링크를 받아 주세요.' });
+    if (party.members.includes(me.id)) return;
+    if (party.instId) return sock.emit('toast', { text: '친구 파티가 이미 게임 중이에요. 끝나면 다시 링크로 들어와 주세요.' });
+    if (party.members.length >= MAX_PARTY) return sock.emit('toast', { text: `친구 파티가 꽉 찼어요 (최대 ${MAX_PARTY}명).` });
+    if (me.partyId) leaveParty(me);
+    party.members.push(me.id); me.partyId = party.id;
+    syncParty(party); broadcastRoster();
+    for (const id of party.members) io.to(id).emit('chat', { channel: 'party', from: '시스템', text: `${me.name} 님이 초대 링크로 파티에 참가했습니다.` });
+    io.to(party.leader).emit('toast', { text: `🎉 ${me.name} 님이 초대 링크로 들어왔어요!` });
+  });
   // 랭킹 조회: 테마별 상위 10개
   sock.on('rank:get', (ack) => {
     const out = {};

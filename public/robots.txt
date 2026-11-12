@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://mia-escape.kr/sitemap.xml

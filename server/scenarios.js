@@ -8,9 +8,21 @@ import { WEST_CHAPTERS, WEST_ENDINGS } from './west.js';
 import { KIMONO_CHAPTERS, KIMONO_ENDINGS } from './kimono.js';
 import { CLOWN_CHAPTERS, CLOWN_ENDINGS } from './clown.js';
 import { PARK_CHAPTERS, PARK_ENDINGS } from './park.js';
+import { MIA_CHAPTERS, MIA_ENDINGS } from './mia.js';
 import { ITEMS } from './items.js';
 
 export const SCENARIOS = {
+  // 처음 온 사람을 위한 짧은 입문 테마 — 목록 맨 앞, 기본 선택
+  mia: {
+    id: 'mia', title: '미아 — 달빛 문방구의 숨바꼭질 (입문)', short: '달빛 문방구',
+    desc: '입문 · 골목 문방구 · 조작을 하나씩 배워요 · 3챕터 · 약 20~30분', difficulty: 1,
+    chapters: MIA_CHAPTERS, endings: MIA_ENDINGS,
+    relics: ['mia_relic_1', 'mia_relic_2', 'mia_relic_3'], relicName: '미아의 물건',
+    cine: { intro: 'mia_intro', true: 'mia_true', normal: 'mia_normal' },
+    saveKey: (name) => 'mia:' + name,
+    carry: () => [],
+    startItems: () => ['talisman', 'talisman'],
+  },
   gwimun: {
     id: 'gwimun', title: '귀문 — 서하리 분교 실종사건', short: '귀문',
     desc: '한국 괴담 · 폐분교 · 7챕터 · 약 4~5시간', difficulty: 5,

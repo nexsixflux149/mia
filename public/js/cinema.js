@@ -508,6 +508,47 @@ export class Cinema {
     ];
   }
 
+  // ── 달빛 문방구 (입문)
+  buildMia(looks) {
+    return this.set('mia', (g) => {
+      g.position.set(-3600, 0, 0);
+      const gr = new THREE.Mesh(new THREE.PlaneGeometry(40, 60), new THREE.MeshStandardMaterial({ color: '#2a2622', roughness: 1 })); gr.rotation.x = -Math.PI / 2; g.add(gr);
+      for (const z of [-10, -2, 6, 14]) { this.prop(g, { t: 'house', x: -6, z, r: 90 }); this.prop(g, { t: 'house', x: 6, z, r: -90 }); }
+      this.prop(g, { t: 'iron_door', x: 0, z: -14 }); this.prop(g, { t: 'flyer', x: -3.2, z: -6, y: 1.4 }); this.prop(g, { t: 'pole', x: -3.2, z: -6.3 });
+      this.miaLamp = this.prop(g, { t: 'lamp', x: 3, z: -4 });
+      this.miaKid = createAvatar({ outfit: 'plain', accent: '#ffd23a', hair: 'bob', hairColor: '#2b1d16', ears: 'none', eyes: 'sparkle', mouth: 'open', body: '#ffe0cc' }); this.miaKid.scale.setScalar(0.78); g.add(this.miaKid);
+      this.miaGran = createAvatar({ outfit: 'plain', accent: '#8a6a9a', hair: 'bun', hairColor: '#d8d4cc', ears: 'none', eyes: 'closed', mouth: 'smile', body: '#f0d4bc' }); this.miaGran.scale.setScalar(0.95); g.add(this.miaGran);
+      this.miaGhost = createGhost('woman'); g.add(this.miaGhost);
+      this.miaCrew = (looks.length ? looks : [{}]).slice(0, 4).map((l, i) => { const a = createAvatar(l); a.position.set(-1.6 + i * 1.1, 0, 16); a.rotation.y = Math.PI; g.add(a); return a; });
+      this.miaWarm = new THREE.PointLight('#ffd8a0', 0, 30, 1.4); this.miaWarm.position.set(0, 5, -8); g.add(this.miaWarm);
+      this.miaHemi = new THREE.HemisphereLight('#8a8aa8', '#1a1410', 1.0); g.add(this.miaHemi);
+    });
+  }
+  miaShots(kind, looks) {
+    const A = () => this.audio;
+    this.buildMia(looks);
+    const X = -3600;
+    if (kind === 'mia_intro') return [
+      { dur: 8, caption: '2026년 11월. 재개발을 앞둔 달동네 골목.\n30년째 문을 닫지 않은 문방구가 있다.', setup: (c) => { c.show('mia'); c.night(0.025, '#0e0c14'); c.miaKid.visible = false; c.miaGran.visible = false; c.miaGhost.visible = false; c.miaWarm.intensity = 25; c.miaHemi.intensity = 1.8; A()?.ambient('mia'); },
+        update: (c, t, k, dt) => { c.miaCrew.forEach((a) => { a.position.z = 12 - t * 0.7; animateAvatar(a, dt, true, t); }); c.look(X + 1.5 - k * 1.5, 3, 24 - k * 3, X, 1.2, -6); } },
+      { dur: 8, sepia: true, caption: '1996년 5월 5일 어린이날.\n일곱 살 미아는 골목에서 숨바꼭질을 했다.', setup: (c) => { c.show('mia'); c.scene.background = new THREE.Color('#d8c0a8'); c.scene.fog = new THREE.Fog('#d8c0a8', 20, 80); c.miaCrew.forEach((a) => (a.visible = false)); c.miaKid.visible = true; c.miaGran.visible = true; c.miaKid.position.set(-0.8, 0, -9); c.miaGran.position.set(0.8, 0, -11.5); c.miaKid.rotation.y = 0; c.miaGran.rotation.y = 0; c.miaWarm.intensity = 30; A()?.ambient(null); A()?.play('musicbox'); },
+        update: (c, t, k, dt) => { animateAvatar(c.miaKid, dt, false, t, false, t < 4 ? 'jump' : 'wave', t); animateAvatar(c.miaGran, dt, false, t, false, 'wave', t); c.look(X + 1.5, 1.4, -4 - k * 1.5, X, 0.9, -10); } },
+      { dur: 7, caption: '그날 이후 밤마다, 문방구 앞에서 누군가 부른다.\n"미아야… 어디 있니…"', capAt: 1, setup: (c) => { c.show('mia'); c.night(0.06, '#06050a'); c.miaKid.visible = false; c.miaGran.visible = false; c.miaWarm.intensity = 0; c.miaGhost.visible = true; c.miaGhost.position.set(0, 0, -11); c.miaGhost.rotation.y = 0; A()?.play(c.fear >= 2 ? 'whisper' : 'wind'); },
+        update: (c, t, k, dt) => { c.miaGhost.position.z = -11 + t * 0.5; animateGhost(c.miaGhost, dt, t, { mode: k > 0.7 ? 'hunt' : 'wander' }, 6); if (c.miaLamp.userData.flicker) c.miaLamp.userData.flicker.intensity = Math.random() < 0.3 ? 0 : 6; c.look(X + 0.4, 1.5, -1 - k * 2, X, 1.5, c.miaGhost.position.z); } },
+      { dur: 4.5, setup: (c) => { c.show(); c.scene.background = new THREE.Color('#000'); c.title('미아', '— 달빛 문방구의 숨바꼭질 —'); A()?.play(c.fear >= 2 ? 'sting' : 'bell'); } },
+    ];
+    if (kind === 'mia_true') return [
+      { dur: 10, caption: '"찾았다. 우리 미아 찾았다."\n할머니와 미아는 손을 잡고 골목 끝 불빛 속으로 걸어갔다.', setup: (c) => { c.show('mia'); c.scene.background = new THREE.Color('#2a2038'); c.scene.fog = new THREE.Fog('#2a2038', 20, 70); c.miaWarm.intensity = 60; c.miaHemi.intensity = 1.8; c.miaGhost.visible = false; c.miaCrew.forEach((a) => (a.visible = false)); c.miaKid.visible = true; c.miaGran.visible = true; c.miaKid.position.set(-0.4, 0, 0); c.miaGran.position.set(0.5, 0, 0); c.miaKid.rotation.y = Math.PI; c.miaGran.rotation.y = Math.PI; A()?.play('musicbox'); },
+        update: (c, t, k, dt) => { const z = -t * 1.1; c.miaKid.position.z = z; c.miaGran.position.z = z; animateAvatar(c.miaKid, dt, true, t); animateAvatar(c.miaGran, dt, true, t); c.miaKid.visible = c.miaGran.visible = t < 9.2; c.look(X + 1, 1.6, 7 - k * 2, X, 1.1, z - 2); } },
+      { dur: 5, setup: (c) => { c.show(); c.scene.background = new THREE.Color('#000'); c.title('다 찾았다', '첫 번째 방탈출 클리어! 이제 다른 테마에 도전해 보세요'); A()?.play('bell'); } },
+    ];
+    return [
+      { dur: 8, caption: '다음 날 밤에도, 골목에는 "미아야—" 부르는 소리가 울렸다.', setup: (c) => { c.show('mia'); c.night(0.05, '#06050a'); c.miaKid.visible = false; c.miaGran.visible = false; c.miaCrew.forEach((a) => (a.visible = false)); c.miaGhost.visible = true; c.miaGhost.position.set(0, 0, -9); c.miaWarm.intensity = 0; A()?.ambient('horror'); },
+        update: (c, t, k, dt) => { animateGhost(c.miaGhost, dt, t, { mode: 'wander' }, 9); c.look(X - 1, 1.8, 6 - k * 3, X, 1.4, -9); } },
+      { dur: 5, setup: (c) => { c.show(); c.scene.background = new THREE.Color('#000'); c.title('아직 숨바꼭질 중', '미아의 물건 세 가지를 모두 찾으면, 다른 결말이…'); A()?.play('whisper'); } },
+    ];
+  }
+
   // ── 해피니스 랜드 (놀이공원)
   buildPark(looks) {
     return this.set('park', (g) => {
@@ -652,6 +693,7 @@ export class Cinema {
     if (kind.startsWith('kimono')) return this.kimonoShots(kind, looks);
     if (kind.startsWith('clown')) return this.clownShots(kind, looks);
     if (kind.startsWith('park')) return this.parkShots(kind, looks);
+    if (kind.startsWith('mia')) return this.miaShots(kind, looks);
     if (kind === 'prologue') {
       this.buildRoad(); this.buildSchool(); this.buildCircle(); this.buildStop(looks);
       return [

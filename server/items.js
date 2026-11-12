@@ -208,6 +208,15 @@ Object.assign(ITEMS, {
   antidote: { name: '백야정 해독제', icon: '💉', use: null, desc: '갈색 앰풀 다섯 개. "투여 금지 (원장 지시)". 해독제는 처음부터 있었다.' },
   battery: { name: '건전지 두 개', icon: '🔋', use: null, desc: '무전기에서 나온 새 건전지. 캠코더에 맞을 것 같다.' },
 });
+// ── 달빛 문방구 (입문)
+Object.assign(ITEMS, {
+  gacha_coin: { name: '뽑기 동전', icon: '🪙', use: null, desc: '100원짜리 뽑기 동전. 뽑기 기계에 넣을 수 있다.' },
+  mia_capsule: { name: '뽑기 캡슐 쪽지', icon: '🥚', use: 'read', desc: '"할머니 금고 비밀번호는 내 그림 속 친구들! 강아지, 고양이, 토끼 순서로 세어 봐."' },
+  roof_key: { name: '옥상 열쇠', icon: '🗝️', use: null, desc: '"옥상"이라고 적힌 작은 열쇠. 철계단 쪽문에 맞을 것 같다.' },
+  mia_relic_1: { name: '미아의 빨간 우산', icon: '☂️', use: null, relic: true, desc: '손잡이에 "김미아" 스티커. 30년이 지났는데 아직 젖어 있다.' },
+  mia_relic_2: { name: '미아의 이름표', icon: '📛', use: null, relic: true, desc: '"달빛유치원 해님반 김미아". 할머니 금고에 넣어 두었던 것.' },
+  mia_relic_3: { name: '미아의 구슬 주머니', icon: '🔮', use: null, relic: true, desc: '유리구슬 일곱 개. 그네 의자 밑에 숨겨 두었던 보물.' },
+});
 // ── 해피니스 랜드
 Object.assign(ITEMS, {
   park_ticket: { name: '해피니스 랜드 입장권', icon: '🎫', use: null, desc: '2006년 7월 7일 날짜가 찍힌 입장권. 회전문에 넣을 수 있다.' },
