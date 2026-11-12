@@ -824,8 +824,8 @@ export function buildProp(p) {
         for (let i = 0; i <= 7; i++) { const a = (i / 7) * Math.PI / 2; x.beginPath(); x.moveTo(0, 0); x.lineTo(Math.cos(a) * w * 1.1, Math.sin(a) * h * 1.1); x.stroke(); }
         for (let r = 14; r < 130; r += 12 + r * 0.12) { x.beginPath(); for (let i = 0; i <= 7; i++) { const a = (i / 7) * Math.PI / 2; const rr = r * (1 + Math.sin(i * 2.1 + r) * 0.06); const px = Math.cos(a) * rr, py = Math.sin(a) * rr; if (i) x.quadraticCurveTo(Math.cos(a - 0.11) * rr * 0.9, Math.sin(a - 0.11) * rr * 0.9, px, py); else x.moveTo(px, py); } x.stroke(); }
       }, 'cobweb');
-      const mt = (TM.get('cobweb') || TM.set('cobweb', new THREE.MeshStandardMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide, roughness: 1, alphaTest: 0.02 })).get('cobweb'));
-      const s = p.s || 1.2; const m = new THREE.Mesh(geo('p1x1', () => new THREE.PlaneGeometry(1, 1).translate(0.5, -0.5, 0)), mt); m.scale.set(s, s, 1); g.add(m); m.userData.noOcc = true; break;
+      const mt = (TM.get('cobweb') || TM.set('cobweb', new THREE.MeshStandardMaterial({ map: tex, color: '#b8b8c0', transparent: false, depthWrite: true, side: THREE.DoubleSide, roughness: 1, alphaTest: 0.25 })).get('cobweb'));
+      const s = p.s || 1.2; const m = new THREE.Mesh(geo('p1x1', () => new THREE.PlaneGeometry(1, 1).translate(0.5, -0.5, 0)), mt); m.scale.set(s, s, 1); m.frustumCulled = false; g.add(m); m.userData.noOcc = true; break; // 반투명 정렬 순서에 따라 깜빡이지 않게 오려낸(알파 컷) 그림으로 그린다
     }
     case 'sconce': {
       const c = p.color || '#ffcf8a';

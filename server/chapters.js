@@ -184,7 +184,7 @@ export const CHAPTERS = [
         doneText: '완성된 시간표. 맨 아래에 없던 칸: "수요일 5교시 — 숙직실"',
         on: { flag: 'timetable', sound: 'bell',
           story: T('시간표', `마지막 카드를 꽂자 수업 종이 울렸다. 땡, 땡, 땡.\n\n시간표 맨 아래, 없던 칸이 하나 생겼다.\n  수요일 5교시 — 숙직실 (건강검진)\n\n그날 아이들의 마지막 수업이었다.`) } },
-      { id: 'organ', t: 'organ', x: -6.6, z: -4, r: 90, label: '풍금', kind: 'lock', req: ['duty'],
+      { id: 'organ', t: 'organ', x: -7.5, z: -4, r: 90, label: '풍금', kind: 'lock', req: ['duty'],
         lockedText: '풍금 뚜껑이 잠겨 있다. 뚜껑 안쪽에서 아이 목소리가 속삭인다. "일직이 열어야 돼."',
         text: '낡은 풍금. 페달을 밟으면 쉭쉭 바람 소리가 난다. 건반을 순서대로 눌러 보자. (7음)',
         lock: { input: 'buttons', buttons: ['도', '레', '미', '파', '솔', '라', '시'], len: 7, answer: ['솔', '솔', '라', '라', '솔', '솔', '미'], notes: true },
