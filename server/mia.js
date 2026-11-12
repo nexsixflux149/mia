@@ -52,14 +52,14 @@ export const MIA_CHAPTERS = [
 
 전단지는 수십 장이 겹겹이 붙어 있다. 가장 위의 것은 아직 새것이다.
 누군가 30년 동안 매년 새로 붙인 것처럼.` },
-      { id: 'memo', t: 'paper', x: 1.2, z: -5.2, y: 1.1, label: '셔터에 붙은 쪽지', kind: 'examine',
+      { id: 'memo', t: 'paper', x: 1.6, z: -5.2, y: 1.1, label: '셔터에 붙은 쪽지', kind: 'examine', goneOn: 'shop',
         text: `셔터 손잡이 옆에 삐뚤빼뚤한 할머니 글씨.
 
   "자물쇠 번호는 우리 미아 잃어버린 날.
    잊어버리면 안 되니까."
 
 (숫자 네 자리: 월·일)` },
-      { id: 'shutter', t: 'iron_door', x: 0, z: -5.6, label: '달빛 문방구 셔터', kind: 'lock',
+      { id: 'shutter', t: 'iron_door', x: 0, z: -5.6, label: '달빛 문방구 셔터', kind: 'lock', goneOn: 'shop', // 열면 셔터가 사라져 뒤의 문을 바로 누를 수 있다
         text: '녹슨 셔터에 네 자리 번호 자물쇠가 걸려 있다.',
         lock: { input: 'digits', len: 4, answer: '0505' },
         doneText: '셔터가 반쯤 올라가 있다. 안에서 형광등이 지직거린다.',
