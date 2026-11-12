@@ -207,6 +207,13 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); c
 .coffee-pop img { width: 240px; max-width: 80%; border-radius: 10px; background: #fff; }
 .coffee-pop .coffee-msg { margin: 10px 0 0; font-size: 17px; font-weight: 700; color: #ffd36a; }
 .coffee-pop small { color: var(--muted); font-size: 12px; }
+.cr-pay { display: block; width: 100%; box-sizing: border-box; margin-top: 10px; padding: 12px 14px; border-radius: 10px; background: #ffe066; color: #1a1208; font-weight: 800; font-size: 15px; text-align: center; text-decoration: none; }
+.cr-pay:active { transform: scale(.98); }
+body.mobile .cr-coffee img, body.mobile .cr-coffee small, body.mobile .cr-coffee > b { display: none; }
+body.mobile .cr-coffee { padding: 0; border: 0; background: none; }
+body.mobile .cr-pay { margin-top: 0; }
+#onlineChip { display: none; }
+body.mobile #onlineChip:not(:empty) { display: inline-block; margin-top: 4px; padding: 2px 9px; border-radius: 999px; background: rgba(10,8,12,.7); border: 1px solid rgba(120,220,140,.5); color: #c8f5d0; font-size: 11px; font-weight: 700; }
 .credits { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
 .cr-row { display: flex; gap: 12px; font-size: 14px; align-items: center; }
 .cr-row > span { width: 110px; color: var(--muted); }

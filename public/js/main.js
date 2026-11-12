@@ -1860,6 +1860,7 @@ function renderRoster() {
   const box = $('#roster'); box.innerHTML = '';
   const others = S.roster.filter((r) => r.id !== S.me);
   $('#rosterCount').textContent = `${S.roster.length}명`;
+  const oc = $('#onlineChip'); if (oc) oc.textContent = `🟢 접속자 ${S.roster.length}명`;
   if (!others.length) box.appendChild(el('div', 'muted', '다른 접속자가 없습니다. 친구에게 주소를 알려주세요!'));
   const canInvite = !S.party || (S.party.leader === S.me && S.party.members.length < 4 && !S.party.instId);
   for (const r of others) {
@@ -1927,13 +1928,16 @@ $('#settingsBtn').onclick = () => {
   const cr = el('div', 'credits');
   cr.innerHTML = `<div class="cr-row"><span>만든이</span><b>nexsixflux</b></div>
     <a class="cr-link" href="https://social.wanted.co.kr//community/profile/ZhZ6VwFkcMvwbQBAER6qEf?utm_source=wanted&utm_medium=share" target="_blank" rel="noopener">🔗 만든이 프로필 보러 가기 <span>›</span></a>
-    <div class="cr-coffee"><b>☕ 커피 한 잔 후원하기</b><small>카카오페이 앱으로 QR을 찍어 주세요</small><img src="/kakaopay.png" alt="카카오페이 후원 QR" loading="lazy" /></div>`;
+    <div class="cr-coffee"><b>☕ 커피 한 잔 후원하기</b><small>카카오페이 앱으로 QR을 찍어 주세요</small><img src="/kakaopay.png" alt="카카오페이 후원 QR" loading="lazy" /><a class="cr-pay" href="https://qr.kakaopay.com/281006011187850590005070" target="_blank" rel="noopener">☕ 커피 한 잔 후원하기</a></div>`;
   wrap.appendChild(cr);
   openModal('⚙ 설정', '변경 사항은 자동으로 저장됩니다.', wrap);
 };
 
 // 제작자 후원 팝업 (오른쪽 ☕ 버튼)
+const KAKAOPAY_URL = 'https://qr.kakaopay.com/281006011187850590005070';
+const openKakaoPay = () => { const w = window.open(KAKAOPAY_URL, '_blank', 'noopener'); if (!w) location.href = KAKAOPAY_URL; };
 $('#coffeeBtn').onclick = () => {
+  if (isMobileView()) return openKakaoPay();
   const w = el('div', 'coffee-pop');
   w.innerHTML = `<img src="/kakaopay.png" alt="카카오페이 후원 QR" /><p class="coffee-msg">커피 한 잔은 큰 힘이 됩니다</p><small>카카오페이 앱으로 QR을 찍어 주세요</small>`;
   openModal('☕ 제작자 커피 한 잔 후원하기', '', w);
