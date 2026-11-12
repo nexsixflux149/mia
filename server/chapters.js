@@ -102,7 +102,7 @@ export const CHAPTERS = [
         on: { flag: 'cairn_done', sound: 'bell',
           story: T('서낭당', `세 번째 돌을 얹는 순간, 빗소리가 뚝 멎었다.\n\n돌무더기 틈에서 작은 꽃고무신 한 짝이 굴러 나왔다.\n고무신 안쪽에 삐뚤삐뚤한 글씨 — "2번 박미숙".\n\n철문 쪽에서 쇠사슬이 저 혼자 '철컹' 흔들렸다.`) } },
       { id: 'relic_1', t: 'shoe', x: -6.6, z: -4.6, label: '꽃고무신', kind: 'pickup', item: 'relic_1', hidden: true, req: ['cairn_done'] },
-      { id: 'gate_lock', t: 'padlock', x: 0, z: -9.9, y: 1.1, label: '철문 자물쇠', kind: 'lock',
+      { id: 'gate_lock', t: 'padlock', x: 0, z: -9.9, y: 1.1, label: '철문 자물쇠', kind: 'lock', goneOn: 'gate_open', // 풀면 사라져 뒤의 철문을 바로 누른다
         req: ['cairn_done', 'eyes'],
         lockedText: '자물쇠에 손을 대자, 차가운 손가락이 당신의 손목을 꽉 움켜쥐었다.\n서낭당에 예를 갖추고, 장승에게 눈을 돌려주기 전에는 열리지 않을 것 같다.',
         text: '녹슨 4자리 번호 자물쇠. 쇠사슬이 철문을 칭칭 감고 있다.',

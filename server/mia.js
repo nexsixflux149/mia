@@ -110,12 +110,12 @@ export const MIA_CHAPTERS = [
 
 (귀신이 쫓아오면 손전등으로 비추거나 물건 뒤로 숨어요. 잡혀도 처음엔 부적이 지켜 줘요)`),
     props: [
-      { t: 'shelf', x: -6.4, z: -1, r: 90 }, { t: 'shelf', x: 6.4, z: -1, r: -90 }, { t: 'toy_blocks', x: -5.5, z: 2.5 },
-      { t: 'teddy', x: 5.6, z: 3 }, { t: 'ddakji', x: -1.5, z: -2.6 }, { t: 'marble', x: 1.2, z: -2.5 }, { t: 'top', x: -2.4, z: 1.8 },
-      { t: 'crt_tv', x: 5.6, z: -4.3, r: -30 }, { t: 'box', x: -5.8, z: -4.2 }, { t: 'rug', x: 0, z: 1 },
+      { t: 'shelf', x: -8.6, z: -1, r: 90 }, { t: 'shelf', x: 8.6, z: -1, r: -90 }, { t: 'toy_blocks', x: -7.4, z: 4.2 }, { t: 'table', x: -6.6, z: 2.4 },
+      { t: 'teddy', x: 7.6, z: 4.4 }, { t: 'ddakji', x: -1.5, z: -3.8 }, { t: 'marble', x: 1.2, z: -3.7 }, { t: 'top', x: -2.4, z: 1.8 },
+      { t: 'crt_tv', x: 7.8, z: -6.2, r: -30 }, { t: 'box', x: -8.0, z: -6.0 }, { t: 'rug', x: 0, z: 1 },
     ],
     objects: [
-      { id: 'counter', t: 'bar_counter', x: 0, z: -3.6, label: '계산대', kind: 'examine',
+      { id: 'counter', t: 'bar_counter', x: 0, z: -4.9, label: '계산대', kind: 'examine',
         text: `계산대 위에 할머니의 장부가 펼쳐져 있다.
 
   "5월 5일. 어린이날이라 손님 많음. 미아 뽑기 한 판 공짜로 해 줌.
@@ -123,9 +123,9 @@ export const MIA_CHAPTERS = [
 
 맨 마지막 줄은 떨리는 글씨다.
   "미아야, 할머니가 큰 소리 내서 미안해. 얼른 나와라."` },
-      { id: 'coin_can', t: 'bucket', x: 1.4, z: -3.1, label: '계산대 아래 깡통', kind: 'pickup', item: 'gacha_coin',
+      { id: 'coin_can', t: 'bucket', x: 1.6, z: -4.2, label: '계산대 아래 깡통', kind: 'pickup', item: 'gacha_coin',
         text: '녹슨 깡통 안에 뽑기 동전 하나가 남아 있다.\n(얻은 물건은 아래 인벤토리에 들어가요)', takenText: '빈 깡통.' },
-      { id: 'gacha', t: 'box', x: -3.2, z: -3.8, label: '뽑기 기계', kind: 'use',
+      { id: 'gacha', t: 'box', x: -3.6, z: -6.3, label: '뽑기 기계', kind: 'use',
         text: '빨간 뽑기 기계. "한 판 100원". 동전 넣는 구멍이 있다.',
         use: { item: 'gacha_coin', times: 1 }, needText: '동전이 없다. 가게 어딘가에 있을 것 같다. (얻은 동전을 가지고 다시 클릭하면 사용해요)',
         doneText: '뽑기 기계 손잡이가 저절로 돌아가고 있다.',
@@ -135,7 +135,7 @@ export const MIA_CHAPTERS = [
 캡슐 안에 접힌 쪽지. 아이 글씨다.
   "할머니 금고 비밀번호는 내 그림 속 친구들!
    강아지, 고양이, 토끼 순서로 세어 봐. — 미아"`) } },
-      { id: 'drawing', t: 'wall_frame', x: 3.2, z: -4.85, y: 1.7, label: '미아의 크레파스 그림', kind: 'examine',
+      { id: 'drawing', t: 'wall_frame', x: 3.6, z: -6.8, y: 1.7, label: '미아의 크레파스 그림', kind: 'examine',
         text: `크레파스로 그린 '우리 동네 친구들'.
 
 골목에 동물들이 놀고 있다.
@@ -144,7 +144,7 @@ export const MIA_CHAPTERS = [
   · 지붕 위에 고양이 한 마리
 
 그림 구석에 미아와 할머니가 손을 잡고 있다. 할머니 얼굴만 크레파스로 빨갛게 칠해져 있다.` },
-      { id: 'safe', t: 'safe', x: 5.8, z: -1.8, r: -90, label: '할머니 금고', kind: 'lock', req: ['gacha'],
+      { id: 'safe', t: 'safe', x: 8.4, z: -3.6, r: -90, label: '할머니 금고', kind: 'lock', req: ['gacha'],
         lockedText: '세 자리 번호 금고. 번호를 알 만한 단서가 아직 없다.',
         text: '할머니의 작은 금고. 세 자리 번호.',
         lock: { input: 'digits', len: 3, answer: '213' }, wrongScare: true,
@@ -157,8 +157,8 @@ export const MIA_CHAPTERS = [
 가게 입구에 허리가 굽은 그림자가 서 있다. 젖은 흰머리, 바닥까지 늘어진 손.
 "…거기 누구니? 우리 미아 봤니?"
 
-(할머니가 다가온다! 손전등으로 비추면 멈춰요. 안쪽 방에 할머니 일기가 있다)`) } },
-      { id: 'diary', t: 'book', x: -5.4, z: 0.6, y: 0.9, label: '할머니의 일기장', kind: 'examine', hidden: true, req: ['safe'], once: true,
+(할머니가 다가온다! 손전등으로 비추면 멈춰요. 왼쪽 탁자 위에 할머니 일기장이 생겼다)`) } },
+      { id: 'diary', t: 'book', x: -6.6, z: 2.4, y: 0.8, label: '할머니의 일기장', kind: 'examine', hidden: true, req: ['safe'], once: true,
         on: { flag: 'diary', sound: 'whisper' },
         text: `【 문옥순의 일기 】
 
@@ -169,7 +169,7 @@ export const MIA_CHAPTERS = [
 2023. 5. 4  미아야. 할머니가 못 찾으면, 누가 대신 꼭 "찾았다" 해 주렴.
 
 …쫓아오던 목소리는, 해치려는 게 아니라 30년째 손녀를 찾는 목소리였다.` },
-      { id: 'stairs', t: 'stairs_up', x: -4.6, z: -4.2, label: '옥상 계단', kind: 'use', req: ['safe'],
+      { id: 'stairs', t: 'stairs_up', x: -6.8, z: -5.6, label: '옥상 계단', kind: 'use', req: ['safe'],
         lockedText: '좁은 철계단 위로 자물쇠 걸린 쪽문이 보인다.',
         text: '옥상으로 가는 철계단. 쪽문에 자물쇠가 걸려 있다.', use: { item: 'roof_key', times: 1 }, needText: '쪽문이 잠겨 있다. 열쇠가 필요하다.',
         on: { flag: 'roof', toast: '옥상 문이 열렸다' }, toChapter: 2 },
