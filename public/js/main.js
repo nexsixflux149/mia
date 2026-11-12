@@ -1903,6 +1903,12 @@ $('#settingsBtn').onclick = () => {
   sb('👗 옷 갈아입기', () => { closeModal(); $('#lookBtn').click(); });
   sb('❔ 도움말', () => { closeModal(); $('#helpBtn').click(); });
   wrap.appendChild(btns);
+  // 만든이 · 링크 · 후원
+  const cr = el('div', 'credits');
+  cr.innerHTML = `<div class="cr-row"><span>만든이</span><b>nexsixflux</b></div>
+    <a class="cr-link" href="https://social.wanted.co.kr//community/profile/ZhZ6VwFkcMvwbQBAER6qEf?utm_source=wanted&utm_medium=share" target="_blank" rel="noopener">🔗 만든이 프로필 보러 가기 <span>›</span></a>
+    <div class="cr-coffee"><b>☕ 커피 한 잔 후원하기</b><small>카카오페이 앱으로 QR을 찍어 주세요</small><img src="/kakaopay.png" alt="카카오페이 후원 QR" loading="lazy" /></div>`;
+  wrap.appendChild(cr);
   openModal('⚙ 설정', '변경 사항은 자동으로 저장됩니다.', wrap);
 };
 

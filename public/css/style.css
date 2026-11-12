@@ -203,6 +203,16 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); c
 .set-row { display: flex; align-items: center; gap: 12px; margin: 10px 0; font-size: 14px; }
 .set-row > span { width: 110px; color: var(--muted); }
 .set-row input[type=range] { flex: 1; }
+.credits { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
+.cr-row { display: flex; gap: 12px; font-size: 14px; align-items: center; }
+.cr-row > span { width: 110px; color: var(--muted); }
+.cr-link { display: flex; justify-content: space-between; align-items: center; padding: 11px 14px; border: 1px solid var(--line); border-radius: 10px; background: #1c171d; color: var(--text); text-decoration: none; font-size: 14px; transition: .15s; }
+.cr-link:hover { border-color: #ffd36a; background: #241d24; }
+.cr-link span { color: #ffd36a; font-size: 18px; }
+.cr-coffee { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: #1c171d; }
+.cr-coffee b { font-size: 15px; }
+.cr-coffee small { color: var(--muted); font-size: 12px; }
+.cr-coffee img { width: 200px; max-width: 70%; border-radius: 8px; margin-top: 6px; background: #fff; }
 .set-row select { flex: 1; background: #141015; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px; font-family: var(--ui); }
 .keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 14px; }
 .keys kbd { background: #2a2228; border: 1px solid #554; border-bottom-width: 3px; border-radius: 6px; padding: 1px 8px; font-family: var(--ui); font-size: 13px; white-space: nowrap; }
