@@ -9,6 +9,7 @@ import { Server } from 'socket.io';
 import { randomBytes } from 'crypto';
 import { GameInstance } from './game.js';
 import { SCENARIOS, scenarioList } from './scenarios.js';
+import { hasBadWord } from './filter.js';
 import { ITEMS, START_ITEMS } from './items.js';
 import { openStore, persist, flushAll, storeKind } from './store.js';
 
@@ -48,6 +49,9 @@ const lobbyNotice = (text) => io.to('lobby').emit('lobby:notice', { text });
 const save = () => persist(DATA_DIR, 'saves', saves, true);
 
 const players = new Map();   // socket.id -> player
+// 채팅 욕설 경고: 닉네임별로 기억해 다시 접속해도 이어진다 (5번이면 5분 채팅 금지)
+const CHAT_WARN_MAX = 5, CHAT_MUTE_MS = 5 * 60 * 1000;
+const chatPenalty = new Map(); // name -> { warns, muteUntil }
 const parties = new Map();   // partyId -> {id, leader, members:[]}
 const instances = new Map(); // instId -> GameInstance
 const invites = new Map();   // targetId -> Set(partyId)
@@ -139,6 +143,7 @@ io.on('connection', (sock) => {
       return;
     }
     name = String(name || '').trim().slice(0, 12) || '익명' + Math.floor(Math.random() * 1000);
+    if (hasBadWord(name)) return ack?.({ error: 'badname', message: '욕설·비방이 들어간 닉네임은 쓸 수 없어요. 다른 닉네임을 정해 주세요.' });
     // 같은 닉네임이 남아 있으면: 끊긴 채 기다리던(창을 닫았거나 시간 초과된) 예전 접속이면 정리하고 그 이름을 그대로 쓴다
     // 정말 다른 사람이 지금 접속 중일 때만 #번호를 붙인다
     const clash = [...players.values()].find((p) => p.name === name);
@@ -208,6 +213,17 @@ io.on('connection', (sock) => {
     const now = Date.now();
     if (now - (me.lastChat || 0) < 400) return;
     me.lastChat = now;
+    const pen = chatPenalty.get(me.name) || { warns: 0, muteUntil: 0 };
+    if (pen.muteUntil > now) {
+      const left = Math.ceil((pen.muteUntil - now) / 1000);
+      return sock.emit('chat:blocked', { muted: true, left, text: `🚫 욕설·비방 경고 ${CHAT_WARN_MAX}회로 채팅이 금지되었습니다. ${Math.floor(left / 60)}분 ${left % 60}초 뒤에 다시 쓸 수 있어요.` });
+    }
+    if (hasBadWord(text)) {
+      pen.warns += 1;
+      if (pen.warns >= CHAT_WARN_MAX) { pen.warns = 0; pen.muteUntil = now + CHAT_MUTE_MS; chatPenalty.set(me.name, pen); return sock.emit('chat:blocked', { muted: true, left: CHAT_MUTE_MS / 1000, text: `🚫 욕설·비방 경고 ${CHAT_WARN_MAX}회! 5분 동안 채팅이 금지됩니다.` }); }
+      chatPenalty.set(me.name, pen);
+      return sock.emit('chat:blocked', { warns: pen.warns, max: CHAT_WARN_MAX, text: `⚠️ 욕설·비방은 금지예요. 메시지가 보내지지 않았습니다. (경고 ${pen.warns}/${CHAT_WARN_MAX} — ${CHAT_WARN_MAX}회가 되면 5분간 채팅 금지)` });
+    }
     const msg = { channel, from: me.name, fromId: me.id, text };
     if (channel === 'party') {
       const party = parties.get(me.partyId);
@@ -483,6 +499,10 @@ setInterval(() => {
   }
 }, 66);
 
+// Render 무료 서버는 15분 동안 바깥 접속이 없으면 잠든다 → 서버가 자기 공개 주소로 10분마다 접속해 깨어 있게 한다
+// (GitHub 예약 작업은 한 시간에 한 번 정도밖에 돌지 않아 이것만으로는 부족했다)
+const SELF_URL = process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL || '';
+if (SELF_URL) setInterval(() => { fetch(SELF_URL.replace(/\/$/, '') + '/health', { headers: { 'user-agent': 'mia-keepalive' } }).catch(() => {}); }, 10 * 60 * 1000).unref?.();
 server.listen(PORT, () => {
   const ips = lanIps();
   console.log(`\n  미아 — 파티형 메타버스 공포 방탈출 서버 실행 중`);

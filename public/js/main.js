@@ -161,6 +161,7 @@ function enter() {
   const saved = store.get('gwimun-resume', null);
   const resume = saved && saved.name && saved.name.replace(/#\d+$/, '') === name && Date.now() - (saved.at || 0) < 10 * 60 * 1000 ? { id: saved.id, token: saved.token } : undefined;
   socket.emit('hello', { name, look, resume }, (res) => {
+    if (res?.error) { const n = $('#nick'); n.value = ''; n.placeholder = '다른 닉네임을 입력하세요'; n.focus(); toast(res.message); return; }
     S.resume = { id: res.id, token: res.token }; store.set('gwimun-resume', { ...S.resume, name: res.name, at: Date.now() });
     S.me = res.id; S.myName = res.name; S.items = res.items; S.unlocked = res.unlocked || 0; S.hearts = res.hearts || 0; S.unlockedBy = res.unlockedBy || {}; S.scenarios = res.scenarios || [];
     voice.myId = res.id;
@@ -170,6 +171,7 @@ function enter() {
     renderInv(); renderRoster(); renderParty(); loadShareInfo();
     if (JOIN_CODE) socket.emit('party:joinCode', JOIN_CODE);
     if (res.resumed && String(res.room || '').startsWith('inst:')) socket.emit('game:state'); // 게임 도중 창을 닫았다 다시 열면 그 게임으로 돌아간다
+    addChat({ channel: 'system', text: '📢 욕설·비방·도배는 금지예요. 경고 5회면 5분 동안 채팅이 금지됩니다.' });
     toast(document.body.classList.contains('mobile') ? `환영합니다, ${S.myName} 님! 왼쪽 조이스틱으로 이동 · 화면을 끌어 시점 · 두 손가락으로 확대` : `환영합니다, ${S.myName} 님! WASD 이동 · 드래그로 시점 · ❔에서 조작법`);
   });
 }
@@ -998,6 +1000,8 @@ function randomHorror(dt) {
 // ─────────────────────────── 서버 이벤트: 게임
 socket.on('enter:lobby', (pos) => { closeModal(); $('#ending').classList.add('hidden'); enterLobby(pos); });
 socket.on('inv', (inv) => { const before = S.inv.length; S.inv = inv; if (!inv.includes('flashlight')) S.light = false; renderInv(); if (inv.length > before) audio.play('pickup'); });
+// 욕설 채팅 경고 · 채팅 금지
+socket.on('chat:blocked', (b) => { addChat({ channel: 'system', text: b.text }); toast(b.text); if (b.muted) { S.chatMutedUntil = Date.now() + b.left * 1000; } });
 socket.on('game:start', async (st) => {
   closeModal(); S.fear = st.fear ?? 2;
   S.scenario = st.scenario || null; updateFearBadge();
