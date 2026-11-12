@@ -15,12 +15,15 @@ const socket = io();
 socket.on('connect', () => {
   if (!S?.resume) return;
   socket.emit('hello', { name: S.myName, look, resume: S.resume }, (res) => {
-    if (!res.resumed) { S.me = res.id; voice.myId = res.id; rebuildMyAvatar(); toast('연결이 오래 끊겨 로비에서 다시 시작합니다.'); }
-    S.resume = { id: res.id, token: res.token };
+    if (!res.resumed) { S.me = res.id; S.myName = res.name; voice.myId = res.id; rebuildMyAvatar(); toast('연결이 오래 끊겨 로비에서 다시 시작합니다.'); }
+    S.resume = { id: res.id, token: res.token }; store.set('gwimun-resume', { ...S.resume, name: res.name, at: Date.now() });
     S.items = res.items; renderInv(); renderParty();
   });
 });
+// 창을 닫거나 숨길 때 '마지막 접속 시각'을 남겨 둔다 → 금방 다시 열면 같은 플레이어로 이어서
+addEventListener('pagehide', () => { const r = store.get('gwimun-resume', null); if (r && S.resume) store.set('gwimun-resume', { ...r, at: Date.now() }); });
 document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { const r = store.get('gwimun-resume', null); if (r && S.resume) store.set('gwimun-resume', { ...r, at: Date.now() }); }
   if (document.hidden) { S.joy = null; const k = document.getElementById('joyKnob'); if (k) k.style.transform = ''; return; }
   if (!socket.connected) socket.connect();
 });
@@ -155,8 +158,10 @@ function enter() {
   const name = $('#nick').value.trim();
   if (!name) { $('#nick').focus(); $('#nick').placeholder = '닉네임을 입력하세요'; return; }
   store.set('gwimun-nick', name);
-  socket.emit('hello', { name, look }, (res) => {
-    S.resume = { id: res.id, token: res.token };
+  const saved = store.get('gwimun-resume', null);
+  const resume = saved && saved.name && saved.name.replace(/#\d+$/, '') === name && Date.now() - (saved.at || 0) < 10 * 60 * 1000 ? { id: saved.id, token: saved.token } : undefined;
+  socket.emit('hello', { name, look, resume }, (res) => {
+    S.resume = { id: res.id, token: res.token }; store.set('gwimun-resume', { ...S.resume, name: res.name, at: Date.now() });
     S.me = res.id; S.myName = res.name; S.items = res.items; S.unlocked = res.unlocked || 0; S.hearts = res.hearts || 0; S.unlockedBy = res.unlockedBy || {}; S.scenarios = res.scenarios || [];
     voice.myId = res.id;
     $('#login').classList.add('hidden'); $('#hud').classList.remove('hidden');
@@ -164,6 +169,7 @@ function enter() {
     rebuildMyAvatar();
     renderInv(); renderRoster(); renderParty(); loadShareInfo();
     if (JOIN_CODE) socket.emit('party:joinCode', JOIN_CODE);
+    if (res.resumed && String(res.room || '').startsWith('inst:')) socket.emit('game:state'); // 게임 도중 창을 닫았다 다시 열면 그 게임으로 돌아간다
     toast(document.body.classList.contains('mobile') ? `환영합니다, ${S.myName} 님! 왼쪽 조이스틱으로 이동 · 화면을 끌어 시점 · 두 손가락으로 확대` : `환영합니다, ${S.myName} 님! WASD 이동 · 드래그로 시점 · ❔에서 조작법`);
   });
 }

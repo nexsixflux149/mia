@@ -126,6 +126,7 @@ io.on('connection', (sock) => {
       const prev = io.sockets.sockets.get(old.sid);
       if (prev && prev.id !== sock.id) { prev.data.replaced = true; prev.disconnect(true); }
       old.sid = sock.id; me = old;
+      if (look) { me.look = sanitizeLook(look); me.lv++; } // 창을 다시 열며 고른 외형으로
       sock.join(me.id); if (me.room) sock.join(me.room);
       ack?.({ id: me.id, token: me.token, name: me.name, items: ITEMS, unlocked: saves[me.name] ?? 0, unlockedBy: unlockedFor(me.name), scenarios: scenarioList(), hearts: hearts[me.name] || 0, resumed: true, room: me.room });
       sock.emit('inv', me.inv);
@@ -138,7 +139,14 @@ io.on('connection', (sock) => {
       return;
     }
     name = String(name || '').trim().slice(0, 12) || '익명' + Math.floor(Math.random() * 1000);
-    if ([...players.values()].some((p) => p.name === name)) name = name.slice(0, 9) + '#' + Math.floor(Math.random() * 90 + 10);
+    // 같은 닉네임이 남아 있으면: 끊긴 채 기다리던(창을 닫았거나 시간 초과된) 예전 접속이면 정리하고 그 이름을 그대로 쓴다
+    // 정말 다른 사람이 지금 접속 중일 때만 #번호를 붙인다
+    const clash = [...players.values()].find((p) => p.name === name);
+    if (clash) {
+      const live = !clash.offline && io.sockets.sockets.get(clash.sid)?.connected;
+      if (!live) { clash.offline = true; clearTimeout(clash.dropTimer); dropPlayer(clash); }
+      else name = name.slice(0, 9) + '#' + Math.floor(Math.random() * 90 + 10);
+    }
     const pid = 'p' + randomBytes(6).toString('hex');
     me = { id: pid, sid: sock.id, token: randomBytes(16).toString('hex'), name, lv: 1, look: sanitizeLook(look), x: 0, z: 5, ry: Math.PI, anim: 0, light: false, room: null, partyId: null, inv: [...START_ITEMS], mic: false };
     players.set(pid, me);
