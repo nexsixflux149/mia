@@ -220,6 +220,8 @@ function makeAvatar(id, name, lk, isMe) {
   spot.position.set(0, 0.72, 0.42);
   const tgt = new THREE.Object3D(); tgt.position.set(0, 0.2, 5); g.add(tgt); spot.target = tgt;
   g.add(spot); g.userData.spot = spot;
+  // 내 캐릭터 발밑만 아주 은은하게 밝힌다 (어두운 맵에서 위치를 잃지 않게)
+  if (isMe) { const foot = new THREE.PointLight('#ffe6c8', 1.1, 2.6, 1.6); foot.position.set(0, 0.35, 0); g.add(foot); }
   const beam = makeBeam(); beam.position.copy(spot.position); beam.visible = false; g.add(beam); g.userData.beam = beam;
   scene.add(g);
   return g;
@@ -325,6 +327,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'Enter') { if (typing()) return; e.preventDefault(); $('#chatInput').focus(); return; }
   if (typing()) { if (e.code === 'Tab' && document.activeElement === $('#chatInput')) { e.preventDefault(); setChatCh(S.chatCh === 'all' ? 'party' : 'all'); } return; }
   keys[e.code] = true;
+  if (e.repeat && ['Space', 'KeyE', 'KeyF', 'KeyX', 'KeyT', 'KeyQ', 'KeyG'].includes(e.code)) { e.preventDefault(); return; } // 누르고 있어도 한 번만 (키 반복 입력 무시)
   if (e.code === 'KeyE') { e.preventDefault(); if (S.nearest) interact(S.nearest); }
   if (e.code === 'Space') { e.preventDefault(); doEmote('jump'); }
   if (e.code === 'KeyX') toggleEmotePanel();
