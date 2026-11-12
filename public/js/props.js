@@ -93,7 +93,7 @@ export const FOOT = {
   jack_box: [0.9, 0.9], balloon_stand: [0.7, 0.7], popcorn_cart: [1.3, 0.8], ticket_booth: [1.9, 1.5], cage: [2.3, 2.3], circus_wagon: [3.1, 1.5], strongman: [0.9, 0.6],
   cups_table: [1.5, 0.8], funhouse_mirror: [1.3, 0.3], vanity_bulb: [1.6, 0.6], bleachers: [6, 2.4], magic_box: [1.3, 1.3], clown_statue: [1.1, 1.1], cannon: [1.4, 2.2], spotlight: [0.7, 0.7],
   burnt_beam: [3, 0.6], scarecrow: [0.6, 0.6],
-  carousel_big: [6.6, 6.6], pirate_frame: [5.6, 3.2], drop_tower: [1.6, 1.6], teacup: [1.8, 1.8], mascot_statue: [1.3, 1.1], turnstile: [1.5, 0.4], park_map: [2, 0.3],
+  swing: [2.0, 1.4], carousel_big: [6.6, 6.6], pirate_frame: [5.6, 3.2], drop_tower: [1.6, 1.6], teacup: [1.8, 1.8], mascot_statue: [1.3, 1.1], turnstile: [1.5, 0.4], park_map: [2, 0.3],
   speaker_pole: [0.3, 0.3], control_panel: [1.6, 0.8], gear_wall: [3, 0.3], ghost_cart: [1.2, 1.6], coffin: [0.8, 2],
 };
 
@@ -985,6 +985,20 @@ export function buildProp(p) {
       B(g, 2.4, 0.6, 2.4, '#c0262d', 0, h, 0); const sign = canvasTex(256, 64, (x, w, hh) => { x.fillStyle = '#1a0a14'; x.fillRect(0, 0, w, hh); x.fillStyle = '#ffd36a'; x.font = 'bold 40px sans-serif'; x.textAlign = 'center'; x.fillText('SKY DROP', w / 2, 46); }); Plane(g, 2.2, 0.55, sign, 0, h + 0.3, 1.22); break;
     }
     case 'drop_car': { const ring = new THREE.Mesh(new THREE.TorusGeometry(1.3, 0.25, 10, 28), M('#d6303a', { metalness: 0.3 })); ring.rotation.x = Math.PI / 2; ring.position.y = 0.5; g.add(ring); for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; B(g, 0.4, 0.7, 0.3, '#2a2a30', Math.cos(a) * 1.35, 0.2, Math.sin(a) * 1.35).rotation.y = -a; } break; }
+    case 'swing': {
+      // 놀이터 그네: 양쪽 A자 기둥 + 가로대, 쇠사슬 두 줄에 매달린 좌석 (좌석은 가로대를 축으로 흔들린다)
+      const w2 = p.w || 1.5, top = 2.4, rust = '#7a3a2a', metal = { metalness: 0.5, roughness: 0.6 };
+      for (const s of [-1, 1]) for (const k of [-1, 1]) { const leg = C(g, 0.045, 0.06, top + 0.25, p.color || '#c0392b', s * (w2 / 2 + 0.1), -0.06, k * 0.55, 10, metal); leg.rotation.x = -k * 0.23; }
+      const bar = C(g, 0.055, 0.055, w2 + 0.45, p.color || '#c0392b', 0, 0, 0, 12, metal); bar.rotation.z = Math.PI / 2; bar.position.y = top;
+      const seat = new THREE.Group(); seat.position.y = top; g.add(seat); g.userData.seat = seat;
+      const chainL = top - 0.5;
+      for (const s of [-0.24, 0.24]) {
+        for (let i = 0; i < 12; i++) { const l = new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.011, 5, 10), M('#d8d8e0', { metalness: 0.6, roughness: 0.35 })); l.position.set(s, -0.08 - i * (chainL / 12), 0); l.rotation.y = i % 2 ? Math.PI / 2 : 0; seat.add(l); }
+      }
+      B(seat, 0.62, 0.07, 0.26, p.seat || '#e8c13a', 0, -chainL - 0.06, 0, { roughness: 0.45 });
+      B(seat, 0.62, 0.02, 0.26, rust, 0, -chainL - 0.08, 0);
+      break;
+    }
     case 'teacup': { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.6, 0.8, 28, 1, true), M(p.color || '#ff9ad0', { side: THREE.DoubleSide })); c.position.y = 0.6; g.add(c); C(g, 0.6, 0.6, 0.05, p.color || '#ff9ad0', 0, 0.2); const hd = new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.06, 8, 16), M('#ffffff')); hd.position.set(0.95, 0.7, 0); g.add(hd); C(g, 0.4, 0.5, 0.2, '#f4f1ea', 0, 0); break; }
     case 'bumper_car': { const b = B(g, 1.2, 0.4, 1.7, p.color || '#2f5fd0', 0, 0.15, 0); const rim = new THREE.Mesh(new THREE.TorusGeometry(0.95, 0.12, 8, 24), M('#1a1a1a')); rim.rotation.x = Math.PI / 2; rim.scale.set(0.75, 1.05, 1); rim.position.y = 0.25; g.add(rim); C(g, 0.03, 0.03, 2.0, '#888', 0, 0.5, -0.6, 6); B(g, 0.9, 0.4, 0.3, '#111', 0, 0.55, -0.4); break; }
     case 'parade_float': {

@@ -67,7 +67,7 @@ export class GameInstance {
       objects: c.objects.map((o) => ({
         id: o.id, t: o.t, x: o.x, z: o.z, r: o.r || 0, y: o.y, label: o.label, kind: o.kind, color: o.color, len: o.len,
         // 모양 · 움직임 정보 (크기 s · 높이 h · 반지름 r2 · 열림 · 거울 물결 · 핏자국 · 폭 · 켜짐 · 회전 속도 · 움직이는 맵 anim · 풀면 움직이기 moveOnDone)
-        s: o.s, h: o.h, r2: o.r2, open: o.open, wave: o.wave, blood: o.blood, w: o.w, on: o.on === true ? true : undefined, speed: o.speed, anim: o.anim, moveOnDone: o.moveOnDone,
+        s: o.s, h: o.h, r2: o.r2, open: o.open, wave: o.wave, blood: o.blood, w: o.w, on: o.on === true ? true : undefined, speed: o.speed, anim: o.anim, moveOnDone: o.moveOnDone, seat: o.seat,
         input: o.lock?.input, buttons: o.lock?.buttons, inputLen: o.lock?.len, notes: o.lock?.notes,
       })),
     };

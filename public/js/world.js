@@ -943,12 +943,15 @@ export function buildChapter(scene, ch, themeId = 'gwimun') {
     for (let i = 0; i < Math.round((W * D) / 40); i++) { const x = (R() - 0.5) * (W - 2), z = (R() - 0.5) * (D - 2); if (Math.abs(x) < 1.6 || !free(x, z, 0.2)) continue; const kind = pick(R, extra); deco({ t: kind, x, z, r: R() * 360, glow: themeId === 'camp' ? '#6aff9a' : undefined, colors: themeId === 'kimono' ? ['#c0202a', '#8a1a20', '#e8a0a8'] : undefined, r2: 2.4, n: 20 }); }
   }
 
+  let objectsRef = {};
   // 움직이는 맵: 소품에 anim 을 달면 계속 움직인다
   //   spin {speed}      제자리 회전 (회전목마 · 찻잔)
   //   swing {amp,speed} 진자처럼 흔들림 (바이킹 · 매달린 인형)
   //   bob {amp,speed}   위아래로 오르내림 (자이로드롭 · 떠다니는 풍선)
   //   orbit {r,speed}   원을 그리며 돈다 (퍼레이드 차량 · 범퍼카)
   const animate = (g, p) => {
+    if (g.userData.seat) { g.userData.live = true; const seat = g.userData.seat, ph = (p.x || 0) * 1.3; anims.push((t) => { const e = p.id && objectsRef[p.id]; const amp = e?.done ? 0.75 : 0.28; seat.rotation.x = Math.sin(t * (e?.done ? 2.2 : 1.5) + ph) * amp; }); } // 그네: 혼자 흔들리다가, 함께 밀면 크게
+    if (p.anim || g.userData.wheel) g.userData.live = true;
     if (g.userData.wheel) { const w = g.userData.wheel, sp = g.userData.spinWheel ?? 0.08; anims.push((t) => { w.rotation.z = t * sp; w.children.forEach((c) => { if (c.isGroup) c.rotation.z = -w.rotation.z; }); }); } // 관람차: 바퀴는 돌고 칸은 늘 아래로 매달린다
     const a = p.anim; if (!a) return; const x0 = g.position.x, y0 = g.position.y, z0 = g.position.z, r0 = g.rotation.y, ph = a.phase ?? (p.x * 0.7 + p.z * 0.3);
     if (a.type === 'spin') anims.push((t) => { g.rotation.y = r0 + t * (a.speed ?? 0.5); });
@@ -962,7 +965,7 @@ export function buildChapter(scene, ch, themeId = 'gwimun') {
     animate(g, p);
   }
 
-  const objects = {};
+  const objects = {}; objectsRef = objects;
   for (const o of ch.objects) {
     const g = place(root, o);
     if (g.userData.flicker) flickers.push(g.userData.flicker);
@@ -985,7 +988,7 @@ export function buildChapter(scene, ch, themeId = 'gwimun') {
     }
     if (f) { f.objId = o.id; colliders.push(f); }
     // 풀면 움직이는 물건: moveOnDone {dx,dy,dz,ry,dur} — 문이 열리고, 기계가 내려오고, 상자가 올라간다
-    if (o.moveOnDone) entry.mv = { from: g.position.clone(), r0: g.rotation.y, k: 0 };
+    if (o.moveOnDone) { entry.mv = { from: g.position.clone(), r0: g.rotation.y, k: 0 }; g.userData.live = true; }
     animate(g, o);
     objects[o.id] = entry;
   }
@@ -1015,7 +1018,7 @@ export function buildChapter(scene, ch, themeId = 'gwimun') {
   root.updateMatrixWorld(true);
   const animated = new Set(Object.values(objects).filter((e) => e.group.userData.swing || e.group.userData.flag).map((e) => e.group));
   for (const c of root.children) {
-    if (c.isLight || c === waterMesh || animated.has(c) || c.userData.sway) continue;
+    if (c.isLight || c === waterMesh || animated.has(c) || c.userData.sway || c.userData.live) continue;
     let moving = false; c.traverse((m) => { if (m.isPoints || m.onBeforeRender !== THREE.Object3D.prototype.onBeforeRender) moving = true; });
     if (!moving) c.matrixWorldAutoUpdate = false;
   }

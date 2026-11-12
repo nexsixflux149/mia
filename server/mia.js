@@ -211,8 +211,8 @@ export const MIA_CHAPTERS = [
 그네 의자 밑에서 구슬 주머니가 툭 떨어졌다.
 바닥 시멘트에 분필 글씨가 드러났다.`) } } },
     objects: [
-      { id: 'swing_l', t: 'pole', x: -2, z: 1, label: '왼쪽 그네', kind: 'coop', coop: { group: 'swing', need: 2 }, text: '그네를 밀었다' },
-      { id: 'swing_r', t: 'pole', x: 0, z: 1, label: '오른쪽 그네', kind: 'coop', coop: { group: 'swing', need: 2 }, text: '그네를 밀었다' },
+      { id: 'swing_l', t: 'swing', doneFlag: 'swing', x: -2.1, z: 1, color: '#c0392b', seat: '#ffd23a', label: '왼쪽 그네', kind: 'coop', coop: { group: 'swing', need: 2 }, text: '그네를 밀었다' },
+      { id: 'swing_r', t: 'swing', doneFlag: 'swing', x: 0.4, z: 1, color: '#2a6ab0', seat: '#ff8fab', label: '오른쪽 그네', kind: 'coop', coop: { group: 'swing', need: 2 }, text: '그네를 밀었다' },
       { id: 'chalk', t: 'paper', x: -1, z: 2.6, y: 0.05, label: '바닥의 분필 글씨', kind: 'examine', hidden: true, req: ['swing'],
         text: `분필로 꾹꾹 눌러 쓴 글씨.
 
