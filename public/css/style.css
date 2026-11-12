@@ -203,6 +203,10 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); c
 .set-row { display: flex; align-items: center; gap: 12px; margin: 10px 0; font-size: 14px; }
 .set-row > span { width: 110px; color: var(--muted); }
 .set-row input[type=range] { flex: 1; }
+.coffee-pop { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px 0 2px; }
+.coffee-pop img { width: 240px; max-width: 80%; border-radius: 10px; background: #fff; }
+.coffee-pop .coffee-msg { margin: 10px 0 0; font-size: 17px; font-weight: 700; color: #ffd36a; }
+.coffee-pop small { color: var(--muted); font-size: 12px; }
 .credits { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
 .cr-row { display: flex; gap: 12px; font-size: 14px; align-items: center; }
 .cr-row > span { width: 110px; color: var(--muted); }

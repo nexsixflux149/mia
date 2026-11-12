@@ -1912,6 +1912,13 @@ $('#settingsBtn').onclick = () => {
   openModal('⚙ 설정', '변경 사항은 자동으로 저장됩니다.', wrap);
 };
 
+// 제작자 후원 팝업 (오른쪽 ☕ 버튼)
+$('#coffeeBtn').onclick = () => {
+  const w = el('div', 'coffee-pop');
+  w.innerHTML = `<img src="/kakaopay.png" alt="카카오페이 후원 QR" /><p class="coffee-msg">커피 한 잔은 큰 힘이 됩니다</p><small>카카오페이 앱으로 QR을 찍어 주세요</small>`;
+  openModal('☕ 제작자 커피 한 잔 후원하기', '', w);
+};
+
 // ─────────────────────────── 기타
 function toast(text) {
   const t = el('div', 'toast', text); $('#toasts').appendChild(t);
@@ -2049,7 +2056,7 @@ applyMobile(); addEventListener('resize', applyMobile);
   const panels = { party: '#partyPanel', share: '#sharePanel', roster: '#rosterPanel', chat: '#chat' };
   const btns = [
     ['party', '👥', '파티'], ['chat', '💬', '채팅'], ['roster', '🧑‍🤝‍🧑', '접속자'], ['share', '🔗', '초대 주소'],
-    ['rank', '🏆', '랭킹'], ['emote', '😀', '감정표현'], ['settings', '⚙', '설정 · 지도 · 옷 · 도움말'],
+    ['rank', '🏆', '랭킹'], ['emote', '😀', '감정표현'], ['settings', '⚙', '설정 · 지도 · 옷 · 도움말'], ['coffee', '☕', '커피 한 잔 후원하기'],
   ];
   let open = null;
   const setOpen = (k) => {
@@ -2069,7 +2076,7 @@ applyMobile(); addEventListener('resize', applyMobile);
       if (open) setOpen(open);
       if (k === 'map') { SET.minimap = !SET.minimap; saveSettings(); }
       else if (k === 'emote') toggleEmotePanel();
-      else ({ look: '#lookBtn', settings: '#settingsBtn', help: '#helpBtn', rank: '#rankBtn' })[k] && $(({ look: '#lookBtn', settings: '#settingsBtn', help: '#helpBtn', rank: '#rankBtn' })[k]).click();
+      else { const sel = ({ look: '#lookBtn', settings: '#settingsBtn', help: '#helpBtn', rank: '#rankBtn', coffee: '#coffeeBtn' })[k]; if (sel) $(sel).click(); }
     };
     bar.appendChild(b);
   }
