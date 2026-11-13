@@ -355,7 +355,7 @@ body.mobile #mact { display: grid; grid-template-columns: 52px 52px 52px; gap: 8
 .abtn.emote { order: 1; } .abtn.light { order: 2; } .abtn.jump { order: 3; } .abtn.mic { order: 4; } .abtn.run { order: 5; } .abtn.sneak { order: 6; }
 .abtn.mic small { font-size: 9px; font-weight: 800; margin-top: -2px; color: #ffe9a8; }
 .abtn.mic.on { background: rgba(120, 220, 140, .45); border-color: #9affb8; box-shadow: 0 0 14px rgba(120, 220, 140, .6); }
-body.mobile .abtn.use { right: 196px; }
+body.mobile .abtn.use { right: auto; left: calc(50% - 39px); bottom: calc(205px + env(safe-area-inset-bottom)); }
 #voicePanel { position: fixed; right: 12px; bottom: calc(196px + env(safe-area-inset-bottom)); z-index: 32; width: min(230px, 70vw); padding: 10px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
 #voicePanel.hidden { display: none; }
 #voicePanel .vp-label { font-size: 12px; color: var(--muted); margin-top: 2px; }
@@ -370,6 +370,7 @@ body.mobile .logo-han { font-size: 40px; }
   body.mobile #joy { bottom: 64px; width: 104px; height: 104px; }
   body.mobile #mbar { max-height: calc(100vh - 16px); }
   body.mobile #minimap, body.mobile #emotePanel { bottom: 150px; right: 70px; }
+  body.mobile .abtn.use { bottom: 159px; }
   body.mobile .abtn.shout { bottom: 254px; right: 89px; }
   body.mobile #chatLog { height: 40vh; }
 }

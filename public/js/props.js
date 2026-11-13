@@ -1033,11 +1033,37 @@ export function buildProp(p) {
     }
     case 'speaker_pole': { C(g, 0.06, 0.08, 3.2, '#4a4e54', 0, 0, 0, 10, { metalness: 0.6 }); for (const sx of [-1, 1]) { const h = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.4, 14, 1, true), M('#c8c0b0', { side: THREE.DoubleSide })); h.rotation.z = Math.PI / 2 * sx; h.position.set(0.22 * sx, 3.0, 0); g.add(h); } break; }
     case 'hanging_dummy': {
-      // 회전 중심(높이 0)이 천장 쪽 밧줄 끝 — swing 애니메이션으로 흔들린다
-      C(g, 0.012, 0.012, 1.0, '#c8b890', 0, -1.0, 0, 6);
-      const b = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 0.7, 6, 12), M('#d8d0c0', { roughness: 1 })); b.position.y = -1.65; g.add(b);
-      const hd = S(g, 0.2, '#d8d0c0', 0, -1.0, 0); const bag = S(g, 0.21, '#8a7a5a', 0, -0.98, 0); bag.scale.set(1, 0.7, 1);
-      for (const sx of [-1, 1]) { S(g, 0.03, '#111', 0.07 * sx, -1.0, 0.18); const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.45, 4, 8), M('#d8d0c0')); leg.position.set(0.1 * sx, -2.3, 0); g.add(leg); }
+      // 목맨 사람: 회전 중심(높이 0)이 천장 쪽 밧줄 끝 — swing 애니메이션으로 천천히 흔들린다
+      // 실제 사람 비율(약 1.7m) · 축 늘어진 팔다리 · 옆으로 꺾인 고개 · 아래로 처진 발끝
+      const skin = M('#c9bfb0', { roughness: 0.9 }), shirt = M(p.color || '#b8b0a2', { roughness: 1 }), pants = M('#2e2c34', { roughness: 1 }), rope = M('#a8946a', { roughness: 1 }), hair = M('#1a1412', { roughness: 0.9 }), shoe = M('#16141a', { roughness: 0.7 });
+      const ph = (Math.abs(p.x || 0) * 7 + Math.abs(p.z || 0) * 3) % 1; // 사람마다 조금씩 다른 자세
+      // 밧줄과 올가미
+      const r1 = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.82, 6), rope); r1.position.y = -0.41; g.add(r1);
+      const knot = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), rope); knot.position.set(0.05, -0.86, -0.02); g.add(knot);
+      const loop = new THREE.Mesh(new THREE.TorusGeometry(0.068, 0.016, 6, 16), rope); loop.rotation.x = Math.PI / 2 - 0.3; loop.position.set(0, -0.97, 0); g.add(loop);
+      // 몸 (위에서 아래로)
+      const body = new THREE.Group(); body.position.y = -0.97; body.rotation.z = (ph - 0.5) * 0.08; g.add(body);
+      const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.05, 0.16, 10), skin); neck.position.y = -0.05; body.add(neck);
+      const head = new THREE.Group(); head.position.set(0, 0.07, 0.01); head.rotation.set(0.35, 0, 0.55 + ph * 0.3); body.add(head); // 고개가 앞·옆으로 꺾여 있다
+      const skull = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 12), skin); skull.scale.set(0.92, 1.08, 1); skull.position.y = 0.09; head.add(skull);
+      const hairM = new THREE.Mesh(new THREE.SphereGeometry(0.128, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.58), hair); hairM.position.y = 0.1; hairM.rotation.x = -0.25; head.add(hairM);
+      for (let i = 0; i < 7; i++) { const st = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.006, 0.22, 4), hair); st.position.set(-0.08 + i * 0.027, 0.0, 0.05 - Math.abs(i - 3) * 0.02); st.rotation.x = 0.2; head.add(st); } // 얼굴을 반쯤 가린 머리카락
+      for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.013, 6, 4), M('#0c0a0a')); e.position.set(0.035 * sx, 0.09, 0.098); head.add(e); }
+      const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.012, 0.01), M('#3a1a1a')); mouth.position.set(0, 0.03, 0.1); head.add(mouth);
+      const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.15, 0.42, 6, 14), shirt); torso.scale.set(1, 1, 0.68); torso.position.y = -0.4; body.add(torso);
+      const hip = new THREE.Mesh(new THREE.CapsuleGeometry(0.135, 0.12, 6, 12), pants); hip.scale.set(1.05, 1, 0.7); hip.position.y = -0.76; body.add(hip);
+      for (const sx of [-1, 1]) {
+        // 팔: 어깨에서 축 늘어져 몸 옆에 붙는다
+        const arm = new THREE.Group(); arm.position.set(0.19 * sx, -0.2, 0); arm.rotation.z = 0.06 * sx; arm.rotation.x = (ph - 0.5) * 0.15 * sx; body.add(arm);
+        const up = new THREE.Mesh(new THREE.CapsuleGeometry(0.048, 0.26, 4, 8), shirt); up.position.y = -0.17; arm.add(up);
+        const lo = new THREE.Mesh(new THREE.CapsuleGeometry(0.04, 0.24, 4, 8), skin); lo.position.y = -0.48; arm.add(lo);
+        const hand = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), skin); hand.scale.set(0.8, 1.3, 0.6); hand.position.y = -0.66; arm.add(hand);
+        // 다리: 힘없이 매달려 발끝이 아래로
+        const leg = new THREE.Group(); leg.position.set(0.075 * sx, -0.84, 0); leg.rotation.x = (sx > 0 ? 0.06 : -0.04) + ph * 0.05; body.add(leg);
+        const th = new THREE.Mesh(new THREE.CapsuleGeometry(0.068, 0.36, 4, 8), pants); th.position.y = -0.22; leg.add(th);
+        const sh = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 0.36, 4, 8), pants); sh.position.y = -0.66; leg.add(sh);
+        const ft = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.07, 0.2), shoe); ft.position.set(0, -0.9, 0.04); ft.rotation.x = 1.0; leg.add(ft);
+      }
       break;
     }
     case 'control_panel': {
