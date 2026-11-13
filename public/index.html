@@ -111,6 +111,8 @@
             <button id="randomBtn" class="btn">🎲 랜덤</button>
             <button id="enterBtn" class="btn primary">입장하기</button>
           </div>
+          <div id="adminRow" class="hidden"><input id="adminPass" type="password" placeholder="운영자 비밀번호" autocomplete="current-password" maxlength="100" /></div>
+          <button id="adminToggle" class="linkbtn" type="button">🔑 운영자 로그인</button>
           <p class="warn">⚠ 강한 공포 연출(점프스케어·큰 소리·잔혹 묘사)이 포함되어 있습니다. 헤드폰 사용을 권장합니다.</p>
         </div>
       </div>
@@ -194,6 +196,7 @@
       <button id="rankBtn" class="btn small">🏆 랭킹</button>
       <button id="lookBtn" class="btn small">👗 꾸미기</button>
       <button id="settingsBtn" class="btn small">⚙ 설정</button>
+      <button id="adminBtn" class="btn small hidden">🛡️ 운영</button>
       <button id="coffeeBtn" class="btn small" title="제작자에게 커피 한 잔 후원하기">☕</button>
       <button id="helpBtn" class="btn small">❔ 조작법</button>
     </div>
@@ -201,6 +204,7 @@
 
   <div id="tooltip" class="hidden"></div>
   <div id="toasts"></div>
+  <div id="noticeBanner" class="hidden"></div>
 
   <!-- 일반 모달 -->
   <div id="modal" class="screen hidden">

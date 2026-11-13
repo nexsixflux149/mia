@@ -16,7 +16,7 @@ socket.on('connect', () => {
   if (!S?.resume) return;
   socket.emit('hello', { name: S.myName, look, resume: S.resume }, (res) => {
     if (!res.resumed) { S.me = res.id; S.myName = res.name; voice.myId = res.id; rebuildMyAvatar(); toast('연결이 오래 끊겨 로비에서 다시 시작합니다.'); }
-    S.resume = { id: res.id, token: res.token }; store.set('gwimun-resume', { ...S.resume, name: res.name, at: Date.now() });
+    S.resume = { id: res.id, token: res.token }; if (!S.admin) store.set('gwimun-resume', { ...S.resume, name: res.name, at: Date.now() });
     S.items = res.items; renderInv(); renderParty();
   });
 });
@@ -156,13 +156,17 @@ function enter() {
     return;
   }
   const name = $('#nick').value.trim();
-  if (!name) { $('#nick').focus(); $('#nick').placeholder = '닉네임을 입력하세요'; return; }
-  store.set('gwimun-nick', name);
-  const saved = store.get('gwimun-resume', null);
+  const adminMode = !$('#adminRow').classList.contains('hidden');
+  if (!name && !adminMode) { $('#nick').focus(); $('#nick').placeholder = '닉네임을 입력하세요'; return; }
+  if (!adminMode) store.set('gwimun-nick', name);
+  const adminPw = $('#adminRow').classList.contains('hidden') ? '' : $('#adminPass').value;
+  const saved = adminPw ? null : store.get('gwimun-resume', null);
   const resume = saved && saved.name && saved.name.replace(/#\d+$/, '') === name && Date.now() - (saved.at || 0) < 10 * 60 * 1000 ? { id: saved.id, token: saved.token } : undefined;
-  socket.emit('hello', { name, look, resume }, (res) => {
+  socket.emit('hello', { name, look, resume, admin: adminPw || undefined }, (res) => {
+    if (res?.error === 'badadmin') { $('#adminPass').value = ''; $('#adminPass').focus(); toast(res.message); return; }
     if (res?.error) { const n = $('#nick'); n.value = ''; n.placeholder = '다른 닉네임을 입력하세요'; n.focus(); toast(res.message); return; }
-    S.resume = { id: res.id, token: res.token }; store.set('gwimun-resume', { ...S.resume, name: res.name, at: Date.now() });
+    S.admin = !!res.admin; $('#adminBtn').classList.toggle('hidden', !S.admin); document.body.classList.toggle('is-admin', S.admin); $('#adminPass').value = '';
+    S.resume = { id: res.id, token: res.token }; if (!S.admin) store.set('gwimun-resume', { ...S.resume, name: res.name, at: Date.now() }); // 운영자 접속은 기기에 남기지 않는다
     S.me = res.id; S.myName = res.name; S.items = res.items; S.unlocked = res.unlocked || 0; S.hearts = res.hearts || 0; S.unlockedBy = res.unlockedBy || {}; S.scenarios = res.scenarios || [];
     voice.myId = res.id;
     $('#login').classList.add('hidden'); $('#hud').classList.remove('hidden');
@@ -213,7 +217,8 @@ function updateLabels() {
   }
 }
 const CAM_MAX = 14; // 가장 멀리 줌아웃한 거리 — 로비·챕터에 들어갈 때마다 여기서 시작
-const cam = { yaw: 0, pitch: 0.55, dist: CAM_MAX };
+const CAM_START = 10; // 로비·챕터에 들어갈 때 시작 거리 (최대 줌아웃보다 살짝 가깝게)
+const cam = { yaw: 0, pitch: 0.55, dist: CAM_START };
 let myAvatar = null;
 const me = { x: 0, z: 5, ry: Math.PI, moving: false };
 if (window.__dbg) Object.assign(window.__dbg, { S, cam, me, scene, camera, renderer }); // ?debug 일 때만 (테스트용)
@@ -256,7 +261,7 @@ function enterLobby(pos) {
   disposeWorld(scene, S.world);
   S.world = buildLobby(scene);
   S.room = 'lobby'; S.chapter = null; S.dark = false; S.objState = {}; S.mount = null; S.perch = null; me.y = 0;
-  cam.dist = CAM_MAX; // 항상 최대 줌아웃으로 시작
+  cam.dist = CAM_START; // 살짝 줌인된 상태로 시작
   me.x = pos.x; me.z = pos.z;
   removeGhost(); clearOthers(); clearPings();
   $('#placeTitle').textContent = '미아 광장';
@@ -275,7 +280,7 @@ function enterChapter(state, showIntro = true) {
   disposeWorld(scene, S.world);
   const ch = state.chapter;
   S.chapter = ch; S.room = 'game'; S.mount = null; S.perch = null; me.y = 0; closeThemePop(); noticeBox.classList.add('hidden');
-  cam.dist = CAM_MAX; // 항상 최대 줌아웃으로 시작
+  cam.dist = CAM_START; // 살짝 줌인된 상태로 시작
   S.world = buildChapter(scene, ch, S.scenario?.id);
   S.objState = state.objects; S.dark = state.dark;
   me.x = ch.spawn[0] + (Math.random() - 0.5); me.z = ch.spawn[1];
@@ -1646,12 +1651,41 @@ function renderChatFilter() {
     if (S.chatCh === 'party' && m.channel === 'all') continue;
     const d = el('div', 'm ' + m.channel);
     if (m.channel === 'system') d.textContent = m.text;
-    else { d.appendChild(el('span', 'ch', m.channel === 'party' ? '[파티]' : '[전체]')); d.appendChild(el('b', null, m.from + ': ')); d.appendChild(document.createTextNode(m.text)); }
+    else { if (m.admin) d.classList.add('admin'); d.appendChild(el('span', 'ch', m.channel === 'party' ? '[파티]' : '[전체]')); d.appendChild(el('b', null, (m.admin ? '🛡️ ' : '') + m.from + ': ')); d.appendChild(document.createTextNode(m.text)); }
     box.appendChild(d);
   }
   box.scrollTop = box.scrollHeight;
 }
 socket.on('chat', addChat);
+// ─────────────────────────── 운영자
+$('#adminToggle').onclick = () => { const r = $('#adminRow'); r.classList.toggle('hidden'); $('#nickRow').classList.toggle('hidden', !r.classList.contains('hidden')); if (!r.classList.contains('hidden')) $('#adminPass').focus(); };
+$('#adminPass').addEventListener('keydown', (e) => { if (e.key === 'Enter') enter(); });
+socket.on('notice', ({ text }) => { const b = $('#noticeBanner'); b.textContent = '📢 ' + text; b.classList.remove('hidden'); audio.play('bell'); clearTimeout(b._t); b._t = setTimeout(() => b.classList.add('hidden'), 9000); });
+socket.on('kicked', ({ text }) => { alert(text); store.set('gwimun-resume', null); location.reload(); });
+function openAdmin() {
+  const w = el('div', 'admin-pop');
+  const ta = el('textarea'); ta.placeholder = '모든 접속자에게 보낼 공지'; ta.maxLength = 200; ta.onkeydown = (e) => e.stopPropagation();
+  const send = el('button', 'btn primary', '📢 공지 보내기'); send.onclick = () => { if (ta.value.trim()) { socket.emit('admin:notice', ta.value); ta.value = ''; } };
+  const list = el('div', 'admin-list'); const head = el('div', 'muted', '불러오는 중…');
+  const load = () => socket.emit('admin:stats', (st) => {
+    head.textContent = `접속자 ${st.players.length}명 · 진행 중인 게임 ${st.games}개`; list.innerHTML = '';
+    for (const p of st.players) {
+      const row = el('div', 'admin-row');
+      row.append(el('span', 'an', (p.admin ? '🛡️ ' : '') + p.name), el('span', 'muted', `${p.room}${p.offline ? ' · 끊김' : ''}${p.muted ? ` · 🚫${Math.ceil(p.muted / 60)}분` : ''}${p.warns ? ` · 경고${p.warns}` : ''}`));
+      if (!p.admin) {
+        const b1 = el('button', 'btn tiny', '🚫 10분'); b1.onclick = () => { socket.emit('admin:mute', { id: p.id, minutes: 10 }); setTimeout(load, 300); };
+        const b2 = el('button', 'btn tiny', '✅ 해제'); b2.onclick = () => { socket.emit('admin:unmute', p.id); setTimeout(load, 300); };
+        const b3 = el('button', 'btn tiny danger', '내보내기'); b3.onclick = () => askConfirm('내보내기', `${p.name} 님을 내보낼까요?`, '내보내기', () => { socket.emit('admin:kick', p.id); setTimeout(load, 600); });
+        row.append(b1, b2, b3);
+      }
+      list.appendChild(row);
+    }
+  });
+  const re = el('button', 'btn small', '🔄 새로고침'); re.onclick = load;
+  w.append(ta, send, head, list, re); load();
+  openModal('🛡️ 운영자', '공지 · 채팅 금지 · 내보내기', w);
+}
+$('#adminBtn').onclick = openAdmin;
 
 // ─────────────────────────── 파티 & 접속자
 socket.on('roster', (list) => { S.roster = list; renderRoster(); updateVoiceTargets(); });
@@ -1878,7 +1912,7 @@ function renderRoster() {
   const canInvite = !S.party || (S.party.leader === S.me && S.party.members.length < 4 && !S.party.instId);
   for (const r of others) {
     const d = el('div', 'rp');
-    d.appendChild(el('span', null, r.name));
+    d.appendChild(el('span', r.admin ? 'admin-name' : null, (r.admin ? '🛡️ ' : '') + r.name));
     if (r.hearts) d.appendChild(el('span', 'tag', `💖${r.hearts}`));
     if (r.inGame) d.appendChild(el('span', 'tag', '· 방탈출 중'));
     else if (r.partyId) d.appendChild(el('span', 'tag', r.partyId === S.party?.id ? '· 우리 파티' : '· 파티 있음'));
@@ -2112,7 +2146,7 @@ applyMobile(); addEventListener('resize', applyMobile);
   const panels = { party: '#partyPanel', share: '#sharePanel', roster: '#rosterPanel', chat: '#chat' };
   const btns = [
     ['party', '👥', '파티'], ['chat', '💬', '채팅'], ['roster', '🧑‍🤝‍🧑', '접속자'], ['share', '🔗', '초대 주소'],
-    ['rank', '🏆', '랭킹'], ['settings', '⚙', '설정 · 지도 · 옷 · 도움말'], ['coffee', '☕', '커피 한 잔 후원하기'],
+    ['rank', '🏆', '랭킹'], ['settings', '⚙', '설정 · 지도 · 옷 · 도움말'], ['coffee', '☕', '커피 한 잔 후원하기'], ['admin', '🛡️', '운영자'],
   ];
   let open = null;
   const setOpen = (k) => {
@@ -2132,7 +2166,7 @@ applyMobile(); addEventListener('resize', applyMobile);
       if (open) setOpen(open);
       if (k === 'map') { SET.minimap = !SET.minimap; saveSettings(); }
       else if (k === 'emote') toggleEmotePanel();
-      else { const sel = ({ look: '#lookBtn', settings: '#settingsBtn', help: '#helpBtn', rank: '#rankBtn', coffee: '#coffeeBtn' })[k]; if (sel) $(sel).click(); }
+      else { const sel = ({ look: '#lookBtn', settings: '#settingsBtn', help: '#helpBtn', rank: '#rankBtn', coffee: '#coffeeBtn', admin: '#adminBtn' })[k]; if (sel) $(sel).click(); }
     };
     bar.appendChild(b);
   }

@@ -10,6 +10,7 @@ import { randomBytes } from 'crypto';
 import { GameInstance } from './game.js';
 import { SCENARIOS, scenarioList } from './scenarios.js';
 import { hasBadWord } from './filter.js';
+import { isAdminPassword, looksLikeAdmin, ADMIN_NAME } from './admin.js';
 import { ITEMS, START_ITEMS } from './items.js';
 import { openStore, persist, flushAll, storeKind } from './store.js';
 
@@ -58,7 +59,7 @@ const invites = new Map();   // targetId -> Set(partyId)
 let seq = 1;
 
 const pub = (p) => ({ id: p.id, name: p.name, lv: p.lv, x: p.x, z: p.z, y: p.y || 0, ry: p.ry, anim: p.anim, crouch: p.crouch ? 1 : 0, light: p.light, partyId: p.partyId, em: p.em || '', eid: p.eid || 0, ride: p.room === 'lobby' ? p.ride || '' : '' });
-const lobbyList = () => [...players.values()].map((p) => ({ id: p.id, name: p.name, partyId: p.partyId, inGame: p.room !== 'lobby', room: p.room || '', hearts: hearts[p.name] || 0 }));
+const lobbyList = () => [...players.values()].map((p) => ({ id: p.id, name: p.name, partyId: p.partyId, inGame: p.room !== 'lobby', room: p.room || '', hearts: hearts[p.name] || 0, admin: !!p.admin }));
 const broadcastRoster = () => io.emit('roster', lobbyList());
 
 function partyInfo(party) {
@@ -122,7 +123,14 @@ function leaveParty(p) {
 io.on('connection', (sock) => {
   let me = null;
 
-  sock.on('hello', ({ name, look, resume }, ack) => {
+  sock.on('hello', ({ name, look, resume, admin }, ack) => {
+    // 운영자 로그인: 비밀번호가 맞으면 '운영자' 닉네임으로 입장 (틀리면 5번까지만 시도 가능)
+    let asAdmin = false;
+    if (admin) {
+      sock.data.adminTries = (sock.data.adminTries || 0) + 1;
+      if (sock.data.adminTries > 5 || !isAdminPassword(admin)) return ack?.({ error: 'badadmin', message: '운영자 비밀번호가 맞지 않아요.' });
+      asAdmin = true; name = ADMIN_NAME; resume = null;
+    }
     // 모바일에서 앱 전환 등으로 연결이 끊겼다 다시 붙으면, 같은 플레이어로 이어서 한다
     const old = resume && players.get(resume.id);
     if (old && resume.token && old.token === resume.token) {
@@ -144,6 +152,7 @@ io.on('connection', (sock) => {
     }
     name = String(name || '').trim().slice(0, 12) || '익명' + Math.floor(Math.random() * 1000);
     if (hasBadWord(name)) return ack?.({ error: 'badname', message: '욕설·비방이 들어간 닉네임은 쓸 수 없어요. 다른 닉네임을 정해 주세요.' });
+    if (!asAdmin && looksLikeAdmin(name)) return ack?.({ error: 'badname', message: '운영자로 오해할 수 있는 닉네임은 쓸 수 없어요. 다른 닉네임을 정해 주세요.' });
     // 같은 닉네임이 남아 있으면: 끊긴 채 기다리던(창을 닫았거나 시간 초과된) 예전 접속이면 정리하고 그 이름을 그대로 쓴다
     // 정말 다른 사람이 지금 접속 중일 때만 #번호를 붙인다
     const clash = [...players.values()].find((p) => p.name === name);
@@ -153,11 +162,11 @@ io.on('connection', (sock) => {
       else name = name.slice(0, 9) + '#' + Math.floor(Math.random() * 90 + 10);
     }
     const pid = 'p' + randomBytes(6).toString('hex');
-    me = { id: pid, sid: sock.id, token: randomBytes(16).toString('hex'), name, lv: 1, look: sanitizeLook(look), x: 0, z: 5, ry: Math.PI, anim: 0, light: false, room: null, partyId: null, inv: [...START_ITEMS], mic: false };
+    me = { id: pid, sid: sock.id, token: randomBytes(16).toString('hex'), name, admin: asAdmin, lv: 1, look: sanitizeLook(look), x: 0, z: 5, ry: Math.PI, anim: 0, light: false, room: null, partyId: null, inv: [...START_ITEMS], mic: false };
     players.set(pid, me);
     sock.join(pid);
     toLobby(me);
-    ack?.({ id: pid, token: me.token, name, items: ITEMS, unlocked: saves[name] ?? 0, unlockedBy: unlockedFor(name), scenarios: scenarioList(), hearts: hearts[name] || 0 });
+    ack?.({ id: pid, token: me.token, name, admin: asAdmin, items: ITEMS, unlocked: saves[name] ?? 0, unlockedBy: unlockedFor(name), scenarios: scenarioList(), hearts: hearts[name] || 0 });
     io.emit('chat', { channel: 'system', text: `${name} 님이 접속했습니다.` });
   });
 
@@ -214,17 +223,17 @@ io.on('connection', (sock) => {
     if (now - (me.lastChat || 0) < 400) return;
     me.lastChat = now;
     const pen = chatPenalty.get(me.name) || { warns: 0, muteUntil: 0 };
-    if (pen.muteUntil > now) {
+    if (!me.admin && pen.muteUntil > now) {
       const left = Math.ceil((pen.muteUntil - now) / 1000);
       return sock.emit('chat:blocked', { muted: true, left, text: `🚫 욕설·비방 경고 ${CHAT_WARN_MAX}회로 채팅이 금지되었습니다. ${Math.floor(left / 60)}분 ${left % 60}초 뒤에 다시 쓸 수 있어요.` });
     }
-    if (hasBadWord(text)) {
+    if (!me.admin && hasBadWord(text)) {
       pen.warns += 1;
       if (pen.warns >= CHAT_WARN_MAX) { pen.warns = 0; pen.muteUntil = now + CHAT_MUTE_MS; chatPenalty.set(me.name, pen); return sock.emit('chat:blocked', { muted: true, left: CHAT_MUTE_MS / 1000, text: `🚫 욕설·비방 경고 ${CHAT_WARN_MAX}회! 5분 동안 채팅이 금지됩니다.` }); }
       chatPenalty.set(me.name, pen);
       return sock.emit('chat:blocked', { warns: pen.warns, max: CHAT_WARN_MAX, text: `⚠️ 욕설·비방은 금지예요. 메시지가 보내지지 않았습니다. (경고 ${pen.warns}/${CHAT_WARN_MAX} — ${CHAT_WARN_MAX}회가 되면 5분간 채팅 금지)` });
     }
-    const msg = { channel, from: me.name, fromId: me.id, text };
+    const msg = { channel, from: me.name, fromId: me.id, text, admin: !!me.admin };
     if (channel === 'party') {
       const party = parties.get(me.partyId);
       if (!party) return sock.emit('chat', { channel: 'system', text: '파티에 속해 있지 않습니다.' });
@@ -275,6 +284,37 @@ io.on('connection', (sock) => {
   });
 
   sock.on('party:leave', () => { if (me) leaveParty(me); });
+  // ───── 운영자 기능 (운영자로 입장한 사람만)
+  const adminOnly = (fn) => (...a) => { if (me?.admin) fn(...a); };
+  sock.on('admin:notice', adminOnly((text) => {
+    text = String(text || '').trim().slice(0, 200); if (!text) return;
+    io.emit('notice', { text });
+    io.emit('chat', { channel: 'system', text: `📢 [공지] ${text}` });
+  }));
+  sock.on('admin:stats', adminOnly((ack) => {
+    if (typeof ack !== 'function') return;
+    ack({ players: [...players.values()].map((p) => ({ id: p.id, name: p.name, room: p.room === 'lobby' ? '로비' : p.room ? '게임 중' : '-', offline: !!p.offline, admin: !!p.admin, muted: Math.max(0, Math.ceil(((chatPenalty.get(p.name)?.muteUntil || 0) - Date.now()) / 1000)), warns: chatPenalty.get(p.name)?.warns || 0 })), games: instances.size });
+  }));
+  sock.on('admin:mute', adminOnly(({ id, minutes }) => {
+    const t = players.get(id); if (!t || t.admin) return;
+    const mins = Math.max(1, Math.min(1440, Number(minutes) || 5));
+    chatPenalty.set(t.name, { warns: 0, muteUntil: Date.now() + mins * 60000 });
+    io.to(t.id).emit('chat:blocked', { muted: true, left: mins * 60, text: `🚫 운영자가 ${mins}분 동안 채팅을 금지했습니다.` });
+    sock.emit('toast', { text: `${t.name} 님 채팅 ${mins}분 금지` });
+  }));
+  sock.on('admin:unmute', adminOnly((id) => {
+    const t = players.get(id); if (!t) return;
+    chatPenalty.delete(t.name);
+    io.to(t.id).emit('chat', { channel: 'system', text: '✅ 운영자가 채팅 금지를 풀었습니다.' });
+    sock.emit('toast', { text: `${t.name} 님 채팅 금지 해제` });
+  }));
+  sock.on('admin:kick', adminOnly((id) => {
+    const t = players.get(id); if (!t || t.admin) return;
+    io.to(t.id).emit('kicked', { text: '운영자에 의해 접속이 끊겼습니다.' });
+    const ts = io.sockets.sockets.get(t.sid); t.offline = true; clearTimeout(t.dropTimer);
+    setTimeout(() => { try { ts?.disconnect(true); } catch {} dropPlayer(t); }, 300);
+    sock.emit('toast', { text: `${t.name} 님을 내보냈습니다.` });
+  }));
   // 초대 링크: 링크를 받은 친구는 캐릭터만 만들면 바로 내 파티로 들어온다
   sock.on('party:link', (ack) => {
     if (!me || typeof ack !== 'function') return;

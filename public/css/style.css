@@ -214,6 +214,17 @@ body.mobile .cr-coffee { padding: 0; border: 0; background: none; }
 body.mobile .cr-pay { margin-top: 0; }
 #onlineChip { display: none; }
 body.mobile #onlineChip:not(:empty) { display: inline-block; margin-top: 4px; padding: 2px 9px; border-radius: 999px; background: rgba(10,8,12,.7); border: 1px solid rgba(120,220,140,.5); color: #c8f5d0; font-size: 11px; font-weight: 700; }
+#adminToggle { margin-top: 8px; background: none; border: 0; color: var(--muted); font-size: 12px; cursor: pointer; text-decoration: underline; padding: 2px; }
+#adminRow { margin-top: 8px; } #adminRow input { width: 100%; box-sizing: border-box; padding: 10px; border-radius: 8px; border: 1px solid var(--line); background: #141015; color: var(--text); }
+#chatLog .m.admin b { color: #ffd36a; } .admin-name { color: #ffd36a; font-weight: 800; }
+#noticeBanner { position: fixed; z-index: 60; left: 50%; top: 12px; transform: translateX(-50%); max-width: min(680px, 92vw); padding: 12px 20px; border-radius: 14px; background: rgba(30,18,6,.92); border: 2px solid #ffd36a; color: #fff6d8; font-weight: 800; font-size: 16px; text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,.6); }
+#noticeBanner.hidden { display: none; }
+.admin-pop textarea { width: 100%; box-sizing: border-box; min-height: 64px; padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: #141015; color: var(--text); font-family: var(--ui); }
+.admin-pop > .btn { margin: 6px 0 10px; }
+.admin-list { max-height: 46vh; overflow: auto; display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.admin-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; }
+.admin-row .an { font-weight: 800; margin-right: auto; } .btn.danger { background: #6a1a1a; border-color: #a03030; }
+body.mobile .mbtn[data-k="admin"] { display: none; } body.mobile.is-admin .mbtn[data-k="admin"] { display: inline-block; }
 .credits { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
 .cr-row { display: flex; gap: 12px; font-size: 14px; align-items: center; }
 .cr-row > span { width: 110px; color: var(--muted); }
