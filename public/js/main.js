@@ -1963,6 +1963,15 @@ function renderRoster() {
     box.appendChild(d);
   }
 }
+// PC: 접속자 목록이 아래 미니맵과 겹치지 않게 남은 높이만큼만 보여 준다 (넘치면 목록 안에서 스크롤)
+function fitRoster() {
+  const list = $('#roster'); if (!list || document.body.classList.contains('mobile')) { if (list) list.style.maxHeight = ''; return; }
+  const top = list.getBoundingClientRect().top;
+  let limit = innerHeight - 70; // 아래쪽 미니맵 · 타이머 바로 위까지만
+  for (const sel of ['#minimap', '#gameTimer']) { const e = $(sel); if (e && !e.classList.contains('hidden') && e.offsetWidth) limit = Math.min(limit, e.getBoundingClientRect().top - 22); }
+  list.style.maxHeight = Math.max(70, Math.min(200, Math.floor(limit - top))) + 'px';
+}
+setInterval(fitRoster, 400); addEventListener('resize', fitRoster);
 $('#rosterToggle').onclick = () => { const r = $('#roster'); r.classList.toggle('hidden'); $('#rosterToggle').textContent = r.classList.contains('hidden') ? '펼치기' : '접기'; };
 function openPlayerMenu(id, name, x, y) {
   const m = $('#playerMenu'); m.innerHTML = '';

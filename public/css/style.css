@@ -673,3 +673,7 @@ body.mobile #login .cpanels { min-height: 160px; }
 .limit-tag { margin-left: 8px; font-size: 12px; font-weight: 700; color: #ffe9a8; opacity: .85; vertical-align: middle; white-space: nowrap; }
 .limit-tag:empty { display: none; }
 .limit-tag.over { color: #ff6a5a; }
+/* 모바일 외치기 버튼: 조금 작게, 오른쪽 아이콘 줄과 겹치지 않게 왼쪽으로 (미니맵 왼쪽 끝은 넘지 않는다) */
+body.mobile .abtn.shout { width: 46px; height: 46px; font-size: 17px; right: 56px; }
+body.mobile .abtn.shout small { font-size: 9px; }
+@media (orientation: landscape) and (max-height: 500px) { body.mobile .abtn.shout { right: 89px; } }
