@@ -187,7 +187,7 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPrefere
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.15;
+renderer.toneMappingExposure = 1.32;
 renderer.shadowMap.enabled = false; // 그림자 효과 끔 (눈부심·무거움)
 THREE.Texture.DEFAULT_ANISOTROPY = Math.min(16, renderer.capabilities.getMaxAnisotropy()); // 비스듬히 보이는 바닥·벽 무늬도 선명하게
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -265,7 +265,7 @@ function enterLobby(pos) {
   $('#objective').classList.add('hidden');
   $('#lookBtn').classList.remove('hidden');
   audio.ambient('lobby');
-  renderer.toneMappingExposure = 1.15;
+  renderer.toneMappingExposure = 1.32;
   renderParty();
 }
 function enterChapter(state, showIntro = true) {
@@ -1641,8 +1641,8 @@ function renderChatFilter() {
 socket.on('chat', addChat);
 
 // ─────────────────────────── 파티 & 접속자
-socket.on('roster', (list) => { S.roster = list; renderRoster(); });
-socket.on('party', (p) => { S.party = p; renderParty(); if (p && p.leader === S.me && !p.instId && (!p.pick || p.pick.n !== p.members.length)) sendPick(); renderRoster(); voice.setParty(p ? p.members.map((m) => m.id) : []); });
+socket.on('roster', (list) => { S.roster = list; renderRoster(); updateVoiceTargets(); });
+socket.on('party', (p) => { S.party = p; renderParty(); if (p && p.leader === S.me && !p.instId && (!p.pick || p.pick.n !== p.members.length)) sendPick(); renderRoster(); updateVoiceTargets(); });
 socket.on('party:invite', ({ partyId, from }) => {
   audio.play('bell');
   $('#inviteText').textContent = `📨 ${from} 님이 파티에 초대했습니다.`;
@@ -1893,12 +1893,31 @@ const voice = new Voice(socket, {
   onLevel: (id, lv) => { const m = document.querySelector(`.mic[data-id="${id}"]`); if (m) m.classList.toggle('speak', lv > 0.06); },
   onError: (msg) => toast('🎙️ ' + msg),
 });
-$('#micBtn').onclick = async () => {
-  if (!S.party || S.party.members.length < 2) toast('음성 채팅은 파티원끼리만 연결됩니다. (지금은 마이크만 켜 둡니다)');
-  const on = await voice.toggleMic();
-  $('#micBtn').textContent = on ? '🎙️ 마이크 켜짐' : '🎙️ 마이크 꺼짐';
-  $('#micBtn').classList.toggle('primary', on);
-};
+// 듣기 범위: 'party' 파티원만 · 'all' 같은 곳(로비 · 같은 게임)의 모두
+S.voiceMode = store.get('gwimun-voice', 'party');
+function updateVoiceTargets() {
+  const ids = new Set((S.party?.members || []).map((m) => m.id));
+  if (S.voiceMode === 'all') {
+    const mine = S.roster?.find((r) => r.id === S.me)?.room;
+    if (mine) (S.roster || []).filter((r) => r.room === mine && r.id !== S.me).slice(0, 10).forEach((r) => ids.add(r.id));
+  }
+  voice.setTargets([...ids]);
+}
+function setVoiceMode(m) { S.voiceMode = m; store.set('gwimun-voice', m); updateVoiceTargets(); renderVoiceUI(); toast(m === 'all' ? '🔊 이제 같은 곳에 있는 모두의 목소리가 들려요' : '🔊 이제 파티원 목소리만 들려요'); }
+function renderVoiceUI() {
+  const on = voice.micOn;
+  $('#micBtn').textContent = on ? '🎙️ 마이크 켜짐' : '🎙️ 마이크 꺼짐'; $('#micBtn').classList.toggle('primary', on);
+  const vm = $('#voiceModeBtn'); if (vm) vm.textContent = S.voiceMode === 'all' ? '🔊 듣기: 전체' : '🔊 듣기: 파티';
+  const mb = document.querySelector('.abtn.mic'); if (mb) { mb.classList.toggle('on', on); mb.querySelector('small').textContent = S.voiceMode === 'all' ? '전체' : '파티'; }
+  const vp = $('#voicePanel'); if (vp) { vp.querySelector('.vp-mic').textContent = on ? '🎙️ 마이크 끄기' : '🎙️ 마이크 켜기'; vp.querySelector('.vp-mic').classList.toggle('primary', on); vp.querySelectorAll('.vp-mode').forEach((b) => b.classList.toggle('primary', b.dataset.m === S.voiceMode)); }
+}
+async function toggleMicUI() {
+  if (S.voiceMode === 'party' && (!S.party || S.party.members.length < 2)) toast('지금은 파티원 목소리만 들리는 설정이에요. 로비의 모두와 말하려면 듣기를 "전체"로 바꾸세요.');
+  await voice.toggleMic();
+  renderVoiceUI();
+}
+$('#micBtn').onclick = toggleMicUI;
+$('#voiceModeBtn').onclick = () => setVoiceMode(S.voiceMode === 'all' ? 'party' : 'all');
 
 // ─────────────────────────── 설정
 function saveSettings() {
@@ -2080,7 +2099,7 @@ applyMobile(); addEventListener('resize', applyMobile);
   const panels = { party: '#partyPanel', share: '#sharePanel', roster: '#rosterPanel', chat: '#chat' };
   const btns = [
     ['party', '👥', '파티'], ['chat', '💬', '채팅'], ['roster', '🧑‍🤝‍🧑', '접속자'], ['share', '🔗', '초대 주소'],
-    ['rank', '🏆', '랭킹'], ['emote', '😀', '감정표현'], ['settings', '⚙', '설정 · 지도 · 옷 · 도움말'], ['coffee', '☕', '커피 한 잔 후원하기'],
+    ['rank', '🏆', '랭킹'], ['settings', '⚙', '설정 · 지도 · 옷 · 도움말'], ['coffee', '☕', '커피 한 잔 후원하기'],
   ];
   let open = null;
   const setOpen = (k) => {
@@ -2131,6 +2150,13 @@ applyMobile(); addEventListener('resize', applyMobile);
   const act = el('div'); act.id = 'mact';
   const abtn = (cls, html, fn) => { const b = el('button', 'abtn ' + cls); b.innerHTML = html; b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); fn(); }); act.appendChild(b); return b; };
   const useBtn = abtn('use hidden', '✋<small>조사</small>', () => { if (S.nearest) interact(S.nearest); });
+  abtn('emote', '😀', () => { $('#voicePanel')?.classList.add('hidden'); toggleEmotePanel(); });
+  abtn('mic', '🎙️<small>파티</small>', () => { $('#emotePanel').classList.add('hidden'); $('#voicePanel').classList.toggle('hidden'); renderVoiceUI(); });
+  const vp = el('div', 'hidden'); vp.id = 'voicePanel';
+  vp.innerHTML = `<button class="btn vp-mic">🎙️ 마이크 켜기</button><div class="vp-label">듣기</div><div class="vp-modes"><button class="btn vp-mode" data-m="all">🔊 전체</button><button class="btn vp-mode" data-m="party">👥 파티</button></div><div class="vp-tip">전체: 같은 곳에 있는 모두와 대화 · 파티: 파티원끼리만</div>`;
+  vp.querySelector('.vp-mic').onclick = (e) => { e.stopPropagation(); toggleMicUI(); };
+  vp.querySelectorAll('.vp-mode').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); setVoiceMode(b.dataset.m); }));
+  hud.appendChild(vp);
   const lightBtn = abtn('light', '🔦', () => { if (S.inv?.includes('flashlight')) useItem('flashlight'); else toast('손전등이 없다.'); });
   abtn('jump', '⤴', () => doEmote('jump'));
   const runBtn = abtn('run', '🏃', () => { S.mRun = !S.mRun; runBtn.classList.toggle('on', S.mRun); if (S.mRun) { S.mSneak = false; snBtn.classList.remove('on'); } });
@@ -2138,6 +2164,7 @@ applyMobile(); addEventListener('resize', applyMobile);
   snBtn = abtn('sneak', '🤫', () => { S.mSneak = !S.mSneak; if (S.mSneak) { S.mRun = false; runBtn.classList.remove('on'); } snBtn.classList.toggle('on', S.mSneak); });
   abtn('shout', '📢<small>외치기</small>', () => sendCallout());
   hud.appendChild(act);
+  renderVoiceUI();
   setInterval(() => {
     const show = !!S.nearest && !S.modalOpen && !S.storyOpen;
     useBtn.classList.toggle('hidden', !show);

@@ -17,11 +17,14 @@ export class Voice {
     setInterval(() => this.meter(), 120);
   }
 
-  setParty(memberIds) {
-    const want = new Set(memberIds.filter((id) => id !== this.myId));
+  // 들을 상대 목록 (파티원만 · 또는 같은 곳의 모두). 서로 상대를 원할 때만 연결된다
+  setTargets(ids) {
+    const want = new Set(ids.filter((id) => id && id !== this.myId));
+    this.want = want;
     for (const id of [...this.peers.keys()]) if (!want.has(id)) this.drop(id);
-    for (const id of want) if (!this.peers.has(id) && this.myId < id) this.connect(id, true);
+    for (const id of want) if (!this.peers.has(id)) { if (this.myId < id) this.connect(id, true); else this.send(id, { hello: true }); }
   }
+  setParty(memberIds) { this.setTargets(memberIds); }
 
   makePeer(id) {
     const pc = new RTCPeerConnection({ iceServers: ICE });
@@ -50,6 +53,8 @@ export class Voice {
   }
 
   async handle({ from, data }) {
+    if (!this.want?.has(from)) return; // 내가 듣지 않기로 한 사람은 연결하지 않는다
+    if (data.hello) { if (!this.peers.has(from) && this.myId < from) this.connect(from, true); return; }
     try {
       let peer = this.peers.get(from);
       if (data.description) {

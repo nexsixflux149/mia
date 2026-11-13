@@ -58,7 +58,7 @@ const invites = new Map();   // targetId -> Set(partyId)
 let seq = 1;
 
 const pub = (p) => ({ id: p.id, name: p.name, lv: p.lv, x: p.x, z: p.z, y: p.y || 0, ry: p.ry, anim: p.anim, crouch: p.crouch ? 1 : 0, light: p.light, partyId: p.partyId, em: p.em || '', eid: p.eid || 0, ride: p.room === 'lobby' ? p.ride || '' : '' });
-const lobbyList = () => [...players.values()].map((p) => ({ id: p.id, name: p.name, partyId: p.partyId, inGame: p.room !== 'lobby', hearts: hearts[p.name] || 0 }));
+const lobbyList = () => [...players.values()].map((p) => ({ id: p.id, name: p.name, partyId: p.partyId, inGame: p.room !== 'lobby', room: p.room || '', hearts: hearts[p.name] || 0 }));
 const broadcastRoster = () => io.emit('roster', lobbyList());
 
 function partyInfo(party) {
@@ -417,7 +417,9 @@ io.on('connection', (sock) => {
   // ───── 음성 (파티원끼리 WebRTC 신호 중계)
   sock.on('voice:signal', ({ to, data }) => {
     const t = players.get(to);
-    if (!me || !t || !me.partyId || t.partyId !== me.partyId) return;
+    if (!me || !t) return;
+    const sameParty = me.partyId && t.partyId === me.partyId, sameRoom = me.room && t.room === me.room; // '전체 듣기'는 같은 곳(로비·같은 게임)에 있는 사람끼리
+    if (!sameParty && !sameRoom) return;
     io.to(to).emit('voice:signal', { from: me.id, data });
   });
   sock.on('voice:mic', (on) => {
