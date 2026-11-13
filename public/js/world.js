@@ -548,8 +548,8 @@ export function buildLobby(scene) {
     c.userData.ph = Math.random() * 6; clouds.add(c);
   }
 
-  const hemi = new THREE.HemisphereLight('#8a90c8', '#2a1c20', 1.5); root.add(hemi);
-  const sun = new THREE.DirectionalLight('#c89aaa', 1.15); sun.position.set(-30, 42, -60); // 붉은 달빛
+  const hemi = new THREE.HemisphereLight('#9aa0d4', '#3a2a2c', 1.95); root.add(hemi);
+  const sun = new THREE.DirectionalLight('#d0a8b4', 1.45); sun.position.set(-30, 42, -60); // 붉은 달빛
   root.add(sun);
 
   const gt = groundTex('#3a4a32', 0.12); gt.repeat.set(18, 18);
@@ -845,9 +845,9 @@ export function buildChapter(scene, ch, themeId = 'gwimun') {
   scene.fog = new THREE.FogExp2(fogCol.clone(), ch.fog || 0.06);
 
   const amb = {
-    night: ['#5a6a96', '#141418', 1.0], dark: ['#4a4a5c', '#101010', 0.4],
-    candle: ['#7a3828', '#100808', 0.45], dusk: ['#a8a0c8', '#2a2420', 1.9], shop: ['#c8a080', '#241810', 1.3], abyss: ['#3a3a4c', '#080808', 0.3],
-  }[ch.ambient] || ['#333', '#000', 0.2];
+    night: ['#5a6a96', '#141418', 1.15], dark: ['#4a4a5c', '#101010', 0.62],
+    candle: ['#7a3828', '#100808', 0.66], dusk: ['#a8a0c8', '#2a2420', 1.9], shop: ['#c8a080', '#241810', 1.3], abyss: ['#3a3a4c', '#080808', 0.48],
+  }[ch.ambient] || ['#3a3a40', '#000', 0.4];
   // 테마 색으로 은은하게 물들인 환경광 (밝기는 그대로)
   const skyC = new THREE.Color(amb[0]).lerp(new THREE.Color(TH.tint), 0.35), gndC = new THREE.Color(amb[1]).lerp(new THREE.Color(TH.tint).multiplyScalar(0.2), 0.3);
   root.add(new THREE.HemisphereLight(skyC, gndC, amb[2]));

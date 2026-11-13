@@ -187,7 +187,7 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPrefere
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.32;
+renderer.toneMappingExposure = 1.5;
 renderer.shadowMap.enabled = false; // 그림자 효과 끔 (눈부심·무거움)
 THREE.Texture.DEFAULT_ANISOTROPY = Math.min(16, renderer.capabilities.getMaxAnisotropy()); // 비스듬히 보이는 바닥·벽 무늬도 선명하게
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -265,7 +265,7 @@ function enterLobby(pos) {
   $('#objective').classList.add('hidden');
   $('#lookBtn').classList.remove('hidden');
   audio.ambient('lobby');
-  renderer.toneMappingExposure = 1.32;
+  renderer.toneMappingExposure = 1.5;
   renderParty();
 }
 function enterChapter(state, showIntro = true) {
@@ -279,7 +279,7 @@ function enterChapter(state, showIntro = true) {
   S.world = buildChapter(scene, ch, S.scenario?.id);
   S.objState = state.objects; S.dark = state.dark;
   me.x = ch.spawn[0] + (Math.random() - 0.5); me.z = ch.spawn[1];
-  me.ry = Math.PI; cam.yaw = 0;
+  me.ry = Math.PI; cam.yaw = bestOpenYaw(); // 시작 지점이 벽에 붙어 있으면 카메라가 머리 속으로 파고들지 않게 가장 트인 쪽에서 비춘다
   S.moveTarget = null; S.pendingInteract = null;
   removeGhost(); clearOthers(); clearPings();
   $('#placeTitle').textContent = ch.title;
@@ -289,7 +289,7 @@ function enterChapter(state, showIntro = true) {
   setObjective(state.objective, state.relics);
   applyObjState(); applyDark();
   audio.ambient({ gwimun: ch.rain ? 'rain' : 'gwimun', ophelia: 'ship', doll: 'doll', hospital: 'hospital', camp: 'camp', west: 'west', kimono: 'kimono', clown: 'clown', park: 'park', mia: 'mia' }[S.scenario?.id] || 'horror');
-  renderer.toneMappingExposure = 1.7;
+  renderer.toneMappingExposure = 1.82;
   if (showIntro && ch.intro) { queueStory({ ...ch.intro, sound: 'story' }); addJournal(ch.intro.title, ch.intro.text, 'story'); }
   if (!document.body.classList.contains('mobile') && !store.get('gwimun-tutorial', false)) { store.set('gwimun-tutorial', true); setTimeout(() => toast('팁: F 손전등 · C 웅크리기(귀신에게 덜 들킴) · G 위치 찍기 · J 수첩'), 4000); }
   renderParty();
@@ -666,6 +666,19 @@ function updateOccluders(dt, tx, ty, tz) {
 }
 const camGoal = new THREE.Vector3(); const camTarget = new THREE.Vector3(); const camDir = new THREE.Vector3();
 // 벽에 걸린 카메라를 벽 안쪽으로. 벽에 바짝 붙어 있으면 머리 위에서 내려다보게 한다
+// 캐릭터 둘레 여러 방향으로 벽까지 거리를 재서, 카메라가 가장 멀리 물러날 수 있는 방향(yaw)을 고른다 (뒤쪽 = 0 을 우선)
+function bestOpenYaw() {
+  const walls = S.world?.walls; if (!walls?.length) return 0;
+  const from = new THREE.Vector3(me.x, 1.6, me.z); const want = Math.cos(cam.pitch) * cam.dist; let best = 0, bestD = -1;
+  for (let i = 0; i < 16; i++) {
+    const yaw = i % 2 ? Math.ceil(i / 2) * (Math.PI / 8) : -(i / 2) * (Math.PI / 8); // 0, +22.5°, -22.5°, +45° … 뒤쪽에 가까운 방향부터
+    camRay.set(from, new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw))); camRay.far = want;
+    const h = camRay.intersectObjects(walls, false)[0]; const d = h ? h.distance : want;
+    if (d > bestD + 0.5) { best = yaw; bestD = d; }
+    if (d >= want) break;
+  }
+  return best;
+}
 function wallPull(out, from, dir, hitDist, ty) {
   const d = hitDist - 0.4;
   if (d >= 0.9) { out.copy(from).addScaledVector(dir, d); return; }
@@ -1908,7 +1921,7 @@ function renderVoiceUI() {
   const on = voice.micOn;
   $('#micBtn').textContent = on ? '🎙️ 마이크 켜짐' : '🎙️ 마이크 꺼짐'; $('#micBtn').classList.toggle('primary', on);
   const vm = $('#voiceModeBtn'); if (vm) vm.textContent = S.voiceMode === 'all' ? '🔊 듣기: 전체' : '🔊 듣기: 파티';
-  const mb = document.querySelector('.abtn.mic'); if (mb) { mb.classList.toggle('on', on); mb.querySelector('small').textContent = S.voiceMode === 'all' ? '전체' : '파티'; }
+  const mb = document.querySelector('.abtn.mic'); if (mb) { mb.classList.toggle('on', on); mb.title = S.voiceMode === 'all' ? '마이크 · 듣기: 전체' : '마이크 · 듣기: 파티'; }
   const vp = $('#voicePanel'); if (vp) { vp.querySelector('.vp-mic').textContent = on ? '🎙️ 마이크 끄기' : '🎙️ 마이크 켜기'; vp.querySelector('.vp-mic').classList.toggle('primary', on); vp.querySelectorAll('.vp-mode').forEach((b) => b.classList.toggle('primary', b.dataset.m === S.voiceMode)); }
 }
 async function toggleMicUI() {
@@ -2151,7 +2164,7 @@ applyMobile(); addEventListener('resize', applyMobile);
   const abtn = (cls, html, fn) => { const b = el('button', 'abtn ' + cls); b.innerHTML = html; b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); fn(); }); act.appendChild(b); return b; };
   const useBtn = abtn('use hidden', '✋<small>조사</small>', () => { if (S.nearest) interact(S.nearest); });
   abtn('emote', '😀', () => { $('#voicePanel')?.classList.add('hidden'); toggleEmotePanel(); });
-  abtn('mic', '🎙️<small>파티</small>', () => { $('#emotePanel').classList.add('hidden'); $('#voicePanel').classList.toggle('hidden'); renderVoiceUI(); });
+  abtn('mic', '🎙️', () => { $('#emotePanel').classList.add('hidden'); $('#voicePanel').classList.toggle('hidden'); renderVoiceUI(); });
   const vp = el('div', 'hidden'); vp.id = 'voicePanel';
   vp.innerHTML = `<button class="btn vp-mic">🎙️ 마이크 켜기</button><div class="vp-label">듣기</div><div class="vp-modes"><button class="btn vp-mode" data-m="all">🔊 전체</button><button class="btn vp-mode" data-m="party">👥 파티</button></div><div class="vp-tip">전체: 같은 곳에 있는 모두와 대화 · 파티: 파티원끼리만</div>`;
   vp.querySelector('.vp-mic').onclick = (e) => { e.stopPropagation(); toggleMicUI(); };
