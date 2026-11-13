@@ -3,8 +3,8 @@
 // 비밀번호는 이 컴퓨터의 .env.local 의 ADMIN_PASSWORD 에 적혀 있다 (git 에 올라가지 않음).
 // 서버 환경변수 ADMIN_PASSWORD 를 넣으면 그 값이 우선한다.
 import { scryptSync, timingSafeEqual } from 'node:crypto';
-const SALT = 'c8e70e8d7c80e3144a124fffc899e226';
-const HASH = Buffer.from('e5c3c432de6f4be1ce7e0a8596c3dfa85f071363a4b4136711e6ccb6a91ca8c2', 'hex');
+const SALT = 'ba2648d96cdd8addb8024108b457e574';
+const HASH = Buffer.from('1b43bca133aff8a05d8231ad0a2b9720592645764aa309344dec51e2e8ac4124', 'hex');
 export const ADMIN_NAME = '운영자';
 export function isAdminPassword(pw) {
   pw = String(pw || '');

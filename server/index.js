@@ -53,6 +53,7 @@ const players = new Map();   // socket.id -> player
 // 채팅 욕설 경고: 닉네임별로 기억해 다시 접속해도 이어진다 (5번이면 5분 채팅 금지)
 const CHAT_WARN_MAX = 5, CHAT_MUTE_MS = 5 * 60 * 1000;
 const chatPenalty = new Map(); // name -> { warns, muteUntil }
+const adminFails = new Map(); // ip -> { n, t } 운영자 비밀번호 틀린 횟수
 const parties = new Map();   // partyId -> {id, leader, members:[]}
 const instances = new Map(); // instId -> GameInstance
 const invites = new Map();   // targetId -> Set(partyId)
@@ -127,8 +128,12 @@ io.on('connection', (sock) => {
     // 운영자 로그인: 비밀번호가 맞으면 '운영자' 닉네임으로 입장 (틀리면 5번까지만 시도 가능)
     let asAdmin = false;
     if (admin) {
+      // 비밀번호 맞히기 공격 막기: 접속마다 5번, 같은 IP 는 10분에 10번까지만
+      const ip = String(sock.handshake.headers['x-forwarded-for'] || sock.handshake.address || '').split(',')[0].trim();
+      const f = adminFails.get(ip) || { n: 0, t: Date.now() }; if (Date.now() - f.t > 10 * 60 * 1000) { f.n = 0; f.t = Date.now(); }
       sock.data.adminTries = (sock.data.adminTries || 0) + 1;
-      if (sock.data.adminTries > 5 || !isAdminPassword(admin)) return ack?.({ error: 'badadmin', message: '운영자 비밀번호가 맞지 않아요.' });
+      if (f.n >= 10 || sock.data.adminTries > 5) return ack?.({ error: 'badadmin', message: '비밀번호를 너무 많이 틀렸어요. 10분 뒤에 다시 시도하세요.' });
+      if (!isAdminPassword(admin)) { f.n++; adminFails.set(ip, f); return ack?.({ error: 'badadmin', message: '운영자 비밀번호가 맞지 않아요.' }); }
       asAdmin = true; name = ADMIN_NAME; resume = null;
     }
     // 모바일에서 앱 전환 등으로 연결이 끊겼다 다시 붙으면, 같은 플레이어로 이어서 한다
