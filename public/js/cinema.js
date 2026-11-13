@@ -348,11 +348,43 @@ export class Cinema {
       this.wardNurse.position.set(12, 0, 0); this.wardNurse.rotation.y = -Math.PI / 2; g.add(this.wardNurse);
       this.wardCrew = (looks.length ? looks : [{}]).slice(0, 4).map((l, i) => { const a = createAvatar(l); a.position.set(-13 + i * 0.9, 0, (i % 2) * 0.8 - 0.4); a.rotation.y = Math.PI / 2; g.add(a); return a; });
       g.add(new THREE.HemisphereLight('#8a9a9a', '#101010', 0.5));
+      // 화재: 침대마다 일렁이는 불꽃 + 위로 피어오르는 검은 연기·재 먼지 + 불티 (불 나는 장면에서만 보인다)
+      const fire = new THREE.Group(); fire.visible = false; g.add(fire);
+      const fc = document.createElement('canvas'); fc.width = 64; fc.height = 128; const fx = fc.getContext('2d');
+      const fg = fx.createRadialGradient(32, 96, 2, 32, 80, 60); fg.addColorStop(0, 'rgba(255,250,210,1)'); fg.addColorStop(0.3, 'rgba(255,170,60,.95)'); fg.addColorStop(0.65, 'rgba(255,70,10,.55)'); fg.addColorStop(1, 'rgba(90,0,0,0)');
+      fx.fillStyle = fg; fx.beginPath(); fx.moveTo(32, 2); fx.bezierCurveTo(60, 50, 62, 90, 32, 126); fx.bezierCurveTo(2, 90, 4, 50, 32, 2); fx.fill();
+      const flameT = new THREE.CanvasTexture(fc); flameT.colorSpace = THREE.SRGBColorSpace;
+      const sc2 = document.createElement('canvas'); sc2.width = sc2.height = 64; const sx = sc2.getContext('2d');
+      const sg = sx.createRadialGradient(32, 32, 0, 32, 32, 32); sg.addColorStop(0, 'rgba(255,255,255,.9)'); sg.addColorStop(0.5, 'rgba(255,255,255,.35)'); sg.addColorStop(1, 'rgba(255,255,255,0)');
+      sx.fillStyle = sg; sx.fillRect(0, 0, 64, 64); const puffT = new THREE.CanvasTexture(sc2);
+      const flames = [];
+      for (let i = 0; i < 5; i++) for (let k = 0; k < 6; k++) {
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: flameT, color: k < 2 ? '#fff0c0' : '#ff9a40', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+        sp.position.set(-10 + i * 5 + (Math.random() - 0.5) * 1.8, 0.9, -2 + (Math.random() - 0.5) * 1.0); sp.userData = { ph: Math.random() * 6, h: 1.1 + Math.random() * 1.2, base: sp.position.clone() }; fire.add(sp); flames.push(sp);
+      }
+      const mkPts = (n, color, size, additive, spread) => {
+        const geo = new THREE.BufferGeometry(); const pos = new Float32Array(n * 3); const seed = [];
+        for (let i = 0; i < n; i++) { const bx = -10 + (i % 5) * 5 + (Math.random() - 0.5) * spread; seed.push([bx, -2 + (Math.random() - 0.5) * 1.6, Math.random(), 0.4 + Math.random() * 0.8, Math.random() * 6]); }
+        geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        const pts = new THREE.Points(geo, new THREE.PointsMaterial({ map: puffT, color, size, transparent: true, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending, opacity: additive ? 1 : 0.55 }));
+        pts.frustumCulled = false; fire.add(pts); return { pts, pos, seed, n };
+      };
+      const smoke = mkPts(220, '#2a2220', 1.6, false, 2.4), dust = mkPts(260, '#8a6a50', 0.35, false, 3.2), embers = mkPts(160, '#ffb050', 0.12, true, 2.2);
+      const glow = new THREE.PointLight('#ff6a1a', 0, 26, 1.2); glow.position.set(0, 1.5, -1.5); fire.add(glow);
+      this.wardFire = fire;
+      this.wardFireUpdate = (t) => {
+        flames.forEach((f) => { const u = f.userData; const k = 0.8 + Math.sin(t * 9 + u.ph) * 0.15 + Math.sin(t * 21 + u.ph * 3) * 0.07; f.scale.set(0.9 * k, u.h * k, 1); f.position.set(u.base.x + Math.sin(t * 3 + u.ph) * 0.06, 0.55 + (u.h * k) / 2, u.base.z); f.material.rotation = Math.sin(t * 2.5 + u.ph) * 0.15; });
+        const flow = (P, rise, sway, top, grow) => { for (let i = 0; i < P.n; i++) { const [bx, bz, r, sp, ph] = P.seed[i]; const k = (t * sp * rise + r) % 1; P.pos[i * 3] = bx + Math.sin(ph + t * 0.7 + k * 3) * sway * (0.4 + k); P.pos[i * 3 + 1] = 0.8 + k * top; P.pos[i * 3 + 2] = bz + Math.cos(ph + t * 0.6) * sway * k + k * grow; } P.pts.geometry.attributes.position.needsUpdate = true; };
+        flow(smoke, 0.18, 1.2, 3.4, 0.8); flow(dust, 0.32, 0.9, 3.6, 1.2); flow(embers, 0.6, 0.5, 3.8, 0.4);
+        smoke.pts.material.size = 1.6 + Math.sin(t * 0.8) * 0.2; embers.pts.material.opacity = 0.7 + Math.random() * 0.3;
+        glow.intensity = 60 + Math.sin(t * 11) * 14 + Math.random() * 12;
+      };
     });
   }
   hospShots(kind, looks) {
     const A = () => this.audio;
     this.buildWard(looks);
+    if (this.wardFire) this.wardFire.visible = false;
     const blink = (c, t, rate = 1) => c.wardLights.forEach((l, i) => (l.intensity = Math.random() < 0.08 * rate ? 0 : 4 - (i * 0.3)));
     if (kind === 'hosp_intro') {
       return [
@@ -360,8 +392,8 @@ export class Cinema {
           update: (c, t, k, dt) => { blink(c, t, 2); c.wardCrew.forEach((a) => { a.position.x += dt * 0.6; animateAvatar(a, dt, true, t); }); c.look(1600 - 16 + k * 4, 1.8, 3.5, 1600 - 8 + k * 6, 1.2, 0); } },
         { dur: 10, sepia: true, caption: "1994년 12월 24일, 성탄 전야.\n원장은 7병동 환자 다섯에게 '수면 치료'를 지시했다.", setup: (c) => { c.show('ward'); c.scene.background = new THREE.Color('#d8c8a8'); c.scene.fog = new THREE.Fog('#d8c8a8', 10, 40); c.wardCrew.forEach((a) => (a.visible = false)); c.wardNurse.position.x = 12; A()?.ambient(null); A()?.play('bell'); },
           update: (c, t, k, dt) => { c.wardLights.forEach((l) => (l.intensity = 4)); c.wardNurse.position.set(12 - t * 1.2, 0, -0.6); animateAvatar(c.wardNurse, dt, true, t); c.look(1600 - 7, 1.8, 2.2, 1600 + c.wardNurse.position.x, 1.2, -0.6); } },
-        { dur: 8, caption: '병실 문은 밖에서 잠겼다.\n그리고 밤 11시 40분, 불이 났다.', capAt: 1.2, setup: (c) => { c.show('ward'); c.scene.background = new THREE.Color('#1a0604'); c.scene.fog = new THREE.FogExp2('#2a0a04', 0.09); c.wardNurse.visible = false; A()?.play(c.fear >= 2 ? 'scream' : 'whisper'); },
-          update: (c, t, k) => { c.wardLights.forEach((l) => { l.color.set('#ff5a1a'); l.intensity = 3 + Math.random() * 4; }); c.wardChair.rotation.y = Math.PI / 2 + Math.sin(t * 2) * 0.2; c.look(1600 - 4 + k * 3, 2.4, 2.4, 1600 + 2, 0.8, -1.5); } },
+        { dur: 8, caption: '병실 문은 밖에서 잠겼다.\n그리고 밤 11시 40분, 불이 났다.', capAt: 1.2, setup: (c) => { c.show('ward'); c.scene.background = new THREE.Color('#1a0604'); c.scene.fog = new THREE.FogExp2('#2a0a04', 0.07); c.wardNurse.visible = false; c.wardFire.visible = true; A()?.play(c.fear >= 2 ? 'scream' : 'whisper'); A()?.play('wind'); },
+          update: (c, t, k) => { c.wardFireUpdate(t); c.wardLights.forEach((l) => { l.color.set('#ff5a1a'); l.intensity = 3 + Math.random() * 4; }); c.wardChair.rotation.y = Math.PI / 2 + Math.sin(t * 2) * 0.2; c.look(1600 - 4 + k * 3, 2.4, 2.4, 1600 + 2, 0.8, -1.5); } },
         { dur: 5, setup: (c) => { c.show(); c.scene.background = new THREE.Color('#000'); c.title('백야 요양병원', '— 7병동의 밤 —'); A()?.play(c.fear >= 2 ? 'sting' : 'bell'); } },
       ];
     }
@@ -682,6 +714,67 @@ export class Cinema {
   look(x, y, z, tx, ty, tz) { this.cam.position.set(x, y, z); this.cam.lookAt(tx, ty, tz); }
   night(fog = 0.035, color = '#05070b') { this.scene.background = new THREE.Color(color); this.scene.fog = new THREE.FogExp2(color, fog); }
 
+  // ── 히든: 데드 시티 (무너진 도시 · 백화점 옥상 · 구조 헬기)
+  buildCity(looks) {
+    return this.set('city', (g) => {
+      g.position.set(0, 0, -4000);
+      const road = new THREE.Mesh(new THREE.PlaneGeometry(60, 90), new THREE.MeshStandardMaterial({ color: '#2a2a2e', roughness: 0.9 })); road.rotation.x = -Math.PI / 2; g.add(road);
+      for (let i = 0; i < 9; i++) { const ln = new THREE.Mesh(new THREE.PlaneGeometry(0.25, 3), new THREE.MeshBasicMaterial({ color: '#d8d0a0' })); ln.rotation.x = -Math.PI / 2; ln.position.set(0, 0.01, -30 + i * 7); g.add(ln); }
+      // 빌딩 숲: 창문 몇 개만 불이 켜져 있다
+      const winTex = (() => { const c = document.createElement('canvas'); c.width = 64; c.height = 128; const x = c.getContext('2d'); x.fillStyle = '#1a1c22'; x.fillRect(0, 0, 64, 128); for (let r = 0; r < 16; r++) for (let k = 0; k < 4; k++) { x.fillStyle = Math.random() < 0.12 ? '#ffd890' : Math.random() < 0.5 ? '#0c0e12' : '#22262e'; x.fillRect(4 + k * 15, 4 + r * 7.8, 10, 5); } const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+      for (const sx of [-1, 1]) for (let i = 0; i < 6; i++) { const h = 14 + ((i * 7 + (sx > 0 ? 3 : 0)) % 5) * 6; const b = new THREE.Mesh(new THREE.BoxGeometry(9, h, 10), new THREE.MeshStandardMaterial({ map: winTex, roughness: 0.8, emissive: '#ffffff', emissiveMap: winTex, emissiveIntensity: 0.5 })); b.position.set(sx * 15, h / 2, -32 + i * 12); g.add(b); }
+      // 백화점 (정면 끝) + 옥상 헬리포트 + 붉은 항공등
+      const store = new THREE.Mesh(new THREE.BoxGeometry(30, 26, 14), new THREE.MeshStandardMaterial({ map: winTex, color: '#c8c0b8', roughness: 0.7, emissive: '#ffffff', emissiveMap: winTex, emissiveIntensity: 0.35 })); store.position.set(0, 13, -44); g.add(store);
+      const sign = new THREE.Mesh(new THREE.BoxGeometry(14, 2, 0.3), new THREE.MeshStandardMaterial({ color: '#1a1a1a', emissive: '#ffcc66', emissiveIntensity: 0.9 })); sign.position.set(0, 20, -36.8); g.add(sign);
+      const pad = new THREE.Mesh(new THREE.CylinderGeometry(6, 6, 0.1, 32), new THREE.MeshStandardMaterial({ color: '#3a3a3e' })); pad.position.set(0, 26.06, -44); g.add(pad);
+      const hMark = new THREE.Mesh(new THREE.RingGeometry(4.2, 4.6, 32), new THREE.MeshBasicMaterial({ color: '#ffe066' })); hMark.rotation.x = -Math.PI / 2; hMark.position.set(0, 26.12, -44); g.add(hMark);
+      this.cityBeacon = new THREE.PointLight('#ff2020', 0, 30, 1.5); this.cityBeacon.position.set(12, 28, -38); g.add(this.cityBeacon);
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.4, 10, 8), new THREE.MeshBasicMaterial({ color: '#ff3030' })); bulb.position.copy(this.cityBeacon.position); g.add(bulb); this.cityBulb = bulb;
+      [[-6, -6, 20], [5, 2, -15], [-4, 10, 95], [7, -18, 10]].forEach(([x, z, r], i) => this.prop(g, { t: 'car', x, z, r, wreck: i % 2 === 0, taxi: i === 1 }));
+      this.prop(g, { t: 'bus', x: 8, z: 12, r: 70 }); this.prop(g, { t: 'barricade', x: -2, z: -24 }); this.prop(g, { t: 'barricade', x: 3, z: -25, r: 10 });
+      for (const [x, z] of [[-9, 14], [9, -6], [-9, -20]]) this.prop(g, { t: 'lamp', x, z });
+      this.cityZ = [[-3, -10], [4, -14], [-6, -18], [2, -6], [7, -20], [-1, -22]].map(([x, z]) => { const zb = createGhost('zombie'); zb.position.set(x, 0, z); zb.rotation.y = Math.random() * 6; g.add(zb); return zb; });
+      this.cityCrew = (looks.length ? looks : [{}]).slice(0, 4).map((l, i) => { const a = createAvatar(l); a.position.set(-1.6 + i * 1.1, 0, 22); a.rotation.y = Math.PI; g.add(a); return a; });
+      // 옥상 장면용: 헬기 · 하린 · 조종사
+      this.cityHeli = this.prop(g, { t: 'heli', x: 0, y: 26.1, z: -44, r: 90 });
+      this.cityKid = createAvatar({ outfit: 'plain', accent: '#ffd23a', hair: 'twintail', hairColor: '#2b1d16', ears: 'bunny', eyes: 'sparkle', mouth: 'open', body: '#ffe0cc' }); this.cityKid.scale.setScalar(0.75); g.add(this.cityKid);
+      this.cityPilot = createAvatar({ outfit: 'astronaut', accent: '#3a5a3a', hair: 'short', hairColor: '#1a1410', ears: 'none', eyes: 'closed', mouth: 'smile', body: '#f0d0b0' }); g.add(this.cityPilot);
+      this.cityRain = (() => { const n = 1400, geo = new THREE.BufferGeometry(), pos = new Float32Array(n * 3); for (let i = 0; i < n; i++) { pos[i * 3] = (Math.random() - 0.5) * 40; pos[i * 3 + 1] = 20 + Math.random() * 16; pos[i * 3 + 2] = -44 + (Math.random() - 0.5) * 40; } geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); const r = new THREE.Points(geo, new THREE.PointsMaterial({ color: '#a8c0d8', size: 0.08, transparent: true, opacity: 0.6 })); g.add(r); return r; })();
+      g.add(new THREE.HemisphereLight('#8a9ab8', '#2a2a24', 2.0));
+      const moon = new THREE.DirectionalLight('#b8c8e8', 1.6); moon.position.set(-20, 40, 10); g.add(moon);
+    });
+  }
+  zombieShots(kind, looks) {
+    const A = () => this.audio;
+    this.buildCity(looks);
+    const Z0 = -4000;
+    const spin = (c, t) => { for (const [r, ax, sp] of c.cityHeli.userData.rotors || []) r.rotation[ax] = t * sp; };
+    const blink = (c, t) => { const on = Math.sin(t * 5) > 0.3; c.cityBeacon.intensity = on ? 40 : 0; c.cityBulb.visible = on; };
+    const rain = (c, dt) => { const a = c.cityRain.geometry.attributes.position; for (let i = 0; i < a.count; i++) { let y = a.getY(i) - dt * 22; if (y < 26) y = 36 + Math.random() * 4; a.setY(i, y); } a.needsUpdate = true; };
+    if (kind === 'zombie_intro') return [
+      { dur: 9, caption: '2026년 11월 13일, 새벽 3시 50분. 한빛시.\n\'R-9\' 감염 사태 사흘째 — 도시에 산 사람이 보이지 않는다.', setup: (c) => { c.show('city'); c.night(0.016, '#0a0c12'); c.cityHeli.visible = false; c.cityKid.visible = false; c.cityPilot.visible = false; c.cityRain.visible = false; A()?.ambient('zombie'); },
+        update: (c, t, k, dt) => { blink(c, t); c.cityCrew.forEach((a) => { a.position.z = 22 - t * 0.9; animateAvatar(a, dt, true, t); }); c.cityZ.forEach((z, i) => { z.position.x += Math.sin(t * 0.3 + i) * dt * 0.3; animateGhost(z, dt, t, { mode: 'wander' }, 20); }); c.look(4 - k * 6, 3.2, Z0 + 30 - k * 4, 0, 4, Z0 - 20); } },
+      { dur: 8, caption: '"…여기는 구조 헬기 매-7.\n05시 정각, 그랜드 한빛 백화점 옥상 헬리포트. 마지막 비행이다."', capAt: 0.6, setup: (c) => { c.show('city'); c.night(0.012, '#0a0c12'); A()?.play('tune_static'); },
+        update: (c, t, k, dt) => { blink(c, t); c.cityZ.forEach((z) => animateGhost(z, dt, t, { mode: 'wander' }, 20)); c.look(0, 4 + k * 20, Z0 - 8 - k * 6, 0, 24, Z0 - 44); } },
+      { dur: 7, caption: '무전기 소리에 — 거리의 그것들이 일제히 고개를 들었다.', capAt: 1, setup: (c) => { c.show('city'); c.night(0.025, '#0a0c0a'); A()?.play(c.fear >= 2 ? 'zombie' : 'whisper'); },
+        update: (c, t, k, dt) => { c.cityZ.forEach((z, i) => { const dx = 0 - z.position.x, dz = 14 - z.position.z; const d = Math.hypot(dx, dz) || 1; z.position.x += (dx / d) * dt * 1.6; z.position.z += (dz / d) * dt * 1.6; z.rotation.y = Math.atan2(dx, dz); animateGhost(z, dt, t + i, { mode: 'hunt' }, 4); }); c.look(0.4, 1.6, Z0 + 16 - k * 1.5, 0, 1.4, Z0 - 6); if (t > 5 && c.fear >= 2 && !c._zs) { c._zs = 1; A()?.play('scream'); } } },
+      { dur: 5, setup: (c) => { c._zs = 0; c.show(); c.scene.background = new THREE.Color('#000'); c.title('데드 시티', '— 마지막 헬기 —'); A()?.play(c.fear >= 2 ? 'sting' : 'bell'); } },
+    ];
+    const roof = (c) => { c.show('city'); c.night(0.012, '#10141a'); c.cityRain.visible = true; c.cityHeli.visible = true; c.cityZ.forEach((z) => (z.visible = false)); c.cityCrew.forEach((a, i) => { a.visible = true; a.position.set(-3 + i * 1.2, 26.1, Z0 - 39); a.rotation.y = Math.PI; }); c.cityPilot.visible = true; c.cityPilot.position.set(2.4, 26.1, Z0 - 42); c.cityPilot.rotation.y = 0; A()?.ambient(null); };
+    if (kind === 'zombie_true') return [
+      { dur: 11, caption: '05시 00분. "하린아!" — "아빠!!"\n비에 젖은 조종사가 딸을 끌어안았다.', setup: (c) => { roof(c); c.cityKid.visible = true; c.cityKid.position.set(-1, 26.1, Z0 - 38); A()?.play('heli'); },
+        update: (c, t, k, dt) => { spin(c, t); rain(c, dt); const kz = Math.min(1, t / 3.5); c.cityKid.position.set(-1 + kz * 3.2, 26.1, Z0 - 38 - kz * 3.6); c.cityKid.rotation.y = Math.PI * 0.8; animateAvatar(c.cityKid, dt, t < 3.5, t, false, t > 3.5 ? 'heart' : null, t); animateAvatar(c.cityPilot, dt, false, t, false, t > 3.5 ? 'heart' : 'wave', t); c.cityCrew.forEach((a) => animateAvatar(a, dt, false, t, false, 'clap', t)); c.look(-6 + k * 2, 28.5, Z0 - 32, 0.5, 26.9, Z0 - 41); } },
+      { dur: 9, caption: '헬기가 떠오른다. 백신 샘플과 23명의 이름, 그리고 노란 리본을 싣고.', setup: (c) => { roof(c); c.cityCrew.forEach((a) => (a.visible = false)); c.cityKid.visible = false; c.cityPilot.visible = false; A()?.play('heli'); },
+        update: (c, t, k, dt) => { spin(c, t); rain(c, dt); c.cityHeli.position.y = 26.1 + k * k * 14; c.cityHeli.rotation.y = Math.PI / 2 + k * 0.4; c.look(-14, 30, Z0 - 20, 0, 28 + k * 10, Z0 - 44); } },
+      { dur: 5, setup: (c) => { c.show(); c.scene.background = new THREE.Color('#000'); c.title('마지막 헬기', '하린이와 함께 · 히든 테마 진 엔딩'); A()?.play('bell'); } },
+    ];
+    return [
+      { dur: 9, caption: '헬기는 05시 정각에 떠올랐다.\n창밖으로 옥상이 점점 작아진다.', setup: (c) => { roof(c); c.cityCrew.forEach((a) => (a.visible = false)); c.cityPilot.visible = false; c.cityKid.visible = true; c.cityKid.position.set(-9, 26.1, Z0 - 49); c.cityKid.rotation.y = 0.6; A()?.play('heli'); },
+        update: (c, t, k, dt) => { spin(c, t); rain(c, dt); c.cityHeli.position.y = 26.1 + k * k * 12; animateAvatar(c.cityKid, dt, false, t, false, 'wave', t); c.look(-12, 31 + k * 4, Z0 - 36, -8, 26.8, Z0 - 48); } },
+      { dur: 5, setup: (c) => { c.show(); c.scene.background = new THREE.Color('#000'); c.title('비 내리는 도시', '하린이의 흔적 일곱 가지를 모두 모으면, 다른 결말이…'); A()?.play('whisper'); } },
+    ];
+  }
+
   makeShots(kind, looks) {
     const A = () => this.audio;
     const walk = (a, dt, t) => animateAvatar(a, dt, true, t);
@@ -694,6 +787,7 @@ export class Cinema {
     if (kind.startsWith('clown')) return this.clownShots(kind, looks);
     if (kind.startsWith('park')) return this.parkShots(kind, looks);
     if (kind.startsWith('mia')) return this.miaShots(kind, looks);
+    if (kind.startsWith('zombie')) return this.zombieShots(kind, looks);
     if (kind === 'prologue') {
       this.buildRoad(); this.buildSchool(); this.buildCircle(); this.buildStop(looks);
       return [

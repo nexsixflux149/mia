@@ -245,9 +245,37 @@ Object.assign(ITEMS, {
   clown_relic_7: { name: '꼬마 단원 이름표', icon: '📛', use: null, relic: true, desc: '"한은별 — 사라지는 상자 담당". 뒤에 반쯤 탄 쪽지.' },
 });
 
+// ───── 히든 테마: 데드 시티
+Object.assign(ITEMS, {
+  fuse: { name: '예비 퓨즈', icon: '🔌', use: null, desc: '약국 두꺼비집에서 꺼낸 예비 퓨즈. 주차장 배전함에 맞는다.' },
+  battery: { name: 'AA 건전지', icon: '🔋', use: null, desc: '편의점 금고에 있던 새 건전지 두 개.' },
+  car_remote: { name: '택시 스마트키 (방전)', icon: '🔑', use: null, desc: '"한빛 개인택시 3157". 눌러도 반응이 없다. 건전지를 넣으면…' },
+  car_remote_on: { name: '택시 스마트키', icon: '🗝️', use: null, desc: '건전지를 끼운 스마트키. 불이 깜빡인다.' },
+  fuel_can: { name: '예비 기름통', icon: '⛽', use: null, desc: '택시 트렁크의 빨간 기름통. 발전기 하나는 돌릴 수 있다.' },
+  parking_ticket: { name: '주차권', icon: '🎫', use: 'read', desc: '구겨진 주차권.', read: `【 GRAND HANBIT 주차권 】
+  차량 12가 3456
+  입차  11월 10일  03:12
+
+뒷면 안내: "출구 정산기 비밀번호는 입차 시각을 거꾸로 읽은 네 자리입니다."` },
+  stair_key: { name: '비상계단 열쇠', icon: '🔐', use: null, desc: '경비실 열쇠 꾸러미. 꼬리표: "비상계단 1F"' },
+  card_2f: { name: '직원 카드키', icon: '💳', use: null, desc: '명품관 직원 카드. "2F 셔터 출입 가능"' },
+  lift_key: { name: '직원용 승강기 열쇠', icon: '🗝️', use: null, desc: '오르골 서랍에서 나온 작은 열쇠. "직원용 승강기 (3F → 4F)"' },
+  pharm_card: { name: '약국 출입 카드', icon: '💳', use: null, desc: '"한빛 약국 — 관계자 출입 카드"' },
+  fire_axe: { name: '소방 도끼', icon: '🪓', use: null, desc: '소화전 함의 빨간 도끼. 묵직하다.' },
+  roof_key: { name: '옥상 셔터 열쇠', icon: '🔑', use: null, desc: '보안실 열쇠함의 열쇠. "R · 방화 셔터"' },
+  zb_relic_1: { name: '하린이의 노란 풍선 리본', icon: '🎗️', use: null, relic: true, desc: '"하린 ♥ 아빠". 풍선은 터지고 리본만 남았다.' },
+  zb_relic_2: { name: '엄마의 쪽지', icon: '💌', use: 'read', relic: true, desc: '피로 얼룩진 쪽지.', read: '"하린아. 엄마가 꼭 다시 올게. 볼풀 속에 꼭꼭 숨어 있다가, 아빠 헬기 소리가 나면 옥상으로 가. 토끼 인형은 엄마 대신 꼭 안고 있어. 사랑해."' },
+  zb_relic_3: { name: '별 머리핀', icon: '⭐', use: null, relic: true, desc: '엄마가 하린이에게 남긴 별 모양 머리핀.' },
+  zb_relic_4: { name: '토끼 인형 깡총이', icon: '🐰', use: null, relic: true, desc: '귀에 "한하린" 이름표가 꿰매진 토끼 인형.' },
+  zb_relic_5: { name: 'R-9 백신 샘플', icon: '💉', use: null, relic: true, desc: '푸른 빛이 도는 앰플 한 개. 한빛시를 살릴 유일한 백신.' },
+  zb_relic_6: { name: '생존자 명단', icon: '📋', use: 'read', relic: true, desc: '5층에 갇혔던 23명의 이름.', read: '5층 문화센터에 갇혔던 생존자 23명의 이름과 연락처. 맨 아래: "구조대에 꼭 전해 주세요."' },
+  zb_relic_7: { name: '하린이의 무전기', icon: '📻', use: null, relic: true, desc: '아빠 목소리를 들으려고 늘 들고 다니던 낡은 무전기.' },
+});
+
 export const RECIPES = [
   { a: 'doll_head', b: 'doll_body', out: 'doll_torso', flag: 'torso', text: '머리를 몸통에 끼우자 인형의 목이 "딸깍" 소리를 내며 저절로 돌아갔다. 당신 쪽으로.' },
   { a: 'doll_torso', b: 'doll_arms', out: 'mended_doll', flag: 'mended_doll_made', text: '팔을 끼우자 인형이 당신의 손가락을 꼭 쥐었다. 그리고 놓지 않았다.\n(인형의 집에 눕혀 주자)' },
+  { a: 'car_remote', b: 'battery', out: 'car_remote_on', flag: 'remote', text: '스마트키 뚜껑을 열고 건전지를 끼우자 빨간 불이 깜빡였다. 삑.\n(이제 택시 트렁크를 열 수 있다. …경보가 울리지 않기를)' },
   { a: 'talisman_blank', b: 'cinnabar', out: 'true_talisman', flag: 'talisman_done', text: '경면주사로 부적의 나머지 획을 그었다. 마지막 획을 긋는 순간, 신당의 모든 촛불이 동시에 꺼졌다가 켜졌다.' },
 ];
 

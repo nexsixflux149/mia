@@ -82,7 +82,7 @@ const FACE = {
   woman: { skin: '#c4cdc9', style: 'pale' }, child: { skin: '#b8c2be', style: 'pale' }, mudang: { skin: '#c9d1cd', style: 'pale' }, crawler: { skin: '#c9d1cd', style: 'pale' }, headless: { skin: '#c4ccc8', style: 'pale' },
   janitor: { skin: '#b8c0b4', style: 'gaunt' }, father: { skin: '#c8c0b4', style: 'gaunt' }, elder: { skin: '#a8a090', style: 'old' }, sailor: { skin: '#8fa39a', style: 'bloated' },
   doll: { skin: '#f4ece4', style: 'porcelain' }, clown: { skin: '#f8f6f0', style: 'clown' }, ringmaster: { skin: '#c8b8a8', style: 'sallow' }, marionette: { skin: '#e8d4b8', style: 'wood' },
-  scarecrow: { skin: '#c8b080', style: 'burlap' }, nurse: { skin: '#efe6d4', style: 'gauze' }, dalgyal: { skin: '#f6f4ee', style: 'egg' }, slender: { skin: '#f4f4f2', style: 'egg' },
+  scarecrow: { skin: '#c8b080', style: 'burlap' }, zombie: { skin: '#8a9a74', style: 'gaunt' }, nurse: { skin: '#efe6d4', style: 'gauze' }, dalgyal: { skin: '#f6f4ee', style: 'egg' }, slender: { skin: '#f4f4f2', style: 'egg' },
 };
 const FT = new Map();
 function faceTex(type) {
@@ -408,6 +408,30 @@ export function createGhost(type = 'woman') {
     const scythe = new THREE.Group(); scythe.position.y = -0.85; P.arms[1].add(scythe);
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.4, 10), M('#5a3d27')); scythe.add(pole);
     const blade = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.025, 6, 19, Math.PI * 0.8), M('#9aa0a6', { metalness: 0.9, roughness: 0.3 })); blade.position.set(0.25, 0.7, 0); scythe.add(blade);
+  } else if (type === 'zombie') {
+    // 좀비: 찢어진 셔츠 · 썩은 초록빛 피부 · 앞으로 뻗은 팔 · 질질 끄는 걸음 (옷 색은 몇 가지 중 하나)
+    const skinM = M('#7a8a64', { emissive: '#1a2a10', emissiveIntensity: 0.5, roughness: 0.95 });
+    const shirts = ['#4a5a7a', '#8a2a2a', '#d8d4c8', '#2a3a2a', '#6a4a8a'];
+    const shirt = M(shirts[Math.floor(Math.random() * shirts.length)], { map: clothTex(), roughness: 1 });
+    const pants = M(['#2a2a34', '#3a3a2a', '#1a2a4a'][Math.floor(Math.random() * 3)], { roughness: 1 });
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.24, 0.75, 18), shirt); torso.position.y = 1.32; body.add(torso); P.torso = torso;
+    const rib = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 8), M('#5a0a08', { roughness: 0.4, emissive: '#2a0000' })); rib.scale.set(1, 1.4, 0.4); rib.position.set(0.1, 1.3, 0.24); body.add(rib);
+    P.legs = [-1, 1].map((s) => { const l = limb(0.92, 0.09, pants); l.position.set(0.13 * s, 0.94, 0); body.add(l); const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.24), M('#1a1410')); shoe.position.set(0, -0.92, 0.05); l.add(shoe); return l; });
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.14, 10), skinM); neck.position.y = 1.76; body.add(neck);
+    const head = new THREE.Group(); head.position.y = 1.95; body.add(head); P.head = head;
+    const skull = new THREE.Mesh(new THREE.SphereGeometry(0.19, 24, 18), skinM); skull.scale.set(0.95, 1.12, 1); head.add(skull);
+    const jaw = new THREE.Group(); jaw.position.set(0, -0.1, 0.06); head.add(jaw); P.jaw = jaw;
+    const jm = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.06, 0.16), skinM); jm.position.set(0, -0.04, 0.04); jaw.add(jm);
+    for (let i = 0; i < 6; i++) { const tth = new THREE.Mesh(GG('ztooth', () => new THREE.BoxGeometry(0.018, 0.028, 0.012)), M('#d8cca0')); tth.position.set(-0.05 + i * 0.02, -0.005, 0.12); jaw.add(tth); }
+    const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.05, 0.02), new THREE.MeshBasicMaterial({ color: '#1a0000' })); mouth.position.set(0, -0.1, 0.17); head.add(mouth); P.mouth = mouth;
+    for (const s of [-1, 1]) { const sk = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 9), new THREE.MeshBasicMaterial({ color: '#0a0a06' })); sk.position.set(0.07 * s, 0.03, 0.155); head.add(sk); }
+    eyes(head, 0.03, 0.18, 0.07, 0.016, '#e8ff9a');
+    for (let i = 0; i < 5; i++) { const tuft = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), M('#2a2420', { roughness: 1 })); const a = i * 1.3; tuft.position.set(Math.sin(a) * 0.13, 0.15, Math.cos(a) * 0.1 - 0.04); head.add(tuft); }
+    const wound = new THREE.Mesh(new THREE.CircleGeometry(0.05, 10), M('#6a0a0a', { emissive: '#2a0000' })); wound.position.set(-0.12, 0.08, 0.13); wound.rotation.y = -0.6; head.add(wound);
+    P.arms = [-1, 1].map((s) => { const a = limb(0.72, 0.065, shirt); a.position.set(0.33 * s, 1.62, 0); body.add(a); const fa = limb(0.3, 0.05, skinM); fa.position.y = -0.72; a.add(fa); const hand = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), skinM); hand.position.y = -0.3; fa.add(hand); a.userData.fa = fa; return a; });
+    P.arms.forEach((a) => claws(a.userData.fa, 0.8, skinM));
+    for (let i = 0; i < 4; i++) { const b = new THREE.Mesh(new THREE.CircleGeometry(0.06 + i * 0.02, 10), M('#4a0606', { emissive: '#1a0000', side: THREE.DoubleSide })); b.position.set((i - 1.5) * 0.12, 1.1 + (i % 2) * 0.3, 0.255); body.add(b); }
+    u.limp = Math.random() < 0.5 ? 1 : -1;
   } else if (type === 'gasmask') {
     // 방독면 사내: 낡은 고무 비옷, 둥근 유리 눈, 길게 늘어진 호스, 숨소리
     const coat = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.48, 1.6, 20), M('#2a2e26', { roughness: 0.35 })); coat.position.y = 1.0; body.add(coat);
@@ -515,6 +539,16 @@ export function animateGhost(g, dt, t, st, distToMe) {
     u.body.rotation.x = 0.12; u.body.position.y = Math.abs(sn) * 0.04;
     P.arms[0].rotation.x = hunting ? -1.6 : -0.1 + sn * 0.1; P.arms[1].rotation.x = hunting ? -1.1 : 0;
     const snip = hunting ? Math.abs(Math.sin(tt * 10)) * 0.5 : 0.1; P.scissors[0].rotation.z = snip; P.scissors[1].rotation.z = -snip;
+  }
+  if (u.type === 'zombie') {
+    // 질질 끄는 걸음 + 앞으로 뻗은 팔 + 턱이 덜컥거린다 (쫓을 때는 더 빠르고 격하게)
+    const sp = hunting ? 6 : 2.6, sn = Math.sin(tt * sp);
+    P.legs[0].rotation.x = sn * 0.45; P.legs[1].rotation.x = -sn * 0.3;
+    u.body.rotation.z = Math.sin(tt * sp * 0.5) * 0.1 * u.limp + 0.06 * u.limp; u.body.rotation.x = hunting ? 0.18 : 0.08;
+    u.body.position.y = Math.abs(sn) * 0.04;
+    P.arms.forEach((a, i) => { const want = hunting ? -1.45 + Math.sin(tt * 7 + i * 2) * 0.12 : -1.1 + Math.sin(tt * 2 + i) * 0.1; a.rotation.x += (want - a.rotation.x) * Math.min(1, dt * 5); a.rotation.z = (i ? -1 : 1) * 0.12; a.userData.fa.rotation.x = -0.25 + Math.sin(tt * 3 + i) * 0.1; });
+    if (P.jaw) P.jaw.rotation.x = 0.15 + Math.abs(Math.sin(tt * (hunting ? 11 : 3))) * (hunting ? 0.55 : 0.25);
+    P.head.rotation.x = Math.sin(tt * 1.3) * 0.1 - 0.1;
   }
   if (u.type === 'dalgyal') {
     u.body.position.y = 0.1 + Math.sin(tt * 1.4) * 0.06;

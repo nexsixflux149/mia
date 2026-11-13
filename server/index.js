@@ -13,6 +13,7 @@ import { hasBadWord } from './filter.js';
 import { isAdminPassword, looksLikeAdmin, ADMIN_NAME } from './admin.js';
 import { ITEMS, START_ITEMS } from './items.js';
 import { openStore, persist, flushAll, storeKind } from './store.js';
+import { MAX_LV, levelOf, xpAt, CLEAR_COINS, CHAPTER_XP, clearXp, timeLimitMs, SHOP, isWear, blankProfile, profileView, dayKey, statRange, pruneStats } from './progress.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
@@ -36,7 +37,7 @@ const io = new Server(server, { maxHttpBufferSize: 2e5 });
 // ───── 저장 (파티장 닉네임별 도달 챕터)
 const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, 'data');
 // DATABASE_URL 이 있으면 무료 DB에, 없으면 data 폴더 파일에 저장 (server/store.js)
-const { saves, hearts, ranks } = await openStore(DATA_DIR, ['saves', 'hearts', 'ranks']).catch((e) => {
+const { saves, hearts, ranks, profiles, stats } = await openStore(DATA_DIR, ['saves', 'hearts', 'ranks', 'profiles', 'stats']).catch((e) => {
   console.error('\n  [DB] 데이터베이스에 연결하지 못했어요. DATABASE_URL 주소를 확인해 주세요.\n  ', e.message, '\n'); process.exit(1);
 });
 const saveHearts = () => persist(DATA_DIR, 'hearts', hearts);
@@ -48,6 +49,33 @@ const fmtTime = (ms) => { const d = Math.round(ms / 100); const m = Math.floor(d
 const partyLabel = (names) => (names.length > 1 ? `${names[0]} 외 ${names.length - 1}명` : names[0] || '누군가');
 const lobbyNotice = (text) => io.to('lobby').emit('lobby:notice', { text });
 const save = () => persist(DATA_DIR, 'saves', saves, true);
+// ───── 레벨 · 코인 · 상점
+const saveProfiles = () => persist(DATA_DIR, 'profiles', profiles);
+const saveStats = () => persist(DATA_DIR, 'stats', stats);
+stats.days ||= {};
+const prof = (name) => { const pf = (profiles[name] ||= blankProfile()); pf.items ||= {}; pf.equip ||= { wings: '', mount: '' }; return pf; };
+const findByName = (name) => [...players.values()].find((p) => p.name === name && !p.offline);
+const sendProfile = (p) => { if (p) io.to(p.id).emit('profile', { ...profileView(prof(p.name), p.admin), hiddenOk: hiddenOk(p.name) }); };
+const gearOf = (p) => { const e = prof(p.name).equip; return `${e.wings || ''}|${e.mount || ''}|${p.riding && e.mount ? 1 : 0}|${p.sword ? 1 : 0}`; };
+/** 모든 테마를 한 번씩 깼거나 만렙이면 히든 테마가 열린다 */
+function hiddenOk(name) {
+  const p = findByName(name); if (p?.admin) return true;
+  if (levelOf(prof(name).xp) >= MAX_LV) return true;
+  return Object.values(SCENARIOS).filter((s) => !s.hidden).every((s) => saves[s.saveKey(name) + ':clear']);
+}
+function addXp(name, amt, why) {
+  if (!name || !(amt > 0)) return;
+  const pf = prof(name); const before = levelOf(pf.xp); const wasOpen = hiddenOk(name);
+  pf.xp += Math.round(amt); saveProfiles();
+  const after = levelOf(pf.xp); const p = findByName(name);
+  if (p) { io.to(p.id).emit('xp', { add: Math.round(amt), why, lv: after, up: after > before }); sendProfile(p); }
+  if (after > before) {
+    if (p) io.to(p.id).emit('toast', { text: `🎉 레벨 업! Lv.${after} — 상점에서 새 물건을 살 수 있는지 확인해 보세요.` });
+    if (after >= MAX_LV) io.emit('notice', { text: `👑 ${name} 님이 만렙(Lv.${MAX_LV})을 달성해 히든 테마 '데드 시티'가 열렸습니다!` });
+  }
+  if (!wasOpen && hiddenOk(name) && after < MAX_LV) io.emit('notice', { text: `🧟 ${name} 님이 모든 테마를 깨서 히든 테마 '데드 시티'가 열렸습니다!` });
+}
+function addCoins(name, n) { const pf = prof(name); pf.coins = Math.max(0, (pf.coins || 0) + n); saveProfiles(); sendProfile(findByName(name)); }
 
 const players = new Map();   // socket.id -> player
 // 채팅 욕설 경고: 닉네임별로 기억해 다시 접속해도 이어진다 (5번이면 5분 채팅 금지)
@@ -59,8 +87,8 @@ const instances = new Map(); // instId -> GameInstance
 const invites = new Map();   // targetId -> Set(partyId)
 let seq = 1;
 
-const pub = (p) => ({ id: p.id, name: p.name, lv: p.lv, x: p.x, z: p.z, y: p.y || 0, ry: p.ry, anim: p.anim, crouch: p.crouch ? 1 : 0, light: p.light, partyId: p.partyId, em: p.em || '', eid: p.eid || 0, ride: p.room === 'lobby' ? p.ride || '' : '' });
-const lobbyList = () => [...players.values()].map((p) => ({ id: p.id, name: p.name, partyId: p.partyId, inGame: p.room !== 'lobby', room: p.room || '', hearts: hearts[p.name] || 0, admin: !!p.admin }));
+const pub = (p) => ({ id: p.id, name: p.name, lv: p.lv, x: p.x, z: p.z, y: p.y || 0, ry: p.ry, anim: p.anim, crouch: p.crouch ? 1 : 0, light: p.light, partyId: p.partyId, em: p.em || '', eid: p.eid || 0, ride: p.room === 'lobby' ? p.ride || '' : '', gear: gearOf(p) });
+const lobbyList = () => [...players.values()].map((p) => ({ id: p.id, name: p.name, partyId: p.partyId, inGame: p.room !== 'lobby', room: p.room || '', hearts: hearts[p.name] || 0, admin: !!p.admin, lv: levelOf(prof(p.name).xp) }));
 const broadcastRoster = () => io.emit('roster', lobbyList());
 
 function partyInfo(party) {
@@ -72,6 +100,7 @@ function partyInfo(party) {
     unlocked: saves[players.get(party.leader)?.name] ?? 0,
     unlockedBy: unlockedFor(players.get(party.leader)?.name),
     scenarios: scenarioList(),
+    hiddenOk: hiddenOk(players.get(party.leader)?.name),
     scenarioId: party.scenarioId || null,
     pick: party.pick || null, // 파티장이 지금 고르고 있는 테마·공포도·챕터 (파티원 화면에 보여 준다)
   };
@@ -145,8 +174,8 @@ io.on('connection', (sock) => {
       old.sid = sock.id; me = old;
       if (look) { me.look = sanitizeLook(look); me.lv++; } // 창을 다시 열며 고른 외형으로
       sock.join(me.id); if (me.room) sock.join(me.room);
-      ack?.({ id: me.id, token: me.token, name: me.name, items: ITEMS, unlocked: saves[me.name] ?? 0, unlockedBy: unlockedFor(me.name), scenarios: scenarioList(), hearts: hearts[me.name] || 0, resumed: true, room: me.room });
-      sock.emit('inv', me.inv);
+      ack?.({ id: me.id, token: me.token, name: me.name, items: ITEMS, unlocked: saves[me.name] ?? 0, unlockedBy: unlockedFor(me.name), scenarios: scenarioList(), hearts: hearts[me.name] || 0, resumed: true, room: me.room, hiddenOk: hiddenOk(me.name), shop: SHOP, admin: !!me.admin });
+      sock.emit('inv', me.inv); sendProfile(me);
       const party = parties.get(me.partyId);
       if (party) sock.emit('party', partyInfo(party));
       const i = party?.instId ? instances.get(party.instId) : null;
@@ -171,7 +200,10 @@ io.on('connection', (sock) => {
     players.set(pid, me);
     sock.join(pid);
     toLobby(me);
-    ack?.({ id: pid, token: me.token, name, admin: asAdmin, items: ITEMS, unlocked: saves[name] ?? 0, unlockedBy: unlockedFor(name), scenarios: scenarioList(), hearts: hearts[name] || 0 });
+    ack?.({ id: pid, token: me.token, name, admin: asAdmin, items: ITEMS, unlocked: saves[name] ?? 0, unlockedBy: unlockedFor(name), scenarios: scenarioList(), hearts: hearts[name] || 0, hiddenOk: hiddenOk(name), shop: SHOP });
+    sendProfile(me);
+    // 방문 통계: 오늘 방문 수 + 방문자
+    if (!asAdmin) { const d = (stats.days[dayKey()] ||= { v: 0, u: {} }); d.v++; d.u[name] ||= 0; saveStats(); }
     io.emit('chat', { channel: 'system', text: `${name} 님이 접속했습니다.` });
   });
 
@@ -180,7 +212,9 @@ io.on('connection', (sock) => {
     if ([m.x, m.z, m.ry].some((v) => typeof v !== 'number' || !isFinite(v))) return;
     me.x = m.x; me.z = m.z; me.ry = m.ry; me.y = typeof m.y === 'number' && isFinite(m.y) ? Math.max(0, Math.min(12, m.y)) : 0; me.anim = m.anim ? 1 : 0; me.run = !!m.run; me.crouch = !!m.crouch; me.sneak = !!m.sneak;
     me.em = typeof m.em === 'string' ? m.em.slice(0, 10) : ''; me.eid = Number(m.eid) | 0;
-    me.ride = typeof m.ride === 'string' && /^[a-z]{1,12}:\d{1,2}$/.test(m.ride) ? m.ride : '';
+    me.ride = typeof m.ride === 'string' && /^[a-z0-9]{1,12}:\d{1,2}$/.test(m.ride) ? m.ride : '';
+    me.riding = !!m.mount && !!prof(me.name).equip.mount;
+    me.sword = !!m.sword && !!prof(me.name).items.sword;
   });
 
   // 외형은 바뀔 때만 전송 (사진 얼굴은 용량이 크므로 매 틱 보내지 않는다)
@@ -289,6 +323,69 @@ io.on('connection', (sock) => {
   });
 
   sock.on('party:leave', () => { if (me) leaveParty(me); });
+  // ───── 상점 · 내 물건 · 선물
+  sock.on('profile:get', () => sendProfile(me));
+  sock.on('shop:buy', (id) => {
+    if (!me) return; const it = SHOP[id]; if (!it) return;
+    const pf = prof(me.name); const lv = levelOf(pf.xp); const have = pf.items[id] || 0;
+    if (!me.admin && lv < it.lv) return sock.emit('toast', { text: `🔒 Lv.${it.lv} 부터 살 수 있어요. (지금 Lv.${lv})` });
+    if (have >= it.max) return sock.emit('toast', { text: it.max > 1 ? `${it.icon} ${it.name}은(는) ${it.max}개까지만 가질 수 있어요.` : `${it.icon} ${it.name}은(는) 이미 가지고 있어요.` });
+    if (!me.admin && (pf.coins || 0) < it.price) return sock.emit('toast', { text: `🪙 코인이 모자라요. (${it.price}코인 필요 · 지금 ${pf.coins || 0}코인)` });
+    if (!me.admin) pf.coins -= it.price;
+    pf.items[id] = have + 1;
+    if (it.kind === 'sword') pf.swordUses = it.uses;
+    if (isWear(id) && !pf.equip[it.kind]) pf.equip[it.kind] = id; // 처음 산 날개·탈것은 바로 착용
+    saveProfiles(); sendProfile(me);
+    sock.emit('shop:bought', { id });
+    sock.emit('toast', { text: `${it.icon} ${it.name}을(를) 샀어요!${isWear(id) ? ' (🎒 내 물건에서 착용/해제)' : ' (🎒 내 물건에서 사용)'}` });
+  });
+  sock.on('shop:equip', ({ id, on } = {}) => {
+    if (!me) return; const it = SHOP[id]; if (!it || !isWear(id)) return;
+    const pf = prof(me.name); if (!pf.items[id]) return;
+    pf.equip[it.kind] = on ? id : (pf.equip[it.kind] === id ? '' : pf.equip[it.kind]);
+    if (it.kind === 'mount' && !on) me.riding = false;
+    saveProfiles(); sendProfile(me);
+  });
+  sock.on('shop:use', (id) => {
+    if (!me || !['popper', 'rocket', 'sword'].includes(id)) return;
+    const pf = prof(me.name); if (!pf.items[id]) return;
+    const now = Date.now(); if (now - (me.lastFx || 0) < 900) return; me.lastFx = now;
+    const room = me.room; if (!room) return;
+    const fx = { type: id, id: me.id, x: me.x, z: me.z, y: me.y || 0, ry: me.ry };
+    if (id === 'sword') {
+      const hit = inst()?.slay?.(me);
+      fx.hit = hit ? { x: hit.x, z: hit.z, name: hit.name } : null;
+      if (hit) {
+        pf.swordUses = Math.max(0, (pf.swordUses || 0) - 1);
+        if (pf.swordUses <= 0) { delete pf.items.sword; me.sword = false; fx.broke = true; io.to(room).emit('toast', { text: `💥 ${me.name} 님의 전설의 검이 귀신을 10번 베고 산산조각 났다!` }); }
+        else sock.emit('toast', { text: `🗡️ ${hit.name}을(를) 베어 없앴다! (남은 횟수 ${pf.swordUses}/10)` });
+        saveProfiles(); sendProfile(me);
+      } else if (!inst()) sock.emit('toast', { text: '🗡️ 휘익— (귀신은 방탈출 안에서만 벨 수 있어요)' });
+      else sock.emit('toast', { text: '🗡️ 휘익— 가까이에 귀신이 없다. (귀신 가까이서 휘두르세요)' });
+      io.to(room).emit('fx:item', fx); return;
+    }
+    pf.items[id] -= 1; if (pf.items[id] <= 0) delete pf.items[id];
+    saveProfiles(); sendProfile(me);
+    if (id === 'rocket') inst()?.lure?.(me.x, me.z, me.name);
+    io.to(room).emit('fx:item', fx);
+  });
+  sock.on('shop:gift', ({ to, id } = {}) => {
+    if (!me) return; const t = players.get(to); const it = SHOP[id];
+    if (!t || t === me || !it) return;
+    const a = prof(me.name), b = prof(t.name);
+    if (!a.items[id] && !me.admin) return sock.emit('toast', { text: '가지고 있지 않은 물건이에요.' });
+    if ((b.items[id] || 0) >= it.max) return sock.emit('toast', { text: `${t.name} 님은 ${it.name}을(를) 더 받을 수 없어요. (최대 ${it.max}개)` });
+    const now = Date.now(); if (now - (me.lastGift || 0) < 1500) return; me.lastGift = now;
+    const uses = it.kind === 'sword' ? (me.admin ? it.uses : a.swordUses || it.uses) : 0;
+    if (!me.admin) { a.items[id] -= 1; if (a.items[id] <= 0) { delete a.items[id]; if (a.equip[it.kind] === id) a.equip[it.kind] = ''; if (it.kind === 'sword') a.swordUses = 0; } }
+    b.items[id] = (b.items[id] || 0) + 1;
+    if (it.kind === 'sword') b.swordUses = uses;
+    if (isWear(id) && !b.equip[it.kind]) b.equip[it.kind] = id;
+    saveProfiles(); sendProfile(me); sendProfile(t);
+    sock.emit('toast', { text: `🎁 ${t.name} 님에게 ${it.icon} ${it.name}을(를) 선물했어요!` });
+    io.to(t.id).emit('gift', { from: me.name, id, icon: it.icon, name: it.name });
+    if (t.room === me.room) io.to(me.room).emit('heartFx', { from: me.id, to: t.id });
+  });
   // ───── 운영자 기능 (운영자로 입장한 사람만)
   const adminOnly = (fn) => (...a) => { if (me?.admin) fn(...a); };
   sock.on('admin:notice', adminOnly((text) => {
@@ -298,7 +395,9 @@ io.on('connection', (sock) => {
   }));
   sock.on('admin:stats', adminOnly((ack) => {
     if (typeof ack !== 'function') return;
-    ack({ players: [...players.values()].map((p) => ({ id: p.id, name: p.name, room: p.room === 'lobby' ? '로비' : p.room ? '게임 중' : '-', offline: !!p.offline, admin: !!p.admin, muted: Math.max(0, Math.ceil(((chatPenalty.get(p.name)?.muteUntil || 0) - Date.now()) / 1000)), warns: chatPenalty.get(p.name)?.warns || 0 })), games: instances.size });
+    ack({ players: [...players.values()].map((p) => ({ id: p.id, name: p.name, room: p.room === 'lobby' ? '로비' : p.room ? '게임 중' : '-', offline: !!p.offline, admin: !!p.admin, muted: Math.max(0, Math.ceil(((chatPenalty.get(p.name)?.muteUntil || 0) - Date.now()) / 1000)), warns: chatPenalty.get(p.name)?.warns || 0, lv: levelOf(prof(p.name).xp) })), games: instances.size,
+      visit: { day: statRange(stats, 1), week: statRange(stats, 7), month: statRange(stats, 30) },
+      daily: Array.from({ length: 14 }, (_, i) => { const k = dayKey(Date.now() - i * 86400000); const r = stats.days[k]; const u = Object.values(r?.u || {}); return { day: k, visitors: u.length, visits: r?.v || 0, totalMs: u.reduce((a, b) => a + b, 0) }; }) });
   }));
   sock.on('admin:mute', adminOnly(({ id, minutes }) => {
     const t = players.get(id); if (!t || t.admin) return;
@@ -312,6 +411,14 @@ io.on('connection', (sock) => {
     chatPenalty.delete(t.name);
     io.to(t.id).emit('chat', { channel: 'system', text: '✅ 운영자가 채팅 금지를 풀었습니다.' });
     sock.emit('toast', { text: `${t.name} 님 채팅 금지 해제` });
+  }));
+  // 랭킹에서 기록 하나 지우기 → 아래 기록이 자동으로 한 칸씩 올라간다
+  sock.on('admin:rankDel', adminOnly(({ sc, at, ms } = {}) => {
+    const list = ranks[sc]; if (!list) return;
+    const i = list.findIndex((r) => r.at === at && r.ms === ms); if (i < 0) return;
+    const [r] = list.splice(i, 1); saveRanks();
+    sock.emit('toast', { text: `🗑️ 랭킹에서 '${r.names.join(', ')}' 기록을 지웠어요. 아래 기록이 한 칸씩 올라갑니다.` });
+    sock.emit('rank:changed');
   }));
   sock.on('admin:kick', adminOnly((id) => {
     const t = players.get(id); if (!t || t.admin) return;
@@ -377,6 +484,7 @@ io.on('connection', (sock) => {
     if (!me) return;
     let chapter = typeof opt === 'object' && opt ? opt.chapter : opt;
     const sc = SCENARIOS[opt?.scenario] || SCENARIOS.gwimun;
+    if (sc.hidden && !hiddenOk(me.name)) return sock.emit('toast', { text: '🔒 히든 테마는 모든 테마를 한 번씩 깨거나 만렙(Lv.20)이 되면 열려요.' });
     const fq = Number(opt?.fear); // 0 왕초보 · 1 순한맛 · 2 보통 · 3 매운맛
     const fear = Number.isFinite(fq) && opt?.fear !== null && opt?.fear !== '' ? Math.max(0, Math.min(3, Math.round(fq))) : 2;
     let party = parties.get(me.partyId);
@@ -401,15 +509,24 @@ io.on('connection', (sock) => {
     const inst = new GameInstance({
       id: instId, io, party, players, chapter, fear, scenario: sc.id,
       onChapter: (idx) => { if ((saves[saveName] ?? 0) < idx) { saves[saveName] = idx; save(); } },
-      onEnd: ({ ms, full, type, hints = 0 } = {}) => {
+      onAdvance: () => { if (inst.overtime()) return; for (const m of inst.members()) addXp(m.name, CHAPTER_XP, '챕터 통과'); },
+      limitMs: timeLimitMs(sc.difficulty || 3),
+      onEnd: ({ ms, full, type, hints = 0, over = false } = {}) => {
         saves[saveName] = sc.chapters.length - 1; saves[saveName + ':clear'] = 1; save();
         const names = party.members.map((id) => players.get(id)?.name).filter(Boolean);
-        if (full && ms > 0) {
+        // 보상: 깰 때마다 10코인 · 제한 시간 안에 깨면 경험치 (시간 초과면 순위표·경험치 제외)
+        for (const m of inst.members()) {
+          addCoins(m.name, CLEAR_COINS);
+          io.to(m.id).emit('toast', { text: `🪙 클리어 보상 ${CLEAR_COINS}코인!${over ? ' (⏰ 시간 초과 — 경험치·순위표 제외)' : ''}` });
+          if (!over) addXp(m.name, clearXp(sc.difficulty || 3, fear, full), '테마 클리어');
+        }
+        if (full && ms > 0 && !over) {
           const list = (ranks[sc.id] ||= []);
           list.push({ names, ms, fear, ending: type, at: Date.now(), hints });
           list.sort((a, b) => a.ms - b.ms); ranks[sc.id] = list.slice(0, 50); saveRanks();
         }
-        lobbyNotice(`🏆 ${partyLabel(names)} 님이 '${sc.short}' 테마를 클리어했습니다!${full && ms ? ` (${fmtTime(ms)} · 힌트 ${hints}개)` : ''}`);
+        lobbyNotice(`🏆 ${partyLabel(names)} 님이 '${sc.short}' 테마를 클리어했습니다!${full && ms ? ` (${fmtTime(ms)} · 힌트 ${hints}개${over ? ' · 시간 초과' : ''})` : ''}`);
+        syncParty(party);
       },
     });
     // 이어하기: 앞 챕터에서 얻었어야 할 핵심 아이템 지급
@@ -541,10 +658,17 @@ setInterval(() => {
   for (const p of players.values()) { if (p.room) (byRoom[p.room] ||= []).push(pub(p)); }
   for (const [room, list] of Object.entries(byRoom)) {
     let ghosts = null;
-    if (room.startsWith('inst:')) ghosts = instances.get(room.slice(5))?.tick(dt) || null;
+    if (room.startsWith('inst:')) { const i = instances.get(room.slice(5)); i?.checkTime?.(); ghosts = i?.tick(dt) || null; }
     io.to(room).emit('state', { players: list, ghosts });
   }
 }, 66);
+
+// 방문 통계: 1분마다 접속 중인 사람의 머문 시간을 더한다 (서버가 갑자기 꺼져도 거의 정확하게 남는다)
+setInterval(() => {
+  const d = (stats.days[dayKey()] ||= { v: 0, u: {} });
+  for (const p of players.values()) if (!p.offline && !p.admin) d.u[p.name] = (d.u[p.name] || 0) + 60000;
+  pruneStats(stats); saveStats();
+}, 60000).unref?.();
 
 // Render 무료 서버는 15분 동안 바깥 접속이 없으면 잠든다 → 서버가 자기 공개 주소로 10분마다 접속해 깨어 있게 한다
 // (GitHub 예약 작업은 한 시간에 한 번 정도밖에 돌지 않아 이것만으로는 부족했다)

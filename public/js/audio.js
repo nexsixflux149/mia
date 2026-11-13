@@ -19,6 +19,7 @@ const THEMES = {
     abc: 'E4 F2 A2 | B4 A4 | c4 B2 A2 | F6 E2 | A4 B2 c2 | e4 c4 | B2 A2 F2 E2 | E8' },
 };
 THEMES.rain = THEMES.gwimun;
+THEMES.zombie = { key: {}, unit: 2, abc: "E2 E2 G2 E2 | F4 E4 | E2 E2 G2 B2 | A4 G4 | E2 E2 G2 E2 | F2 G2 F2 E2 | D2 E2 F2 D2 | E8" };
 THEMES.mia = { key: {}, unit: 2, abc: "G2 E2 G2 E2 | G2 A2 G4 | E2 D2 E2 G2 | E8 | A2 G2 A2 c2 | A2 G2 E4 | D2 E2 G2 E2 | D8" };
 THEMES.park = { key: {}, unit: 2, abc: "E2 A2 B2 c2 | B4 A4 | G2 F2 E2 ^D2 | E8 | A2 c2 e2 d2 | c4 B4 | A2 ^G2 F2 ^G2 | A8 | e2 d2 c2 B2 | c2 A2 F4 | E2 ^G2 B2 d2 | c8" };
 
@@ -46,6 +47,8 @@ const SCORES = {
 };
 SCORES.mia = { bpm: 58, root: 43, kick: 'kick', snare: 'snare', hat: 'tick', tom: 'drum', lead: 'mia', leadVoice: 'musicbox', accent: 'whisper',
   K: 'x.......x.......', T: '................', H: '..x...x...x...x.', S: '........x.......', bass: '0.......2.......', stab: 'x...............', prog: [0, 0, -3, 0, 2, 0, -5, 0] };
+SCORES.zombie = { bpm: 92, root: 40, kick: 'kick', snare: 'snare', hat: 'hat', tom: 'timpani', lead: 'zombie', leadVoice: 'lullaby', accent: 'glass',
+  K: 'x..x..x...x..x..', T: '..............xx', H: 'x.x.x.x.x.x.x.x.', S: '....x.......x...', bass: '0.0.0.0.1.1.0.0.', stab: 'x.......x..x....', prog: [0, 0, 1, 0, 0, 0, -2, -1] };
 SCORES.park = { bpm: 62, root: 45, kick: 'kick', snare: 'clap', hat: 'tick', tom: 'drum', lead: 'park', leadVoice: 'musicbox', accent: 'whisper',
   K: 'x.......x.......', T: '..........x...x.', H: 'x...x...x...x...', S: '....x.......x...', bass: '0...0...1...0...', stab: 'x.......x.......', prog: [0, 0, 1, 0, 0, -2, 1, -1] };
 SCORES.rain = SCORES.gwimun;
@@ -136,6 +139,7 @@ export class AudioFX {
         west: ['wind', 'wind', 'creak', 'bell', 'whisper', 'knock', 'chain'],
         kimono: ['gayageum', 'gong', 'whisper', 'wind', 'giggle', 'creak', 'drip'],
         mia: ['whisper', 'giggle', 'creak', 'wind', 'knock', 'giggle', 'drip', 'whisper'],
+        zombie: ['zombie', 'wind', 'glass', 'zombie', 'bang', 'drip', 'zombie', 'creak'],
         park: ['calliope_far', 'giggle', 'whisper', 'creak', 'pop', 'musicbox_far', 'giggle', 'wind'],
         clown: ['honk', 'clown_laugh', 'giggle', 'creak', 'pop', 'whisper', 'jackbox', 'calliope_far'],
       }[mode] || ['creak', 'whisper', 'knock'];
@@ -379,6 +383,17 @@ export class AudioFX {
     if (!this.ctx) return;
     switch (name) {
       case 'click': this.tone(880, 0.06, { type: 'square', gain: 0.04 }); break;
+      // ── 상점 물건 · 장난 소리
+      case 'party_pop': this.noise(0.14, { freq: 1400, q: 0.5, gain: 1.4 }); this.noise(0.5, { freq: 5200, q: 0.6, gain: 0.35, at: 0.04, release: 0.45 }); this.tone(95, 0.2, { type: 'square', gain: 0.55, slide: 40 }); for (let i = 0; i < 10; i++) this.tone(1800 + Math.random() * 2600, 0.12, { type: 'triangle', gain: 0.05, at: 0.06 + i * 0.03 }); break;
+      case 'rocket_up': this.noise(1.1, { freq: 900, q: 1.5, gain: 0.32, attack: 0.05, release: 0.3 }); this.tone(500, 1.1, { type: 'sine', gain: 0.08, slide: 2400 }); break;
+      case 'firework': this.noise(0.3, { freq: 160, type: 'lowpass', gain: 1.5, release: 0.28 }); this.noise(1.6, { freq: 3600, q: 0.6, gain: 0.25, at: 0.1, attack: 0.05, release: 1.4 }); this.tone(70, 0.6, { type: 'sine', gain: 0.5, slide: 35 }); for (let i = 0; i < 16; i++) this.noise(0.03, { freq: 4000 + Math.random() * 3000, q: 3, gain: 0.15, at: 0.25 + Math.random() * 1.2 }); break;
+      case 'sword': this.noise(0.22, { freq: 3800, q: 1.2, gain: 0.45, attack: 0.02, release: 0.18 }); [1568, 2093, 2637].forEach((f, i) => this.tone(f, 0.9, { type: 'sine', gain: 0.05, at: 0.05 + i * 0.03, release: 0.85 })); break;
+      case 'slay': this.play('sword'); this.noise(0.9, { freq: 900, q: 0.8, gain: 0.35, at: 0.1, release: 0.8 }); [880, 1320, 1760, 2640].forEach((f, i) => this.tone(f, 1.4, { type: 'triangle', gain: 0.05, at: 0.15 + i * 0.07, release: 1.3 })); break;
+      case 'shatter': this.play('glass'); this.tone(3000, 0.6, { type: 'sine', gain: 0.08, slide: 900 }); break;
+      case 'fart': { const d = 0.55 + Math.random() * 0.35; this.tone(78 + Math.random() * 20, d, { type: 'sawtooth', gain: 0.32, slide: 52, attack: 0.02, release: 0.12, detune: 25 }); this.tone(115, d * 0.8, { type: 'square', gain: 0.08, slide: 70, at: 0.03 }); this.noise(d, { freq: 260, q: 2.5, gain: 0.35, release: 0.1 }); break; }
+      case 'laugh': for (let i = 0; i < 7; i++) { const f = 330 + Math.random() * 80 - i * 8; this.tone(f, 0.11, { type: 'triangle', gain: 0.09, at: i * 0.14, slide: f * 0.72 }); this.noise(0.08, { freq: 1600, q: 2, gain: 0.05, at: i * 0.14 }); } break;
+      case 'zombie': this.tone(85 + Math.random() * 30, 1.2, { type: 'sawtooth', gain: 0.18, slide: 60, attack: 0.1, release: 0.6, detune: 40 }); this.noise(1.1, { freq: 420, q: 2, gain: 0.25, attack: 0.15, release: 0.6 }); break;
+      case 'heli': for (let i = 0; i < 16; i++) this.noise(0.07, { freq: 200, type: 'lowpass', gain: 0.6, at: i * 0.11 }); break;
       case 'pickup': this.tone(660, 0.12, { gain: 0.12 }); this.tone(990, 0.2, { gain: 0.1, at: 0.08 }); break;
       case 'wrong': this.tone(140, 0.35, { type: 'sawtooth', gain: 0.15, slide: 90 }); break;
       case 'unlock': this.noise(0.1, { freq: 2500, gain: 0.25 }); this.tone(1200, 0.08, { type: 'square', gain: 0.06, at: 0.1 }); break;

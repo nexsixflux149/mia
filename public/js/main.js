@@ -8,6 +8,7 @@ import { AudioFX } from './audio.js';
 import { jumpscare, pickScare } from './scare.js';
 import { Voice } from './voice.js';
 import { FX, makeBeam } from './fx.js';
+import { applyGear, animateGear, initFx, updateFx, popperFx, rocketFx, swordFx, shatterFx, fartFx } from './gear.js';
 
 const $ = (s) => document.querySelector(s);
 const socket = io();
@@ -17,7 +18,7 @@ socket.on('connect', () => {
   socket.emit('hello', { name: S.myName, look, resume: S.resume }, (res) => {
     if (!res.resumed) { S.me = res.id; S.myName = res.name; voice.myId = res.id; rebuildMyAvatar(); toast('연결이 오래 끊겨 로비에서 다시 시작합니다.'); }
     S.resume = { id: res.id, token: res.token }; if (!S.admin) store.set('gwimun-resume', { ...S.resume, name: res.name, at: Date.now() });
-    S.items = res.items; renderInv(); renderParty();
+    S.items = res.items; if (res.shop) S.shop = res.shop; if (res.hiddenOk != null) S.hiddenOk = res.hiddenOk; renderInv(); renderParty();
   });
 });
 // 창을 닫거나 숨길 때 '마지막 접속 시각'을 남겨 둔다 → 금방 다시 열면 같은 플레이어로 이어서
@@ -43,6 +44,7 @@ const S = {
   crouch: false, run: false, pings: [], callouts: [], journal: store.get('gwimun-journal', []).filter((j) => j && j.sc),
   mouse: { x: 0, y: 0 }, danger: 0, ghosts: new Map(),
   fear: 2, em: '', emT: 0, eid: 0, labels: [], hearts: 0, flyHearts: [],
+  profile: null, shop: {}, riding: false, holdSword: false, hiddenOk: false, vlv: new Map(), vrings: [],
 };
 const SET = Object.assign({ volume: 0.8, voice: 1, sens: 1, quality: (matchMedia('(pointer: coarse)').matches || innerWidth < 760) ? 'medium' : 'high', brightness: 1, minimap: true }, store.get('gwimun-settings', {}));
 if (SET.quality === 'low') SET.quality = 'medium'; // '낮음'은 없어졌다 → 보통
@@ -168,14 +170,16 @@ function enter() {
     S.admin = !!res.admin; $('#adminBtn').classList.toggle('hidden', !S.admin); document.body.classList.toggle('is-admin', S.admin); $('#adminPass').value = '';
     S.resume = { id: res.id, token: res.token }; if (!S.admin) store.set('gwimun-resume', { ...S.resume, name: res.name, at: Date.now() }); // 운영자 접속은 기기에 남기지 않는다
     S.me = res.id; S.myName = res.name; S.items = res.items; S.unlocked = res.unlocked || 0; S.hearts = res.hearts || 0; S.unlockedBy = res.unlockedBy || {}; S.scenarios = res.scenarios || [];
+    S.shop = res.shop || {}; S.hiddenOk = !!res.hiddenOk;
     voice.myId = res.id;
     $('#login').classList.add('hidden'); $('#hud').classList.remove('hidden');
     pvLoop = false;
-    rebuildMyAvatar();
+    rebuildMyAvatar(); updateHiddenGate(true);
     renderInv(); renderRoster(); renderParty(); loadShareInfo();
     if (JOIN_CODE) socket.emit('party:joinCode', JOIN_CODE);
     if (res.resumed && String(res.room || '').startsWith('inst:')) socket.emit('game:state'); // 게임 도중 창을 닫았다 다시 열면 그 게임으로 돌아간다
     addChat({ channel: 'system', text: '📢 욕설·비방·도배는 금지예요. 경고 5회면 5분 동안 채팅이 금지됩니다.' });
+    addChat({ channel: 'system', text: '📢 모든 테마를 클리어하면 숨겨진 히든 테마가 오픈됩니다! (만렙 Lv.20 달성 시에도 열려요)' });
     toast(document.body.classList.contains('mobile') ? `환영합니다, ${S.myName} 님! 왼쪽 조이스틱으로 이동 · 화면을 끌어 시점 · 두 손가락으로 확대` : `환영합니다, ${S.myName} 님! WASD 이동 · 드래그로 시점 · ❔에서 조작법`);
   });
 }
@@ -196,6 +200,7 @@ renderer.shadowMap.enabled = false; // 그림자 효과 끔 (눈부심·무거�
 THREE.Texture.DEFAULT_ANISOTROPY = Math.min(16, renderer.capabilities.getMaxAnisotropy()); // 비스듬히 보이는 바닥·벽 무늬도 선명하게
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
+initFx(scene);
 const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 220);
 const fx = new FX(renderer, scene, camera);
 fx.setQuality(SET.quality); fx.brightness = SET.brightness;
@@ -259,7 +264,7 @@ function resetInput() { S.joy = null; S.moveTarget = null; S.pendingInteract = n
 function enterLobby(pos) {
   resetInput();
   disposeWorld(scene, S.world);
-  S.world = buildLobby(scene);
+  S.world = buildLobby(scene, { hidden: !!(S.hiddenOk || S.admin) });
   S.room = 'lobby'; S.chapter = null; S.dark = false; S.objState = {}; S.mount = null; S.perch = null; me.y = 0;
   cam.dist = CAM_START; // 살짝 줌인된 상태로 시작
   me.x = pos.x; me.z = pos.z;
@@ -275,7 +280,7 @@ function enterLobby(pos) {
 }
 function enterChapter(state, showIntro = true) {
   resetInput();
-  setGameClock(state.elapsed, state.timed); setHintsUsed(state.hintsUsed ?? 0);
+  setGameClock(state.elapsed, state.timed); setHintsUsed(state.hintsUsed ?? 0); S.limitMs = state.limitMs || 0;
   if (state.fear != null) { S.fear = state.fear; if (state.scenario) S.scenario = state.scenario; updateFearBadge(); }
   disposeWorld(scene, S.world);
   const ch = state.chapter;
@@ -287,13 +292,13 @@ function enterChapter(state, showIntro = true) {
   me.ry = Math.PI; cam.yaw = bestOpenYaw(); // 시작 지점이 벽에 붙어 있으면 카메라가 머리 속으로 파고들지 않게 가장 트인 쪽에서 비춘다
   S.moveTarget = null; S.pendingInteract = null;
   removeGhost(); clearOthers(); clearPings();
-  $('#placeTitle').textContent = ch.title;
+  $('#placeTitle').textContent = ch.title; $('#placeTitle').appendChild(Object.assign(el('span', 'limit-tag'), { id: 'limitTag' }));
   $('#placeSub').textContent = ch.place;
   $('#objective').classList.remove('hidden');
   $('#lookBtn').classList.add('hidden');
   setObjective(state.objective, state.relics);
   applyObjState(); applyDark();
-  audio.ambient({ gwimun: ch.rain ? 'rain' : 'gwimun', ophelia: 'ship', doll: 'doll', hospital: 'hospital', camp: 'camp', west: 'west', kimono: 'kimono', clown: 'clown', park: 'park', mia: 'mia' }[S.scenario?.id] || 'horror');
+  audio.ambient({ gwimun: ch.rain ? 'rain' : 'gwimun', ophelia: 'ship', doll: 'doll', hospital: 'hospital', camp: 'camp', west: 'west', kimono: 'kimono', clown: 'clown', park: 'park', mia: 'mia', zombie: 'zombie' }[S.scenario?.id] || 'horror');
   renderer.toneMappingExposure = 1.82;
   if (showIntro && ch.intro) { queueStory({ ...ch.intro, sound: 'story' }); addJournal(ch.intro.title, ch.intro.text, 'story'); }
   if (!document.body.classList.contains('mobile') && !store.get('gwimun-tutorial', false)) { store.set('gwimun-tutorial', true); setTimeout(() => toast('팁: F 손전등 · C 웅크리기(귀신에게 덜 들킴) · G 위치 찍기 · J 수첩'), 4000); }
@@ -319,7 +324,11 @@ function updateGameTimer() {
   const t = $('#gameTimer'); const show = S.room === 'game' && !!S.clock;
   t.classList.toggle('hidden', !show); if (!show) return;
   const ms = S.clock.stop ?? performance.now() - S.clock.base;
+  const lim = S.limitMs || 0, over = lim && ms > lim;
   t.textContent = `⏱ ${fmtClock(Math.max(0, ms))}${S.clock.timed ? '' : ' *'}`;
+  const tag = $('#limitTag'); if (tag) { tag.textContent = lim ? (over ? `⏰ 제한 ${Math.round(lim / 60000)}분 초과` : `⏰ 제한 ${Math.round(lim / 60000)}분`) : ''; tag.classList.toggle('over', !!over); }
+  t.classList.toggle('over', !!over); t.classList.toggle('warn', !!lim && !over && lim - ms < 5 * 60000);
+  t.title = lim ? `제한 시간 ${Math.round(lim / 60000)}분 — 넘기면 순위표·경험치에서 빠져요 (코인은 받아요)` : '';
 }
 function setObjective(ob, relics) {
   if (!ob) return;
@@ -340,7 +349,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'Enter') { if (typing()) return; e.preventDefault(); $('#chatInput').focus(); return; }
   if (typing()) { if (e.code === 'Tab' && document.activeElement === $('#chatInput')) { e.preventDefault(); setChatCh(S.chatCh === 'all' ? 'party' : 'all'); } return; }
   keys[e.code] = true;
-  if (e.repeat && ['Space', 'KeyE', 'KeyF', 'KeyX', 'KeyT', 'KeyQ', 'KeyG'].includes(e.code)) { e.preventDefault(); return; } // 누르고 있어도 한 번만 (키 반복 입력 무시)
+  if (e.repeat && ['Space', 'KeyE', 'KeyF', 'KeyX', 'KeyT', 'KeyQ', 'KeyG', 'KeyZ', 'KeyB', 'KeyI', 'KeyP'].includes(e.code)) { e.preventDefault(); return; } // 누르고 있어도 한 번만 (키 반복 입력 무시)
   if (e.code === 'KeyE') { e.preventDefault(); if (S.nearest) interact(S.nearest); }
   if (e.code === 'Space') { e.preventDefault(); doEmote('jump'); }
   if (e.code === 'KeyX') toggleEmotePanel();
@@ -353,6 +362,10 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyG') sendPing();
   if (e.code === 'KeyQ') sendCallout();
   if (e.code === 'KeyR') cam.yaw = me.ry + Math.PI;
+  if (e.code === 'KeyZ') toggleRide();
+  if (e.code === 'KeyB') swingSword();
+  if (e.code === 'KeyI') openBag();
+  if (e.code === 'KeyP') openShop();
   if (/^Digit[1-9]$/.test(e.code)) { const i = Number(e.code.slice(5)) - 1; if (S.inv[i]) primaryItem(S.inv[i], i); }
 });
 addEventListener('keyup', (e) => { keys[e.code] = false; if (e.code === 'KeyC' && S.crouch) { S.crouch = false; updateStatus(); } });
@@ -540,7 +553,7 @@ function updateMove(dt) {
   if (sneak !== !!S.sneak) { S.sneak = sneak; updateStatus(); }
   const run = !!(runKey || (S.mRun && S.joy)) && !S.crouch && !sneak;
   if (run !== S.run) { S.run = run; updateStatus(); }
-  const speed = sneak ? 1.5 : S.crouch ? 2.0 : run ? 6.2 : 4.0;
+  const speed = (sneak ? 1.5 : S.crouch ? 2.0 : run ? 6.2 : 4.0) * (S.riding ? 1.5 : 1); // 탈것을 탄 동안 1.5배
   if (ix || iz) {
     S.moveTarget = null; S.pendingInteract = null;
     const sin = Math.sin(cam.yaw), cos = Math.cos(cam.yaw);
@@ -575,9 +588,9 @@ function updateMove(dt) {
 let sendT = 0, lastSent = '';
 function netSend(dt) {
   sendT += dt; if (sendT < 0.066 || !S.me) return; sendT = 0;
-  const k = `${(me.y || 0).toFixed(2)},${me.x.toFixed(2)},${me.z.toFixed(2)},${me.ry.toFixed(2)},${me.moving},${S.run},${S.crouch},${!!S.sneak},${S.em},${S.eid},${rideTag()}`;
+  const k = `${(me.y || 0).toFixed(2)},${me.x.toFixed(2)},${me.z.toFixed(2)},${me.ry.toFixed(2)},${me.moving},${S.run},${S.crouch},${!!S.sneak},${S.em},${S.eid},${rideTag()},${S.riding},${S.holdSword}`;
   if (k === lastSent) return; lastSent = k;
-  socket.emit('move', { x: me.x, z: me.z, y: me.y || 0, ry: me.ry, anim: me.moving, run: S.run && me.moving, crouch: S.crouch || S.sneak, sneak: !!S.sneak, em: S.em, eid: S.eid, ride: rideTag() });
+  socket.emit('move', { x: me.x, z: me.z, y: me.y || 0, ry: me.ry, anim: me.moving, run: S.run && me.moving, crouch: S.crouch || S.sneak, sneak: !!S.sneak, em: S.em, eid: S.eid, ride: rideTag(), mount: !!S.riding, sword: !!S.holdSword });
 }
 function rideTag() { return S.mount?.kind === 'ride' && S.room === 'lobby' ? `${S.mount.ride}:${S.mount.seat}` : ''; }
 function updateStatus() {
@@ -779,7 +792,7 @@ socket.on('state', ({ players, ghosts }) => {
       g.userData.lv = lk.lv; g.position.copy(pos);
       S.others.set(p.id, g);
     }
-    if (g.userData.eid !== p.eid || g.userData.em !== p.em) { g.userData.eid = p.eid; g.userData.em = p.em; g.userData.emT = 0; if (p.em === 'jump') audio.play('pickup'); }
+    if (g.userData.eid !== p.eid || g.userData.em !== p.em) { const fresh = g.userData.eid != null; g.userData.eid = p.eid; g.userData.em = p.em; g.userData.emT = 0; if (p.em === 'jump') audio.play('pickup'); if (p.em === 'fart' && fresh) doFart(g, p.x, p.y || 0, p.z, p.ry); }
     g.userData.target = p;
     setLight(g, p.light);
     const inParty = !!S.party?.members.some((m) => m.id === p.id);
@@ -807,7 +820,7 @@ function updateOthers(dt, t) {
     const p = g.userData.target; if (!p) continue;
     if (p.ride && S.room === 'lobby') {
       const [rn, si] = p.ride.split(':'); const rp = S.world?.rides?.[rn]?.pos(Number(si));
-      if (rp) { g.position.set(rp.x, rp.y, rp.z); g.rotation.y = rp.ry; g.userData.emT = (g.userData.emT || 0) + dt; animateAvatar(g, dt, false, t, false, p.em || null, g.userData.emT); continue; }
+      if (rp) { g.position.set(rp.x, rp.y, rp.z); g.rotation.y = rp.ry; g.userData.emT = (g.userData.emT || 0) + dt; animateAvatar(g, dt, false, t, false, p.em || null, g.userData.emT); applyGear(g, (p.gear || '').replace(/\|1\|/, '|0|')); animateGear(g, t, dt, false); continue; }
     }
     const k = Math.min(1, dt * 10);
     g.position.x += (p.x - g.position.x) * k; g.position.z += (p.z - g.position.z) * k; g.position.y += ((p.y || 0) - g.position.y) * k;
@@ -815,6 +828,7 @@ function updateOthers(dt, t) {
     g.rotation.y += diff * k;
     g.userData.emT = (g.userData.emT || 0) + dt;
     animateAvatar(g, dt, !!p.anim, t, !!p.crouch, p.em || null, g.userData.emT);
+    applyGear(g, p.gear || ''); animateGear(g, t, dt, !!p.anim);
   }
   S.danger = 0;
   for (const e of S.ghosts.values()) {
@@ -843,7 +857,7 @@ function updateOthers(dt, t) {
     if (myAvatar && S.light && lvl > 0.5) setLight(myAvatar, Math.random() > 0.25);
     e.soundT -= dt;
     if (gs.v && d < 13 && e.soundT < 0) {
-      const sounds = { janitor: ['stomp', 0.55], elder: ['pipe', 2.2], woman: ['whisper', 2.4], mudang: ['crawl', 0.45], child: ['giggle', 3], sailor: ['water_step', 0.6], doll: ['porcelain', 0.4], father: ['snip', 1.1], dalgyal: ['hum', 2.6], slender: ['static_hiss', 1.8], nurse: ['cart', 0.9], headless: ['drag', 0.8], shadow: ['whisper', 3] };
+      const sounds = { zombie: ['zombie', 1.7], janitor: ['stomp', 0.55], elder: ['pipe', 2.2], woman: ['whisper', 2.4], mudang: ['crawl', 0.45], child: ['giggle', 3], sailor: ['water_step', 0.6], doll: ['porcelain', 0.4], father: ['snip', 1.1], dalgyal: ['hum', 2.6], slender: ['static_hiss', 1.8], nurse: ['cart', 0.9], headless: ['drag', 0.8], shadow: ['whisper', 3] };
       const [snd, gap] = sounds[gs.type] || ['whisper', 2];
       e.soundT = gap * (gs.mode === 'hunt' ? 1 : 1.8) * (0.6 + d / 13);
       if (Math.random() < 1 - d / 15) audio.play(snd);
@@ -896,10 +910,14 @@ function loop() {
   if (S.me && S.world && myAvatar) {
     updateMove(dt);
     animateAvatar(myAvatar, dt, me.moving, t, S.crouch || S.sneak, S.em || null, S.emT);
+    applyGear(myAvatar, myGear()); animateGear(myAvatar, t, dt, me.moving);
     updateOthers(dt, t);
+    updateVoiceRings(dt);
     updateCamera(dt);
     updateNearest(t);
     netSend(dt);
+    if (S.room === 'lobby' && S.world.rides?.swing) { const b = new Set(); if (S.mount?.ride === 'swing') b.add(S.mount.seat); for (const g of S.others.values()) { const rd = g.userData.target?.ride; if (rd?.startsWith('swing:')) b.add(Number(rd.split(':')[1])); } S.world.rides.swing.setBusy(b); }
+    S.world.shopFace?.(me.x, me.z);
     S.world.update?.(t, dt);
     updateThemeBubble();
     // 보조광: 머리 위가 아니라 카메라 쪽에서 넓게 비춰 캐릭터 머리가 하얗게 빛나지 않게 한다
@@ -913,7 +931,7 @@ function loop() {
     drawMinimap(dt, t);
     randomHorror(dt);
   }
-  updateLabels(); updateHearts(dt);
+  updateLabels(); updateHearts(dt); updateFx(dt);
   const inLobby = S.room === 'lobby';
   if (inLobby !== S._lobbyCls) { S._lobbyCls = inLobby; document.body.classList.toggle('in-lobby', inLobby); }
   updateGameTimer();
@@ -924,6 +942,8 @@ loop();
 
 // 로비 테마 관문: 가까이 가면 설명 말풍선
 const THEME_INFO = {
+  zombie: { title: '🧟 데드 시티 — 마지막 헬기 (히든)', tag: '히든 테마 · 좀비 도시 → 백화점 5층 → 옥상 헬기 · 7챕터 · 역대급 퍼즐 · 약 4~5시간', color: '#8aff5a',
+    story: '2026년 11월, R-9 감염 사태 사흘째. 무너진 한빛시에서 구조 헬기 매-7의 마지막 방송이 들린다. "05시 정각, 그랜드 한빛 백화점 옥상." 좀비로 가득한 백화점을 지하주차장부터 옥상까지 올라가 헬기에 오르자. 그리고 — 노란 풍선을 든 아이를 찾아서.' },
   gwimun: { title: '鬼門 귀문 — 서하리 분교 실종사건', tag: '한국 괴담 · 폐분교 · 7챕터 · 약 4~5시간', color: '#ff6a5a',
     story: '1979년 11월 7일, 서하분교 3학년 아이 일곱 명이 집에 돌아오지 않았다. 댐에 마을이 잠기기 직전, 심야 괴담 방송 크루가 서하리로 가는 막차에 오른다.' },
   ophelia: { title: '⚓ 오필리아호의 마지막 항해', tag: '유령선 · 등대 · 모스 부호 · 4챕터 · 약 2~3시간', color: '#7ae0ff',
@@ -1102,7 +1122,7 @@ socket.on('game:ending', (e) => {
     const icons = e.icons || ['👟', '🃏', '🎀', '🌀', '🔮', '➰', '🏷️'];
     $('#endRelics').textContent = icons.map((ic, i) => (i < e.relics ? ic : '·')).join(' ') + `   (${e.relics}/${e.total || 7})`;
     let tm = $('#endTime'); if (!tm) { tm = el('div', 'end-time'); tm.id = 'endTime'; $('#endRelics').after(tm); }
-    tm.textContent = e.ms ? `⏱ 클리어 시간 ${fmtMs(e.ms)} · 💡 힌트 ${e.hints ?? 0}개${e.full ? ' — 🏆 랭킹에 기록되었습니다' : ' (이어하기는 랭킹에 기록되지 않아요)'}` : '';
+    tm.textContent = e.ms ? `⏱ 클리어 시간 ${fmtMs(e.ms)} · 💡 힌트 ${e.hints ?? 0}개${e.over ? ' — ⏰ 제한 시간을 넘겨 순위표·경험치에서 빠졌어요 (코인은 받아요)' : e.full ? ' — 🏆 랭킹에 기록되었습니다' : ' (이어하기는 랭킹에 기록되지 않아요)'}` : '';
     $('#ending').classList.remove('hidden');
     audio.ambient(null); audio.play(e.type === 'true' || S.fear === 0 ? 'bell' : 'scream');
   }, 1200);
@@ -1418,6 +1438,20 @@ function openSlide(l) {
 }
 function slideArt(kind, n) {
   const c = document.createElement('canvas'); c.width = c.height = 300; const x = c.getContext('2d');
+  if (kind === 'zombie') { // 하린이네 가족사진: 헬멧을 든 아빠 · 엄마 · 노란 원피스 아이 · 노란 풍선
+    const g = x.createLinearGradient(0, 0, 0, 300); g.addColorStop(0, '#8ac8f0'); g.addColorStop(1, '#e8f4ff'); x.fillStyle = g; x.fillRect(0, 0, 300, 300);
+    x.fillStyle = '#6aa860'; x.fillRect(0, 220, 300, 80);
+    x.fillStyle = '#3a5a3a'; x.beginPath(); x.ellipse(40, 120, 26, 10, 0, 0, 7); x.fill(); x.fillRect(10, 116, 60, 8); x.fillRect(64, 112, 30, 4); // 멀리 헬기
+    const person = (cx, top, shirt, skin, h) => { x.fillStyle = shirt; x.fillRect(cx - 22, top + 40, 44, h); x.fillStyle = skin; x.beginPath(); x.arc(cx, top + 22, 20, 0, 7); x.fill(); x.fillStyle = '#2a1a10'; x.beginPath(); x.arc(cx, top + 14, 20, Math.PI, 0); x.fill(); x.fillStyle = '#222'; x.fillRect(cx - 8, top + 20, 4, 4); x.fillRect(cx + 4, top + 20, 4, 4); x.strokeStyle = '#a04040'; x.lineWidth = 2; x.beginPath(); x.arc(cx, top + 28, 6, 0.1 * Math.PI, 0.9 * Math.PI); x.stroke(); };
+    person(80, 70, '#3a5a8a', '#f0c8a0', 130); x.fillStyle = '#f0f0f0'; x.beginPath(); x.arc(52, 160, 18, 0, 7); x.fill(); x.fillStyle = '#2a4a6a'; x.fillRect(40, 152, 24, 10); // 비행 헬멧
+    person(220, 80, '#d86a8a', '#f4d4b4', 120);
+    person(150, 140, '#ffd23a', '#ffe0cc', 70);
+    x.strokeStyle = '#888'; x.lineWidth = 1.5; x.beginPath(); x.moveTo(168, 200); x.lineTo(190, 60); x.stroke(); x.fillStyle = '#ffd23a'; x.beginPath(); x.ellipse(190, 46, 22, 27, 0, 0, 7); x.fill();
+    x.fillStyle = '#c03040'; x.font = 'bold 20px serif'; x.fillText('🎂', 120, 40);
+    x.strokeStyle = '#ffffff'; x.lineWidth = 10; x.strokeRect(5, 5, 290, 290);
+    x.fillStyle = '#3a2a1a'; x.font = 'bold 18px serif'; x.fillText('하린 생일 2018.08.24', 60, 278);
+    return c.toDataURL();
+  }
   if (kind === 'park') { // 2006.07.07 21:40 거울 미궁 입구 — 아이 일곱, 맨 앞 왕관 쓴 아이가 열쇠를 든다
     const g = x.createLinearGradient(0, 0, 0, 300); g.addColorStop(0, '#2a1a2a'); g.addColorStop(1, '#4a3a3a'); x.fillStyle = g; x.fillRect(0, 0, 300, 300);
     for (let i = 0; i < 6; i++) { x.fillStyle = `rgba(200,220,240,${0.15 + (i % 2) * 0.1})`; x.fillRect(10 + i * 48, 40, 40, 150); }
@@ -1669,6 +1703,7 @@ function openAdmin() {
   const list = el('div', 'admin-list'); const head = el('div', 'muted', '불러오는 중…');
   const load = () => socket.emit('admin:stats', (st) => {
     head.textContent = `접속자 ${st.players.length}명 · 진행 중인 게임 ${st.games}개`; list.innerHTML = '';
+    statBox.innerHTML = ''; if (st.visit) statBox.appendChild(visitStats(st));
     for (const p of st.players) {
       const row = el('div', 'admin-row');
       row.append(el('span', 'an', (p.admin ? '🛡️ ' : '') + p.name), el('span', 'muted', `${p.room}${p.offline ? ' · 끊김' : ''}${p.muted ? ` · 🚫${Math.ceil(p.muted / 60)}분` : ''}${p.warns ? ` · 경고${p.warns}` : ''}`));
@@ -1682,8 +1717,10 @@ function openAdmin() {
     }
   });
   const re = el('button', 'btn small', '🔄 새로고침'); re.onclick = load;
-  w.append(ta, send, head, list, re); load();
-  openModal('🛡️ 운영자', '공지 · 채팅 금지 · 내보내기', w);
+  const statBox = el('div', 'visit-box');
+  const rk = el('button', 'btn small', '🏆 랭킹 관리 (기록 지우기)'); rk.onclick = () => openRank();
+  w.append(ta, send, statBox, rk, head, list, re); load();
+  openModal('🛡️ 운영자', '공지 · 방문 통계 · 랭킹 관리 · 채팅 금지 · 내보내기 · 머니 무한', w);
 }
 $('#adminBtn').onclick = openAdmin;
 
@@ -1717,10 +1754,11 @@ function renderParty() {
   $('#quitBtn').classList.toggle('hidden', !inGame);
   $('#quitBtn').textContent = amLeader ? '파티 전원 로비로 돌아가기' : '파티를 떠나 로비로';
   const sel = $('#chapterSel'); const prev = sel.value; sel.innerHTML = '';
-  const scs = p?.scenarios || S.scenarios || [];
+  const hidOk = p ? (p.hiddenOk || S.admin) : (S.hiddenOk || S.admin);
+  const scs = (p?.scenarios || S.scenarios || []).filter((x) => !x.hidden || hidOk); // 히든 테마는 열린 사람(파티장)에게만
   const ssel = $('#scenarioSel');
   const prevSc = ssel.value || store.get('gwimun-scenario', 'mia');
-  if (ssel.options.length !== scs.length) { ssel.innerHTML = ''; scs.forEach((x) => { const o = el('option', null, `🚪 ${x.title}  ${diffStars(x.difficulty || 3)}`); o.value = x.id; o.title = x.desc; ssel.appendChild(o); }); }
+  if (ssel.options.length !== scs.length) { ssel.innerHTML = ''; scs.forEach((x) => { const o = el('option', null, `${x.hidden ? '🧟' : '🚪'} ${x.title}  ${diffStars(x.difficulty || 3)}`); o.value = x.id; o.title = x.desc; ssel.appendChild(o); }); }
   if ([...ssel.options].some((o) => o.value === prevSc)) ssel.value = prevSc;
   const scInfo = scs.find((x) => x.id === ssel.value) || scs[0];
   const ub = (p ? p.unlockedBy : S.unlockedBy) || {};
@@ -1777,6 +1815,8 @@ function dismount() {
 }
 function lobbyAct(id) {
   if (S.mount) { dismount(); toast('내렸어요.'); return; }
+  if (id === 'shop') { openShop(); return; }
+  if (S.riding) S.riding = false;
   if (S.perch && id === 'off') { S.perch = null; me.y = 0; [me.x, me.z] = collide(me.x + Math.sin(me.ry) * 1.2, me.z + Math.cos(me.ry) * 1.2); return; }
   const it = S.world?.interactives?.find((i) => i.id === id); if (!it) return;
   audio.play('click');
@@ -1880,7 +1920,8 @@ function openRank(tab) {
     if ($('#modal').classList.contains('hidden') || $('#modalBody').firstChild !== holder) return; // 그새 닫았거나 다른 창을 열었다
     const wrap = holder; wrap.innerHTML = '';
     const tabs = el('div', 'rank-tabs'); const list = el('div', 'rank-list');
-    const scs = S.scenarios || [];
+    S.rankTab = () => cur;
+    const scs = (S.scenarios || []).filter((x) => !x.hidden || S.hiddenOk);
     let cur = tab || scs[0]?.id;
     const draw = () => {
       tabs.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.id === cur));
@@ -1891,6 +1932,7 @@ function openRank(tab) {
         const row = el('div', 'rank-row' + (r.names.includes(S.myName) ? ' me' : ''));
         row.append(el('span', 'rank-no', ['🥇', '🥈', '🥉'][i] || String(i + 1)), el('span', 'rank-names', r.names.join(', ')), el('span', 'rank-time', fmtMs(r.ms)), el('span', 'rank-meta', `${FEAR_SHORT[r.fear] ?? ''} · 💡${r.hints ?? '-'}`));
         if (r.ending === 'true') { const tb = el('span', 'rank-true', '🏅 진'); tb.title = '진엔딩으로 클리어'; row.querySelector('.rank-names').append(' ', tb); }
+        if (S.admin) { const del = el('button', 'btn tiny danger', '🗑️'); del.title = '이 기록 지우기 (아래 기록이 한 칸씩 올라가요)'; del.onclick = () => askConfirm('랭킹 기록 지우기', `${i + 1}위 '${r.names.join(', ')}' (${fmtMs(r.ms)}) 기록을 지울까요?\n지우면 아래 기록이 한 칸씩 올라갑니다.`, '지우기', () => { socket.emit('admin:rankDel', { sc: cur, at: r.at, ms: r.ms }); }); row.appendChild(del); }
         list.appendChild(row);
       });
     };
@@ -1930,14 +1972,15 @@ function openPlayerMenu(id, name, x, y) {
   if (canInvite) { const b = el('button', 'btn small', '🎟️ 파티 초대'); b.onclick = () => { socket.emit('party:invite', id); m.classList.add('hidden'); }; m.appendChild(b); }
   else m.appendChild(el('div', 'muted', r?.partyId && r.partyId === S.party?.id ? '같은 파티원' : '초대할 수 없음'));
   const h = el('button', 'btn small', '💖 하트 보내기'); h.onclick = () => { socket.emit('heart', id); m.classList.add('hidden'); }; m.appendChild(h);
+  const gf = el('button', 'btn small', '🎁 선물하기'); gf.onclick = () => { m.classList.add('hidden'); openGift(id, name); }; m.appendChild(gf);
   const w = el('button', 'btn small', '👋 인사하기'); w.onclick = () => { socket.emit('chat', { channel: 'all', text: `${name} 님 안녕하세요! 👋` }); m.classList.add('hidden'); }; m.appendChild(w);
-  m.style.left = Math.min(x, innerWidth - 160) + 'px'; m.style.top = Math.min(y, innerHeight - 120) + 'px';
+  m.style.left = Math.min(x, innerWidth - 160) + 'px'; m.style.top = Math.min(y, innerHeight - 170) + 'px';
   m.classList.remove('hidden');
 }
 
 // ─────────────────────────── 음성
 const voice = new Voice(socket, {
-  onLevel: (id, lv) => { const m = document.querySelector(`.mic[data-id="${id}"]`); if (m) m.classList.toggle('speak', lv > 0.06); },
+  onLevel: (id, lv) => { S.vlv.set(id, lv); const m = document.querySelector(`.mic[data-id="${id}"]`); if (m) m.classList.toggle('speak', lv > 0.06); },
   onError: (msg) => toast('🎙️ ' + msg),
 });
 // 듣기 범위: 'party' 파티원만 · 'all' 같은 곳(로비 · 같은 게임)의 모두
@@ -2056,6 +2099,7 @@ function doEmote(id) {
   if (id === 'jump') audio.play('pickup');
   if (id === 'boo') { socket.emit('boo'); audio.play('giggle'); }
   if (id === 'heart') { burstHearts(myAvatar, 6); }
+  if (id === 'fart') doFart(myAvatar, me.x, me.y || 0, me.z, me.ry);
   $('#emotePanel').classList.add('hidden');
 }
 function toggleEmotePanel() { $('#emotePanel').classList.toggle('hidden'); }
@@ -2129,6 +2173,232 @@ async function loadShareInfo() {
   } catch {}
 }
 
+// ─────────────────────────── 레벨 · 코인 · 상점 · 내 물건 · 선물
+const SHOP_ORDER = ['popper', 'rocket', 'wings_fairy', 'mount_pony', 'wings_angel', 'mount_broom', 'mount_unicorn', 'wings_devil', 'mount_trex', 'wings_dragon', 'mount_ufo', 'sword'];
+const coinsText = () => (S.profile?.coins === -1 ? '∞' : String(S.profile?.coins ?? 0));
+const myGear = () => { const e = S.profile?.equip || {}; return `${e.wings || ''}|${e.mount || ''}|${S.riding && e.mount ? 1 : 0}|${S.holdSword && S.profile?.items?.sword ? 1 : 0}`; };
+// 맨 아래 얇은 경험치 바 + 왼쪽 위 레벨·코인
+const xpBar = el('div'); xpBar.id = 'xpBar'; xpBar.innerHTML = '<div id="xpFill"></div><div id="xpLabel"></div>'; $('#hud').appendChild(xpBar);
+const lvChip = el('div'); lvChip.id = 'lvChip'; $('#onlineChip').after(lvChip);
+lvChip.onclick = () => openBag();
+function renderXp() {
+  const pf = S.profile; if (!pf) return;
+  const span = Math.max(1, pf.next - pf.cur), k = pf.lv >= pf.max ? 1 : (pf.xp - pf.cur) / span;
+  $('#xpFill').style.width = (Math.max(0, Math.min(1, k)) * 100).toFixed(1) + '%';
+  $('#xpLabel').textContent = pf.lv >= pf.max ? `Lv.${pf.lv} 만렙 👑` : `Lv.${pf.lv}  ${pf.xp - pf.cur} / ${span} XP`;
+  lvChip.innerHTML = `<b>Lv.${pf.lv}</b> · 🪙 ${coinsText()}`;
+  lvChip.title = '내 물건 🎒 (I)';
+  if (!pf.equip?.mount) S.riding = false;
+  if (!pf.items?.sword) S.holdSword = false;
+  updateGearButtons();
+}
+socket.on('profile', (pf) => {
+  const was = S.profile; S.profile = pf; renderXp();
+  if (pf.hiddenOk != null && pf.hiddenOk !== S.hiddenOk) { S.hiddenOk = pf.hiddenOk; updateHiddenGate(); renderParty(); }
+  if (S.shopRefresh) S.shopRefresh(); if (S.bagRefresh) S.bagRefresh();
+  if (was) return;
+});
+socket.on('xp', ({ add, why, lv, up }) => {
+  const f = el('div', 'xp-float', `+${add} XP${why ? ' · ' + why : ''}`); $('#hud').appendChild(f); setTimeout(() => f.remove(), 2600);
+  if (up) { audio.play('bell'); if (myAvatar) burstHearts(myAvatar, 10); }
+});
+socket.on('gift', ({ from, icon, name }) => { toast(`🎁 ${from} 님이 ${icon} ${name}을(를) 선물했어요! (🎒 내 물건)`); audio.play('pickup'); if (myAvatar) burstHearts(myAvatar, 8); });
+socket.on('rank:changed', () => openRank(S.rankTab?.()));
+socket.on('game:overtime', () => { audio.play('bell'); $('#gameTimer').classList.add('over'); });
+// 히든 테마: 모든 테마를 한 번씩 깨거나 만렙이면 열린다
+function updateHiddenGate(quiet) {
+  const ok = !!(S.hiddenOk || S.admin);
+  if (S.room === 'lobby' && S.world?.hiddenGate !== undefined && S.world.hiddenGate !== ok && myAvatar) { enterLobby({ x: me.x, z: me.z }); if (!quiet) toast('🧟 광장에 히든 테마 「데드 시티」 관문이 나타났어요!'); }
+}
+// ───── 탈것 · 전설의 검
+function toggleRide() {
+  const m = S.profile?.equip?.mount;
+  if (!m) { toast('🐴 탈것이 없어요. 🛒 상점에서 사서 🎒 내 물건에서 착용하세요.'); return; }
+  if (S.mount) dismount();
+  S.riding = !S.riding; S.perch = null; me.y = 0;
+  toast(S.riding ? `${S.shop[m]?.icon || '🐴'} ${S.shop[m]?.name || '탈것'}에 탔어요! 이동 속도 1.5배 (Z: 내리기)` : '탈것에서 내렸어요.');
+  updateGearButtons();
+}
+function swingSword() {
+  if (!S.profile?.items?.sword) { toast('🗡️ 전설의 검이 없어요. (🛒 상점)'); return; }
+  if (!S.holdSword) { S.holdSword = true; toast(`🗡️ 전설의 검을 들었다! B: 휘두르기 · 남은 횟수 ${S.profile.swordUses}/10`); updateGearButtons(); return; }
+  if (myAvatar) myAvatar.userData.swingT = 0.45;
+  socket.emit('shop:use', 'sword');
+}
+socket.on('fx:item', (f) => {
+  const d = Math.hypot(f.x - me.x, f.z - me.z); if (d > 40) return;
+  const g = avatarById(f.id);
+  if (f.type === 'popper') { popperFx(f.x, f.y, f.z, f.ry); audio.play('party_pop'); if (d < 4) S.shake = 0.25; }
+  else if (f.type === 'rocket') { audio.play('rocket_up'); rocketFx(f.x, f.y, f.z, () => audio.play('firework')); }
+  else if (f.type === 'sword') {
+    if (g && f.id !== S.me) g.userData.swingT = 0.45;
+    swordFx(f.x, f.y, f.z, f.ry, f.hit); audio.play(f.hit ? 'slay' : 'sword');
+    if (f.broke) { shatterFx(f.x, f.y, f.z); audio.play('shatter'); if (f.id === S.me) S.holdSword = false; }
+  }
+});
+function useShopItem(id) {
+  if (id === 'sword') return swingSword();
+  if (!S.profile?.items?.[id]) { toast('남은 게 없어요. 🛒 상점에서 더 살 수 있어요.'); return; }
+  socket.emit('shop:use', id);
+}
+// ───── 방귀 뿡 (먼지 + 낄낄)
+function doFart(g, x, y, z, ry) {
+  const d = Math.hypot(x - me.x, z - me.z);
+  setTimeout(() => { fartFx(x, y, z, ry); if (d < 16) audio.play('fart'); }, 380);
+  if (d < 16) setTimeout(() => audio.play('laugh'), 820);
+  if (g) setTimeout(() => { const b = textSprite('뿌우웅~ 💨 낄낄', { size: 26, bg: 'rgba(60,50,20,.8)', color: '#ffe9a8' }); addLabel(g, b, 2.05); setTimeout(() => removeLabel(b), 1800); }, 400);
+}
+// ───── 마이크로 말하면 발밑에 초록 링이 목소리 크기에 맞춰 퍼진다
+const ringGeo = new THREE.RingGeometry(0.9, 1, 56); ringGeo.rotateX(-Math.PI / 2);
+function updateVoiceRings(dt) {
+  // 말하는 동안 발밑에 초록 원 하나가 나타나고, 말을 멈추면 서서히 사라진다
+  const seen = new Set();
+  for (const [id, lv] of S.vlv) {
+    const g = id === S.me ? myAvatar : S.others.get(id); if (!g) continue;
+    seen.add(g);
+    const u = g.userData;
+    if (lv >= 0.05) u.vrHold = 0.35; else u.vrHold = Math.max(0, (u.vrHold || 0) - dt);
+    const want = u.vrHold > 0 ? 0.75 : 0;
+    if (!u.vring && want) { u.vring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: '#3dff7a', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })); u.vring.scale.setScalar(0.55); scene.add(u.vring); S.vrings.push(g); }
+    if (!u.vring) continue;
+    const m = u.vring.material; m.opacity += (want - m.opacity) * Math.min(1, dt * (want ? 12 : 5));
+    u.vring.position.set(g.position.x, (g.position.y || 0) + 0.04, g.position.z);
+    if (!want && m.opacity < 0.02) { scene.remove(u.vring); m.dispose(); u.vring = null; S.vrings = S.vrings.filter((x) => x !== g); }
+  }
+  for (const g of S.vrings) if (!seen.has(g) || !g.parent) { const u = g.userData; if (u.vring) { scene.remove(u.vring); u.vring.material.dispose(); u.vring = null; } }
+  S.vrings = S.vrings.filter((g) => g.userData.vring);
+}
+// ───── 상점 (미리보기 + 목록)
+let shopPv = null;
+function shopPreview() {
+  if (shopPv) return shopPv;
+  const canvas = el('canvas'); canvas.width = 240; canvas.height = 220; canvas.className = 'shop-pv';
+  const r = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true }); r.setPixelRatio(Math.min(2, devicePixelRatio)); r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.4;
+  const sc = new THREE.Scene(); sc.add(new THREE.HemisphereLight('#ffffff', '#443344', 2.2)); const dl = new THREE.DirectionalLight('#fff', 1.6); dl.position.set(2, 3, 3); sc.add(dl);
+  const cam = new THREE.PerspectiveCamera(36, 240 / 220, 0.1, 50); cam.position.set(0, 1.3, 4.2); cam.lookAt(0, 0.75, 0);
+  shopPv = { canvas, r, sc, cam, av: null, gear: '', on: false };
+  const tick = (t) => { if (!shopPv.on) return; requestAnimationFrame(tick); if (shopPv.av) { const tt = t / 1000; shopPv.av.rotation.y = tt * 0.6; animateAvatar(shopPv.av, 0.016, shopPv.walk, tt); applyGear(shopPv.av, shopPv.gear); animateGear(shopPv.av, tt, 0.016, shopPv.walk); } r.render(sc, cam); };
+  shopPv.start = () => { if (shopPv.on) return; shopPv.on = true; requestAnimationFrame(tick); };
+  return shopPv;
+}
+function previewItem(id) {
+  const pv = shopPreview(); const it = S.shop[id] || {};
+  if (!pv.av) { pv.av = createAvatar(look); pv.sc.add(pv.av); }
+  pv.walk = it.kind === 'mount';
+  pv.gear = it.kind === 'wings' ? `${id}||0|0` : it.kind === 'mount' ? `|${id}|1|0` : it.kind === 'sword' ? '|||1' : '';
+  pv.cam.position.set(0, it.kind === 'mount' ? 1.6 : 1.3, it.kind === 'mount' ? 4.8 : 4.2); pv.cam.lookAt(0, it.kind === 'mount' ? 0.9 : 0.75, 0);
+}
+function openShop() {
+  if (!S.profile) return;
+  const w = el('div', 'shop');
+  const head = el('div', 'shop-head'); const pvBox = el('div', 'shop-pvbox'); const info = el('div', 'shop-info'); const grid = el('div', 'shop-grid');
+  const pv = shopPreview(); pvBox.appendChild(pv.canvas); pv.start();
+  let sel = 'wings_fairy';
+  const draw = () => {
+    const pf = S.profile;
+    head.innerHTML = `<span><b>Lv.${pf.lv}</b>${pf.lv >= pf.max ? ' 👑' : ''}</span><span>🪙 <b>${coinsText()}</b> 코인</span><span class="muted">방탈출을 한 번 깰 때마다 🪙10 · 레벨이 오르면 새 물건이 열려요</span>`;
+    grid.innerHTML = '';
+    for (const id of SHOP_ORDER) {
+      const it = S.shop[id]; if (!it) continue;
+      const have = pf.items?.[id] || 0, locked = !pf.admin && pf.lv < it.lv, full = have >= it.max;
+      const c = el('div', 'shop-card' + (sel === id ? ' sel' : '') + (locked ? ' locked' : ''));
+      c.innerHTML = `<div class="si">${it.icon}</div><div class="sn">${it.name}</div><div class="sp">🪙 ${it.price.toLocaleString()}</div><div class="sl">${locked ? `🔒 Lv.${it.lv}` : it.max > 1 ? `${have}/${it.max}개` : have ? '✅ 보유' : `Lv.${it.lv}+`}</div>`;
+      c.onclick = () => { sel = id; previewItem(id); draw(); };
+      grid.appendChild(c);
+    }
+    const it = S.shop[sel]; const have = pf.items?.[sel] || 0; const locked = !pf.admin && pf.lv < it.lv;
+    info.innerHTML = `<div class="sh-t">${it.icon} ${it.name}</div><div class="sh-d">${it.desc}</div><div class="muted">${it.max > 1 ? `최대 ${it.max}개까지 가질 수 있어요 · 지금 ${have}개` : '1개만 살 수 있어요'}${it.kind === 'mount' ? ' · 탄 동안 이동 속도 1.5배 (Z)' : ''}${it.kind === 'sword' ? ' · 귀신 10번 베면 깨져요' : ''}</div>`;
+    const buy = el('button', 'btn primary', locked ? `🔒 Lv.${it.lv} 부터` : have >= it.max ? (it.max > 1 ? '가득 찼어요' : '이미 있어요') : `🪙 ${it.price.toLocaleString()} 코인에 사기`);
+    buy.disabled = locked || have >= it.max;
+    buy.onclick = () => { socket.emit('shop:buy', sel); audio.play('click'); };
+    const bag = el('button', 'btn', '🎒 내 물건'); bag.onclick = () => openBag();
+    const row = el('div', 'row'); row.append(buy, bag); info.appendChild(row);
+  };
+  const top = el('div', 'shop-top'); top.append(pvBox, info);
+  w.append(head, top, grid);
+  previewItem(sel); draw();
+  S.shopRefresh = () => { if ($('#modalBody').firstChild === w) draw(); else S.shopRefresh = null; };
+  openModal('🛒 코인 상점', '날개 · 탈것 · 폭죽 · 전설의 검', w);
+  const stop = () => { if ($('#modalBody').firstChild !== w || $('#modal').classList.contains('hidden')) { pv.on = false; S.shopRefresh = null; } else setTimeout(stop, 500); }; setTimeout(stop, 500);
+}
+socket.on('shop:bought', ({ id }) => { audio.play('pickup'); const it = S.shop[id]; if (it?.kind === 'sword') S.holdSword = true; });
+// ───── 내 물건 (착용 · 사용 · 선물)
+function openBag() {
+  if (!S.profile) return;
+  const w = el('div', 'bag');
+  const draw = () => {
+    w.innerHTML = ''; const pf = S.profile;
+    const ids = SHOP_ORDER.filter((id) => pf.items?.[id]);
+    w.appendChild(el('div', 'muted', `Lv.${pf.lv} · 🪙 ${coinsText()} 코인 · 단축키: Z 탈것 타기/내리기 · B 검 들기/휘두르기`));
+    if (!ids.length) { w.appendChild(el('div', 'muted', '아직 가진 물건이 없어요. 🛒 상점에서 사 보세요!')); }
+    for (const id of ids) {
+      const it = S.shop[id]; const n = pf.items[id];
+      const row = el('div', 'bag-row');
+      row.appendChild(el('span', 'bi', it.icon));
+      row.appendChild(el('span', 'bn', `${it.name}${it.max > 1 ? ` ×${n}` : ''}${it.kind === 'sword' ? ` (남은 ${pf.swordUses}/10)` : ''}`));
+      const acts = el('span', 'ba');
+      if (it.kind === 'wings' || it.kind === 'mount') {
+        const on = pf.equip?.[it.kind] === id;
+        const b = el('button', 'btn tiny' + (on ? ' primary' : ''), on ? '착용 중 ✓' : '착용'); b.onclick = () => { socket.emit('shop:equip', { id, on: !on }); if (it.kind === 'mount' && on) S.riding = false; };
+        acts.appendChild(b);
+        if (it.kind === 'mount' && on) { const r = el('button', 'btn tiny', S.riding ? '내리기 (Z)' : '타기 (Z)'); r.onclick = () => { toggleRide(); draw(); }; acts.appendChild(r); }
+      } else if (it.kind === 'sword') {
+        const b = el('button', 'btn tiny' + (S.holdSword ? ' primary' : ''), S.holdSword ? '넣기' : '들기'); b.onclick = () => { S.holdSword = !S.holdSword; updateGearButtons(); draw(); };
+        const sw = el('button', 'btn tiny', '휘두르기 (B)'); sw.onclick = () => { S.holdSword = true; closeModal(); swingSword(); };
+        acts.append(b, sw);
+      } else {
+        const b = el('button', 'btn tiny primary', it.kind === 'pop' ? '🎉 펑!' : '🎆 쏘기'); b.onclick = () => { closeModal(); useShopItem(id); };
+        acts.appendChild(b);
+      }
+      const gb = el('button', 'btn tiny', '🎁'); gb.title = '친구에게 선물하기'; gb.onclick = () => pickGiftTarget(id); acts.appendChild(gb);
+      row.appendChild(acts); w.appendChild(row);
+    }
+    const shop = el('button', 'btn small', '🛒 상점 가기'); shop.onclick = () => openShop(); w.appendChild(shop);
+  };
+  draw();
+  S.bagRefresh = () => { if ($('#modalBody').firstChild === w) draw(); else S.bagRefresh = null; };
+  openModal('🎒 내 물건', '날개·탈것은 착용하면 모두에게 보여요', w);
+}
+function pickGiftTarget(id) {
+  const it = S.shop[id]; const w = el('div', 'bag');
+  const others = S.roster.filter((r) => r.id !== S.me);
+  if (!others.length) w.appendChild(el('div', 'muted', '선물할 접속자가 없어요.'));
+  for (const r of others) { const b = el('button', 'btn small', `🎁 ${r.name}`); b.onclick = () => { socket.emit('shop:gift', { to: r.id, id }); closeModal(); }; w.appendChild(b); }
+  openModal(`🎁 ${it.icon} ${it.name} 선물하기`, '누구에게 보낼까요? (선물하면 내 것에서 1개가 빠져요)', w);
+}
+function openGift(toId, name) {
+  if (!S.profile) return;
+  const w = el('div', 'bag'); const pf = S.profile;
+  const ids = SHOP_ORDER.filter((id) => pf.items?.[id] || pf.admin);
+  if (!ids.length) w.appendChild(el('div', 'muted', '선물할 물건이 없어요. 🛒 상점에서 먼저 사 보세요!'));
+  for (const id of ids) { const it = S.shop[id]; const b = el('button', 'btn small', `${it.icon} ${it.name}${pf.items?.[id] > 1 ? ` (${pf.items[id]}개)` : ''}`); b.onclick = () => { socket.emit('shop:gift', { to: toId, id }); closeModal(); }; w.appendChild(b); }
+  openModal(`🎁 ${name} 님에게 선물하기`, '내 물건 중 하나를 골라 보내요', w);
+}
+$('#sideBtns').insertBefore(Object.assign(el('button', 'btn small', '🛒 상점'), { id: 'shopBtn', onclick: () => openShop() }), $('#rankBtn'));
+$('#sideBtns').insertBefore(Object.assign(el('button', 'btn small', '🎒 내 물건'), { id: 'bagBtn', onclick: () => openBag() }), $('#rankBtn'));
+function updateGearButtons() {
+  const rb = $('.abtn.ride'), sb = $('.abtn.sword');
+  if (rb) { rb.classList.toggle('hidden', !S.profile?.equip?.mount); rb.classList.toggle('on', !!S.riding); rb.firstChild.textContent = S.shop[S.profile?.equip?.mount]?.icon || '🐴'; }
+  if (sb) { sb.classList.toggle('hidden', !S.profile?.items?.sword); sb.classList.toggle('on', !!S.holdSword); }
+}
+// ───── 운영자: 방문 통계 (일간 · 주간 · 월간)
+const fmtDur = (ms) => { const m = Math.round(ms / 60000); return m >= 60 ? `${Math.floor(m / 60)}시간 ${m % 60}분` : `${m}분`; };
+function visitStats(st) {
+  const box = el('div');
+  const cards = el('div', 'visit-cards');
+  for (const [k, label] of [['day', '오늘'], ['week', '최근 7일'], ['month', '최근 30일']]) {
+    const v = st.visit[k];
+    const c = el('div', 'visit-card'); c.innerHTML = `<div class="vl">${label}</div><div class="vn">${v.visitors}<small>명</small></div><div class="vs">방문 ${v.visits}회<br>총 체류 ${fmtDur(v.totalMs)}<br>1인 평균 ${fmtDur(v.avgMs)}</div>`;
+    cards.appendChild(c);
+  }
+  box.appendChild(cards);
+  const max = Math.max(1, ...st.daily.map((d) => d.visitors));
+  const chart = el('div', 'visit-chart');
+  for (const d of [...st.daily].reverse()) { const b = el('div', 'vbar'); b.title = `${d.day} · 방문자 ${d.visitors}명 · 방문 ${d.visits}회 · 체류 ${fmtDur(d.totalMs)}`; b.innerHTML = `<i style="height:${(d.visitors / max) * 100}%"></i><span>${d.day.slice(8)}</span>`; chart.appendChild(b); }
+  box.append(el('div', 'muted', '최근 14일 방문자 (막대에 손을 올리면 자세히)'), chart);
+  return box;
+}
+
 // ─────────────────────────── 모바일 (터치) UI
 const isMobileView = () => matchMedia('(pointer: coarse)').matches || innerWidth < 760;
 function applyMobile() {
@@ -2146,7 +2416,7 @@ applyMobile(); addEventListener('resize', applyMobile);
   const panels = { party: '#partyPanel', share: '#sharePanel', roster: '#rosterPanel', chat: '#chat' };
   const btns = [
     ['party', '👥', '파티'], ['chat', '💬', '채팅'], ['roster', '🧑‍🤝‍🧑', '접속자'], ['share', '🔗', '초대 주소'],
-    ['rank', '🏆', '랭킹'], ['settings', '⚙', '설정 · 지도 · 옷 · 도움말'], ['coffee', '☕', '커피 한 잔 후원하기'], ['admin', '🛡️', '운영자'],
+    ['shop', '🛒', '코인 상점'], ['bag', '🎒', '내 물건'], ['rank', '🏆', '랭킹'], ['settings', '⚙', '설정 · 지도 · 옷 · 도움말'], ['coffee', '☕', '커피 한 잔 후원하기'], ['admin', '🛡️', '운영자'],
   ];
   let open = null;
   const setOpen = (k) => {
@@ -2166,6 +2436,7 @@ applyMobile(); addEventListener('resize', applyMobile);
       if (open) setOpen(open);
       if (k === 'map') { SET.minimap = !SET.minimap; saveSettings(); }
       else if (k === 'emote') toggleEmotePanel();
+      else if (k === 'shop') openShop(); else if (k === 'bag') openBag();
       else { const sel = ({ look: '#lookBtn', settings: '#settingsBtn', help: '#helpBtn', rank: '#rankBtn', coffee: '#coffeeBtn', admin: '#adminBtn' })[k]; if (sel) $(sel).click(); }
     };
     bar.appendChild(b);
@@ -2210,6 +2481,9 @@ applyMobile(); addEventListener('resize', applyMobile);
   let snBtn = null;
   snBtn = abtn('sneak', '🤫', () => { S.mSneak = !S.mSneak; if (S.mSneak) { S.mRun = false; runBtn.classList.remove('on'); } snBtn.classList.toggle('on', S.mSneak); });
   abtn('shout', '📢<small>외치기</small>', () => sendCallout());
+  abtn('ride hidden', '🐴<small>타기</small>', () => toggleRide());
+  abtn('sword hidden', '🗡️<small>검</small>', () => swingSword());
+  updateGearButtons();
   hud.appendChild(act);
   renderVoiceUI();
   setInterval(() => {
@@ -2237,3 +2511,4 @@ applyMobile(); addEventListener('resize', applyMobile);
   });
   $('#inventory').addEventListener('click', (e) => { const s = e.target.closest('.slot'); if (s?.dataset.lp) { e.stopImmediatePropagation(); e.preventDefault(); delete s.dataset.lp; } }, true);
 }
+if (window.__dbg) Object.assign(window.__dbg, { S, me, cam, openShop, openBag, toggleRide, swingSword, doEmote, interact, lobbyAct, scene, camera, cinema });

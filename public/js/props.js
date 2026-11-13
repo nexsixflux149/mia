@@ -95,6 +95,7 @@ export const FOOT = {
   burnt_beam: [3, 0.6], scarecrow: [0.6, 0.6],
   swing: [2.0, 1.4], carousel_big: [6.6, 6.6], pirate_frame: [5.6, 3.2], drop_tower: [1.6, 1.6], teacup: [1.8, 1.8], mascot_statue: [1.3, 1.1], turnstile: [1.5, 0.4], park_map: [2, 0.3],
   speaker_pole: [0.3, 0.3], control_panel: [1.6, 0.8], gear_wall: [3, 0.3], ghost_cart: [1.2, 1.6], coffin: [0.8, 2],
+  car: [1.9, 4.2], barricade: [2.4, 0.6], generator: [1.4, 0.9], escalator: [1.4, 5.2], vending: [1.0, 0.8], heli: [3.4, 7.5], tv_wall: [3.2, 0.5], cash_register: [0.7, 0.6], shop_cart: [0.6, 0.9], sandbags: [2.2, 0.7], dept_counter: [2.4, 0.8], mannequin_row: [3, 0.6],
 };
 
 // 지금 짓는 맵의 테마 (포스터·게시물 그림을 테마에 맞게 그린다)
@@ -175,6 +176,51 @@ export function buildProp(p) {
       break;
     }
     case 'rock': { const r = S(g, 0.6, '#555a58', 0, 0.25, 0); r.scale.set(1.1, 0.6, 0.9); break; }
+    // ── 좀비 도시 · 백화점 (히든 테마)
+    case 'car': { // 버려진 승용차 (p.color · p.taxi · p.police · p.wreck)
+      const c = p.color || (p.taxi ? '#e8b818' : p.police ? '#f0f0f0' : ['#7a1a1a', '#2a3a5a', '#4a4a4e', '#e8e4dc'][seedOf(p) % 4]);
+      B(g, 1.8, 0.55, 4.0, c, 0, 0.32, 0, { metalness: 0.5, roughness: 0.4 });
+      B(g, 1.6, 0.5, 2.0, shade(c, -6), 0, 0.87, -0.2, { metalness: 0.5, roughness: 0.4 });
+      B(g, 1.5, 0.42, 1.94, '#1a2a34', 0, 0.9, -0.2, { metalness: 0.9, roughness: 0.1, transparent: true, opacity: 0.85 });
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const w = C(g, 0.34, 0.34, 0.24, '#141414', sx * 0.86, 0.34, sz * 1.3, 14); w.rotation.z = Math.PI / 2; w.position.y = 0.34; }
+      for (const sx of [-1, 1]) { B(g, 0.3, 0.12, 0.05, '#fff6c8', sx * 0.6, 0.48, 2.01, { emissive: p.wreck ? '#000' : '#fff2b0', emissiveIntensity: 0.8 }); B(g, 0.3, 0.12, 0.05, '#a01010', sx * 0.6, 0.5, -2.01, { emissive: '#ff2020', emissiveIntensity: 0.5 }); }
+      if (p.taxi) { B(g, 0.6, 0.18, 0.3, '#ffe066', 0, 1.13, -0.2, { emissive: '#ffcc33', emissiveIntensity: 0.6 }); }
+      if (p.police) { B(g, 0.9, 0.15, 0.25, '#222', 0, 1.13, -0.2); B(g, 0.35, 0.14, 0.24, '#2a5aff', -0.25, 1.14, -0.2, { emissive: '#2a5aff', emissiveIntensity: 1.2 }); B(g, 0.35, 0.14, 0.24, '#ff2a2a', 0.25, 1.14, -0.2, { emissive: '#ff2a2a', emissiveIntensity: 1.2 }); B(g, 1.82, 0.12, 1.4, '#1a2a6a', 0, 0.5, 0.6); }
+      if (p.wreck) { const sm = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), M('#141210', { roughness: 1, transparent: true, opacity: 0.5 })); sm.position.set(0, 0.9, 1.6); sm.scale.set(1.4, 0.5, 1); g.add(sm); B(g, 1.0, 0.1, 0.8, '#1a0a06', 0.2, 0.62, 1.4); }
+      break;
+    }
+    case 'barricade': { for (let i = 0; i < 2; i++) B(g, 2.4, 0.22, 0.06, i ? '#f0f0f0' : '#e03a1a', 0, 0.55 + i * 0.3, 0); for (const s of [-1, 1]) { const l = B(g, 0.07, 1.0, 0.5, '#d8d8d8', s * 1.0, 0, 0); l.rotation.x = 0.0; } S(g, 0.07, '#ffb020', 0.9, 1.2, 0, { emissive: '#ff9a00', emissiveIntensity: 1.5 }); break; }
+    case 'sandbags': { for (let r = 0; r < 3; r++) for (let i = 0; i < 4 - r; i++) { const b = S(g, 0.32, '#8a7a58', -0.75 + i * 0.5 + r * 0.25, 0.14 + r * 0.24, 0); b.scale.set(0.85, 0.42, 0.6); } break; }
+    case 'generator': { B(g, 1.3, 0.8, 0.8, '#c8a020', 0, 0.08, 0, { metalness: 0.4 }); B(g, 1.36, 0.08, 0.86, '#2a2a2a', 0, 0); B(g, 0.5, 0.3, 0.05, '#1a1a1a', 0.3, 0.4, 0.41); C(g, 0.06, 0.06, 0.4, '#555', -0.45, 0.88, 0.2); for (let i = 0; i < 4; i++) B(g, 0.04, 0.4, 0.02, '#333', -0.5 + i * 0.1, 0.25, 0.41); S(g, 0.04, p.on ? '#40ff60' : '#ff3030', 0.55, 0.65, 0.42, { emissive: p.on ? '#40ff60' : '#ff3030', emissiveIntensity: 1.5 }); break; }
+    case 'escalator': { // 멈춘 에스컬레이터 (뒤쪽 -z 로 올라간다)
+      const st = new THREE.Group(); g.add(st);
+      for (let i = 0; i < 14; i++) B(st, 1.0, 0.04, 0.36, '#5a5e64', 0, i * 0.24, 2.3 - i * 0.34, { metalness: 0.7, roughness: 0.4 });
+      for (const s of [-1, 1]) { const rail = B(g, 0.12, 0.9, 5.4, '#c8ccd4', s * 0.62, 0, 0, { metalness: 0.6, roughness: 0.3 }); rail.rotation.x = 0.61; rail.position.y = 1.6; const hr = B(g, 0.14, 0.08, 5.6, '#141414', s * 0.62, 0, 0); hr.rotation.x = 0.61; hr.position.y = 2.3; }
+      B(g, 1.4, 0.1, 0.8, '#7a7e84', 0, 0, 2.5, { metalness: 0.6 });
+      break;
+    }
+    case 'vending': { B(g, 0.95, 1.9, 0.75, p.color || '#c0202a'); B(g, 0.6, 1.1, 0.03, '#a8d8ff', -0.1, 0.6, 0.38, { emissive: '#6ab0ff', emissiveIntensity: p.on === false ? 0 : 0.6, transparent: true, opacity: 0.85 }); for (let r = 0; r < 4; r++) for (let i = 0; i < 4; i++) B(g, 0.1, 0.16, 0.05, ['#ff6a6a', '#ffd36a', '#6ae0a0', '#6ab0ff'][(r + i) % 4], -0.32 + i * 0.15, 0.7 + r * 0.26, 0.36); B(g, 0.6, 0.18, 0.05, '#222', -0.1, 0.25, 0.39); break; }
+    case 'tv_wall': { B(g, 3.2, 2.0, 0.3, '#1a1a1e'); for (let r = 0; r < 3; r++) for (let i = 0; i < 4; i++) B(g, 0.74, 0.58, 0.03, '#0a0a0c', -1.17 + i * 0.78, 0.1 + r * 0.62, 0.16, { emissive: p.on === false ? '#000' : ['#2a6aff', '#ff3a3a', '#3aff8a', '#ffffff'][(r * 4 + i) % 4], emissiveIntensity: 0.35 }); break; }
+    case 'cash_register': { B(g, 0.6, 0.9, 0.5, '#2a2a30'); B(g, 0.5, 0.18, 0.4, '#3a3a42', 0, 0.9, 0); const sc = B(g, 0.32, 0.22, 0.04, '#1a3a2a', 0, 1.1, -0.1, { emissive: '#30ff80', emissiveIntensity: 0.5 }); sc.rotation.x = -0.3; break; }
+    case 'shop_cart': { B(g, 0.55, 0.42, 0.8, '#b8bcc4', 0, 0.42, 0, { metalness: 0.8, roughness: 0.3, transparent: true, opacity: 0.7 }); for (const sx of [-1, 1]) for (const sz of [-1, 1]) S(g, 0.05, '#222', sx * 0.22, 0.05, sz * 0.32); B(g, 0.6, 0.04, 0.04, '#d02a2a', 0, 1.0, -0.42); break; }
+    case 'dept_counter': { B(g, 2.4, 0.95, 0.8, '#f2ece4'); B(g, 2.46, 0.06, 0.86, '#d8b060', 0, 0.95, 0, { metalness: 0.7, roughness: 0.25 }); B(g, 2.2, 0.35, 0.6, '#cfe8ff', 0, 1.01, 0, { transparent: true, opacity: 0.35, roughness: 0.05 }); for (let i = 0; i < 6; i++) C(g, 0.04, 0.05, 0.16, ['#ff6a9a', '#ffd36a', '#c080ff'][i % 3], -0.9 + i * 0.36, 1.01, 0, 10); break; }
+    case 'mannequin_row': { for (let i = 0; i < 3; i++) { const m = new THREE.Group(); m.position.set(-1 + i, 0, 0); g.add(m); C(m, 0.16, 0.2, 0.05, '#222', 0, 0, 0); C(m, 0.02, 0.02, 0.8, '#888', 0, 0.05, 0); const b = C(m, 0.18, 0.13, 0.62, ['#c02a4a', '#2a4ac0', '#e8e0d0'][i], 0, 0.85, 0, 12); S(m, 0.12, '#e8e0d8', 0, 1.62, 0); if ((seedOf(p) + i) % 3 === 0) m.rotation.z = 0.5; } break; }
+    case 'heli': { // 구조 헬기 (회전날개가 돈다)
+      const body = S(g, 1, '#2a4a2a', 0, 1.2, 0.4); body.scale.set(1.15, 0.95, 2.1);
+      B(g, 0.5, 0.45, 3.4, '#2a4a2a', 0, 1.1, -2.9); B(g, 0.08, 1.0, 0.7, '#2a4a2a', 0, 1.35, -4.5);
+      const glass = S(g, 0.8, '#7ab8d8', 0, 1.35, 1.75, { metalness: 0.9, roughness: 0.05, transparent: true, opacity: 0.6 }); glass.scale.set(1.15, 0.8, 0.8);
+      for (const s of [-1, 1]) { B(g, 0.08, 0.08, 3.4, '#1a1a1a', s * 0.9, 0.05, 0.4); for (const z of [-0.6, 1.4]) { const leg = B(g, 0.06, 0.5, 0.06, '#1a1a1a', s * 0.85, 0.08, z); leg.rotation.z = s * 0.3; } }
+      B(g, 2.0, 0.5, 0.6, '#ffffff', 0, 1.3, 0.5, { transparent: true, opacity: 0.0 });
+      const mast = C(g, 0.1, 0.12, 0.5, '#1a1a1a', 0, 2.05, 0.3);
+      const rotor = new THREE.Group(); rotor.position.set(0, 2.55, 0.3); g.add(rotor);
+      for (let i = 0; i < 4; i++) { const bl = B(rotor, 0.28, 0.04, 4.6, '#141414', 0, 0, 0); bl.rotation.y = (i * Math.PI) / 4 * 2; }
+      const tr = new THREE.Group(); tr.position.set(0.12, 1.5, -4.6); g.add(tr);
+      for (let i = 0; i < 2; i++) { const bl = B(tr, 0.03, 1.0, 0.12, '#141414', 0, -0.5, 0); bl.rotation.x = i * Math.PI / 2; }
+      B(g, 0.8, 0.25, 0.04, '#e8e4dc', 0, 1.1, -2.2, {}); // 기체 번호판
+      S(g, 0.07, '#ff3030', 0, 0.98, -4.3, { emissive: '#ff2020', emissiveIntensity: 2 });
+      g.userData.rotors = [[rotor, 'y', p.on === false ? 0 : 14], [tr, 'x', p.on === false ? 0 : 22]];
+      break;
+    }
     case 'house': {
       B(g, 4.6, 2.4, 3.6, '#4d4035');
       const roof = new THREE.Mesh(new THREE.ConeGeometry(3.6, 1.6, 4), M('#2a2522')); roof.position.y = 3.2; roof.rotation.y = Math.PI / 4; roof.scale.z = 0.8; g.add(roof);

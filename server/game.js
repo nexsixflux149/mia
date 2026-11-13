@@ -10,7 +10,7 @@ const norm = (s) => String(s ?? '').replace(/\s+/g, '').toLowerCase();
 
 // 한 파티의 방탈출 진행 상태(서버 권한)
 export class GameInstance {
-  constructor({ id, io, party, players, chapter, fear = 2, scenario = 'gwimun', onChapter, onEnd }) {
+  constructor({ id, io, party, players, chapter, fear = 2, scenario = 'gwimun', onChapter, onEnd, onAdvance, limitMs = 0 }) {
     this.sc = SCENARIOS[scenario] || SCENARIOS.gwimun;
     this.chapters = this.sc.chapters;
     this.fear = fear; // 0 왕초보(귀신 없음) · 1 순한맛 · 2 보통 · 3 매운맛
@@ -26,7 +26,8 @@ export class GameInstance {
     this.hintLevel = {};
     this.wrong = {};
     this.onChapter = onChapter;
-    this.onEnd = onEnd;
+    this.onEnd = onEnd; this.onAdvance = onAdvance;
+    this.limitMs = limitMs; this.overWarned = false; // 제한 시간 (쉬운 테마 60분 · 어려운 테마 120분)
     this.ghost = null;
     this.ended = false;
     this.startedAt = Date.now(); this.startChapter = chapter; // 랭킹: 처음부터 시작한 판만 기록
@@ -106,7 +107,7 @@ export class GameInstance {
   hintsUsed() { return Object.values(this.hintLevel).reduce((a, b) => a + b, 0); }
   fullState() {
     return {
-      elapsed: Date.now() - this.startedAt, hintsUsed: this.hintsUsed(), timed: this.startChapter === 0,
+      elapsed: Date.now() - this.startedAt, hintsUsed: this.hintsUsed(), timed: this.startChapter === 0, limitMs: this.limitMs,
       chapterIdx: this.chapterIdx,
       chapter: this.clientChapter(),
       objects: this.objState(),
@@ -380,7 +381,38 @@ export class GameInstance {
     this.syncAll();
   }
 
+  overtime() { return !!this.limitMs && Date.now() - this.startedAt > this.limitMs; }
+  // 제한 시간이 지나면 한 번 알린다 (게임은 계속할 수 있지만 순위표·경험치에서 빠진다)
+  checkTime() {
+    if (this.ended || this.overWarned || !this.overtime()) return;
+    this.overWarned = true;
+    this.emit('game:overtime', { limitMs: this.limitMs });
+    this.emit('toast', { text: `⏰ 제한 시간 ${Math.round(this.limitMs / 60000)}분이 지났어요! 계속할 수 있지만, 이번 판은 순위표와 경험치에서 빠져요.` });
+  }
+  // 쏘아 올린 폭죽: 활동 중인 귀신이 그쪽으로 몰려간다
+  lure(x, z, by) {
+    const act = this.ghosts.filter((g) => g.active);
+    for (const g of act) { g.mode = 'wander'; g.target = null; g.wp = [x, z]; g.wpUntil = Date.now() + 9000; g.lureUntil = Date.now() + 9000; }
+    if (act.length) this.emit('toast', { text: `🎆 ${by} 님의 폭죽 소리에 ${act.map((g) => g.name).join(', ')}이(가) 그쪽을 돌아본다…` });
+  }
+  // 전설의 검: 3.2m 안의 가장 가까운 귀신을 베어 없앤다 (90초 뒤 처음 자리에서 다시 나타난다)
+  slay(p) {
+    let best = null, bd = 3.2;
+    for (const g of this.ghosts) {
+      if (!g.active || Date.now() < g.repelUntil) continue;
+      const d = Math.hypot(g.x - p.x, g.z - p.z); if (d < bd) { bd = d; best = g; }
+    }
+    if (!best) return null;
+    const hit = { x: best.x, z: best.z, name: best.name };
+    best.repelUntil = Date.now() + 90000; best.mode = 'wander'; best.target = null;
+    best.x = best.cfg.spawn[0]; best.z = best.cfg.spawn[1];
+    this.emit('game:sound', 'talisman');
+    this.emit('toast', { text: `🗡️ ${p.name} 님이 전설의 검으로 ${hit.name}을(를) 베었다! (잠시 동안 나타나지 않는다)` });
+    return hit;
+  }
+
   gotoChapter(idx) {
+    if (idx > this.chapterIdx) this.onAdvance?.();
     if (idx >= this.chapters.length) return this.finish();
     this.loadChapter(idx);
     this.emit('game:chapter', this.fullState());
@@ -393,8 +425,8 @@ export class GameInstance {
     const all = relics >= this.sc.relics.length;
     const end = all ? this.sc.endings.true : this.sc.endings.normal;
     const ms = Date.now() - this.startedAt, full = this.startChapter === 0;
-    this.emit('game:ending', { ...end, relics, type: all ? 'true' : 'normal', total: this.sc.relics.length, icons: relicIcons(this.sc), cine: all ? this.sc.cine.true : this.sc.cine.normal, ms, full, hints: this.hintsUsed() });
-    this.onEnd?.({ ms, full, type: all ? 'true' : 'normal', hints: this.hintsUsed() });
+    this.emit('game:ending', { ...end, relics, type: all ? 'true' : 'normal', total: this.sc.relics.length, icons: relicIcons(this.sc), cine: all ? this.sc.cine.true : this.sc.cine.normal, ms, full, hints: this.hintsUsed(), over: this.overtime() });
+    this.onEnd?.({ ms, full, type: all ? 'true' : 'normal', hints: this.hintsUsed(), over: this.overtime() });
   }
 
   // 매 틱마다 호출 — 귀신 AI
@@ -449,6 +481,7 @@ export class GameInstance {
       }
       if (d < sense && d < best) { best = d; target = m; }
     }
+    if (g.lureUntil > now) target = null; // 폭죽 쪽으로 가는 중에는 사람을 쫓지 않는다
     if (target) { g.mode = 'hunt'; g.lastSeen = now; g.target = target.id; }
     else if (g.mode === 'hunt') {
       const t = this.players.get(g.target);
@@ -471,7 +504,7 @@ export class GameInstance {
         return { ...base, x: g.x, z: g.z, v: true, mode: 'pause' };
       }
     } else {
-      if (!g.wp || Math.hypot(g.wp[0] - g.x, g.wp[1] - g.z) < 0.6 || now > g.wpUntil) {
+      if (g.lureUntil > now) { /* 폭죽 쪽으로 */ } else if (!g.wp || Math.hypot(g.wp[0] - g.x, g.wp[1] - g.z) < 0.6 || now > g.wpUntil) {
         g.wp = [(Math.random() - 0.5) * (W - 2), (Math.random() - 0.5) * (D - 2)];
         g.wpUntil = now + 9000;
       }

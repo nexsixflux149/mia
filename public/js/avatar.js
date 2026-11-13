@@ -383,7 +383,10 @@ function addOutfit(rig, l, O) {
       add(new THREE.ConeGeometry(0.06, 0.12, 6), '#d6303a', 0, 0.6, 0.29, Math.PI, 0, 0);
       for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.05, 13, 10), '#d6303a', 0.05 * s, 0.67, 0.28).scale.set(1.3, 0.7, 0.5);
       skirt('#1f2f5a', 0.27, 0.4, 0.22, 0.33);
-      for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; add(new THREE.BoxGeometry(0.01, 0.2, 0.02), '#16224a', Math.sin(a) * 0.34, 0.33, Math.cos(a) * 0.34, 0, a, 0); }
+      // 주름선: 치마 경사를 그대로 따라 붙는다 (위는 좁고 아래는 넓게)
+      { const slope = Math.atan2(0.4 - 0.27, 0.22), len = Math.hypot(0.13, 0.22) * 0.92, pm = mat('#16224a');
+        for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; const pg = new THREE.Group(); pg.position.y = 0.33; pg.rotation.y = a; rig.add(pg);
+          const ln = new THREE.Mesh(new THREE.BoxGeometry(0.012, len, 0.006), pm); ln.position.z = 0.338; ln.rotation.x = -slope; pg.add(ln); } }
       break;
     case 'blazer':
       add(new THREE.BoxGeometry(0.16, 0.22, 0.03), '#f5f5f2', 0, 0.62, 0.26);
@@ -664,7 +667,7 @@ function addOutfitHeadwear(head, l) {
 export const EMOTES = [
   ['wave', '인사', '👋', 2.5], ['dance', '춤추기', '💃', 0], ['spin', '빙글빙글', '🌀', 0], ['jump', '뛰기', '⬆️', 0.7],
   ['lie', '엎드리기', '🛌', 0], ['sit', '앉기', '🪑', 0], ['clap', '박수', '👏', 2.5], ['heart', '하트', '🫶', 2.5],
-  ['boo', '놀래키기', '👻', 1.3], ['shiver', '덜덜', '🥶', 0], ['bow', '꾸벅', '🙇', 2],
+  ['boo', '놀래키기', '👻', 1.3], ['shiver', '덜덜', '🥶', 0], ['bow', '꾸벅', '🙇', 2], ['fart', '방귀 뿡', '💨', 2.2],
 ];
 // 감정표현별 표정 (눈 · 입 · 눈썹 · 볼). 사진 얼굴일 때는 사진이 그대로 유지된다
 export const EXPR = {
@@ -679,6 +682,7 @@ export const EXPR = {
   boo: { eyes: 'angry', mouth: 'open', brows: 'angry' },
   shiver: { eyes: 'teary', mouth: 'flat', brows: 'worried', cheeks: 'none' },
   bow: { eyes: 'closed', mouth: 'smile', brows: 'soft' },
+  fart: { eyes: 'closed', mouth: 'grin', brows: 'soft', cheeks: 'blush' },
 };
 export const EMOTE_DUR = Object.fromEntries(EMOTES.map((e) => [e[0], e[3]]));
 
@@ -714,12 +718,22 @@ export function animateAvatar(g, dt, moving, t, crouch = false, emote = null, et
       case 'spin': ry = et * 9; A[0].rotation.z = -1.4; A[1].rotation.z = 1.4; y = 0.05; break;
       case 'jump': { const k = Math.min(1, et / 0.7); y = Math.sin(Math.PI * k) * 0.9; A[0].rotation.z = -2.6 * Math.sin(Math.PI * k); A[1].rotation.z = 2.6 * Math.sin(Math.PI * k); L[0].rotation.x = -0.5 * Math.sin(Math.PI * k); L[1].rotation.x = -0.5 * Math.sin(Math.PI * k); break; }
       case 'lie': rx = 1.45; y = 0.4; A[0].rotation.x = -2.8; A[1].rotation.x = -2.8; L[0].rotation.x = Math.sin(et * 4) * 0.4 + 0.2; L[1].rotation.x = -Math.sin(et * 4) * 0.4 + 0.2; head.rotation.x = -0.6; break;
-      case 'sit': y = 0.27; L[0].rotation.x = -1.5; L[1].rotation.x = -1.5; A[0].rotation.x = -0.4; A[1].rotation.x = -0.4; head.rotation.z = Math.sin(t * 1.2) * 0.08; break;
+      case 'sit': y = -0.075; L[0].rotation.x = -1.5; L[1].rotation.x = -1.5; A[0].rotation.x = -0.4; A[1].rotation.x = -0.4; head.rotation.z = Math.sin(t * 1.2) * 0.08; break; // 엉덩이 밑면이 앉는 자리(바닥·벤치·통나무·그네·놀이기구 좌석) 표면에 닿게
       case 'clap': { const c = Math.abs(Math.sin(et * 12)); A[0].rotation.x = -1.3; A[1].rotation.x = -1.3; A[0].rotation.z = -0.2 - c * 0.5; A[1].rotation.z = 0.2 + c * 0.5; y = c * 0.03; break; }
       case 'heart': A[0].rotation.z = -2.7; A[1].rotation.z = 2.7; A[0].rotation.x = -0.3; A[1].rotation.x = -0.3; head.rotation.z = Math.sin(et * 3) * 0.15; y = Math.abs(Math.sin(et * 3)) * 0.05; break;
       case 'boo': { const k = Math.min(1, et / 0.25); A[0].rotation.z = -2.5 * k; A[1].rotation.z = 2.5 * k; A[0].rotation.x = -0.8 * k; A[1].rotation.x = -0.8 * k; rx = 0.35 * k; head.scale.setScalar(1 + 0.25 * k * (et < 0.8 ? 1 : 0)); y = 0.15 * k; break; }
       case 'shiver': rz = Math.sin(t * 60) * 0.04; A[0].rotation.set(-1.2, 0, 0.9); A[1].rotation.set(-1.2, 0, -0.9); y = -0.06; head.rotation.x = 0.2; break;
       case 'bow': { const k = Math.sin(Math.min(1, et / 1.2) * Math.PI); rx = 0.9 * k; break; }
+      // 방귀: 엉덩이를 쭉 내밀고 → 뿡! → 몸을 흔들며 낄낄
+      case 'fart': {
+        const k = Math.min(1, et / 0.3), giggle = et > 0.45 ? Math.sin(et * 26) : 0;
+        rx = 0.55 * k; y = -0.03 * k + Math.abs(giggle) * 0.03;
+        L[0].rotation.x = 0.35 * k; L[1].rotation.x = 0.35 * k;
+        A[0].rotation.set(-0.9 * k, 0, -0.3); A[1].rotation.set(-0.9 * k, 0, 0.3);
+        if (et > 0.35 && et < 0.6) rz = Math.sin(et * 60) * 0.06; // 뿡 하는 순간 엉덩이가 떨린다
+        rz += giggle * 0.05; head.rotation.z = giggle * 0.12; head.rotation.x = -0.35 * k;
+        break;
+      }
     }
   }
   rig.position.y = y; rig.rotation.set(rx, ry, rz);
@@ -732,29 +746,33 @@ export function animateAvatar(g, dt, moving, t, crouch = false, emote = null, et
 
 // 캔버스 텍스트 스프라이트
 export function textSprite(text, { color = '#fff', bg = 'rgba(0,0,0,0.6)', size = 32, maxW = 440, stroke = null, border = null, tail = false } = {}) {
+  // 2.5배 해상도로 그려서 또렷하게 (글자를 같은 색으로 덧칠해 두껍게 하던 방식은 한글이 뭉개져서 뺐다)
+  const R = 2.5;
   const c = document.createElement('canvas');
   const x = c.getContext('2d');
-  const font = `900 ${size}px "Gowun Dodum", "Malgun Gothic", sans-serif`;
+  const font = `700 ${size}px "Gowun Dodum", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif`;
   x.font = font;
   const lines = wrap(x, text, maxW);
   const w = Math.min(maxW, Math.max(...lines.map((l) => x.measureText(l).width))) + 34;
   const th = tail ? 14 : 0;
   const h = lines.length * (size + 10) + 20 + th;
-  c.width = Math.ceil(w); c.height = Math.ceil(h);
+  c.width = Math.ceil(w * R); c.height = Math.ceil(h * R);
+  x.scale(R, R);
+  const cw = c.width / R, ch = c.height / R;
   x.font = font;
-  x.fillStyle = bg; roundRect(x, 2, 2, c.width - 4, c.height - 4 - th, 16); x.fill();
-  if (border) { x.strokeStyle = border; x.lineWidth = 3; roundRect(x, 2, 2, c.width - 4, c.height - 4 - th, 16); x.stroke(); }
-  if (tail) { x.fillStyle = bg; x.beginPath(); x.moveTo(c.width / 2 - 12, c.height - th - 4); x.lineTo(c.width / 2, c.height - 2); x.lineTo(c.width / 2 + 12, c.height - th - 4); x.fill(); if (border) { x.strokeStyle = border; x.lineWidth = 3; x.beginPath(); x.moveTo(c.width / 2 - 12, c.height - th - 3); x.lineTo(c.width / 2, c.height - 2); x.lineTo(c.width / 2 + 12, c.height - th - 3); x.stroke(); } }
+  x.fillStyle = bg; roundRect(x, 2, 2, cw - 4, ch - 4 - th, 16); x.fill();
+  if (border) { x.strokeStyle = border; x.lineWidth = 3; roundRect(x, 2, 2, cw - 4, ch - 4 - th, 16); x.stroke(); }
+  if (tail) { x.fillStyle = bg; x.beginPath(); x.moveTo(cw / 2 - 12, ch - th - 4); x.lineTo(cw / 2, ch - 2); x.lineTo(cw / 2 + 12, ch - th - 4); x.fill(); }
   x.textAlign = 'center'; x.textBaseline = 'top'; x.lineJoin = 'round';
   lines.forEach((l, i) => {
     const ty = 12 + i * (size + 10);
-    // 외곽선을 같은 색으로 한 번 더 그려 글자를 두껍게
-    x.strokeStyle = stroke || color; x.lineWidth = stroke ? 6 : 2.2; x.strokeText(l, c.width / 2, ty);
-    x.fillStyle = color; x.fillText(l, c.width / 2, ty);
+    // 어두운 테두리 + 살짝 그림자만 (글자 속은 깨끗하게)
+    x.strokeStyle = stroke || 'rgba(0,0,0,.75)'; x.lineWidth = stroke ? 5 : 3.5; x.strokeText(l, cw / 2, ty);
+    x.fillStyle = color; x.fillText(l, cw / 2, ty);
   });
-  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8; tex.generateMipmaps = true; tex.minFilter = THREE.LinearMipmapLinearFilter;
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true, toneMapped: false, fog: false }));
-  const k = 0.0038; sp.scale.set(c.width * k, c.height * k, 1); sp.renderOrder = 10;
+  const k = 0.0038; sp.scale.set(cw * k, ch * k, 1); sp.renderOrder = 10;
   return sp;
 }
 function wrap(x, text, maxW) { const out = []; let line = ''; for (const ch of String(text)) { if (x.measureText(line + ch).width > maxW - 28) { out.push(line); line = ch; } else line += ch; } out.push(line); return out.slice(0, 4); }

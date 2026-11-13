@@ -9,6 +9,7 @@ import { KIMONO_CHAPTERS, KIMONO_ENDINGS } from './kimono.js';
 import { CLOWN_CHAPTERS, CLOWN_ENDINGS } from './clown.js';
 import { PARK_CHAPTERS, PARK_ENDINGS } from './park.js';
 import { MIA_CHAPTERS, MIA_ENDINGS } from './mia.js';
+import { ZOMBIE_CHAPTERS, ZOMBIE_ENDINGS } from './zombie.js';
 import { ITEMS } from './items.js';
 
 export const SCENARIOS = {
@@ -113,6 +114,17 @@ export const SCENARIOS = {
     carry: () => [],
     startItems: () => ['talisman', 'talisman', 'talisman'],
   },
+  // 히든 테마: 모든 테마를 한 번씩 깨거나 만렙이 되면 열린다 (서버가 확인)
+  zombie: {
+    id: 'zombie', title: '데드 시티 — 마지막 헬기 (히든)', short: '데드 시티', hidden: true,
+    desc: '히든 · 좀비 도시 → 백화점 5층 → 옥상 헬기 탈출 · 7챕터 · 역대급 퍼즐 · 약 4~5시간', difficulty: 6,
+    chapters: ZOMBIE_CHAPTERS, endings: ZOMBIE_ENDINGS,
+    relics: ['zb_relic_1', 'zb_relic_2', 'zb_relic_3', 'zb_relic_4', 'zb_relic_5', 'zb_relic_6', 'zb_relic_7'], relicName: '하린이의 흔적',
+    cine: { intro: 'zombie_intro', true: 'zombie_true', normal: 'zombie_normal' },
+    saveKey: (name) => 'zombie:' + name,
+    carry: () => [],
+    startItems: () => ['talisman', 'talisman', 'talisman'],
+  },
 };
 
 // ───── 숨겨진 이야기 퍼즐: 기존 테마마다 새 방식의 선택 퍼즐 하나 (풀면 몰랐던 뒷이야기가 열린다)
@@ -211,5 +223,5 @@ function enlarge(ch) {
 }
 for (const s of Object.values(SCENARIOS)) s.chapters.forEach(enlarge);
 
-export const scenarioList = () => Object.values(SCENARIOS).map((s) => ({ id: s.id, title: s.title, short: s.short, desc: s.desc, difficulty: s.difficulty || 3, chapters: s.chapters.map((c) => c.title) }));
+export const scenarioList = () => Object.values(SCENARIOS).map((s) => ({ id: s.id, title: s.title, short: s.short, desc: s.desc, difficulty: s.difficulty || 3, hidden: !!s.hidden, chapters: s.chapters.map((c) => c.title) }));
 export const relicIcons = (s) => s.relics.map((id) => ITEMS[id]?.icon || '·');
