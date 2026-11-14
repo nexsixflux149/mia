@@ -750,7 +750,9 @@ export function textSprite(text, { color = '#fff', bg = 'rgba(0,0,0,0.6)', size 
   const R = 2.5;
   const c = document.createElement('canvas');
   const x = c.getContext('2d');
-  const font = `700 ${size}px "Gowun Dodum", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif`;
+  // 밝은 배경(채팅 말풍선 등)은 테두리 없이 깔끔한 고딕체로, 어두운 배경은 얇은 테두리만
+  const light = (() => { const m = String(bg).match(/rgba?\(([^)]+)\)/); let r, g, b, a = 1; if (m) [r, g, b, a = 1] = m[1].split(',').map(Number); else { const h = String(bg).replace('#', ''); if (h.length < 6) return false; [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)); } return a > 0.4 && r * 0.3 + g * 0.59 + b * 0.11 > 160; })();
+  const font = light ? `600 ${size}px "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif` : `700 ${size}px "Gowun Dodum", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif`;
   x.font = font;
   const lines = wrap(x, text, maxW);
   const w = Math.min(maxW, Math.max(...lines.map((l) => x.measureText(l).width))) + 34;
@@ -767,7 +769,7 @@ export function textSprite(text, { color = '#fff', bg = 'rgba(0,0,0,0.6)', size 
   lines.forEach((l, i) => {
     const ty = 12 + i * (size + 10);
     // 어두운 테두리 + 살짝 그림자만 (글자 속은 깨끗하게)
-    x.strokeStyle = stroke || 'rgba(0,0,0,.75)'; x.lineWidth = stroke ? 5 : 3.5; x.strokeText(l, cw / 2, ty);
+    if (stroke || !light) { x.strokeStyle = stroke || 'rgba(0,0,0,.7)'; x.lineWidth = stroke ? 4 : 2.4; x.strokeText(l, cw / 2, ty); }
     x.fillStyle = color; x.fillText(l, cw / 2, ty);
   });
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8; tex.generateMipmaps = true; tex.minFilter = THREE.LinearMipmapLinearFilter;
