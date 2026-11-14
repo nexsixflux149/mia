@@ -714,3 +714,5 @@ body.mobile #celebrate { top: 92px; width: calc(100vw - 86px); left: 12px; trans
 body.mobile #celebrate { animation-name: celebInM; }
 @keyframes celebInM { 0% { opacity: 0; transform: scale(.7); } 6% { opacity: 1; transform: scale(1.06); } 10% { transform: scale(1); } 90% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes celebSpark { from { opacity: .5; } to { opacity: 1; } }
+.sh-lv { font-size: 13px; font-weight: 700; color: #9affd0; }
+.sh-lv.locked { color: #ffb35a; }

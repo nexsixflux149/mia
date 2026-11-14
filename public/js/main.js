@@ -2194,9 +2194,9 @@ const lvChip = el('div'); lvChip.id = 'lvChip'; $('#onlineChip').after(lvChip);
 lvChip.onclick = () => openBag();
 function renderXp() {
   const pf = S.profile; if (!pf) return;
-  const span = Math.max(1, pf.next - pf.cur), k = pf.lv >= pf.max ? 1 : (pf.xp - pf.cur) / span;
+  const span = Math.max(1, pf.next - pf.cur), k = pf.lv >= pf.max || pf.admin ? 1 : (pf.xp - pf.cur) / span;
   $('#xpFill').style.width = (Math.max(0, Math.min(1, k)) * 100).toFixed(1) + '%';
-  $('#xpLabel').textContent = pf.lv >= pf.max ? `Lv.${pf.lv} 만렙 👑` : `Lv.${pf.lv}  ${pf.xp - pf.cur} / ${span} XP`;
+  $('#xpLabel').textContent = pf.admin ? `Lv.${pf.lv} 운영자 🛡️` : pf.lv >= pf.max ? `Lv.${pf.lv} 만렙 👑` : `Lv.${pf.lv}  ${pf.xp - pf.cur} / ${span} XP`;
   lvChip.innerHTML = `<b>Lv.${pf.lv}</b> · 🪙 ${coinsText()}`;
   lvChip.title = '내 물건 🎒 (I)';
   if (!pf.equip?.mount) S.riding = false;
@@ -2327,7 +2327,7 @@ function openShop() {
       grid.appendChild(c);
     }
     const it = S.shop[sel]; const have = pf.items?.[sel] || 0; const locked = !pf.admin && pf.lv < it.lv;
-    info.innerHTML = `<div class="sh-t">${it.icon} ${it.name}</div><div class="sh-d">${it.desc}</div><div class="muted">${it.max > 1 ? `최대 ${it.max}개까지 가질 수 있어요 · 지금 ${have}개` : '1개만 살 수 있어요'}${it.kind === 'mount' ? ' · 탄 동안 이동 속도 1.5배 (Z)' : ''}${it.kind === 'sword' ? ' · 귀신 30번 베면 깨져요' : ''}</div>`;
+    info.innerHTML = `<div class="sh-t">${it.icon} ${it.name}</div><div class="sh-d">${it.desc}</div><div class="sh-lv${locked ? ' locked' : ''}">${it.lv > 1 ? `🔒 Lv.${it.lv} 이상 구매 가능` : '🔓 누구나 구매 가능'}${locked ? ` · 지금 Lv.${pf.lv}` : ' ✓'}</div><div class="muted">${it.max > 1 ? `최대 ${it.max}개까지 가질 수 있어요 · 지금 ${have}개` : '1개만 살 수 있어요'}${it.kind === 'mount' ? ' · 탄 동안 이동 속도 1.5배 (Z)' : ''}${it.kind === 'sword' ? ' · 귀신 30번 베면 깨져요' : ''}</div>`;
     const buy = el('button', 'btn primary', locked ? `🔒 Lv.${it.lv} 부터` : have >= it.max ? (it.max > 1 ? '가득 찼어요' : '이미 있어요') : `🪙 ${it.price.toLocaleString()} 코인에 사기`);
     buy.disabled = locked || have >= it.max;
     buy.onclick = () => { socket.emit('shop:buy', sel); audio.play('click'); };

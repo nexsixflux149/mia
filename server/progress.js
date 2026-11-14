@@ -2,6 +2,7 @@
 // 계정이 따로 없으므로 기록은 닉네임별로 남는다 (이어하기·랭킹과 같은 방식)
 
 export const MAX_LV = 100;
+export const ADMIN_LV = 1000; // 운영자 표시 레벨
 export const HIDDEN_LV = 20; // 이 레벨이 되면 히든 테마가 열린다
 /** lv 레벨이 되기 위해 모아야 하는 누적 경험치 (1레벨 = 0) */
 export const xpAt = (lv) => 60 * (lv - 1) * lv;
@@ -37,8 +38,8 @@ export const isWear = (id) => ['wings', 'mount', 'costume'].includes(SHOP[id]?.k
 
 export function blankProfile() { return { xp: 0, coins: 0, items: {}, swordUses: 0, equip: { wings: '', mount: '', costume: '' }, at: Date.now() }; }
 export function profileView(pf, admin) {
-  const lv = levelOf(pf.xp);
-  return { xp: pf.xp, lv, max: MAX_LV, hiddenLv: HIDDEN_LV, cur: xpAt(lv), next: lv >= MAX_LV ? xpAt(lv) : xpAt(lv + 1), coins: admin ? -1 : pf.coins, items: pf.items, swordUses: pf.swordUses, equip: pf.equip, admin: !!admin };
+  const lv = admin ? ADMIN_LV : levelOf(pf.xp); // 운영자는 Lv.1000
+  return { xp: pf.xp, lv, max: MAX_LV, hiddenLv: HIDDEN_LV, cur: admin ? 0 : xpAt(lv), next: admin ? 0 : lv >= MAX_LV ? xpAt(lv) : xpAt(lv + 1), coins: admin ? -1 : pf.coins, items: pf.items, swordUses: pf.swordUses, equip: pf.equip, admin: !!admin };
 }
 
 // ───── 방문 통계 (한국 시간 기준 날짜별)
