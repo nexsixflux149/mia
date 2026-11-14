@@ -2331,7 +2331,7 @@ function openShop() {
       grid.appendChild(c);
     }
     const it = S.shop[sel]; const have = pf.items?.[sel] || 0; const locked = !pf.admin && pf.lv < it.lv;
-    info.innerHTML = `<div class="sh-t">${it.icon} ${it.name}</div><div class="sh-d">${it.desc}</div><div class="sh-lv${locked ? ' locked' : ''}">${it.lv > 1 ? `🔒 Lv.${it.lv} 이상 구매 가능` : '🔓 누구나 구매 가능'}${locked ? ` · 지금 Lv.${pf.lv}` : ' ✓'}</div><div class="muted">${it.max > 1 ? `최대 ${it.max}개까지 가질 수 있어요 · 지금 ${have}개` : '1개만 살 수 있어요'}${it.kind === 'mount' ? ' · 탄 동안 이동 속도 1.5배 (Z)' : ''}${it.kind === 'sword' ? ' · 귀신 30번 베면 깨져요' : ''}</div>`;
+    info.innerHTML = `<div class="sh-t">${it.icon} ${it.name}</div><div class="sh-d">${it.desc}</div><div class="sh-lv${locked ? ' locked' : ''}">${it.lv > 1 ? `🔒 Lv.${it.lv} 이상 구매 가능` : '🔓 누구나 구매 가능'}${locked ? ` · 현재 Lv.${pf.lv}` : ' ✓'}</div><div class="muted">${it.max > 1 ? `최대 ${it.max}개까지 가질 수 있어요 · 지금 ${have}개` : '1개만 살 수 있어요'}${it.kind === 'mount' ? ' · 탄 동안 이동 속도 1.5배 (Z)' : ''}${it.kind === 'sword' ? ' · 귀신 30번 베면 깨져요' : ''}</div>`;
     const buy = el('button', 'btn primary', locked ? `🔒 Lv.${it.lv} 부터` : have >= it.max ? (it.max > 1 ? '가득 찼어요' : '이미 있어요') : `🪙 ${it.price.toLocaleString()} 코인에 사기`);
     buy.disabled = locked || have >= it.max;
     buy.onclick = () => { socket.emit('shop:buy', sel); audio.play('click'); };
