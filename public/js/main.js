@@ -1814,11 +1814,12 @@ function dismount() {
     else if (it) { const a = Math.atan2(me.x - it.x, me.z - it.z); const d = m.ride === 'carousel' ? 3.9 : 0; me.x = it.x + Math.sin(a) * d; me.z = m.ride === 'wheel' ? it.z + 0.6 : it.z + Math.cos(a) * d; if (m.ride === 'wheel') me.x = it.x; }
   } else { me.x += Math.sin(me.ry) * 0.7; me.z += Math.cos(me.ry) * 0.7; }
   [me.x, me.z] = collide(me.x, me.z);
+  if (S.wasRiding && S.profile?.equip?.mount) { S.riding = true; updateGearButtons(); } S.wasRiding = false;
 }
 function lobbyAct(id) {
   if (S.mount) { dismount(); toast('내렸어요.'); return; }
   if (id === 'shop') { setTimeout(openShop, 160); return; }
-  if (S.riding) S.riding = false;
+  if (S.riding) { S.riding = false; S.wasRiding = true; } // 벤치·놀이기구에서 내리면 다시 탈것에 탄다
   if (S.perch && id === 'off') { S.perch = null; me.y = 0; [me.x, me.z] = collide(me.x + Math.sin(me.ry) * 1.2, me.z + Math.cos(me.ry) * 1.2); return; }
   const it = S.world?.interactives?.find((i) => i.id === id); if (!it) return;
   audio.play('click');
@@ -2204,7 +2205,10 @@ function renderXp() {
   updateGearButtons();
 }
 socket.on('profile', (pf) => {
-  const was = S.profile; S.profile = pf; renderXp();
+  const was = S.profile; S.profile = pf;
+  if (!was && pf.equip?.mount) S.riding = true; // 탈것을 착용해 두었다면 타고 시작
+  if (was && pf.equip?.mount && pf.equip.mount !== was.equip?.mount) S.riding = true; // 새 탈것을 착용하면 바로 탄다
+  renderXp();
   if (pf.hiddenOk != null && pf.hiddenOk !== S.hiddenOk) { S.hiddenOk = pf.hiddenOk; updateHiddenGate(); renderParty(); }
   if (S.shopRefresh) S.shopRefresh(); if (S.bagRefresh) S.bagRefresh();
   if (was) return;
@@ -2360,7 +2364,7 @@ function openBag() {
       const acts = el('span', 'ba');
       if (it.kind === 'wings' || it.kind === 'mount' || it.kind === 'costume') {
         const on = pf.equip?.[it.kind] === id;
-        const b = el('button', 'btn tiny' + (on ? ' primary' : ''), on ? '착용 중 ✓' : '착용'); b.onclick = () => { socket.emit('shop:equip', { id, on: !on }); if (it.kind === 'mount' && on) S.riding = false; };
+        const b = el('button', 'btn tiny' + (on ? ' primary' : ''), on ? '착용 중 ✓' : '착용'); b.onclick = () => { socket.emit('shop:equip', { id, on: !on }); if (it.kind === 'mount') { S.riding = !on; if (!on) { if (S.mount) dismount(); S.perch = null; me.y = 0; toast(`${it.icon} ${it.name}에 탔어요! 이동 속도 1.5배 (Z: 내리기/타기)`); } updateGearButtons(); } };
         acts.appendChild(b);
         if (it.kind === 'mount' && on) { const r = el('button', 'btn tiny', S.riding ? '내리기 (Z)' : '타기 (Z)'); r.onclick = () => { toggleRide(); draw(); }; acts.appendChild(r); }
       } else if (it.kind === 'sword') {
