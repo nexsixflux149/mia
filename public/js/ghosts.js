@@ -494,7 +494,7 @@ export function createGhost(type = 'woman') {
 export function animateGhost(g, dt, t, st, distToMe) {
   const u = g.userData, P = u.parts; const tt = t + u.t0;
   const hunting = st.mode === 'hunt';
-  const frozen = st.lit && u.type === 'woman';
+  const frozen = st.lit && (u.type === 'woman' || u.type === 'doll');
   if (frozen) return; // 빛을 비추면 그대로 굳는다 — 움직이지 않는 게 더 무섭다
   // 경련: 이따금 머리가 확 꺾인다
   u.twitch = (u.twitch || 0) - dt;

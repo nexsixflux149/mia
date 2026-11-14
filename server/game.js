@@ -510,8 +510,8 @@ export class GameInstance {
       }
       tx = g.wp[0]; tz = g.wp[1]; speed *= 0.45;
     }
-    // 인형 귀신은 빛을 받으면 완전히 굳지 않고 느려진다 (굳으면 '어딘가 껴서 멈춘' 것처럼 보이고, 붙어 있어도 잡지 못해 끌려가지 않던 문제)
-    if (lit) speed = cfg.lightFreeze ? (g.type === 'doll' ? speed * 0.3 : 0) : cfg.lightFast ? speed * 1.4 : speed * 0.5;
+    // 손전등을 비추는 동안 굳는 귀신(하얀 여자 · 인형)은 꼼짝 못 한다. 단 인형은 이미 몸에 닿아 있으면 그대로 붙잡는다
+    if (lit) speed = cfg.lightFreeze ? 0 : cfg.lightFast ? speed * 1.4 : speed * 0.5;
 
     const dx = tx - g.x, dz = tz - g.z, d = Math.hypot(dx, dz);
     if (d > 0.01 && speed > 0) {

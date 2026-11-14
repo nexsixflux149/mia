@@ -833,7 +833,7 @@ function updateOthers(dt, t) {
   S.danger = 0;
   for (const e of S.ghosts.values()) {
     const gs = e.st, G = e.G;
-    const frozen = gs.lit && gs.type === 'woman';
+    const frozen = gs.lit && (gs.type === 'woman' || gs.type === 'doll');
     if (!frozen) {
       G.position.x += (gs.x - G.position.x) * Math.min(1, dt * 6);
       G.position.z += (gs.z - G.position.z) * Math.min(1, dt * 6);
