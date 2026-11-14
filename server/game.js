@@ -510,7 +510,8 @@ export class GameInstance {
       }
       tx = g.wp[0]; tz = g.wp[1]; speed *= 0.45;
     }
-    if (lit) speed = cfg.lightFreeze ? 0 : cfg.lightFast ? speed * 1.4 : speed * 0.5;
+    // 인형 귀신은 빛을 받으면 완전히 굳지 않고 느려진다 (굳으면 '어딘가 껴서 멈춘' 것처럼 보이고, 붙어 있어도 잡지 못해 끌려가지 않던 문제)
+    if (lit) speed = cfg.lightFreeze ? (g.type === 'doll' ? speed * 0.3 : 0) : cfg.lightFast ? speed * 1.4 : speed * 0.5;
 
     const dx = tx - g.x, dz = tz - g.z, d = Math.hypot(dx, dz);
     if (d > 0.01 && speed > 0) {
@@ -523,7 +524,7 @@ export class GameInstance {
     g.x = clamp(g.x, -W / 2 + 0.4, W / 2 - 0.4); g.z = clamp(g.z, -D / 2 + 0.4, D / 2 - 0.4);
 
     // 붙잡기 (굳어 있는 동안은 못 잡는다)
-    if (target && !(lit && cfg.lightFreeze)) {
+    if (target && !(lit && cfg.lightFreeze && g.type !== 'doll')) {
       const cd = Math.hypot(target.x - g.x, target.z - g.z);
       if (cd < 0.85 && now > (target.invulnUntil || 0)) {
         target.invulnUntil = now + 5000;

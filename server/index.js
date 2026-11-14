@@ -13,7 +13,7 @@ import { hasBadWord } from './filter.js';
 import { isAdminPassword, looksLikeAdmin, ADMIN_NAME } from './admin.js';
 import { ITEMS, START_ITEMS } from './items.js';
 import { openStore, persist, flushAll, storeKind } from './store.js';
-import { MAX_LV, levelOf, xpAt, CLEAR_COINS, CHAPTER_XP, clearXp, timeLimitMs, SHOP, isWear, blankProfile, profileView, dayKey, statRange, pruneStats } from './progress.js';
+import { MAX_LV, HIDDEN_LV, levelOf, xpAt, CLEAR_COINS, CHAPTER_XP, clearXp, timeLimitMs, SHOP, isWear, blankProfile, profileView, dayKey, statRange, pruneStats } from './progress.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
@@ -53,27 +53,27 @@ const save = () => persist(DATA_DIR, 'saves', saves, true);
 const saveProfiles = () => persist(DATA_DIR, 'profiles', profiles);
 const saveStats = () => persist(DATA_DIR, 'stats', stats);
 stats.days ||= {};
-const prof = (name) => { const pf = (profiles[name] ||= blankProfile()); pf.items ||= {}; pf.equip ||= { wings: '', mount: '' }; return pf; };
+const prof = (name) => { const pf = (profiles[name] ||= blankProfile()); pf.items ||= {}; pf.equip ||= { wings: '', mount: '' }; pf.equip.costume ??= ''; return pf; };
 const findByName = (name) => [...players.values()].find((p) => p.name === name && !p.offline);
 const sendProfile = (p) => { if (p) io.to(p.id).emit('profile', { ...profileView(prof(p.name), p.admin), hiddenOk: hiddenOk(p.name) }); };
-const gearOf = (p) => { const e = prof(p.name).equip; return `${e.wings || ''}|${e.mount || ''}|${p.riding && e.mount ? 1 : 0}|${p.sword ? 1 : 0}`; };
+const gearOf = (p) => { const e = prof(p.name).equip; return `${e.wings || ''}|${e.mount || ''}|${p.riding && e.mount ? 1 : 0}|${p.sword ? 1 : 0}|${e.costume || ''}`; };
 /** 모든 테마를 한 번씩 깼거나 만렙이면 히든 테마가 열린다 */
 function hiddenOk(name) {
   const p = findByName(name); if (p?.admin) return true;
-  if (levelOf(prof(name).xp) >= MAX_LV) return true;
+  if (levelOf(prof(name).xp) >= HIDDEN_LV) return true;
   return Object.values(SCENARIOS).filter((s) => !s.hidden).every((s) => saves[s.saveKey(name) + ':clear']);
 }
 function addXp(name, amt, why) {
   if (!name || !(amt > 0)) return;
-  const pf = prof(name); const before = levelOf(pf.xp); const wasOpen = hiddenOk(name);
+  const pf = prof(name); const before = levelOf(pf.xp);
   pf.xp += Math.round(amt); saveProfiles();
   const after = levelOf(pf.xp); const p = findByName(name);
   if (p) { io.to(p.id).emit('xp', { add: Math.round(amt), why, lv: after, up: after > before }); sendProfile(p); }
   if (after > before) {
     if (p) io.to(p.id).emit('toast', { text: `🎉 레벨 업! Lv.${after} — 상점에서 새 물건을 살 수 있는지 확인해 보세요.` });
-    if (after >= MAX_LV) io.emit('notice', { text: `👑 ${name} 님이 만렙(Lv.${MAX_LV})을 달성해 히든 테마 '데드 시티'가 열렸습니다!` });
+    if (before < HIDDEN_LV && after >= HIDDEN_LV) io.emit('celebrate', { name, kind: 'level', text: `👑 ${name} 님이 Lv.${HIDDEN_LV}을 달성해 히든 테마 '데드 시티'가 열렸습니다!` });
+    if (after >= MAX_LV && before < MAX_LV) io.emit('celebrate', { name, kind: 'max', text: `👑 ${name} 님이 만렙 Lv.${MAX_LV}을 달성했습니다!` });
   }
-  if (!wasOpen && hiddenOk(name) && after < MAX_LV) io.emit('notice', { text: `🧟 ${name} 님이 모든 테마를 깨서 히든 테마 '데드 시티'가 열렸습니다!` });
 }
 function addCoins(name, n) { const pf = prof(name); pf.coins = Math.max(0, (pf.coins || 0) + n); saveProfiles(); sendProfile(findByName(name)); }
 
@@ -357,8 +357,8 @@ io.on('connection', (sock) => {
       fx.hit = hit ? { x: hit.x, z: hit.z, name: hit.name } : null;
       if (hit) {
         pf.swordUses = Math.max(0, (pf.swordUses || 0) - 1);
-        if (pf.swordUses <= 0) { delete pf.items.sword; me.sword = false; fx.broke = true; io.to(room).emit('toast', { text: `💥 ${me.name} 님의 전설의 검이 귀신을 10번 베고 산산조각 났다!` }); }
-        else sock.emit('toast', { text: `🗡️ ${hit.name}을(를) 베어 없앴다! (남은 횟수 ${pf.swordUses}/10)` });
+        if (pf.swordUses <= 0) { delete pf.items.sword; me.sword = false; fx.broke = true; io.to(room).emit('toast', { text: `💥 ${me.name} 님의 전설의 검이 귀신을 30번 베고 산산조각 났다!` }); }
+        else sock.emit('toast', { text: `🗡️ ${hit.name}을(를) 베어 없앴다! (남은 횟수 ${pf.swordUses}/30)` });
         saveProfiles(); sendProfile(me);
       } else if (!inst()) sock.emit('toast', { text: '🗡️ 휘익— (귀신은 방탈출 안에서만 벨 수 있어요)' });
       else sock.emit('toast', { text: '🗡️ 휘익— 가까이에 귀신이 없다. (귀신 가까이서 휘두르세요)' });
@@ -484,7 +484,7 @@ io.on('connection', (sock) => {
     if (!me) return;
     let chapter = typeof opt === 'object' && opt ? opt.chapter : opt;
     const sc = SCENARIOS[opt?.scenario] || SCENARIOS.gwimun;
-    if (sc.hidden && !hiddenOk(me.name)) return sock.emit('toast', { text: '🔒 히든 테마는 모든 테마를 한 번씩 깨거나 만렙(Lv.20)이 되면 열려요.' });
+    if (sc.hidden && !hiddenOk(me.name)) return sock.emit('toast', { text: '🔒 히든 테마는 모든 테마를 한 번씩 깨거나 Lv.20이 되면 열려요.' });
     const fq = Number(opt?.fear); // 0 왕초보 · 1 순한맛 · 2 보통 · 3 매운맛
     const fear = Number.isFinite(fq) && opt?.fear !== null && opt?.fear !== '' ? Math.max(0, Math.min(3, Math.round(fq))) : 2;
     let party = parties.get(me.partyId);
@@ -512,8 +512,12 @@ io.on('connection', (sock) => {
       onAdvance: () => { if (inst.overtime()) return; for (const m of inst.members()) addXp(m.name, CHAPTER_XP, '챕터 통과'); },
       limitMs: timeLimitMs(sc.difficulty || 3),
       onEnd: ({ ms, full, type, hints = 0, over = false } = {}) => {
-        saves[saveName] = sc.chapters.length - 1; saves[saveName + ':clear'] = 1; save();
         const names = party.members.map((id) => players.get(id)?.name).filter(Boolean);
+        const wasOpen = new Map(names.map((n) => [n, hiddenOk(n)]));
+        saves[saveName] = sc.chapters.length - 1; saves[saveName + ':clear'] = 1;
+        for (const n of names) saves[sc.saveKey(n) + ':clear'] = 1; // 함께 깬 파티원 모두 '클리어'로 기록 (히든 테마 조건)
+        save();
+        setTimeout(() => { for (const n of names) if (!wasOpen.get(n) && hiddenOk(n) && levelOf(prof(n).xp) < HIDDEN_LV) io.emit('celebrate', { name: n, kind: 'clear', text: `🧟 ${n} 님이 모든 테마를 클리어해 히든 테마 '데드 시티'가 열렸습니다!` }); for (const n of names) sendProfile(findByName(n)); }, 300);
         // 보상: 깰 때마다 10코인 · 제한 시간 안에 깨면 경험치 (시간 초과면 순위표·경험치 제외)
         for (const m of inst.members()) {
           addCoins(m.name, CLEAR_COINS);

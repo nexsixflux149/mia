@@ -193,7 +193,84 @@ function trex() {
   };
   return g;
 }
+// 대왕 고양이 · 대왕 강아지 (같은 뼈대, 귀·꼬리·무늬만 다르다)
+function bigPet(kind) {
+  const cat = kind === 'cat';
+  const g = new THREE.Group();
+  const fur = M(cat ? '#f0a050' : '#e8d0a8', { roughness: 0.85 }), fur2 = M(cat ? '#c06a20' : '#a8784a', { roughness: 0.85 }), white = M('#fbf6ee', { roughness: 0.85 }), dark = M('#2a1a14');
+  const body = new THREE.Group(); body.position.y = 0.95; g.add(body);
+  const torso = mesh(new THREE.SphereGeometry(0.5, 24, 16), fur, 0, 0, 0, body); torso.scale.set(0.95, 0.85, 1.45);
+  mesh(new THREE.SphereGeometry(0.4, 18, 12), white, 0, -0.12, 0.12, body).scale.set(0.8, 0.75, 1.3);
+  if (cat) for (let i = 0; i < 4; i++) { const st = mesh(new THREE.TorusGeometry(0.42, 0.04, 6, 24, Math.PI), fur2, 0, 0.05, -0.35 + i * 0.22, body); st.rotation.set(0, Math.PI / 2, 0); st.scale.set(1, 0.9, 1.05); } // 줄무늬
+  else for (const [x, z] of [[0.3, -0.2], [-0.25, 0.25]]) mesh(new THREE.SphereGeometry(0.16, 12, 8), fur2, x, 0.32, z, body).scale.set(1, 0.4, 1.3); // 얼룩
+  const head = new THREE.Group(); head.position.set(0, 0.38, 0.72); body.add(head);
+  mesh(new THREE.SphereGeometry(0.4, 22, 16), fur, 0, 0, 0, head).scale.set(1.05, 0.95, 0.95);
+  mesh(new THREE.SphereGeometry(0.2, 16, 12), white, 0, -0.1, 0.3, head).scale.set(cat ? 1.2 : 1.1, 0.8, cat ? 0.8 : 1.3);
+  mesh(new THREE.SphereGeometry(0.06, 10, 8), cat ? M('#ff8fab') : dark, 0, cat ? -0.02 : 0, cat ? 0.42 : 0.52, head);
+  for (const s of [-1, 1]) {
+    const eye = mesh(new THREE.SphereGeometry(0.075, 14, 10), M(cat ? '#7ad84a' : '#3a2414', { emissive: cat ? '#3a8a1a' : '#000', emissiveIntensity: 0.5, roughness: 0.2 }), s * 0.16, 0.1, 0.32, head);
+    mesh(new THREE.SphereGeometry(0.025, 8, 6), M('#ffffff'), s * 0.18, 0.14, 0.39, head);
+    if (cat) { eye.scale.set(1, 1.2, 0.7); const ear = mesh(new THREE.ConeGeometry(0.14, 0.3, 4), fur, s * 0.24, 0.36, -0.02, head); ear.rotation.z = -s * 0.3; mesh(new THREE.ConeGeometry(0.08, 0.18, 4), M('#ff9ab0'), s * 0.235, 0.34, 0.03, head).rotation.z = -s * 0.3;
+      for (let k = 0; k < 3; k++) { const w = mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.34, 4), M('#ffffff'), s * 0.28, -0.08 + k * 0.03, 0.34, head); w.rotation.z = Math.PI / 2 + s * (k - 1) * 0.15; } }
+    else { const ear = mesh(new THREE.SphereGeometry(0.15, 12, 8), fur2, s * 0.36, 0.1, -0.02, head); ear.scale.set(0.5, 1.4, 0.9); ear.rotation.z = s * 0.35; }
+  }
+  let tongue = null; if (!cat) { tongue = mesh(new THREE.BoxGeometry(0.1, 0.02, 0.16), M('#ff6a8a'), 0, -0.24, 0.46, head); tongue.rotation.x = 0.5; }
+  const legs = [];
+  for (const [x, z] of [[-0.3, 0.45], [0.3, 0.45], [-0.3, -0.45], [0.3, -0.45]]) { const piv = new THREE.Group(); piv.position.set(x, 0.75, z); g.add(piv); mesh(new THREE.CylinderGeometry(0.13, 0.11, 0.66, 12), fur, 0, -0.35, 0, piv); mesh(new THREE.SphereGeometry(0.15, 12, 8), white, 0, -0.7, 0.04, piv).scale.set(1, 0.6, 1.25); legs.push(piv); }
+  const tail = new THREE.Group(); tail.position.set(0, 0.2, -0.7); body.add(tail);
+  if (cat) { const c = new THREE.CatmullRomCurve3([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0.25, -0.25), new THREE.Vector3(0, 0.7, -0.3), new THREE.Vector3(0.1, 0.95, -0.15)]); mesh(new THREE.TubeGeometry(c, 16, 0.07, 8), fur, 0, 0, 0, tail); }
+  else { const t2 = mesh(new THREE.CapsuleGeometry(0.07, 0.4, 6, 10), fur, 0, 0.22, -0.12, tail); t2.rotation.x = -0.8; }
+  mesh(new THREE.BoxGeometry(0.5, 0.06, 0.42), M(cat ? '#6a3ab0' : '#2a6ab0', { emissive: cat ? '#a060ff' : '#40a0ff', emissiveIntensity: 0.3 }), 0, 0.42, -0.02, body); // 안장
+  g.userData.seat = 1.4;
+  g.userData.anim = (t, moving) => {
+    const sp = moving ? (cat ? 9 : 11) : 0, k = moving ? 0.55 : 0;
+    legs.forEach((l, i) => (l.rotation.x = Math.sin(t * sp + (i === 0 || i === 3 ? 0 : Math.PI)) * k));
+    g.position.y = moving ? Math.abs(Math.sin(t * sp)) * 0.07 : Math.sin(t * 1.5) * 0.01;
+    tail.rotation.z = Math.sin(t * (cat ? 2 : 12)) * (cat ? 0.25 : 0.6); tail.rotation.x = cat ? Math.sin(t * 1.3) * 0.1 : 0;
+    head.rotation.y = Math.sin(t * 0.8) * 0.15; head.rotation.z = Math.sin(t * 1.1) * 0.05;
+    if (tongue) tongue.position.y = -0.24 + Math.sin(t * 8) * 0.01;
+    torso.scale.y = 0.85 + Math.sin(t * 2) * 0.01;
+  };
+  return g;
+}
+// 황금 마차 (최고 레벨) — 바퀴가 굴러가고, 장식 보석이 반짝인다
+function carriage() {
+  const g = new THREE.Group();
+  const gold = M('#f2c440', { metalness: 0.9, roughness: 0.22, emissive: '#8a6010', emissiveIntensity: 0.35 }), cream = M('#fff4dc', { roughness: 0.5 }), red = M('#b0142a', { roughness: 0.6 });
+  const box = new THREE.Group(); box.position.y = 0.75; g.add(box);
+  const shell = mesh(new THREE.SphereGeometry(0.62, 26, 18), gold, 0, 0.1, -0.1, box); shell.scale.set(0.95, 0.85, 1.15);
+  mesh(new THREE.CylinderGeometry(0.5, 0.56, 0.08, 24), red, 0, -0.05, -0.1, box); // 좌석
+  mesh(new THREE.BoxGeometry(0.7, 0.42, 0.12), red, 0, 0.12, -0.55, box); // 등받이
+  for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2; mesh(new THREE.SphereGeometry(0.035, 8, 6), M(['#ff4a8a', '#4ad8ff', '#7eff7a'][i % 3], { emissive: ['#ff4a8a', '#4ad8ff', '#7eff7a'][i % 3], emissiveIntensity: 1.2 }), Math.cos(a) * 0.6, 0.12, Math.sin(a) * 0.7 - 0.1, box); }
+  const crown = new THREE.Group(); crown.position.set(0, 1.42, -0.1); box.add(crown);
+  mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.12, 12), gold, 0, 0, 0, crown);
+  for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2; mesh(new THREE.ConeGeometry(0.04, 0.12, 6), gold, Math.cos(a) * 0.15, 0.1, Math.sin(a) * 0.15, crown); }
+  mesh(new THREE.OctahedronGeometry(0.06), M('#ff2a5a', { emissive: '#ff2a5a', emissiveIntensity: 1.5 }), 0, 0.2, 0, crown);
+  for (const s of [-1, 1]) { const pole = mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.3, 8), gold, s * 0.46, 0.65, -0.3, box); pole.rotation.x = 0; }
+  const canopy = mesh(new THREE.SphereGeometry(0.62, 22, 12, 0, Math.PI * 2, 0, Math.PI / 2), cream, 0, 1.3, -0.1, box); canopy.scale.y = 0.4; canopy.material = M('#fff4dc', { roughness: 0.5, side: THREE.DoubleSide });
+  const wheels = [];
+  for (const [x, z, r] of [[-0.62, 0.35, 0.3], [0.62, 0.35, 0.3], [-0.62, -0.5, 0.4], [0.62, -0.5, 0.4]]) {
+    const w = new THREE.Group(); w.position.set(x, r, z); g.add(w);
+    const rim = mesh(new THREE.TorusGeometry(r, 0.035, 8, 28), gold, 0, 0, 0, w); rim.rotation.y = Math.PI / 2;
+    for (let k = 0; k < 8; k++) { const sp = mesh(new THREE.CylinderGeometry(0.012, 0.012, r * 2, 5), gold, 0, 0, 0, w); sp.rotation.x = (k / 8) * Math.PI; }
+    mesh(new THREE.SphereGeometry(0.06, 10, 8), gold, 0, 0, 0, w); wheels.push(w);
+  }
+  mesh(new THREE.BoxGeometry(0.12, 0.05, 1.3), gold, 0, 0.35, -0.08, g);
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: sparkTex(), color: '#ffe08a', transparent: true, opacity: 0.4, depthWrite: false, blending: THREE.AdditiveBlending })); glow.scale.setScalar(2.4); glow.position.y = 0.9; g.add(glow);
+  const sparks = []; for (let i = 0; i < 10; i++) { const sp = glowSprite('#ffe9a8', 0.1, 0.9); g.add(sp); sparks.push(sp); }
+  g.userData.seat = 0.72;
+  g.userData.anim = (t, moving) => {
+    wheels.forEach((w) => (w.rotation.x = moving ? -t * 6 : w.rotation.x));
+    box.position.y = 0.75 + (moving ? Math.abs(Math.sin(t * 10)) * 0.03 : 0); box.rotation.z = Math.sin(t * 1.2) * 0.02;
+    crown.rotation.y = t * 0.8; glow.material.opacity = 0.3 + Math.sin(t * 2.5) * 0.12;
+    sparks.forEach((s, i) => { const a = t * 1.2 + i * 0.63; s.position.set(Math.cos(a) * 0.9, 0.5 + ((t * 0.4 + i * 0.1) % 1) * 1.2, Math.sin(a) * 1.0); s.material.opacity = 0.4 + Math.sin(t * 5 + i) * 0.4; });
+  };
+  return g;
+}
 export function buildMount(id) {
+  if (id === 'mount_cat') return bigPet('cat');
+  if (id === 'mount_dog') return bigPet('dog');
+  if (id === 'mount_carriage') return carriage();
   if (id === 'mount_trex') return trex();
   if (id === 'mount_pony') return horse(false);
   if (id === 'mount_unicorn') return horse(true);
@@ -215,11 +292,43 @@ export function buildSword() {
   return g;
 }
 
-/** gear = "날개|탈것|타는중(1/0)|검 듦(1/0)" */
+function robotParts(u) {
+  const parts = [];
+  const metal = M('#dfe6f0', { metalness: 0.25, roughness: 0.35, emissive: '#4a5a70', emissiveIntensity: 0.25 }), dark = M('#5a6478', { metalness: 0.3, roughness: 0.45 }), blue = (i) => glowM('#4ad8ff', i);
+  const add = (parent, geo, mat, x, y, z) => { const m = mesh(geo, mat, x, y, z, parent); m.userData.robot = true; parts.push(m); return m; };
+  // 머리 (네모난 헬멧 + 눈 화면 + 안테나)
+  add(u.head, new THREE.BoxGeometry(0.78, 0.66, 0.72), metal, 0, 0.02, 0);
+  add(u.head, new THREE.BoxGeometry(0.62, 0.26, 0.04), dark, 0, 0.05, 0.37);
+  const eyes = [-1, 1].map((s) => add(u.head, new THREE.BoxGeometry(0.14, 0.08, 0.03), blue(1.6), s * 0.15, 0.06, 0.39));
+  add(u.head, new THREE.BoxGeometry(0.3, 0.05, 0.03), dark, 0, -0.17, 0.37);
+  for (const s of [-1, 1]) add(u.head, new THREE.CylinderGeometry(0.08, 0.08, 0.06, 14), dark, s * 0.4, 0, 0).rotation.z = Math.PI / 2;
+  add(u.head, new THREE.CylinderGeometry(0.015, 0.015, 0.25, 6), dark, 0, 0.45, 0);
+  const tip = add(u.head, new THREE.SphereGeometry(0.05, 10, 8), glowM('#ff4a4a', 1.5), 0, 0.6, 0);
+  // 몸통 (가슴 불빛 패널)
+  add(u.rig, new THREE.BoxGeometry(0.5, 0.44, 0.38), metal, 0, 0.36, 0);
+  add(u.rig, new THREE.BoxGeometry(0.28, 0.16, 0.02), dark, 0, 0.4, 0.2);
+  const chest = [0, 1, 2].map((i) => add(u.rig, new THREE.SphereGeometry(0.022, 8, 6), glowM(['#ff4a4a', '#ffe066', '#4aff8a'][i], 1.4), -0.07 + i * 0.07, 0.4, 0.215));
+  add(u.rig, new THREE.BoxGeometry(0.44, 0.1, 0.34), dark, 0, 0.12, 0);
+  // 팔 · 다리 (관절에 붙여서 같이 움직인다)
+  for (const a of u.arms || []) { const s = a.position.x > 0 ? 1 : -1; add(a, new THREE.BoxGeometry(0.17, 0.38, 0.17), metal, 0.05 * s, -0.17, 0); add(a, new THREE.SphereGeometry(0.11, 12, 8), dark, 0, 0, 0); add(a, new THREE.BoxGeometry(0.2, 0.14, 0.2), dark, 0.08 * s, -0.4, 0); }
+  for (const l of u.legs || []) { add(l, new THREE.BoxGeometry(0.17, 0.14, 0.17), metal, 0, -0.06, 0); add(l, new THREE.BoxGeometry(0.22, 0.07, 0.3), dark, 0, -0.13, 0.04); }
+  return { parts, anim: (t) => { const on = Math.sin(t * 3) > -0.6; eyes.forEach((e) => (e.material.emissiveIntensity = on ? 1.6 : 0.3)); tip.material.emissiveIntensity = 0.8 + Math.sin(t * 6) * 0.7; chest.forEach((c, i) => (c.material.emissiveIntensity = Math.sin(t * 4 + i * 2) > 0 ? 1.6 : 0.2)); } };
+}
+function setCostume(g, id) {
+  const u = g.userData;
+  if (u.gCostume) { u.gCostume.parts.forEach((m) => m.parent?.remove(m)); u.gCostume = null; }
+  // 원래 몸(옷·얼굴·머리카락·장신구)을 숨기거나 되돌린다 — 상점 날개·탈것·검은 그대로
+  const keep = new Set([u.gWings, u.gMount, u.gSword].filter(Boolean));
+  const walk = (o) => { if (keep.has(o)) return; if (o.isMesh && !o.userData.robot) { if (id) { if (o.userData.vis0 == null) o.userData.vis0 = o.visible; o.visible = false; } else if (o.userData.vis0 != null) { o.visible = o.userData.vis0; delete o.userData.vis0; } } o.children.forEach(walk); };
+  walk(u.rig);
+  if (id === 'costume_robot') u.gCostume = robotParts(u);
+  u.gCostumeId = id;
+}
+/** gear = "날개|탈것|타는중(1/0)|검 듦(1/0)|코스튬" */
 export function applyGear(g, gear = '') {
   const u = g.userData; if (!u.rig) return;
   if (u.gearStr === gear) return; u.gearStr = gear;
-  const [w = '', m = '', riding = '0', sword = '0'] = gear.split('|');
+  const [w = '', m = '', riding = '0', sword = '0', costume = ''] = gear.split('|');
   if (u.gWingsId !== w) { if (u.gWings) u.rig.remove(u.gWings); u.gWings = w ? buildWings(w) : null; if (u.gWings) u.rig.add(u.gWings); u.gWingsId = w; }
   const mid = riding === '1' ? m : '';
   if (u.gMountId !== mid) { if (u.gMount) g.remove(u.gMount); u.gMount = mid ? buildMount(mid) : null; if (u.gMount) g.add(u.gMount); u.gMountId = mid; }
@@ -229,11 +338,13 @@ export function applyGear(g, gear = '') {
     u.gSword = null;
     if (sw && u.arms?.[0]) { const s = buildSword(); s.position.set(-0.09, -0.33, 0.04); s.rotation.set(Math.PI / 2 - 0.25, 0, 0); s.scale.setScalar(1.25); u.arms[0].add(s); u.gSword = s; }
   }
+  if ((u.gCostumeId || '') !== costume) setCostume(g, costume);
 }
 /** animateAvatar 다음에 부른다: 날개·탈것 움직임 + 탄 자세 + 검 휘두르기 */
 export function animateGear(g, t, dt, moving) {
   const u = g.userData;
   u.gWings?.userData.anim(t);
+  u.gCostume?.anim(t);
   if (u.gMount) {
     u.gMount.userData.anim(t, moving);
     const seat = u.gMount.userData.seat + (u.gMount.userData.float ? u.gMount.position.y : u.gMount.position.y * 0.6);

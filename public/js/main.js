@@ -179,7 +179,7 @@ function enter() {
     if (JOIN_CODE) socket.emit('party:joinCode', JOIN_CODE);
     if (res.resumed && String(res.room || '').startsWith('inst:')) socket.emit('game:state'); // 게임 도중 창을 닫았다 다시 열면 그 게임으로 돌아간다
     addChat({ channel: 'system', text: '📢 욕설·비방·도배는 금지예요. 경고 5회면 5분 동안 채팅이 금지됩니다.' });
-    addChat({ channel: 'system', text: '📢 모든 테마를 클리어하면 숨겨진 히든 테마가 오픈됩니다! (만렙 Lv.20 달성 시에도 열려요)' });
+    addChat({ channel: 'system', text: '📢 모든 테마를 클리어하면 숨겨진 히든 테마가 오픈됩니다! (Lv.20 달성 시에도 열려요)' });
     toast(document.body.classList.contains('mobile') ? `환영합니다, ${S.myName} 님! 왼쪽 조이스틱으로 이동 · 화면을 끌어 시점 · 두 손가락으로 확대` : `환영합니다, ${S.myName} 님! WASD 이동 · 드래그로 시점 · ❔에서 조작법`);
   });
 }
@@ -833,7 +833,7 @@ function updateOthers(dt, t) {
   S.danger = 0;
   for (const e of S.ghosts.values()) {
     const gs = e.st, G = e.G;
-    const frozen = gs.lit && (gs.type === 'woman' || gs.type === 'doll');
+    const frozen = gs.lit && gs.type === 'woman';
     if (!frozen) {
       G.position.x += (gs.x - G.position.x) * Math.min(1, dt * 6);
       G.position.z += (gs.z - G.position.z) * Math.min(1, dt * 6);
@@ -1143,10 +1143,12 @@ function openDoc(title, text, hint) {
   if (!paper) return openModal(title, text);
   openModal(title, '', paper); $('#modal .modal-card').classList.add('doc-mode');
 }
+{ const mx = el('button', 'modal-x', '✕'); mx.title = '닫기'; mx.onclick = () => closeModal(); $('#modal .modal-card').prepend(mx); } // 상점 창 오른쪽 위 닫기
+function footBtn(label, fn) { const b = el('button', 'btn primary foot-extra', label); b.onclick = fn; $('#modal .modal-foot').prepend(b); return b; }
 function openModal(title, text, bodyEl) {
   resetInput();
   S.modalOpen = true; S.lockCtx = null; hideMenus();
-  $('#modal .modal-card').classList.remove('doc-mode');
+  $('#modal .modal-card').classList.remove('doc-mode', 'shop-mode'); document.querySelectorAll('#modal .foot-extra').forEach((b) => b.remove());
   $('#modalTitle').textContent = title || '';
   $('#modalText').textContent = text || '';
   const b = $('#modalBody'); b.innerHTML = ''; if (bodyEl) b.appendChild(bodyEl);
@@ -1815,7 +1817,7 @@ function dismount() {
 }
 function lobbyAct(id) {
   if (S.mount) { dismount(); toast('내렸어요.'); return; }
-  if (id === 'shop') { openShop(); return; }
+  if (id === 'shop') { setTimeout(openShop, 160); return; }
   if (S.riding) S.riding = false;
   if (S.perch && id === 'off') { S.perch = null; me.y = 0; [me.x, me.z] = collide(me.x + Math.sin(me.ry) * 1.2, me.z + Math.cos(me.ry) * 1.2); return; }
   const it = S.world?.interactives?.find((i) => i.id === id); if (!it) return;
@@ -2183,9 +2185,9 @@ async function loadShareInfo() {
 }
 
 // ─────────────────────────── 레벨 · 코인 · 상점 · 내 물건 · 선물
-const SHOP_ORDER = ['popper', 'rocket', 'wings_fairy', 'mount_pony', 'wings_angel', 'mount_broom', 'mount_unicorn', 'wings_devil', 'mount_trex', 'wings_dragon', 'mount_ufo', 'sword'];
+const SHOP_ORDER = ['popper', 'rocket', 'wings_fairy', 'mount_pony', 'wings_angel', 'mount_broom', 'mount_cat', 'mount_dog', 'mount_unicorn', 'wings_devil', 'mount_trex', 'wings_dragon', 'mount_ufo', 'costume_robot', 'mount_carriage', 'sword'];
 const coinsText = () => (S.profile?.coins === -1 ? '∞' : String(S.profile?.coins ?? 0));
-const myGear = () => { const e = S.profile?.equip || {}; return `${e.wings || ''}|${e.mount || ''}|${S.riding && e.mount ? 1 : 0}|${S.holdSword && S.profile?.items?.sword ? 1 : 0}`; };
+const myGear = () => { const e = S.profile?.equip || {}; return `${e.wings || ''}|${e.mount || ''}|${S.riding && e.mount ? 1 : 0}|${S.holdSword && S.profile?.items?.sword ? 1 : 0}|${e.costume || ''}`; };
 // 맨 아래 얇은 경험치 바 + 왼쪽 위 레벨·코인
 const xpBar = el('div'); xpBar.id = 'xpBar'; xpBar.innerHTML = '<div id="xpFill"></div><div id="xpLabel"></div>'; $('#hud').appendChild(xpBar);
 const lvChip = el('div'); lvChip.id = 'lvChip'; $('#onlineChip').after(lvChip);
@@ -2213,6 +2215,15 @@ socket.on('xp', ({ add, why, lv, up }) => {
 });
 socket.on('gift', ({ from, icon, name }) => { toast(`🎁 ${from} 님이 ${icon} ${name}을(를) 선물했어요! (🎒 내 물건)`); audio.play('pickup'); if (myAvatar) burstHearts(myAvatar, 8); });
 socket.on('rank:changed', () => openRank(S.rankTab?.()));
+const celeb = el('div', 'hidden'); celeb.id = 'celebrate'; document.body.appendChild(celeb);
+socket.on('celebrate', ({ name, text }) => {
+  celeb.innerHTML = `<div class="cb-spark">✦ ✧ ✦</div><div class="cb-text"></div><div class="cb-sub">축하합니다! 🎉</div>`; celeb.querySelector('.cb-text').textContent = text;
+  celeb.classList.remove('hidden'); celeb.style.animation = 'none'; void celeb.offsetWidth; celeb.style.animation = '';
+  audio.play('bell'); setTimeout(() => audio.play('firework'), 400);
+  if (name === S.myName && myAvatar) { burstHearts(myAvatar, 12); rocketFx(me.x, me.y || 0, me.z, () => {}); }
+  addChat({ channel: 'system', text: '🎊 ' + text });
+  clearTimeout(celeb._t); celeb._t = setTimeout(() => celeb.classList.add('hidden'), 9000);
+});
 socket.on('game:overtime', () => { audio.play('bell'); $('#gameTimer').classList.add('over'); });
 // 히든 테마: 모든 테마를 한 번씩 깨거나 만렙이면 열린다
 function updateHiddenGate(quiet) {
@@ -2230,7 +2241,7 @@ function toggleRide() {
 }
 function swingSword() {
   if (!S.profile?.items?.sword) { toast('🗡️ 전설의 검이 없어요. (🛒 상점)'); return; }
-  if (!S.holdSword) { S.holdSword = true; toast(`🗡️ 전설의 검을 들었다! B: 휘두르기 · 남은 횟수 ${S.profile.swordUses}/10`); updateGearButtons(); return; }
+  if (!S.holdSword) { S.holdSword = true; toast(`🗡️ 전설의 검을 들었다! B: 휘두르기 · 남은 횟수 ${S.profile.swordUses}/30`); updateGearButtons(); return; }
   if (myAvatar) myAvatar.userData.swingT = 0.45;
   socket.emit('shop:use', 'sword');
 }
@@ -2293,9 +2304,9 @@ function shopPreview() {
 function previewItem(id) {
   const pv = shopPreview(); const it = S.shop[id] || {};
   if (!pv.av) { pv.av = createAvatar(look); pv.sc.add(pv.av); }
-  pv.walk = it.kind === 'mount';
-  pv.gear = it.kind === 'wings' ? `${id}||0|0` : it.kind === 'mount' ? `|${id}|1|0` : it.kind === 'sword' ? '|||1' : '';
-  pv.cam.position.set(0, it.kind === 'mount' ? 1.6 : 1.3, it.kind === 'mount' ? 4.8 : 4.2); pv.cam.lookAt(0, it.kind === 'mount' ? 0.9 : 0.75, 0);
+  pv.walk = it.kind === 'mount' || it.kind === 'costume';
+  pv.gear = it.kind === 'wings' ? `${id}||0|0|` : it.kind === 'mount' ? `|${id}|1|0|` : it.kind === 'sword' ? '|||1|' : it.kind === 'costume' ? `||0|0|${id}` : '';
+  const big = ['mount_cat', 'mount_dog', 'mount_carriage', 'mount_trex'].includes(id); pv.cam.position.set(0, it.kind === 'mount' ? (big ? 2.2 : 1.6) : 1.3, it.kind === 'mount' ? (big ? 6.2 : 4.8) : 4.2); pv.cam.lookAt(0, it.kind === 'mount' ? (big ? 1.2 : 0.9) : 0.75, 0);
 }
 function openShop() {
   if (!S.profile) return;
@@ -2316,7 +2327,7 @@ function openShop() {
       grid.appendChild(c);
     }
     const it = S.shop[sel]; const have = pf.items?.[sel] || 0; const locked = !pf.admin && pf.lv < it.lv;
-    info.innerHTML = `<div class="sh-t">${it.icon} ${it.name}</div><div class="sh-d">${it.desc}</div><div class="muted">${it.max > 1 ? `최대 ${it.max}개까지 가질 수 있어요 · 지금 ${have}개` : '1개만 살 수 있어요'}${it.kind === 'mount' ? ' · 탄 동안 이동 속도 1.5배 (Z)' : ''}${it.kind === 'sword' ? ' · 귀신 10번 베면 깨져요' : ''}</div>`;
+    info.innerHTML = `<div class="sh-t">${it.icon} ${it.name}</div><div class="sh-d">${it.desc}</div><div class="muted">${it.max > 1 ? `최대 ${it.max}개까지 가질 수 있어요 · 지금 ${have}개` : '1개만 살 수 있어요'}${it.kind === 'mount' ? ' · 탄 동안 이동 속도 1.5배 (Z)' : ''}${it.kind === 'sword' ? ' · 귀신 30번 베면 깨져요' : ''}</div>`;
     const buy = el('button', 'btn primary', locked ? `🔒 Lv.${it.lv} 부터` : have >= it.max ? (it.max > 1 ? '가득 찼어요' : '이미 있어요') : `🪙 ${it.price.toLocaleString()} 코인에 사기`);
     buy.disabled = locked || have >= it.max;
     buy.onclick = () => { socket.emit('shop:buy', sel); audio.play('click'); };
@@ -2327,7 +2338,8 @@ function openShop() {
   w.append(head, top, grid);
   previewItem(sel); draw();
   S.shopRefresh = () => { if ($('#modalBody').firstChild === w) draw(); else S.shopRefresh = null; };
-  openModal('🛒 코인 상점', '날개 · 탈것 · 폭죽 · 전설의 검', w);
+  openModal('🛒 코인 상점', '날개 · 탈것 · 코스튬 · 폭죽 · 전설의 검', w);
+  $('#modal .modal-card').classList.add('shop-mode'); // 위는 고정, 아래 물건 목록만 스크롤
   const stop = () => { if ($('#modalBody').firstChild !== w || $('#modal').classList.contains('hidden')) { pv.on = false; S.shopRefresh = null; } else setTimeout(stop, 500); }; setTimeout(stop, 500);
 }
 socket.on('shop:bought', ({ id }) => { audio.play('pickup'); const it = S.shop[id]; if (it?.kind === 'sword') S.holdSword = true; });
@@ -2339,14 +2351,14 @@ function openBag() {
     w.innerHTML = ''; const pf = S.profile;
     const ids = SHOP_ORDER.filter((id) => pf.items?.[id]);
     w.appendChild(el('div', 'muted', `Lv.${pf.lv} · 🪙 ${coinsText()} 코인 · 단축키: Z 탈것 타기/내리기 · B 검 들기/휘두르기`));
-    if (!ids.length) { w.appendChild(el('div', 'muted', '아직 가진 물건이 없어요. 🛒 상점에서 사 보세요!')); }
+    if (!ids.length) { w.appendChild(el('div', 'bag-empty', '물건이 없습니다 😀 상점에서 구매하세요')); }
     for (const id of ids) {
       const it = S.shop[id]; const n = pf.items[id];
       const row = el('div', 'bag-row');
       row.appendChild(el('span', 'bi', it.icon));
-      row.appendChild(el('span', 'bn', `${it.name}${it.max > 1 ? ` ×${n}` : ''}${it.kind === 'sword' ? ` (남은 ${pf.swordUses}/10)` : ''}`));
+      row.appendChild(el('span', 'bn', `${it.name}${it.max > 1 ? ` ×${n}` : ''}${it.kind === 'sword' ? ` (남은 ${pf.swordUses}/30)` : ''}`));
       const acts = el('span', 'ba');
-      if (it.kind === 'wings' || it.kind === 'mount') {
+      if (it.kind === 'wings' || it.kind === 'mount' || it.kind === 'costume') {
         const on = pf.equip?.[it.kind] === id;
         const b = el('button', 'btn tiny' + (on ? ' primary' : ''), on ? '착용 중 ✓' : '착용'); b.onclick = () => { socket.emit('shop:equip', { id, on: !on }); if (it.kind === 'mount' && on) S.riding = false; };
         acts.appendChild(b);
@@ -2362,11 +2374,11 @@ function openBag() {
       const gb = el('button', 'btn tiny', '🎁'); gb.title = '친구에게 선물하기'; gb.onclick = () => pickGiftTarget(id); acts.appendChild(gb);
       row.appendChild(acts); w.appendChild(row);
     }
-    const shop = el('button', 'btn small', '🛒 상점 가기'); shop.onclick = () => openShop(); w.appendChild(shop);
   };
   draw();
   S.bagRefresh = () => { if ($('#modalBody').firstChild === w) draw(); else S.bagRefresh = null; };
-  openModal('🎒 내 물건', '날개·탈것은 착용하면 모두에게 보여요', w);
+  openModal('🎒 내 물건', '날개·탈것·코스튬은 착용하면 모두에게 보여요', w);
+  footBtn('🛒 상점', () => openShop());
 }
 function pickGiftTarget(id) {
   const it = S.shop[id]; const w = el('div', 'bag');

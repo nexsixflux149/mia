@@ -1,7 +1,8 @@
 // ───── 레벨 · 경험치 · 코인 · 상점 · 방문 통계
 // 계정이 따로 없으므로 기록은 닉네임별로 남는다 (이어하기·랭킹과 같은 방식)
 
-export const MAX_LV = 20;
+export const MAX_LV = 100;
+export const HIDDEN_LV = 20; // 이 레벨이 되면 히든 테마가 열린다
 /** lv 레벨이 되기 위해 모아야 하는 누적 경험치 (1레벨 = 0) */
 export const xpAt = (lv) => 60 * (lv - 1) * lv;
 export function levelOf(xp) { let lv = 1; while (lv < MAX_LV && xp >= xpAt(lv + 1)) lv++; return lv; }
@@ -26,14 +27,18 @@ export const SHOP = {
   mount_trex: { name: '티라노사우루스', icon: '🦖', kind: 'mount', price: 220, lv: 13, max: 1, desc: '쿵쿵 걷는 티라노사우루스. 가끔 크앙! 하고 입을 벌려요. 탄 동안 이동 속도 1.5배!' },
   wings_dragon: { name: '용의 날개', icon: '🐉', kind: 'wings', price: 260, lv: 15, max: 1, desc: '보랏빛 비늘이 빛나는 커다란 용 날개.' },
   mount_ufo: { name: '꼬마 우주선', icon: '🛸', kind: 'mount', price: 300, lv: 17, max: 1, desc: '빙글빙글 불빛이 도는 우주선. 탄 동안 이동 속도 1.5배!' },
-  sword: { name: '전설의 검', icon: '🗡️', kind: 'sword', price: 1000, lv: 1, max: 1, uses: 10, desc: '푸른 빛을 내뿜는 크리스탈 검. 가까운 귀신을 베어 없앨 수 있어요. 귀신을 10번 없애면 깨져 버려요.' },
+  mount_cat: { name: '대왕 고양이', icon: '🐈', kind: 'mount', price: 150, lv: 10, max: 1, desc: '집채만 한 대왕 고양이. 꼬리를 살랑이며 사뿐사뿐 걸어요. 탄 동안 이동 속도 1.5배!' },
+  mount_dog: { name: '대왕 강아지', icon: '🐕', kind: 'mount', price: 150, lv: 10, max: 1, desc: '혀를 내밀고 신나게 달리는 대왕 강아지. 탄 동안 이동 속도 1.5배!' },
+  costume_robot: { name: '로봇 코스튬', icon: '🤖', kind: 'costume', price: 400, lv: 30, max: 1, desc: '머리부터 발끝까지 반짝이는 로봇으로 변신! 눈과 가슴 불빛이 깜빡여요.' },
+  mount_carriage: { name: '황금 마차', icon: '👑', kind: 'mount', price: 2000, lv: 100, max: 1, desc: '번쩍이는 황금 마차. 최고 레벨만 탈 수 있는 전설의 탈것. 탄 동안 이동 속도 1.5배!' },
+  sword: { name: '전설의 검', icon: '🗡️', kind: 'sword', price: 1000, lv: 1, max: 1, uses: 30, desc: '푸른 빛을 내뿜는 크리스탈 검. 가까운 귀신을 베어 없앨 수 있어요. 귀신을 30번 없애면 깨져 버려요.' },
 };
-export const isWear = (id) => ['wings', 'mount'].includes(SHOP[id]?.kind);
+export const isWear = (id) => ['wings', 'mount', 'costume'].includes(SHOP[id]?.kind);
 
-export function blankProfile() { return { xp: 0, coins: 0, items: {}, swordUses: 0, equip: { wings: '', mount: '' }, at: Date.now() }; }
+export function blankProfile() { return { xp: 0, coins: 0, items: {}, swordUses: 0, equip: { wings: '', mount: '', costume: '' }, at: Date.now() }; }
 export function profileView(pf, admin) {
   const lv = levelOf(pf.xp);
-  return { xp: pf.xp, lv, max: MAX_LV, cur: xpAt(lv), next: lv >= MAX_LV ? xpAt(lv) : xpAt(lv + 1), coins: admin ? -1 : pf.coins, items: pf.items, swordUses: pf.swordUses, equip: pf.equip, admin: !!admin };
+  return { xp: pf.xp, lv, max: MAX_LV, hiddenLv: HIDDEN_LV, cur: xpAt(lv), next: lv >= MAX_LV ? xpAt(lv) : xpAt(lv + 1), coins: admin ? -1 : pf.coins, items: pf.items, swordUses: pf.swordUses, equip: pf.equip, admin: !!admin };
 }
 
 // ───── 방문 통계 (한국 시간 기준 날짜별)

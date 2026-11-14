@@ -815,7 +815,7 @@ function buildLobbyExtras(root, colliders, add) {
     for (const s of [-1, 1]) mesh(new THREE.BoxGeometry(0.1, 2.3, 0.46), wood, s * 1.4, 1.33, -1.08, g);
     // 선반 위 상품: 실제 날개 · 탈것 · 검 모형이 천천히 돌며 빛난다
     const showcase = [];
-    const stand = (obj, x, y, sc, oy = 0) => { const h = new THREE.Group(); h.position.set(x, y, -1.05); const inner = new THREE.Group(); inner.position.y = oy; inner.scale.setScalar(sc); inner.add(obj); h.add(inner); h.userData.obj = obj; g.add(h); showcase.push(h);
+    const stand = (obj, x, y, sc, oy = 0) => { const h = new THREE.Group(); h.position.set(x, y, -1.05); const inner = new THREE.Group(); inner.scale.setScalar(sc); inner.add(obj); inner.updateMatrixWorld(true); { const bb = new THREE.Box3(); obj.traverse((m) => { if (m.isMesh) bb.expandByObject(m); }); inner.position.y = (bb.isEmpty() ? oy : -bb.min.y) + 0.01; } h.add(inner); /* 선반 위에 딱 올려놓는다 */ h.userData.obj = obj; g.add(h); showcase.push(h);
       const halo = mesh(new THREE.CircleGeometry(0.17, 20), new THREE.MeshBasicMaterial({ color: '#ffe9a8', transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending }), x, y + 0.005, -1.05, g); halo.rotation.x = -Math.PI / 2; halo.castShadow = false; return h; };
     stand(buildWings('wings_angel'), -0.85, 0.66, 0.42, -0.26); stand(buildWings('wings_dragon'), 0.85, 0.66, 0.32, -0.2);
     stand(buildMount('mount_unicorn'), -0.8, 1.28, 0.34); stand(buildMount('mount_ufo'), 0.1, 1.28, 0.3); stand(buildMount('mount_pony'), 0.88, 1.28, 0.32);

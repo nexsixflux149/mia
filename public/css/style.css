@@ -677,3 +677,40 @@ body.mobile #login .cpanels { min-height: 160px; }
 body.mobile .abtn.shout { width: 46px; height: 46px; font-size: 17px; right: 56px; }
 body.mobile .abtn.shout small { font-size: 9px; }
 @media (orientation: landscape) and (max-height: 500px) { body.mobile .abtn.shout { right: 89px; } }
+/* ─── v10: 상점 창 (위 고정 · 아래 목록만 스크롤 · 오른쪽 위 닫기) */
+.modal-card { position: relative; }
+.modal-x { display: none; position: absolute; top: 10px; right: 10px; z-index: 3; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: rgba(255,255,255,.08); color: #fff; font-size: 18px; cursor: pointer; }
+.modal-x:hover { background: rgba(255,255,255,.18); }
+.modal-card.shop-mode .modal-x { display: block; }
+.modal-card.shop-mode { display: flex; flex-direction: column; height: min(86vh, 760px); overflow: hidden; }
+.modal-card.shop-mode #modalBody { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.modal-card.shop-mode .shop { flex: 1; min-height: 0; }
+.modal-card.shop-mode .shop-grid { flex: 1; min-height: 0; max-height: none; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.modal-card.shop-mode .modal-foot { display: none; }
+body.mobile .modal-card.shop-mode { height: 90vh; }
+body.mobile .shop-pv { width: 150px; height: 150px; }
+body.mobile .shop-top { flex-wrap: nowrap; gap: 8px; }
+body.mobile .shop-info { min-width: 0; }
+body.mobile .sh-d { font-size: 12px; }
+body.mobile .shop-head .muted { display: none; }
+/* 내 물건: 빈 가방 · 아래 버튼 줄 */
+.bag-empty { padding: 18px 8px; text-align: center; font-size: 16px; color: #ffe9a8; }
+.modal-foot .foot-extra { flex: 1; }
+/* 현재 목표: '사용한 힌트'는 오른쪽 위로 */
+#objective { position: relative; }
+#hintUsed { position: absolute; top: 9px; right: 12px; font-size: 11px; }
+body.mobile #hintUsed { top: 7px; right: 9px; }
+/* 경험치 바: 붉은색 */
+#xpFill { background: linear-gradient(90deg, #8a0a14, #d6303a, #ff6a5a); box-shadow: 0 0 8px rgba(255,60,60,.8); }
+/* 축하 배너 (Lv.20 · 모든 테마 클리어): 위쪽 가운데에 보라색으로 */
+#celebrate { position: fixed; z-index: 61; left: 50%; top: 62px; transform: translateX(-50%); width: min(560px, 64vw); padding: 12px 18px 10px; border-radius: 16px; text-align: center; pointer-events: none;
+  background: linear-gradient(135deg, rgba(90,20,140,.95), rgba(150,60,220,.92)); border: 2px solid #e0b0ff; box-shadow: 0 0 30px rgba(190,110,255,.75), inset 0 0 18px rgba(255,255,255,.15); color: #fff; animation: celebIn 9s ease forwards; }
+#celebrate.hidden { display: none; }
+#celebrate .cb-spark { color: #ffe9a8; letter-spacing: 8px; font-size: 14px; animation: celebSpark 1s ease-in-out infinite alternate; }
+#celebrate .cb-text { font: 800 16px/1.45 var(--ui); text-shadow: 0 2px 6px rgba(40,0,60,.8); }
+#celebrate .cb-sub { margin-top: 2px; font-size: 13px; color: #f0d8ff; }
+body.mobile #celebrate { top: 92px; width: calc(100vw - 86px); left: 12px; transform: none; }
+@keyframes celebIn { 0% { opacity: 0; transform: translateX(-50%) scale(.7); } 6% { opacity: 1; transform: translateX(-50%) scale(1.06); } 10% { transform: translateX(-50%) scale(1); } 90% { opacity: 1; } 100% { opacity: 0; } }
+body.mobile #celebrate { animation-name: celebInM; }
+@keyframes celebInM { 0% { opacity: 0; transform: scale(.7); } 6% { opacity: 1; transform: scale(1.06); } 10% { transform: scale(1); } 90% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes celebSpark { from { opacity: .5; } to { opacity: 1; } }
