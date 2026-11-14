@@ -2185,7 +2185,7 @@ async function loadShareInfo() {
 }
 
 // ─────────────────────────── 레벨 · 코인 · 상점 · 내 물건 · 선물
-const SHOP_ORDER = ['popper', 'rocket', 'wings_fairy', 'mount_pony', 'wings_angel', 'mount_broom', 'mount_cat', 'mount_dog', 'mount_unicorn', 'wings_devil', 'mount_trex', 'wings_dragon', 'mount_ufo', 'costume_robot', 'mount_carriage', 'sword'];
+const SHOP_ORDER = ['popper', 'rocket', 'wings_fairy', 'mount_pony', 'wings_angel', 'mount_broom', 'mount_cat', 'mount_dog', 'mount_unicorn', 'wings_devil', 'mount_trex', 'wings_dragon', 'sword', 'mount_ufo', 'costume_robot', 'mount_carriage'];
 const coinsText = () => (S.profile?.coins === -1 ? '∞' : String(S.profile?.coins ?? 0));
 const myGear = () => { const e = S.profile?.equip || {}; return `${e.wings || ''}|${e.mount || ''}|${S.riding && e.mount ? 1 : 0}|${S.holdSword && S.profile?.items?.sword ? 1 : 0}|${e.costume || ''}`; };
 // 맨 아래 얇은 경험치 바 + 왼쪽 위 레벨·코인
