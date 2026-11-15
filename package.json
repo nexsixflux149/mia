@@ -8,7 +8,9 @@
     "start": "node server/index.js",
     "share": "node scripts/share.mjs",
     "preview": "node preview/start.mjs",
-    "preview:check": "node preview/check.mjs"
+    "preview:check": "node preview/check.mjs",
+    "preview:mobile": "node preview/mobile/build.mjs",
+    "preview:mobile:test": "node preview/mobile/test.mjs"
   },
   "dependencies": {
     "@neon/config": "^1.13.0",

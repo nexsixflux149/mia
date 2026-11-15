@@ -1,0 +1,14 @@
+#soloBanner{position:fixed;top:env(safe-area-inset-top,0);left:50%;transform:translateX(-50%);z-index:4000;font:11px/1.5 sans-serif;color:#f5e6be;background:#12171ee6;padding:5px 10px;border-radius:0 0 10px 10px;white-space:nowrap;pointer-events:none}
+#soloGraphics{left:auto!important;right:10px!important;bottom:calc(env(safe-area-inset-bottom,0px) + 145px)!important;max-width:min(300px,calc(100vw - 30px))!important;padding:9px!important;font-size:12px!important}
+#soloGraphics summary{cursor:pointer;min-height:32px;display:flex;align-items:center}
+#soloGraphics button,#soloGraphics select{min-height:38px;padding:5px 8px;border-radius:7px;background:#29333f;color:#f9edcf;border:1px solid #67717d}
+#soloGraphics input{min-height:32px;max-width:130px;vertical-align:middle}
+#soloComplete{position:fixed;inset:0;z-index:9000;background:#060b12e8;display:grid;place-items:center;padding:24px;color:#f7eddb}
+.solo-complete-card{max-width:430px;padding:26px;border:1px solid #8c7b56;border-radius:18px;background:#151b22;font:16px/1.8 sans-serif}
+.solo-complete-card h2{color:#f4d993}.solo-complete-card button{background:#f4d993;color:#151b22;border:0;border-radius:9px;min-height:48px;padding:10px 16px;font-size:16px}
+#partyPanel,#rosterBox,#chatBox,#shareBox,#micBtn,#voiceModeBtn,#shareCopy,#adminToggle,#adminBtn,#shopBtn,#bagBtn,#rankBtn,.credits{display:none!important}
+#login .logo-sub{font-size:12px}#login #nickRow:after{content:'이 기기의 브라우저에서만 진행이 저장됩니다.';display:block;font:11px/1.6 sans-serif;color:#a9a6a0;margin-top:5px}
+@media(max-width:760px){#soloBanner{font-size:10px}#soloGraphics{bottom:calc(env(safe-area-inset-bottom,0px) + 155px)!important}#soloGraphics:has(details[open]){max-height:calc(100dvh - 225px);overflow:auto}}
+#rosterPanel,#sharePanel,#chat,#voicePanel,#mact .mic,#mact .shout,#mbar .mbtn:not([data-k="settings"]){display:none!important}
+
+#soloGraphics{top:calc(env(safe-area-inset-top,0px) + 58px)!important;bottom:auto!important} @media(max-width:760px){#soloGraphics{bottom:auto!important;top:calc(env(safe-area-inset-top,0px) + 58px)!important}}
