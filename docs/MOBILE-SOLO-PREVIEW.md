@@ -1,5 +1,9 @@
 # 모바일 1인 미리보기
 
+게시 완료: https://mia-mobile-ch1-playtest.resolutechest3.chatgpt.site
+
+소유자 전용 Sites입니다. 휴대폰에서 같은 ChatGPT 계정으로 로그인한 뒤 닉네임을 입력하고 입장합니다. Sites 게시 성공은 확인했으며 실제 휴대폰 하드웨어 검증은 아직입니다.
+
 사용자가 멀티플레이/음성채팅 제외에 동의한 별도 모바일 테스트입니다. 기존 Node/Socket.IO 멀티플레이 버전과 운영 배포는 변경하지 않습니다.
 
 `preview/mobile/build.mjs`는 기존 public 클라이언트와 순수 JavaScript GameInstance/챕터 데이터 및 Three.js 필수 모듈을 별도 정적 디렉터리로 복사합니다. `adapter.js`가 소켓 대신 브라우저 내 게임 엔진에 이벤트를 전달합니다. 이동·카메라·터치 조이스틱·아이템·퍼즐 판정·손전등·수첩/힌트는 원래 코드를 사용합니다. 네트워크 서버·DB·관리자 비밀번호·운영 환경 파일은 복사하거나 연결하지 않습니다.
