@@ -36,10 +36,10 @@ export const SHOP = {
   mount_carriage: { name: '황금 마차', icon: '👑', kind: 'mount', price: 2000, lv: 100, max: 1, desc: '번쩍이는 황금 마차. 최고 레벨만 탈 수 있는 전설의 탈것. 탄 동안 이동 속도 1.5배!' },
   sword: { name: '전설의 검', icon: '🗡️', kind: 'sword', price: 1000, lv: 30, max: 1, uses: 30, desc: '푸른 빛을 내뿜는 크리스탈 검. 가까운 귀신을 베어 없앨 수 있어요. 귀신을 30번 없애면 깨져 버려요.' },
   // ── 황금 고양이 세트 (비매품 · kind: gold): 매주 주간랭킹 1위에게 아직 없는 것 하나를 랜덤으로 준다. part = 몸의 어느 부위인지 (착용 글자)
-  gold_hat: { name: '황금 고양이 모자', icon: '🎩', kind: 'gold', part: 'h', price: 0, lv: 1, max: 1, nosale: true, desc: GOLD_NOTE, tip: '쫑긋한 귀가 달린 황금 고양이 모자.' },
-  gold_mask: { name: '황금 고양이 가면', icon: '🎭', kind: 'gold', part: 'm', price: 0, lv: 1, max: 1, nosale: true, desc: GOLD_NOTE, tip: '눈이 반짝이는 황금 고양이 얼굴 가면.' },
+  gold_hat: { name: '황금 고양이 모자', icon: '🎩', kind: 'gold', part: 'h', price: 0, lv: 1, max: 1, nosale: true, desc: GOLD_NOTE, tip: '큼직한 귀가 쫑긋한 황금 고양이 모자.' },
+  gold_mask: { name: '황금 고양이 가면', icon: '🎭', kind: 'gold', part: 'm', price: 0, lv: 1, max: 1, nosale: true, desc: GOLD_NOTE, tip: '하얀 바탕에 붉은 무늬와 황금 눈꼬리를 그린, 귀가 큰 고양이 탈.' },
   gold_gloves: { name: '황금 고양이 장갑', icon: '🧤', kind: 'gold', part: 'g', price: 0, lv: 1, max: 1, nosale: true, desc: GOLD_NOTE, tip: '분홍 발바닥 젤리가 달린 황금 고양이 장갑.' },
-  gold_top: { name: '황금 고양이 상의', icon: '👕', kind: 'gold', part: 't', price: 0, lv: 1, max: 1, nosale: true, desc: GOLD_NOTE, tip: '가슴에 방울이 달린 황금 고양이 윗옷.' },
+  gold_top: { name: '황금 고양이 상의', icon: '👕', kind: 'gold', part: 't', price: 0, lv: 1, max: 1, nosale: true, desc: GOLD_NOTE, tip: '붉은 목줄에 고양이 방울이 달린 황금 고양이 윗옷.' },
   gold_bottom: { name: '황금 고양이 하의', icon: '👖', kind: 'gold', part: 'b', price: 0, lv: 1, max: 1, nosale: true, desc: GOLD_NOTE, tip: '반짝이는 황금 고양이 바지.' },
   gold_shoes: { name: '황금 고양이 신발', icon: '👢', kind: 'gold', part: 's', price: 0, lv: 1, max: 1, nosale: true, desc: GOLD_NOTE, tip: '사뿐사뿐 황금 고양이 발 신발.' },
   gold_tail: { name: '황금 고양이 꼬리', icon: '🐾', kind: 'gold', part: 'l', price: 0, lv: 1, max: 1, nosale: true, desc: GOLD_NOTE, tip: '살랑살랑 흔들리는 황금 고양이 꼬리.' },
@@ -56,11 +56,11 @@ export const hasGoldSet = (pf) => GOLD_IDS.every((id) => pf.items?.[id]);
 export const goldWorn = (pf) => { const on = pf.equip?.gold || ''; if (!on) return ''; let out = ''; for (const id of GOLD_IDS) if (pf.items?.[id] && on.includes(SHOP[id].part)) out += SHOP[id].part; return out; };
 /** 아직 없는 황금 고양이 부위 중 하나를 랜덤으로 고른다 (다 가졌으면 null) */
 export function randomGold(pf, rnd = Math.random) { const left = GOLD_IDS.filter((id) => !pf.items?.[id]); return left.length ? left[Math.min(left.length - 1, Math.floor(rnd() * left.length))] : null; }
-/** 황금 고양이 부위 하나를 준다: 아이템별 1개만 · 받자마자 착용 · 7종이 다 모이면 지팡이도 준다 → { added, staff } */
+/** 황금 고양이 부위 하나를 준다: 아이템별 1개만 · 받자마자 착용(로봇 코스튬은 벗는다) · 7종이 다 모이면 지팡이도 준다 → { added, staff } */
 export function giveGold(pf, id) {
   pf.items ||= {}; pf.equip ||= {};
   const added = isGold(id) && !pf.items[id];
-  if (added) { pf.items[id] = 1; const part = SHOP[id].part; if (!(pf.equip.gold || '').includes(part)) pf.equip.gold = (pf.equip.gold || '') + part; }
+  if (added) { pf.items[id] = 1; const part = SHOP[id].part; if (!(pf.equip.gold || '').includes(part)) pf.equip.gold = (pf.equip.gold || '') + part; pf.equip.costume = ''; } // (고양이 세트를 입으면 로봇 코스튬은 벗는다)
   const staff = hasGoldSet(pf) && !pf.items[GOLD_STAFF];
   if (staff) pf.items[GOLD_STAFF] = 1;
   return { added, staff };

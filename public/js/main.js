@@ -2771,7 +2771,16 @@ function openBag() {
     const ids = SHOP_ORDER.filter((id) => pf.items?.[id]);
     w.appendChild(el('div', 'muted', `Lv.${pf.lv} · 🪙 ${coinsText()} 코인 · 단축키: Z 탈것 타기/내리기 · B 검·지팡이 들기/휘두르기`));
     const goldHave = GOLD_ORDER.filter((id) => pf.items?.[id]).length;
-    if (goldHave) w.appendChild(el('div', 'muted gold-note', `🏆 황금 고양이 세트 ${goldHave}/7${goldHave >= 7 ? ' — 세트 완성! 🪄 지팡이로 귀신을 횟수 제한 없이 물리칠 수 있어요' : ' · 7종을 다 모으면 🪄 황금 고양이 지팡이를 받아요'}`));
+    if (goldHave) {
+      const note = el('div', 'muted gold-note', `🏆 황금 고양이 세트 ${goldHave}/7${goldHave >= 7 ? ' — 세트 완성! 🪄 지팡이로 귀신을 횟수 제한 없이 물리칠 수 있어요' : ' · 7종을 다 모으면 🪄 황금 고양이 지팡이를 받아요'} `);
+      if (goldHave >= 2) { // 한꺼번에 입기 / 벗기
+        const worn = goldWorn().length;
+        const all = el('button', 'btn tiny' + (worn >= goldHave ? ' primary' : ''), worn >= goldHave ? '모두 벗기' : '모두 입기'); all.onclick = () => socket.emit('shop:equip', { id: 'gold_set', on: worn < goldHave });
+        note.appendChild(all);
+      }
+      w.appendChild(note);
+      if (pf.equip?.costume) w.appendChild(el('div', 'muted', '※ 황금 고양이 세트를 입으면 입고 있던 코스튬은 저절로 벗겨져요.'));
+    }
     if (!ids.length) { w.appendChild(el('div', 'bag-empty', '물건이 없습니다 😀 상점에서 구매하세요')); }
     for (const id of ids) {
       const it = S.shop[id]; const n = pf.items[id];

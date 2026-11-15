@@ -298,6 +298,59 @@ const goldM = () => M('#ffd04a', { metalness: 0.32, roughness: 0.27, emissive: '
 const goldD = () => M('#e5a520', { metalness: 0.36, roughness: 0.36, emissive: '#946400', emissiveIntensity: 0.46 });
 const goldPink = () => M('#ff9ec4', { roughness: 0.5, emissive: '#ff5f9e', emissiveIntensity: 0.3 });
 const goldDark = () => M('#1c1408', { roughness: 0.4 });
+// 황금 고양이 가면의 그림: 하얀 바탕에 붉은 불꽃 무늬 · 황금 눈꼬리 · 이마 점 · 작은 코 (여우 · 고양이 탈 느낌). 한 번만 그려 모두가 함께 쓴다
+//  바깥(얼굴 모양 밖)은 투명하게 두어 잘라 낸다. 왼쪽 = 보는 사람 기준 왼쪽.
+let _maskMat = null;
+function catMaskMat() {
+  if (_maskMat) return _maskMat;
+  const W = 512, H = 336, c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+  const face = new Path2D();
+  face.moveTo(256, 8); face.bezierCurveTo(400, 2, 500, 70, 504, 150); face.bezierCurveTo(508, 240, 380, 322, 256, 330);
+  face.bezierCurveTo(132, 322, 4, 240, 8, 150); face.bezierCurveTo(12, 70, 112, 2, 256, 8); face.closePath();
+  x.save(); x.clip(face);
+  const bg = x.createRadialGradient(256, 140, 30, 256, 170, 330); bg.addColorStop(0, '#fffdf7'); bg.addColorStop(0.7, '#fbf3e4'); bg.addColorStop(1, '#eadcc4');
+  x.fillStyle = bg; x.fillRect(0, 0, W, H);
+  const RED = '#e3262b', GOLD = '#f7b500';
+  const petal = (ax, ay, c1x, c1y, tx, ty, c2x, c2y, bx, by, col) => { x.beginPath(); x.moveTo(ax, ay); x.quadraticCurveTo(c1x, c1y, tx, ty); x.quadraticCurveTo(c2x, c2y, bx, by); x.closePath(); x.fillStyle = col; x.fill(); };
+  // 왼쪽 이마에서 번져 나오는 붉은 불꽃 세 가닥 + 황금 한 가닥
+  petal(4, 96, 70, 18, 214, 40, 110, 66, 20, 150, RED);
+  petal(18, 160, 80, 84, 196, 96, 104, 122, 34, 196, RED);
+  petal(30, 206, 70, 150, 132, 150, 84, 176, 52, 232, RED);
+  petal(96, 14, 150, 6, 232, 22, 160, 30, 120, 40, GOLD);
+  // 이마 한가운데 붉은 점
+  x.beginPath(); x.moveTo(256, 50); x.quadraticCurveTo(275, 84, 256, 108); x.quadraticCurveTo(237, 84, 256, 50); x.closePath(); x.fillStyle = RED; x.fill();
+  // 볼 터치 (아주 옅게)
+  for (const bx of [112, 400]) { const bl = x.createRadialGradient(bx, 252, 2, bx, 252, 40); bl.addColorStop(0, 'rgba(255,120,140,.34)'); bl.addColorStop(1, 'rgba(255,120,140,0)'); x.fillStyle = bl; x.fillRect(bx - 44, 208, 88, 88); }
+  // 눈구멍: 눈꼬리가 올라간 고양이 눈
+  const eye = (s) => { const X = (v) => 256 + s * v; x.beginPath(); x.moveTo(X(44), 204); x.quadraticCurveTo(X(92), 136, X(158), 166); x.quadraticCurveTo(X(118), 232, X(44), 204); x.closePath(); x.fillStyle = '#150d12'; x.fill(); };
+  eye(-1); eye(1);
+  // 황금 눈꼬리: 오른쪽은 눈 아래를 감싸 올리고, 왼쪽은 눈꼬리만 살짝
+  x.lineCap = 'round'; x.lineJoin = 'round'; x.strokeStyle = GOLD;
+  x.lineWidth = 13; x.beginPath(); x.moveTo(306, 214); x.quadraticCurveTo(372, 246, 432, 160); x.stroke();
+  x.lineWidth = 10; x.beginPath(); x.moveTo(118, 226); x.quadraticCurveTo(90, 214, 78, 176); x.stroke();
+  x.strokeStyle = RED; x.lineWidth = 7; x.beginPath(); x.moveTo(204, 214); x.quadraticCurveTo(160, 240, 122, 232); x.stroke();
+  // 작은 붉은 코 · 입
+  x.fillStyle = RED; x.beginPath(); x.moveTo(238, 268); x.quadraticCurveTo(256, 258, 274, 268); x.quadraticCurveTo(268, 288, 256, 292); x.quadraticCurveTo(244, 288, 238, 268); x.closePath(); x.fill();
+  x.strokeStyle = RED; x.lineWidth = 5; x.beginPath(); x.moveTo(256, 292); x.quadraticCurveTo(250, 310, 234, 306); x.moveTo(256, 292); x.quadraticCurveTo(262, 310, 278, 306); x.stroke();
+  x.restore();
+  // 가장자리의 황금 테
+  x.lineWidth = 9; x.strokeStyle = '#f0b429'; x.stroke(face);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  // 부드러운(번들거리지 않는) 재질 · 어두운 맵에서도 무늬가 보이게 살짝 스스로 빛난다
+  _maskMat = new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.5, roughness: 0.84, metalness: 0, emissive: '#ffffff', emissiveMap: tex, emissiveIntensity: 0.3, side: THREE.DoubleSide });
+  return _maskMat;
+}
+const softM = (c, e, i = 0.28) => M(c, { roughness: 0.84, metalness: 0, emissive: e, emissiveIntensity: i });
+/** 귀(반지름 R · 높이 H 인 원뿔)의 앞면에 붙는 안쪽 세모. 귀의 자식으로 달면 귀와 함께 납작해지고 기운다 */
+function earInner(R, H, mat, inset = 0.62) {
+  const yb = -H / 2 + H * 0.07, yt = H / 2 - H * 0.24, front = (y) => (R * (H / 2 - y)) / H + 0.014;
+  const r = R * ((H / 2 - yb) / H) * inset;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute([-r, yb, front(yb), r, yb, front(yb), 0, yt, front(yt)], 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0.5, 1], 2));
+  g.computeVertexNormals();
+  const m = new THREE.Mesh(g, mat); m.userData.gold = true; return m;
+}
 function goldParts(u, set) {
   const parts = [], anims = [], hidden = [];
   const gold = goldM(), dk = goldD(), pink = goldPink(), black = goldDark();
@@ -306,31 +359,31 @@ function goldParts(u, set) {
   // 모자: 귀가 쫑긋한 황금 모자 (원래 쓰고 있던 모자 · 동물 귀는 잠시 감춘다)
   if (has('h')) {
     u.head.traverse((o) => { if ((o.userData.hatPart || o.userData.earPart) && o.visible) { o.visible = false; hidden.push(o); } });
-    const cap = add(u.head, new THREE.SphereGeometry(0.47, 36, 18, 0, Math.PI * 2, 0, Math.PI / 2.15), gold, 0, 0.05, 0); cap.scale.set(1.08, 0.97, 1.03);
-    const band = add(u.head, new THREE.TorusGeometry(0.468, 0.042, 12, 44), dk, 0, 0.1, 0); band.rotation.x = Math.PI / 2; band.scale.set(1.08, 1.03, 1);
-    for (const s of [-1, 1]) {
-      const ear = add(u.head, new THREE.ConeGeometry(0.135, 0.27, 14), gold, 0.25 * s, 0.5, 0.0); ear.rotation.z = -0.32 * s; ear.scale.z = 0.62;
-      const inn = add(ear, new THREE.ConeGeometry(0.075, 0.17, 12), pink, 0, -0.025, 0.05); inn.scale.z = 0.4;
+    const hg = new THREE.Group(); hg.userData.gold = true; u.head.add(hg); parts.push(hg);
+    if (has('m')) hg.scale.setScalar(1.07); // 가면과 함께 쓰면 가면 윗부분을 덮도록 살짝 크게
+    const hm = (geo, mat, x = 0, y = 0, z = 0, parent = hg) => { const m = mesh(geo, mat, x, y, z, parent); m.userData.gold = true; return m; };
+    hm(new THREE.SphereGeometry(0.47, 36, 18, 0, Math.PI * 2, 0, Math.PI / 2.15), gold, 0, 0.05, 0).scale.set(1.08, 0.97, 1.03);
+    const band = hm(new THREE.TorusGeometry(0.468, 0.042, 12, 44), dk, 0, 0.1, 0); band.rotation.x = Math.PI / 2; band.scale.set(1.08, 1.03, 1);
+    const ears = [];
+    for (const s of [-1, 1]) { // 큼직하고 쫑긋한 귀
+      const ear = hm(new THREE.ConeGeometry(0.205, 0.46, 18), gold, 0.275 * s, 0.6, 0.0); ear.rotation.z = -0.3 * s; ear.scale.z = 0.55; ears.push([ear, s]);
+      ear.add(earInner(0.205, 0.46, pink));
     }
-    add(u.head, new THREE.OctahedronGeometry(0.05), glowM('#ff4d6d', 1.1), 0, 0.2, 0.488).scale.set(1, 1.25, 0.6); // 이마의 붉은 보석
+    hm(new THREE.OctahedronGeometry(0.05), glowM('#ff4d6d', 1.1), 0, 0.2, 0.488).scale.set(1, 1.25, 0.6); // 이마의 붉은 보석
+    anims.push((t) => { for (const [e, s] of ears) e.rotation.z = -0.3 * s + Math.sin(t * 2.6 + s) * 0.035 * s; }); // 귀가 가끔 쫑긋
   }
-  // 가면: 눈이 반짝이는 황금 고양이 얼굴 (입은 보인다)
+  // 가면: 얼굴을 넉넉히 덮는 고양이 탈 — 하얀 바탕에 붉은 무늬와 황금 눈꼬리, 큰 귀 (부드러운 재질)
   if (has('m')) {
-    const plate = add(u.head, new THREE.SphereGeometry(0.455, 36, 14, Math.PI / 2 - 0.8, 1.6, Math.PI / 2 - 0.5, 0.7), gold, 0, 0, 0); plate.scale.set(1.08, 0.95, 1);
-    let hatOn = has('h'); if (!hatOn) u.head.traverse((o) => { if (o.userData.hatPart && o.isMesh && o.visible) hatOn = true; }); // 모자를 쓰고 있으면 가면의 귀는 달지 않는다 (모자를 뚫고 나온다)
-    const on = (ang, y, r = 0.462) => [Math.sin(ang) * r * 1.08 * Math.sqrt(Math.max(0, 1 - (y / (r * 0.95)) ** 2)), y, Math.cos(ang) * r * Math.sqrt(Math.max(0, 1 - (y / (r * 0.95)) ** 2))];
-    const eyes = [];
-    for (const s of [-1, 1]) {
-      const [x, y, z] = on(0.36 * s, 0.06);
-      const hole = add(u.head, new THREE.SphereGeometry(0.075, 16, 12), black, x, y, z); hole.scale.set(1.15, 0.72, 0.28); hole.rotation.y = 0.36 * s; hole.rotation.z = 0.22 * s;
-      const pupil = add(u.head, new THREE.SphereGeometry(0.04, 12, 10), glowM('#7dffb5', 1.5), x * 1.012, y, z * 1.012 + 0.006); pupil.scale.set(0.36, 0.95, 0.3); pupil.rotation.y = 0.36 * s; eyes.push(pupil);
-      // 가면 위쪽 모서리의 뾰족한 귀 (모자를 쓰고 있으면 뺀다)
-      if (!hatOn) { const tip = add(u.head, new THREE.ConeGeometry(0.07, 0.15, 10), dk, 0.3 * s, 0.27, 0.3); tip.rotation.z = -0.5 * s; tip.rotation.x = 0.25; tip.scale.z = 0.5; }
-      // 수염 세 가닥
-      for (let k = -1; k <= 1; k++) { const [wx, wy, wz] = on(0.62 * s, -0.045 + k * 0.035); const w = add(u.head, new THREE.CylinderGeometry(0.004, 0.004, 0.2, 5), dk, wx + 0.07 * s, wy + k * 0.012, wz + 0.01); w.rotation.z = Math.PI / 2 + k * 0.16 * s; w.rotation.y = -0.55 * s; }
+    const plate = add(u.head, new THREE.SphereGeometry(0.472, 44, 22, Math.PI / 2 - 1.08, 2.16, Math.PI / 2 - 0.78, 1.42), catMaskMat(), 0, 0, 0); plate.scale.set(1.08, 0.95, 1);
+    plate.castShadow = false;
+    // 귀: 황금 모자를 함께 쓰면 모자의 큰 귀가 있으니 달지 않는다
+    if (!has('h')) {
+      const white = softM('#fff8ec', '#fff1d6'), red = softM('#e3262b', '#a81216'), yel = softM('#ffc533', '#c79a00', 0.36);
+      for (const s of [-1, 1]) {
+        const ear = add(u.head, new THREE.ConeGeometry(0.175, 0.38, 18), s < 0 ? red : white, 0.215 * s, 0.475, 0.3); ear.rotation.set(-0.3, 0, -0.3 * s); ear.scale.z = 0.5;
+        ear.add(earInner(0.175, 0.38, yel, 0.7));
+      }
     }
-    add(u.head, new THREE.SphereGeometry(0.03, 12, 10), pink, 0, -0.07, 0.468).scale.set(1.2, 0.8, 0.6); // 분홍 코
-    anims.push((t) => { const k = 1.1 + Math.sin(t * 2.4) * 0.5; for (const e of eyes) e.material.emissiveIntensity = k; });
   }
   // 장갑: 분홍 젤리가 달린 고양이 발
   if (has('g')) for (const a of u.arms || []) {
@@ -345,15 +398,21 @@ function goldParts(u, set) {
   if (has('t') && u.torso?.parent) {
     const up = u.torso.parent;
     add(up, new THREE.CapsuleGeometry(0.294, 0.22, 10, 30), gold, 0, 0.52, 0);
-    const collar = add(up, new THREE.TorusGeometry(0.175, 0.036, 10, 30), dk, 0, 0.83, 0); collar.rotation.x = Math.PI / 2;
+    const collar = add(up, new THREE.TorusGeometry(0.192, 0.04, 12, 34), softM('#e3262b', '#a81216', 0.3), 0, 0.825, 0.012); collar.rotation.x = Math.PI / 2 - 0.16; // 붉은 목줄
     const hem = add(up, new THREE.TorusGeometry(0.262, 0.03, 10, 34), dk, 0, 0.3, 0); hem.rotation.x = Math.PI / 2;
-    const bell = add(up, new THREE.SphereGeometry(0.052, 14, 10), glowM('#ffe27a', 0.9, { metalness: 0.4 }), 0, 0.76, 0.2);
-    add(up, new THREE.BoxGeometry(0.012, 0.03, 0.02), black, 0, 0.725, 0.245);
+    // 고양이 방울: 목줄 앞에 매달려 흔들린다
+    const bp = new THREE.Group(); bp.position.set(0, 0.79, 0.2); bp.userData.gold = true; up.add(bp); parts.push(bp);
+    const bm = (geo, mat, x, y, z) => { const m = mesh(geo, mat, x, y, z, bp); m.userData.gold = true; return m; };
+    const strap = bm(new THREE.BoxGeometry(0.05, 0.13, 0.016), softM('#e3262b', '#a81216', 0.3), 0, -0.06, 0.1); strap.rotation.x = -0.55; // 목줄에서 내려오는 붉은 끈
+    const bell = bm(new THREE.SphereGeometry(0.1, 22, 16), glowM('#ffd84a', 0.75, { metalness: 0.35, roughness: 0.25 }), 0, -0.2, 0.17);
+    const ridge = bm(new THREE.TorusGeometry(0.101, 0.011, 8, 28), dk, 0, -0.2, 0.17); ridge.rotation.x = Math.PI / 2;
+    bm(new THREE.BoxGeometry(0.016, 0.078, 0.02), black, 0, -0.25, 0.256);
+    bm(new THREE.SphereGeometry(0.017, 8, 6), black, 0, -0.205, 0.268);
     // 가슴의 발바닥 무늬
-    add(up, new THREE.SphereGeometry(0.045, 12, 10), pink, 0, 0.52, 0.292).scale.set(1.15, 0.95, 0.3);
-    for (let k = -1; k <= 1; k++) add(up, new THREE.SphereGeometry(0.02, 10, 8), pink, k * 0.045, 0.592 - Math.abs(k) * 0.014, 0.288 - Math.abs(k) * 0.006).scale.z = 0.35;
+    add(up, new THREE.SphereGeometry(0.04, 12, 10), pink, 0, 0.385, 0.283).scale.set(1.15, 0.95, 0.3);
+    for (let k = -1; k <= 1; k++) add(up, new THREE.SphereGeometry(0.018, 10, 8), pink, k * 0.04, 0.448 - Math.abs(k) * 0.012, 0.29 - Math.abs(k) * 0.005).scale.z = 0.35;
     for (const a of u.arms || []) { const s = a.position.x > 0 ? 1 : -1; const sl = add(a, new THREE.CapsuleGeometry(0.081, 0.2, 8, 20), gold, 0.035 * s, -0.15, 0); sl.rotation.z = 0.32 * s; }
-    anims.push((t) => { bell.position.x = Math.sin(t * 5) * 0.006; });
+    anims.push((t, moving) => { const a = moving ? 0.34 : 0.06; bp.rotation.z = Math.sin(t * (moving ? 9 : 2.2)) * a; bp.rotation.x = Math.sin(t * (moving ? 7 : 1.7) + 1) * a * 0.5; bell.material.emissiveIntensity = 0.7 + Math.sin(t * 3) * 0.12; });
   }
   // 하의: 황금 반바지 (치마를 입고 있었다면 그 동안 감춘다)
   if (has('b')) {
@@ -378,7 +437,7 @@ function goldParts(u, set) {
     const ring = mesh(new THREE.TorusGeometry(0.05, 0.016, 8, 18), pink, 0, 0.02, -0.1, piv); ring.userData.gold = true;
     anims.push((t) => { piv.rotation.y = Math.sin(t * 2.2) * 0.38; piv.rotation.x = Math.sin(t * 1.3) * 0.08; });
   }
-  return { parts, set, hidden, anim: (t) => { for (const f of anims) f(t); } };
+  return { parts, set, hidden, anim: (t, moving) => { for (const f of anims) f(t, moving); } };
 }
 function setGold(g, set) {
   const u = g.userData;
@@ -463,7 +522,7 @@ export function animateGear(g, t, dt, moving) {
   const u = g.userData;
   u.gWings?.userData.anim(t);
   u.gCostume?.anim(t);
-  u.gGold?.anim(t);
+  u.gGold?.anim(t, moving);
   if (u.gMount) {
     u.gMount.userData.anim(t, moving);
     const seat = u.gMount.userData.seat + (u.gMount.userData.float ? u.gMount.position.y : u.gMount.position.y * 0.6);

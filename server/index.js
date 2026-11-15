@@ -114,7 +114,7 @@ const profChecked = new Set(); // 서버가 켜진 뒤 처음 볼 때 한 번씩
 const prof = (name) => {
   const pf = (profiles[name] ||= blankProfile()); pf.items ||= {}; pf.equip ||= { wings: '', mount: '' }; pf.equip.costume ??= ''; pf.equip.gold ??= '';
   // 탈것 · 코스튬 · 날개 · 검 · 비매품은 아이템별 1개만 (폭죽은 max 개까지): 혹시 예전 기록에 더 들어 있으면 줄여 둔다
-  if (!profChecked.has(name)) { profChecked.add(name); for (const [id, n] of Object.entries(pf.items)) { const it = SHOP[id]; if (it && n > it.max) pf.items[id] = it.max; } }
+  if (!profChecked.has(name)) { profChecked.add(name); for (const [id, n] of Object.entries(pf.items)) { const it = SHOP[id]; if (it && n > it.max) pf.items[id] = it.max; } if (pf.equip.gold && pf.equip.costume) pf.equip.costume = ''; } // (고양이 세트와 로봇 코스튬은 함께 입지 않는다)
   return pf;
 };
 const findByName = (name) => [...players.values()].find((p) => p.name === name && !p.offline);
@@ -479,19 +479,30 @@ io.on('connection', (sock) => {
     if (!me.admin) pf.coins -= it.price;
     pf.items[id] = have + 1;
     if (it.kind === 'sword') pf.swordUses = it.uses;
-    if (isWear(id) && !pf.equip[it.kind]) pf.equip[it.kind] = id; // 처음 산 날개·탈것은 바로 착용
+    if (isWear(id) && !pf.equip[it.kind] && !(it.kind === 'costume' && pf.equip.gold)) pf.equip[it.kind] = id; // 처음 산 날개·탈것은 바로 착용 (고양이 세트를 입고 있으면 코스튬은 그대로 둔다)
     saveProfiles(); sendProfile(me);
     sock.emit('shop:bought', { id });
     sock.emit('toast', { text: `${it.icon} ${it.name}을(를) 샀어요!${isWear(id) ? ' (🎒 내 물건에서 착용/해제)' : ' (🎒 내 물건에서 사용)'}` });
   });
   sock.on('shop:equip', ({ id, on } = {}) => {
-    if (!me) return; const it = SHOP[id]; if (!it || !(isWear(id) || isGold(id))) return;
+    if (!me) return;
+    // 고양이 세트를 입으면 입고 있던 로봇 코스튬은 저절로 벗겨진다
+    const dropCostume = (pf) => { const c = SHOP[pf.equip.costume]; if (!c) return; pf.equip.costume = ''; sock.emit('toast', { text: `${c.icon} ${c.name}을(를) 벗었어요. (황금 고양이 세트와는 함께 입을 수 없어요)` }); };
+    if (id === 'gold_set') { // 가진 황금 고양이 부위를 한꺼번에 입거나 벗는다
+      const pf = prof(me.name);
+      pf.equip.gold = on ? GOLD_IDS.filter((g) => pf.items[g]).map((g) => SHOP[g].part).join('') : '';
+      if (pf.equip.gold) dropCostume(pf);
+      saveProfiles(); sendProfile(me); return;
+    }
+    const it = SHOP[id]; if (!it || !(isWear(id) || isGold(id))) return;
     const pf = prof(me.name); if (!pf.items[id]) return;
     if (isGold(id)) { // 황금 고양이 부위는 부위마다 따로 입고 벗는다 (여러 개 함께 착용)
       const cur = new Set(pf.equip.gold || ''); if (on) cur.add(it.part); else cur.delete(it.part);
       pf.equip.gold = GOLD_IDS.map((g) => SHOP[g].part).filter((c) => cur.has(c)).join('');
+      if (on) dropCostume(pf);
       saveProfiles(); sendProfile(me); return;
     }
+    if (it.kind === 'costume' && on && pf.equip.gold) { pf.equip.gold = ''; sock.emit('toast', { text: `🏆 황금 고양이 세트를 벗었어요. (${it.icon} ${it.name}와(과)는 함께 입을 수 없어요)` }); } // 반대로 로봇 코스튬을 입으면 고양이 세트를 벗는다
     pf.equip[it.kind] = on ? id : (pf.equip[it.kind] === id ? '' : pf.equip[it.kind]);
     if (it.kind === 'mount' && !on) me.riding = false;
     saveProfiles(); sendProfile(me);
@@ -548,7 +559,7 @@ io.on('connection', (sock) => {
     if (!me.admin) { a.items[id] -= 1; if (a.items[id] <= 0) { delete a.items[id]; if (a.equip[it.kind] === id) a.equip[it.kind] = ''; if (it.kind === 'sword') a.swordUses = 0; } }
     b.items[id] = (b.items[id] || 0) + 1;
     if (it.kind === 'sword') b.swordUses = uses;
-    if (isWear(id) && !b.equip[it.kind]) b.equip[it.kind] = id;
+    if (isWear(id) && !b.equip[it.kind] && !(it.kind === 'costume' && b.equip.gold)) b.equip[it.kind] = id;
     saveProfiles(); sendProfile(me); sendProfile(t);
     sock.emit('toast', { text: `🎁 ${t.name} 님에게 ${it.icon} ${it.name}을(를) 선물했어요!` });
     io.to(t.id).emit('gift', { from: me.name, id, icon: it.icon, name: it.name });
