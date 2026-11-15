@@ -15,7 +15,7 @@ def font(row):
  print(out.name,out.stat().st_size,'bytes',flush=True)
  return {'file':out.name,'source':url,'source_sha256':hashlib.sha256(data).hexdigest(),'woff2_sha256':hashlib.sha256(out.read_bytes()).hexdigest()}
 def license(family):
- data=urlopen(BASE+family+'/OFL.txt',timeout=40).read();(ROOT/(family+'-OFL.txt')).write_bytes(data)
+ data=urlopen(BASE+family+'/OFL.txt',timeout=40).read();(ROOT/(family+'-OFL.txt')).write_text('\n'.join(line.rstrip() for line in data.decode('utf-8').splitlines())+'\n')
 ROOT.mkdir(exist_ok=True)
 with ThreadPoolExecutor(max_workers=7) as pool:manifest=list(pool.map(font,FACES))
 with ThreadPoolExecutor(max_workers=5) as pool:list(pool.map(license,sorted({r[0] for r in FACES})))
