@@ -1,0 +1,15 @@
+{
+  "checks": [
+    "Portrait first chapter loads without a game server or external requests",
+    "Actual touch joystick moves/stops and flashlight action works",
+    "Three presets and original comparison preserve collider data",
+    "Original item/reveal rules and touch keypad solve the real shutter puzzle",
+    "Reload restores puzzle and inventory checkpoint in this browser",
+    "Landscape touch layout has no horizontal overflow",
+    "Real exit completes preview without loading/remastering later chapters",
+    "Replay resets first-chapter progress",
+    "No browser errors or external requests"
+  ],
+  "errors": [],
+  "external": []
+}
