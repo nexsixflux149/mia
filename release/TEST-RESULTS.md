@@ -1,4 +1,4 @@
-# 全体 수정본 검증 결과
+# 전체 수정본 검증 결과
 
 검증일: 2026-11-15. Linux/Node 24/Chromium headless/SwiftShader. 실제 Windows/모바일 GPU 환경은 아닙니다.
 
@@ -52,3 +52,7 @@
 ![수정본 인게임](validation/full-client.png)
 
 ![귀신 외형 시안](validation/ghost.png)
+
+## 배포 파일 자체 검증
+
+최종 ZIP을 저장소 밖의 새 폴더에 풀고 `npm ci`를 새로 실행해 통과했습니다. Git/Python 없이 클라이언트를 재생성하고 수정본 서버를 실행했으며, 정적 JS/폰트/Socket.IO 파일 응답을 확인했습니다. 테스트 전용 해금 도구를 실제 실행한 뒤 일반 닉네임 `수정본테스터`로 숨김 테마의 마지막 챕터 시작까지 확인했습니다. 압축파일 CRC와 비밀 설정/실제 사용자 저장 데이터 미포함도 확인했습니다. Windows 배치 자체의 Windows 실행은 여전히 미검증입니다.
