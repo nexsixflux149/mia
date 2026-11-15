@@ -22,8 +22,11 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <meta name="theme-color" content="#1a0508" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Nanum+Myeongjo:wght@400;800&family=Nanum+Pen+Script&family=Gaegu:wght@400;700&family=Do+Hyeon&display=swap" rel="stylesheet" />
+  <!-- 글꼴: 우리 서버에서 (구글 글꼴 대신). 첫 화면(스플래시 · 로그인)에 쓰는 세 가지는 미리 받기 시작한다 -->
+  <link rel="preload" href="/fonts/gowun-dodum-400.23232a5f.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="/fonts/nanum-myeongjo-800.c9e39b71.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="/fonts/nanum-myeongjo-400.c848faaf.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/fonts/fonts.css" />
   <link rel="stylesheet" href="/css/style.css" />
   <script type="importmap">
     { "imports": { "three": "/vendor/three/build/three.module.min.js", "three/addons/": "/vendor/three/examples/jsm/" } }

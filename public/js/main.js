@@ -10,8 +10,12 @@ import { Voice } from './voice.js';
 import { FX, makeBeam } from './fx.js';
 import { applyGear, animateGear, initFx, updateFx, popperFx, rocketFx, swordFx, shatterFx, fartFx } from './gear.js';
 import { FRAMES, shootPhoto, composePhoto, drawStampCard, loadPhotoFonts } from './photo.js';
+import { GraphicsUpgrade } from './graphics-upgrade.js';
+import { gfx } from './visual-upgrade.js';
 
 const $ = (s) => document.querySelector(s);
+// 글꼴(이름표 · 쪽지 같은 캔버스 글씨)이 준비될 때까지 잠깐 기다린다. 느린 회선에서 화면이 멈추지 않게 최대 1.2초만 (글꼴 파일은 /fonts, 줄여 담아 약 160KB)
+await Promise.race([document.fonts.load('16px "Gowun Dodum"').catch(() => []), new Promise((r) => setTimeout(r, 1200))]);
 // 화면(클라이언트)과 서버가 주고받는 방식의 버전 — 서버(server/index.js 의 PROTO)와 맞춘다
 const PROTO = 2;
 // 웹소켓으로 바로 붙는다 (막힌 곳에서는 예전 방식으로 자동 전환) — 처음 붙을 때 오가는 양이 줄어든다
@@ -53,8 +57,10 @@ const S = {
   fear: 2, em: '', emT: 0, eid: 0, labels: [], hearts: 0, flyHearts: [],
   profile: null, shop: {}, riding: false, holdSword: false, hiddenOk: false, vlv: new Map(), vrings: [],
 };
-const SET = Object.assign({ volume: 0.8, voice: 1, sens: 1, quality: (matchMedia('(pointer: coarse)').matches || innerWidth < 760) ? 'medium' : 'high', brightness: 1, minimap: true }, store.get('gwimun-settings', {}));
+const SET = Object.assign({ volume: 0.8, voice: 1, sens: 1, quality: (matchMedia('(pointer: coarse)').matches || innerWidth < 760) ? 'medium' : 'high', brightness: 1, minimap: true, gfx: true }, store.get('gwimun-settings', {}));
 if (SET.quality === 'low') SET.quality = 'medium'; // '낮음'은 없어졌다 → 보통
+// 그래픽 강화 (질감 · 나무 · 집 · 캐릭터 디테일): 설정 ⚙ 에서 끄고 켠다. 주소 끝에 ?gfx=0 을 붙이면 이번 접속만 끈다. 캐릭터를 만들기 전에 정해 둔다.
+{ const q = new URLSearchParams(location.search).get('gfx'); gfx.on = q === '0' ? false : q === '1' ? true : !!SET.gfx; gfx.quality = SET.quality; }
 
 // ─────────────────────────── 꾸미기
 let look = { ...DEFAULT_LOOK, ...store.get('gwimun-look', {}) };
@@ -124,7 +130,7 @@ $('#preview').addEventListener('pointerdown', (e) => { pv.drag = e.clientX; });
 addEventListener('pointerup', () => { pv.drag = null; });
 addEventListener('pointermove', (e) => { if (pv.drag != null) { pv.rot += (e.clientX - pv.drag) * 0.012; pv.drag = e.clientX; } });
 let pvTimer = null;
-function refreshPreview() { clearTimeout(pvTimer); pvTimer = setTimeout(() => { if (pv.av) pv.scene.remove(pv.av); pv.av = createAvatar(look); pv.scene.add(pv.av); }, 30); }
+function refreshPreview() { clearTimeout(pvTimer); pvTimer = setTimeout(() => { if (pv.av) { pv.av.userData.visualUpgrade?.dispose(); pv.scene.remove(pv.av); } pv.av = createAvatar(look); pv.scene.add(pv.av); }, 30); }
 let pvLoop = true;
 (function loopPv(t) { requestAnimationFrame(loopPv); if (!pvLoop) return; if (pv.av) { pv.av.rotation.y = pv.rot + (pv.drag == null ? Math.sin(t / 2000) * 0.25 : 0); animateAvatar(pv.av, 0.016, false, t / 1000); } pv.renderer.render(pv.scene, pv.cam); })(0);
 buildOptions(); refreshPreview();
@@ -249,9 +255,29 @@ addEventListener('resize', () => { fitCamera(); fx.resize(); });
 
 const overlay = new THREE.Scene();
 const cinema = new Cinema(renderer);
+// ───── 그래픽 강화 (graphics-upgrade.js · visual-upgrade.js)
+const graphics = new GraphicsUpgrade();
+/** 켜고 끈다: 지금 챕터에는 바로 반영하고, 이미 만들어진 캐릭터는 새로 만든다 (서버가 방 전체를 다시 보내 준다). 귀신은 그래픽 강화와 상관없이 그대로 둔다 */
+function applyGfx(on) {
+  restoreFaded();
+  graphics.setOn(on);
+  if (S.me) { rebuildMyAvatar(); clearOthers(); }
+}
+// 느린 기기 보호: 그래픽 강화가 켜진 채 방탈출 안에서 평균 FPS 가 너무 낮으면 스스로 끈다 (이번에 한 번만 · 설정에서 다시 켤 수 있다)
+const PERF = { on: !window.__dbg, minFps: 22, secs: 8, holdMs: 3500, t0: 0, frames: 0, hold: 0, fired: false };
+function watchPerf(now) {
+  if (!PERF.on || PERF.fired || !gfx.on || S.room !== 'game' || document.hidden || cinema.active || now < PERF.hold) { PERF.t0 = 0; return; }
+  if (!PERF.t0) { PERF.t0 = now; PERF.frames = 0; return; }
+  PERF.frames++;
+  const el = now - PERF.t0; if (el < PERF.secs * 1000) return;
+  const fps = PERF.frames / (el / 1000); PERF.t0 = 0;
+  if (fps >= PERF.minFps) return;
+  PERF.fired = true; SET.gfx = false; SET.gfxAuto = true; saveSettings(); applyGfx(false);
+  toast(`🎨 이 기기에서는 화면이 느려서(${Math.round(fps)} FPS) 그래픽 강화를 껐어요. ⚙ 설정에서 다시 켤 수 있어요.`);
+}
 function addLabel(owner, sprite, y) { overlay.add(sprite); S.labels.push({ owner, sprite, y }); return sprite; }
 function removeLabel(sprite) { overlay.remove(sprite); S.labels = S.labels.filter((l) => l.sprite !== sprite); sprite.material.map?.dispose(); sprite.material.dispose(); }
-function removeAvatar(g) { if (!g) return; scene.remove(g); for (const l of S.labels.filter((l) => l.owner === g)) removeLabel(l.sprite); }
+function removeAvatar(g) { if (!g) return; g.userData.visualUpgrade?.dispose(); scene.remove(g); for (const l of S.labels.filter((l) => l.owner === g)) removeLabel(l.sprite); }
 function updateLabels() {
   for (const l of S.labels) {
     if (!l.owner.parent) continue;
@@ -302,6 +328,7 @@ function setBubble(g, text) {
 function resetInput() { S.joy = null; S.moveTarget = null; S.pendingInteract = null; for (const k in keys) keys[k] = false; const kb = document.getElementById('joyKnob'); if (kb) kb.style.transform = ''; document.getElementById('joy')?.classList.remove('act'); }
 function enterLobby(pos) {
   resetInput();
+  restoreFaded(); graphics.leave(); // 반투명해진 물체를 먼저 정리하고, 바꿔 둔 재질을 원래대로 돌린 뒤 세계를 지운다
   disposeWorld(scene, S.world);
   S.world = buildLobby(scene, { hidden: !!(S.hiddenOk || S.admin) });
   S.room = 'lobby'; S.chapter = null; S.dark = false; S.objState = {}; S.mount = null; S.perch = null; me.y = 0;
@@ -321,6 +348,7 @@ function enterChapter(state, showIntro = true) {
   resetInput();
   setGameClock(state.elapsed, state.timed); setHintsUsed(state.hintsUsed ?? 0); S.limitMs = state.limitMs || 0;
   if (state.fear != null) { S.fear = state.fear; if (state.scenario) S.scenario = state.scenario; updateFearBadge(); }
+  restoreFaded(); graphics.leave(); // 반투명해진 물체를 먼저 정리하고, 바꿔 둔 재질을 원래대로 돌린 뒤 세계를 지운다
   disposeWorld(scene, S.world);
   const ch = state.chapter;
   S.chapter = ch; S.room = 'game'; S.mount = null; S.perch = null; me.y = 0; closeThemePop(); noticeBox.classList.add('hidden');
@@ -339,6 +367,7 @@ function enterChapter(state, showIntro = true) {
   applyObjState(); applyDark();
   audio.ambient(roomAmbient());
   renderer.toneMappingExposure = 1.82;
+  graphics.enter(S.world, ch, S.scenario?.id); PERF.hold = performance.now() + PERF.holdMs; PERF.t0 = 0; // (조명 · 노출은 그대로 — 질감과 디테일만 더한다)
   if (showIntro && ch.intro) { queueStory({ ...ch.intro, sound: 'story' }); addJournal(ch.intro.title, ch.intro.text, 'story'); }
   if (!document.body.classList.contains('mobile') && !store.get('gwimun-tutorial', false)) { store.set('gwimun-tutorial', true); setTimeout(() => toast('팁: F 손전등 · C 웅크리기(귀신에게 덜 들킴) · G 위치 찍기 · J 수첩'), 4000); }
   renderParty();
@@ -675,6 +704,14 @@ const LENS_PTS = [[0, 0], [-0.85, -0.85], [0.85, -0.85], [-0.85, 0.85], [0.85, 0
 // 바닥·땅·러그처럼 납작하고 넓은 면은 투명하게 하면 아래 빈 공간이 비쳐 오히려 검어진다
 function isFlat(m) { const b = m.userData._wb ||= new THREE.Box3().setFromObject(m); if (m.userData._flat == null) { const s = b.getSize(new THREE.Vector3()); m.userData._flat = s.y < 0.06 && Math.max(s.x, s.z) > 1.5; } return m.userData._flat; }
 let occT = 0, lastHit = new Set();
+/** 가림 처리로 반투명해진 물체를 모두 원래대로 돌려 놓는다 (그래픽 강화를 켜고 끌 때 물체의 재질이 바뀌므로, 그 전에 정리해 둔다 — 곧바로 다시 검사해서 필요한 것만 투명해진다) */
+function restoreFaded() {
+  for (const [m, st] of faded) {
+    if (!m.parent) { if (!st.own) m.material.dispose(); continue; }
+    if (st.own) { Object.assign(m.material, st.orig); m.material.needsUpdate = true; } else { m.material.dispose(); m.material = st.orig; }
+  }
+  faded.clear(); lastHit = new Set(); occT = 1;
+}
 function updateOccluders(dt, tx, ty, tz) {
   if (fadedWorld !== S.world) { faded.clear(); fadedWorld = S.world; }
   const list = occluderList();
@@ -994,6 +1031,7 @@ function loop() {
     if (S.room === 'lobby' && S.world.rides?.swing) { const b = new Set(); if (S.mount?.ride === 'swing') b.add(S.mount.seat); for (const g of S.others.values()) { const rd = g.userData.target?.ride; if (rd?.startsWith('swing:')) b.add(Number(rd.split(':')[1])); } S.world.rides.swing.setBusy(b); }
     S.world.shopFace?.(me.x, me.z);
     S.world.update?.(t, dt);
+    graphics.update(camera.position, me); watchPerf(performance.now());
     updateThemeBubble();
     // 보조광: 머리 위가 아니라 카메라 쪽에서 넓게 비춰 캐릭터 머리가 하얗게 빛나지 않게 한다
     fill.position.copy(camera.position); fill.position.y = Math.min(fill.position.y, 3.8);
@@ -2335,8 +2373,14 @@ $('#settingsBtn').onclick = () => {
   row('마우스 감도', range('sens', 0.3, 2.5, 0.05));
   row('밝기', range('brightness', 0.6, 1.8, 0.05));
   const q = el('select'); [['high', '높음 (가장 선명)'], ['medium', '보통 (선명 · 가벼움)']].forEach(([v, t]) => { const o = el('option', null, t); o.value = v; q.appendChild(o); });
-  q.value = SET.quality; q.onchange = () => { SET.quality = q.value; fx.setQuality(SET.quality); saveSettings(); rebuildMyAvatar(); };
+  q.value = SET.quality; q.onchange = () => { SET.quality = q.value; fx.setQuality(SET.quality); graphics.setQuality(SET.quality); saveSettings(); rebuildMyAvatar(); };
   row('그래픽 품질', q);
+  // 그래픽 강화: 질감 · 나무 · 집 · 캐릭터 디테일 (느린 기기에서는 끄는 게 좋다)
+  const gx = el('label', 'set-check'); const gcb = el('input'); gcb.type = 'checkbox'; gcb.checked = !!SET.gfx;
+  const gtxt = el('span', null, SET.gfxAuto && !SET.gfx ? '꺼짐 (기기가 느려서 자동으로 껐어요)' : SET.gfx ? '켜짐' : '꺼짐');
+  gcb.onchange = () => { SET.gfx = gcb.checked; SET.gfxAuto = false; PERF.fired = true; saveSettings(); applyGfx(SET.gfx); gtxt.textContent = SET.gfx ? '켜짐' : '꺼짐'; toast(SET.gfx ? '🎨 그래픽 강화를 켰어요.' : '그래픽 강화를 껐어요. 예전 그래픽으로 보여요.'); };
+  gx.append(gcb, gtxt); row('그래픽 강화', gx);
+  wrap.appendChild(el('div', 'muted set-hint', '🎨 켜면 벽 · 바닥의 질감, 나무 · 집 · 캐릭터 디테일이 더해져요. 화면이 느린 폰에서는 끄세요.'));
   if (!S.admin && S.myName) row('내 고정 계정', el('b', 'set-acct', `🔒 ${S.myName}`));
   const btns = el('div', 'set-btns');
   const sb = (label, fn) => { const b = el('button', 'btn', label); b.onclick = fn; btns.appendChild(b); return b; };
@@ -2841,4 +2885,4 @@ applyMobile(); addEventListener('resize', applyMobile);
   });
   $('#inventory').addEventListener('click', (e) => { const s = e.target.closest('.slot'); if (s?.dataset.lp) { e.stopImmediatePropagation(); e.preventDefault(); delete s.dataset.lp; } }, true);
 }
-if (window.__dbg) Object.assign(window.__dbg, { S, me, cam, openShop, openBag, toggleRide, swingSword, doEmote, interact, lobbyAct, scene, camera, cinema, openRank, openFeedback, openStamps, openClearPhoto, rememberClear, showEndExtras, playHiddenPreview, openJournal });
+if (window.__dbg) Object.assign(window.__dbg, { graphics, gfx, PERF, applyGfx, restoreFaded, SET, S, me, cam, openShop, openBag, toggleRide, swingSword, doEmote, interact, lobbyAct, scene, camera, cinema, openRank, openFeedback, openStamps, openClearPhoto, rememberClear, showEndExtras, playHiddenPreview, openJournal });

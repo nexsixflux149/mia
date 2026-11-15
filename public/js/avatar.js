@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { upgradeAvatar } from './visual-upgrade.js';
 
 // ───────────────────────── 커스터마이징 옵션
 export const OPTIONS = {
@@ -245,6 +246,7 @@ export function createAvatar(look) {
   g.traverse((o) => { if (o.isMesh && o !== blob && o !== faceMesh) o.castShadow = true; });
   g.userData = { rig, legs, arms, head, torso, phase: Math.random() * 6, blob, crouch: 0, expr: null, accFx, blinkT: 1 + Math.random() * 3, setBlink,
     setExpr: (e) => { curExpr = e && EXPR[e] ? e : null; blinking = false; redraw(); } };
+  try { upgradeAvatar(g, look); } catch (e) { console.warn('[그래픽 강화] 캐릭터 디테일을 건너뜁니다', e); } // 그래픽 강화: 솔기 · 단추 · 소매 단 같은 디테일 (설정에서 끌 수 있다 · 실패해도 캐릭터는 그대로)
   return g;
 }
 

@@ -16,7 +16,7 @@ function footOf(p, g) {
 }
 
 function place(root, p) {
-  const g = buildProp(p);
+  const g = buildProp(p); g.userData.propKind = p.t; // (그래픽 강화가 집 같은 소품을 찾는 데 쓴다)
   g.position.set(p.x, p.y || 0, p.z);
   g.rotation.y = (p.r || 0) * DEG;
   root.add(g);
@@ -234,7 +234,7 @@ function instancedForest(root, spots, kind) {
   for (const s of spots) {
     const m = new THREE.Mesh(geo, TREE_MAT);
     m.position.set(s.x, 0, s.z); m.rotation.y = (s.x * 1.7 + s.z) % (Math.PI * 2); m.scale.setScalar(s.s);
-    m.castShadow = false; root.add(m);
+    m.castShadow = false; m.userData.forestKind = kind; root.add(m); // (그래픽 강화가 나무를 찾는 데 쓴다)
   }
 }
 

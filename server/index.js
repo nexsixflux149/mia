@@ -79,7 +79,7 @@ app.use('/vendor/three', zstatic(THREE_DIR, { cache: 'public, max-age=3600' }), 
 // index.html 의 three.js 주소를 버전이 붙은 주소로 바꿔서 보낸다
 const pageTransform = (rel, text) => (rel === '/index.html' ? text.replaceAll('/vendor/three/', `/vendor/${THREE_TAG}/`) : text);
 app.use(zstatic(PUBLIC_DIR, { cache: 'no-cache', transform: pageTransform, tag: '-' + THREE_TAG }));
-app.use(express.static(PUBLIC_DIR, { setHeaders: (res, file) => res.setHeader('Cache-Control', /\.(png|jpe?g|ico|webp|gif)$/i.test(file) ? 'public, max-age=86400' : 'no-cache') }));
+app.use(express.static(PUBLIC_DIR, { setHeaders: (res, file) => res.setHeader('Cache-Control', /\.woff2$/i.test(file) ? YEAR : /\.(png|jpe?g|ico|webp|gif)$/i.test(file) ? 'public, max-age=86400' : 'no-cache') })); // 글꼴(.woff2)은 파일 이름에 해시가 붙어 있어 내용이 바뀌면 이름도 바뀐다 → 1년 캐시
 const server = http.createServer(app);
 const io = new Server(server, { maxHttpBufferSize: 2e5 });
 // 화면(클라이언트)과 서버가 주고받는 방식의 버전. 예전 화면이 새 서버에 붙으면 새로고침시킨다.
