@@ -82,6 +82,8 @@ app.use(zstatic(PUBLIC_DIR, { cache: 'no-cache', transform: pageTransform, tag: 
 app.use(express.static(PUBLIC_DIR, { setHeaders: (res, file) => res.setHeader('Cache-Control', /\.woff2$/i.test(file) ? YEAR : /\.(png|jpe?g|ico|webp|gif)$/i.test(file) ? 'public, max-age=86400' : 'no-cache') })); // 글꼴(.woff2)은 파일 이름에 해시가 붙어 있어 내용이 바뀌면 이름도 바뀐다 → 1년 캐시
 const server = http.createServer(app);
 const io = new Server(server, { maxHttpBufferSize: 2e5 });
+// 로비 전광판에 걸린 캡처 사진 (최신이 앞 · 메모리에만 — 서버를 다시 켜면 비어 있다)
+const SNAP_MAX = 24, snaps = [];
 // 화면(클라이언트)과 서버가 주고받는 방식의 버전. 예전 화면이 새 서버에 붙으면 새로고침시킨다.
 const PROTO = 2;
 
@@ -368,6 +370,19 @@ io.on('connection', (sock) => {
     if (!me) return;
     const now = Date.now(); if (now - (me.lastBoo || 0) < 1500) return; me.lastBoo = now;
     for (const p of players.values()) if (p !== me && p.room === me.room && Math.hypot(p.x - me.x, p.z - me.z) < 3.5) io.to(p.id).emit('booed', { from: me.name, fromId: me.id });
+  });
+  // 📸 캡처: 작은 사진을 받아 로비 전광판(최근 24장)에 올리고, 로비에 있는 모두에게 바로 보낸다
+  sock.on('snap:list', (ack) => { if (typeof ack === 'function') ack(snaps); });
+  sock.on('snap:post', (img, ack) => {
+    if (!me || typeof ack !== 'function') return;
+    if (typeof img !== 'string' || !/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(img) || img.length > 90000) return ack({ error: '사진이 너무 커요.' });
+    const now = Date.now();
+    if (!me.admin && now - (me.lastSnap || 0) < 8000) return ack({ error: '전광판에는 8초에 한 장씩 올라가요. (내 폰에는 저장됐어요)' });
+    me.lastSnap = now;
+    const s = { id: 's' + now.toString(36) + randomBytes(2).toString('hex'), name: me.name, at: now, img };
+    snaps.unshift(s); if (snaps.length > SNAP_MAX) snaps.length = SNAP_MAX;
+    for (const p of players.values()) if (p.room === 'lobby' && !p.offline) io.to(p.id).emit('snap:new', s);
+    ack({ ok: true });
   });
   // 하트 보내기
   sock.on('heart', (toId) => {

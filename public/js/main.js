@@ -89,8 +89,7 @@ const S = {
 };
 const SET = Object.assign({ volume: 0.8, voice: 1, sens: 1, quality: (matchMedia('(pointer: coarse)').matches || innerWidth < 760) ? 'medium' : 'high', brightness: 1, minimap: true, gfx: true }, store.get('gwimun-settings', {}));
 if (SET.quality === 'low') SET.quality = 'medium'; // '낮음'은 없어졌다 → 보통
-// 그래픽 강화 (질감 · 나무 · 집 · 캐릭터 디테일): 설정 ⚙ 에서 끄고 켠다. 주소 끝에 ?gfx=0 을 붙이면 이번 접속만 끈다. 캐릭터를 만들기 전에 정해 둔다.
-{ const q = new URLSearchParams(location.search).get('gfx'); gfx.on = q === '0' ? false : q === '1' ? true : !!SET.gfx; gfx.quality = SET.quality; }
+gfx.on = false; gfx.quality = SET.quality; // 그래픽 강화는 그래픽이 이상해져서 없앴다 (항상 꺼짐 · 설정에서도 뺐다)
 
 // ─────────────────────────── 꾸미기
 let look = { ...DEFAULT_LOOK, ...store.get('gwimun-look', {}) };
@@ -362,6 +361,7 @@ function enterLobby(pos) {
   restoreFaded(); graphics.leave(); // 반투명해진 물체를 먼저 정리하고, 바꿔 둔 재질을 원래대로 돌린 뒤 세계를 지운다
   disposeWorld(scene, S.world);
   S.world = buildLobby(scene, { hidden: !!(S.hiddenOk || S.admin), champ: S.champ });
+  socket.emit('snap:list', (l) => { if (Array.isArray(l)) S.snaps = l; showSnaps(); });
   S.room = 'lobby'; S.chapter = null; S.dark = false; S.objState = {}; S.mount = null; S.perch = null; me.y = 0;
   cam.dist = CAM_START; // 살짝 줌인된 상태로 시작
   me.x = pos.x; me.z = pos.z;
@@ -1997,6 +1997,34 @@ function openAdmin() {
 }
 // ─────────────────────────── 고객소리함 (버그 · 건의사항)
 const FB_KIND = { bug: '🐞 버그', idea: '💡 건의', etc: '💬 기타' };
+// 🖼 갤러리: 사람들이 📸캡처로 찍은 최근 사진(전광판과 같은 24장)을 모아 본다. 열려 있는 동안 새 사진이 오면 바로 추가된다
+function openGallery() {
+  const w = el('div', 'gal');
+  const ago = (t) => { const m = Math.floor((Date.now() - t) / 60000); return m < 1 ? '방금' : m < 60 ? `${m}분 전` : m < 1440 ? `${Math.floor(m / 60)}시간 전` : `${Math.floor(m / 1440)}일 전`; };
+  const grid = () => {
+    w.innerHTML = '';
+    if (!S.snaps.length) { w.appendChild(el('div', 'muted gal-empty', '아직 찍은 사진이 없어요.\n화면 위 📸 캡처 를 눌러 첫 사진을 올려 보세요!')); return; }
+    const g = el('div', 'gal-grid');
+    for (const sn of S.snaps) {
+      const card = el('button', 'gal-card'); const im = el('img'); im.src = sn.img; im.alt = `${sn.name} 님의 캡처`; im.loading = 'lazy';
+      card.append(im, el('div', 'gal-cap', `📸 ${sn.name} · ${ago(sn.at)}`));
+      card.onclick = () => big(sn); g.appendChild(card);
+    }
+    w.appendChild(g);
+  };
+  const big = (sn) => {
+    w.innerHTML = ''; S.galleryBig = true;
+    const im = el('img', 'gal-big'); im.src = sn.img; im.alt = `${sn.name} 님의 캡처`;
+    const row = el('div', 'row gal-row');
+    const back = el('button', 'btn', '← 목록'); back.onclick = () => { S.galleryBig = false; grid(); };
+    const save = el('button', 'btn primary', '💾 저장'); save.onclick = () => { const a = el('a'); a.href = sn.img; a.download = `mia-gallery-${sn.name}-${sn.id}.jpg`; document.body.appendChild(a); a.click(); a.remove(); };
+    row.append(back, save); w.append(im, el('div', 'gal-cap big', `📸 ${sn.name} · ${ago(sn.at)}`), row);
+  };
+  S.galleryRefresh = () => { if (!S.galleryBig && w.isConnected) grid(); };
+  S.galleryBig = false; grid();
+  openModal('🖼 갤러리', `모두가 📸 캡처로 찍은 최근 사진 ${S.snaps.length ? S.snaps.length + '장' : ''} (로비 전광판과 같아요)`, w);
+  socket.emit('snap:list', (l) => { if (Array.isArray(l)) { S.snaps = l; S.galleryRefresh?.(); } });
+}
 function openFeedback() {
   const w = el('div', 'fb');
   let kind = 'bug';
@@ -2408,12 +2436,6 @@ $('#settingsBtn').onclick = () => {
   const q = el('select'); [['high', '높음 (가장 선명)'], ['medium', '보통 (선명 · 가벼움)']].forEach(([v, t]) => { const o = el('option', null, t); o.value = v; q.appendChild(o); });
   q.value = SET.quality; q.onchange = () => { SET.quality = q.value; fx.setQuality(SET.quality); graphics.setQuality(SET.quality); saveSettings(); rebuildMyAvatar(); };
   row('그래픽 품질', q);
-  // 그래픽 강화: 질감 · 나무 · 집 · 캐릭터 디테일 (느린 기기에서는 끄는 게 좋다)
-  const gx = el('label', 'set-check'); const gcb = el('input'); gcb.type = 'checkbox'; gcb.checked = !!SET.gfx;
-  const gtxt = el('span', null, SET.gfxAuto && !SET.gfx ? '꺼짐 (기기가 느려서 자동으로 껐어요)' : SET.gfx ? '켜짐' : '꺼짐');
-  gcb.onchange = () => { SET.gfx = gcb.checked; SET.gfxAuto = false; PERF.fired = true; saveSettings(); applyGfx(SET.gfx); gtxt.textContent = SET.gfx ? '켜짐' : '꺼짐'; toast(SET.gfx ? '🎨 그래픽 강화를 켰어요.' : '그래픽 강화를 껐어요. 예전 그래픽으로 보여요.'); };
-  gx.append(gcb, gtxt); row('그래픽 강화', gx);
-  wrap.appendChild(el('div', 'muted set-hint', '🎨 켜면 벽 · 바닥의 질감, 나무 · 집 · 캐릭터 디테일이 더해져요. 화면이 느린 폰에서는 끄세요.'));
   if (!S.admin && S.myName) row('내 고정 계정', el('b', 'set-acct', `🔒 ${S.myName}`));
   const btns = el('div', 'set-btns');
   const sb = (label, fn) => { const b = el('button', 'btn', label); b.onclick = fn; btns.appendChild(b); return b; };
@@ -2423,6 +2445,7 @@ $('#settingsBtn').onclick = () => {
   sb('🧟 히든 「데드 시티」 미리보기 영상 ▶', () => { closeModal(); playHiddenPreview(); }).classList.add('wide');
   sb('🎫 클리어 도장표', () => { closeModal(); openStamps(); });
   sb('📮 고객소리함', () => { closeModal(); openFeedback(); });
+  sb('🖼 갤러리 (모두가 찍은 사진)', () => { closeModal(); openGallery(); }).classList.add('wide');
   wrap.appendChild(btns);
   // 만든이 · 링크 · 후원
   const cr = el('div', 'credits');
@@ -2486,6 +2509,7 @@ function flashRed() { const v = $('#vignette'); v.classList.add('danger'); setTi
 // ─────────────────────────── 감정표현
 function doEmote(id) {
   if (!myAvatar) return;
+  if (id === 'jump' && S.em === 'jump' && S.emT < 0.7) return; // 공중에 떠 있는 동안(발이 땅에 닿기 전)에는 다시 뛸 수 없다
   S.em = id; S.emT = 0; S.eid++;
   if (id === 'jump') audio.play('pickup');
   if (id === 'boo') { socket.emit('boo'); audio.play('giggle'); }
@@ -2577,12 +2601,41 @@ const myGear = () => { const e = S.profile?.equip || {}; return `${e.wings || ''
 const xpBar = el('div'); xpBar.id = 'xpBar'; xpBar.innerHTML = '<div id="xpFill"></div><div id="xpLabel"></div>'; $('#hud').appendChild(xpBar);
 const lvChip = el('div'); lvChip.id = 'lvChip'; $('#onlineChip').after(lvChip);
 lvChip.onclick = () => openBag();
+// 📸 캡처: 지금 화면을 찍어 내 폰(PC는 다운로드)에 저장하고, 작은 사진은 로비 전광판에 실시간으로 올린다
+const snapChip = el('div', null, '📸 캡처'); snapChip.id = 'snapChip'; snapChip.hidden = true; snapChip.title = '화면 캡처 → 내 폰에 저장 + 로비 전광판에 올리기'; lvChip.after(snapChip);
+snapChip.onclick = (e) => { e.stopPropagation(); takeSnap(); };
+S.snaps = [];
+const showSnaps = () => S.world?.snapBoard?.set(S.snaps);
+socket.on('snap:new', (sn) => { S.snaps = [sn, ...S.snaps.filter((x) => x.id !== sn.id)].slice(0, 24); showSnaps(); S.galleryRefresh?.(); });
+function takeSnap() {
+  if (!S.room || S._snapAt > performance.now() - 1500) return; S._snapAt = performance.now();
+  // 같은 순간에 한 번 더 그려서 바로 읽는다 (화면 버퍼가 지워지기 전에)
+  fx.render(performance.now(), { danger: S.danger, mode: S.room === 'lobby' ? 'lobby' : 'game' });
+  renderer.autoClear = false; renderer.clearDepth(); renderer.render(overlay, camera); renderer.autoClear = true;
+  const full = canvas.toDataURL('image/jpeg', 0.92);
+  const tc = document.createElement('canvas'); tc.width = 384; tc.height = 216; const tx = tc.getContext('2d');
+  { const k = Math.max(384 / canvas.width, 216 / canvas.height), w = canvas.width * k, h = canvas.height * k; tx.drawImage(canvas, (384 - w) / 2, (216 - h) / 2, w, h); }
+  let thumb = tc.toDataURL('image/jpeg', 0.72); if (thumb.length > 88000) thumb = tc.toDataURL('image/jpeg', 0.45);
+  // 찰칵 효과
+  const fl = el('div', 'snap-flash'); document.body.appendChild(fl); setTimeout(() => fl.remove(), 600); audio.play('pickup');
+  // 내 폰에 저장: 폰은 공유 창(→ '이미지 저장'), PC는 다운로드
+  const d = new Date(), pad = (n) => String(n).padStart(2, '0');
+  const name = `mia-capture-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.jpg`;
+  const bin = atob(full.split(',')[1]), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  const blob = new Blob([u8], { type: 'image/jpeg' });
+  const download = () => { const url = URL.createObjectURL(blob); const a = el('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000); };
+  const file = new File([blob], name, { type: 'image/jpeg' });
+  if (isMobileView() && navigator.canShare?.({ files: [file] })) navigator.share({ files: [file], title: '미아 캡처' }).catch((err) => { if (err?.name !== 'AbortError') download(); });
+  else download();
+  socket.emit('snap:post', thumb, (r) => toast(r?.error ? `💾 내 기기에 저장했어요. ${r.error}` : '📸 캡처! 내 기기에 저장하고 로비 전광판에도 올렸어요.'));
+}
 function renderXp() {
   const pf = S.profile; if (!pf) return;
   const span = Math.max(1, pf.next - pf.cur), k = pf.lv >= pf.max || pf.admin ? 1 : (pf.xp - pf.cur) / span;
   $('#xpFill').style.width = (Math.max(0, Math.min(1, k)) * 100).toFixed(1) + '%';
   $('#xpLabel').textContent = pf.admin ? `Lv.${pf.lv} 운영자 🛡️` : pf.lv >= pf.max ? `Lv.${pf.lv} 만렙 👑` : `Lv.${pf.lv}  ${pf.xp - pf.cur} / ${span} XP`;
   lvChip.innerHTML = `<b>Lv.${pf.lv}</b> · 🪙 ${coinsText()}`;
+  snapChip.hidden = false;
   lvChip.title = '내 물건 🎒 (I)';
   if (!pf.equip?.mount) S.riding = false;
   if (!pf.items?.sword) S.holdSword = false;
@@ -2971,4 +3024,4 @@ applyMobile(); addEventListener('resize', applyMobile);
   });
   $('#inventory').addEventListener('click', (e) => { const s = e.target.closest('.slot'); if (s?.dataset.lp) { e.stopImmediatePropagation(); e.preventDefault(); delete s.dataset.lp; } }, true);
 }
-if (window.__dbg) Object.assign(window.__dbg, { graphics, gfx, PERF, applyGfx, restoreFaded, SET, S, me, cam, openShop, openBag, toggleRide, swingSword, doEmote, interact, lobbyAct, scene, camera, cinema, openRank, openFeedback, openStamps, openClearPhoto, rememberClear, showEndExtras, playHiddenPreview, openJournal });
+if (window.__dbg) Object.assign(window.__dbg, { openGallery, takeSnap, graphics, gfx, PERF, applyGfx, restoreFaded, SET, S, me, cam, openShop, openBag, toggleRide, swingSword, doEmote, interact, lobbyAct, scene, camera, cinema, openRank, openFeedback, openStamps, openClearPhoto, rememberClear, showEndExtras, playHiddenPreview, openJournal });

@@ -541,6 +541,56 @@ function buildPark(root, colliders, add) {
   return { interactives, rides, update: (t) => anim.forEach((f) => f(t)) };
 }
 
+// 📸 캡처 전광판: 로비 남쪽 들판, 롤러코스터 뒤에 높이 세운 6×4 = 24칸 타일 화면. 맨 왼쪽 위가 가장 최근 사진
+const SNAP_COLS = 6, SNAP_ROWS = 4, SNAP_W = 1.92, SNAP_H = 1.08, SNAP_GAP = 0.12;
+function snapTileTex(img, name) {
+  const c = document.createElement('canvas'); c.width = 384; c.height = 216; const x = c.getContext('2d');
+  if (img) {
+    const k = Math.max(c.width / img.width, c.height / img.height), w = img.width * k, h = img.height * k;
+    x.drawImage(img, (c.width - w) / 2, (c.height - h) / 2, w, h);
+    if (name) { x.fillStyle = 'rgba(0,0,0,.6)'; x.fillRect(0, 186, 384, 30); x.font = '700 20px "Noto Sans KR", sans-serif'; x.fillStyle = '#ffe9a8'; x.textBaseline = 'middle'; x.fillText(`📸 ${name}`.slice(0, 22), 10, 201); }
+  } else {
+    const g = x.createLinearGradient(0, 0, 0, 216); g.addColorStop(0, '#16101e'); g.addColorStop(1, '#0a070e'); x.fillStyle = g; x.fillRect(0, 0, 384, 216);
+    x.strokeStyle = 'rgba(111,214,255,.18)'; x.lineWidth = 2; x.strokeRect(6, 6, 372, 204);
+    x.font = '48px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.globalAlpha = 0.35; x.fillText('📸', 192, 92);
+    x.font = '700 20px "Noto Sans KR", sans-serif'; x.fillStyle = '#9fdcff'; x.fillText('캡처를 기다리는 중', 192, 150);
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+function buildSnapBoard(root, colliders) {
+  const g = new THREE.Group(); g.position.set(0, 0, 29.6); g.rotation.y = Math.PI; root.add(g); // 광장(북쪽)을 바라본다
+  const W = SNAP_COLS * SNAP_W + (SNAP_COLS - 1) * SNAP_GAP, H = SNAP_ROWS * SNAP_H + (SNAP_ROWS - 1) * SNAP_GAP, CY = 7.6;
+  const metal = new THREE.MeshStandardMaterial({ color: '#2a2530', metalness: 0.6, roughness: 0.45 });
+  const back = new THREE.Mesh(new THREE.BoxGeometry(W + 0.7, H + 0.7, 0.3), metal); back.position.set(0, CY, -0.18); g.add(back);
+  const rim = new THREE.Mesh(new THREE.BoxGeometry(W + 0.9, H + 0.9, 0.12), new THREE.MeshStandardMaterial({ color: '#6fd6ff', emissive: '#2fb6ff', emissiveIntensity: 0.9 })); rim.position.set(0, CY, -0.3); g.add(rim);
+  for (const s of [-1, 1]) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.45, CY - H / 2, 0.45), metal); leg.position.set(s * 5.4, (CY - H / 2) / 2, -0.2); g.add(leg);
+    colliders.push({ x: -s * 5.4, z: 29.8, hw: 0.4, hd: 0.4 });
+  }
+  const title = textSprite('📸 실시간 캡처 전광판 · 화면 위 📸캡처를 눌러 보세요', { size: 30, bg: 'rgba(8,20,32,.88)', color: '#9fdcff', border: '#6fd6ff', maxW: 900 });
+  title.position.set(0, CY + H / 2 + 0.9, 0); title.scale.multiplyScalar(1.6); g.add(title);
+  const geo = new THREE.PlaneGeometry(SNAP_W, SNAP_H), tiles = [];
+  for (let i = 0; i < SNAP_COLS * SNAP_ROWS; i++) {
+    const c = i % SNAP_COLS, r = Math.floor(i / SNAP_COLS);
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: snapTileTex(null), toneMapped: false }));
+    m.position.set(-W / 2 + SNAP_W / 2 + c * (SNAP_W + SNAP_GAP), CY + H / 2 - SNAP_H / 2 - r * (SNAP_H + SNAP_GAP), 0.0); g.add(m); tiles.push(m);
+  }
+  let ids = []; let flash = 0;
+  const setTile = (m, tex) => { m.material.map?.dispose(); m.material.map = tex; m.material.needsUpdate = true; };
+  const load = (s) => new Promise((res) => { const im = new Image(); im.onload = () => res(snapTileTex(im, s.name)); im.onerror = () => res(snapTileTex(null)); im.src = s.img; });
+  return {
+    /** 최근 사진 목록(최신이 앞)으로 타일을 다시 채운다 */
+    async set(list) {
+      list = (list || []).slice(0, tiles.length); const want = list.map((s) => s.id).join();
+      if (want === ids.join()) return; ids = list.map((s) => s.id);
+      const texs = await Promise.all(list.map(load));
+      tiles.forEach((m, i) => setTile(m, texs[i] || snapTileTex(null)));
+      flash = 1;
+    },
+    update(dt) { if (flash > 0) { flash = Math.max(0, flash - dt * 1.5); rim.material.emissiveIntensity = 0.9 + flash * 3; tiles[0].scale.setScalar(1 + flash * 0.08); } },
+  };
+}
+
 export function buildLobby(scene, opts = {}) {
   setPropTheme('lobby');
   const root = new THREE.Group();
@@ -583,6 +633,7 @@ export function buildLobby(scene, opts = {}) {
   const themes = placeThemes(LOBBY_THEMES.filter((th) => !th.hidden || opts.hidden).map((th) => ({ ...th })));
   const exhibits = themes.map((th) => buildExhibit(root, colliders, th));
   const extra = buildLobbyExtras(root, colliders, add);
+  const snapBoard = buildSnapBoard(root, colliders);
   const tip = textSprite('🚪 테마 관문을 클릭하면 바로 시작! · 🎠 놀이기구도 탈 수 있어요', { size: 26, bg: 'rgba(0,0,0,.55)', maxW: 700 });
   tip.position.set(0, 4.3, 0); root.add(tip);
 
@@ -731,7 +782,9 @@ export function buildLobby(scene, opts = {}) {
   }
   colliders.push(...ringColliders(30.5));
   scene.add(root);
+  let lastT = 0;
   const update = (t) => {
+    snapBoard.update(Math.min(0.1, Math.max(0, t - lastT))); lastT = t;
     park.update(t); outer.update(t); fountain.update(t); champSign.update(t); fireflies.update(t); extra.update(t);
     clouds.rotation.y = t * 0.006; clouds.children.forEach((c) => (c.position.y += Math.sin(t * 0.3 + c.userData.ph) * 0.004));
     flies.rotation.y = t * 0.02; flies.position.y = Math.sin(t) * 0.2;
@@ -743,7 +796,7 @@ export function buildLobby(scene, opts = {}) {
       e.spin.forEach((s) => (s.rotation.z = Math.sin(t * 1.2 + i) * 0.15));
     });
   };
-  return { root, colliders, walls: [], objects: {}, flickers: [], ceiling: [], update, bounds: 28.5, outdoor: true, themes, exhibits, hiddenGate: !!opts.hidden, setChamp: (c) => champSign.set(c), shopFace: extra.shopFace, clickables: extra.clickables, interactives: [...park.interactives, ...outer.interactives, ...extra.interactives], rides: { ...park.rides, ...extra.rides } };
+  return { root, colliders, walls: [], objects: {}, flickers: [], ceiling: [], update, bounds: 28.5, outdoor: true, themes, exhibits, hiddenGate: !!opts.hidden, setChamp: (c) => champSign.set(c), snapBoard, shopFace: extra.shopFace, clickables: extra.clickables, interactives: [...park.interactives, ...outer.interactives, ...extra.interactives], rides: { ...park.rides, ...extra.rides } };
 }
 
 // ───── 로비 쉼터: 불멍 캠프파이어 + 통나무 벤치 · 타면 움직이는 그네 · 코인 상점
