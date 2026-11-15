@@ -24,20 +24,50 @@ const socket = io({ transports: ['websocket', 'polling'], tryAllTransports: true
 socket.on('connect', () => {
   if (!S?.resume) return;
   socket.emit('hello', { v: PROTO, name: S.myName, look, resume: S.resume, acct: S.admin ? undefined : store.get('mia-account', null) || undefined }, (res) => {
-    if (!res || res.error) return;
-    if (!res.resumed) { S.me = res.id; S.myName = res.name; voice.myId = res.id; dropOther(res.id); rebuildMyAvatar(); toast('연결이 오래 끊겨 로비에서 다시 시작합니다.'); }
+    if (!res) return;
+    if (res.error) { toast((res.message || '다시 접속하지 못했어요.') + ' 잠시 뒤 화면을 새로 엽니다.'); setTimeout(() => location.reload(), 2500); return; } // 입장이 거절되면 멈춘 화면으로 남지 않게 새로 연다
+    // 오래 끊겨 서버가 내 자리를 이미 정리했다면 새 캐릭터로 로비에서 다시 시작한다 (예전 파티 · 게임 화면도 함께 정리)
+    if (!res.resumed) { S.me = res.id; S.myName = res.name; voice.myId = res.id; dropOther(res.id); S.party = null; closeModal(); S.storyQueue = []; closeStory(true); rebuildMyAvatar(); toast('연결이 오래 끊겨 로비에서 다시 시작합니다.'); }
     S.resume = { id: res.id, token: res.token }; if (!S.admin) store.set('gwimun-resume', { ...S.resume, name: res.name, at: Date.now() });
     if (res.account && !S.admin) store.set('mia-account', res.account);
     S.items = res.items; if (res.shop) S.shop = res.shop; if (res.hiddenOk != null) S.hiddenOk = res.hiddenOk; if (res.unlockedBy) S.unlockedBy = res.unlockedBy; renderInv(); renderParty();
+    if ('champ' in res) setChamp(res.champ);
+    if (res.resumed && String(res.room || '').startsWith('inst:') && S.room !== 'game') socket.emit('game:state'); // 게임 중이었다면 그 게임 화면으로
     clearOthers(); // 끊긴 동안 바뀐 것이 있을 수 있으니 방 안 사람들을 처음부터 다시 받는다
+    voice.refresh(true); // 끊긴 동안 음성 연결도 죽었을 수 있다 → 다시 잇는다
   });
 });
+// ───── 휴대폰이 잠들었다 깨어났을 때 (화면 꺼짐 · 다른 앱 · 오래 내려 둠)
+//  잠든 사이 연결이 조용히 죽어도 브라우저는 한동안 '붙어 있다'고 여긴다 → 그 동안 다른 사람들이 잠들기 전 모습으로 멈춰 보였다.
+//  깨어나면 서버에 바로 물어보고(alive), 2.5초 안에 답이 없으면 연결을 끊고 다시 붙는다. 답이 오면 방 안 사람들을 처음부터 다시 받는다.
+let hiddenAt = 0, wakeBusy = false;
+function wakeCheck(why) {
+  if (!S?.resume || wakeBusy) return;
+  if (!socket.connected) { socket.connect(); return; }
+  wakeBusy = true;
+  let done = false;
+  const fail = () => { if (done) return; done = true; wakeBusy = false; try { socket.disconnect(); } catch {} socket.connect(); }; // 다시 붙으면 위의 'connect' 가 이어서 처리한다
+  const t = setTimeout(fail, 2500);
+  socket.emit('alive', (id) => {
+    if (done) return; done = true; clearTimeout(t); wakeBusy = false;
+    if (!id || id !== S.me) { try { socket.disconnect(); } catch {} socket.connect(); return; } // 서버가 나를 모른다(자리가 정리됨 · 서버 재시작) → 다시 입장
+    S.lastStateAt = performance.now();
+    socket.emit('state:full'); voice.refresh(why === 'long'); // 붙어 있다 → 그래도 잠든 사이 바뀐 것을 새로 받는다 (없어진 사람은 지워지고, 자리는 지금 것으로)
+  });
+}
+// 화면이 켜져 있는데도 연결이 조용히 죽는 경우(와이파이 ↔ 데이터 전환 등): 서버는 방 상태를 적어도 10초에 한 번 보낸다 → 25초 넘게 아무것도 안 오면 확인한다
+setInterval(() => { if (!document.hidden && S?.me && S.resume && performance.now() - (S.lastStateAt || 0) > 25000) { S.lastStateAt = performance.now(); wakeCheck('quiet'); } }, 5000);
+addEventListener('online', () => wakeCheck('net'));
+addEventListener('pageshow', (e) => { if (e.persisted) wakeCheck('long'); });
+document.addEventListener('resume', () => wakeCheck('long')); // (안드로이드 크롬: 얼려 두었던 탭이 풀릴 때)
 // 창을 닫거나 숨길 때 '마지막 접속 시각'을 남겨 둔다 → 금방 다시 열면 같은 플레이어로 이어서
 addEventListener('pagehide', () => { const r = store.get('gwimun-resume', null); if (r && S.resume) store.set('gwimun-resume', { ...r, at: Date.now() }); });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { const r = store.get('gwimun-resume', null); if (r && S.resume) store.set('gwimun-resume', { ...r, at: Date.now() }); }
-  if (document.hidden) { S.joy = null; const k = document.getElementById('joyKnob'); if (k) k.style.transform = ''; return; }
+  if (document.hidden) { hiddenAt = Date.now(); S.joy = null; const k = document.getElementById('joyKnob'); if (k) k.style.transform = ''; return; }
+  const away = hiddenAt ? Date.now() - hiddenAt : 0; hiddenAt = 0;
   if (!socket.connected) socket.connect();
+  else if (away > 4000) wakeCheck(away > 60000 ? 'long' : 'short'); // 4초 넘게 가려져 있었다면 연결이 살아 있는지 확인하고 방 상태를 새로 받는다
 });
 if (location.search.includes('debug')) window.__dbg = { socket };
 const audio = new AudioFX();
@@ -55,7 +85,7 @@ const S = {
   crouch: false, run: false, pings: [], callouts: [], journal: store.get('gwimun-journal', []).filter((j) => j && j.sc),
   mouse: { x: 0, y: 0 }, danger: 0, ghosts: new Map(),
   fear: 2, em: '', emT: 0, eid: 0, labels: [], hearts: 0, flyHearts: [],
-  profile: null, shop: {}, riding: false, holdSword: false, hiddenOk: false, vlv: new Map(), vrings: [],
+  profile: null, shop: {}, riding: false, holdSword: false, holdStaff: false, champ: null, hiddenOk: false, vlv: new Map(), vrings: [],
 };
 const SET = Object.assign({ volume: 0.8, voice: 1, sens: 1, quality: (matchMedia('(pointer: coarse)').matches || innerWidth < 760) ? 'medium' : 'high', brightness: 1, minimap: true, gfx: true }, store.get('gwimun-settings', {}));
 if (SET.quality === 'low') SET.quality = 'medium'; // '낮음'은 없어졌다 → 보통
@@ -216,6 +246,7 @@ function enter() {
     S.resume = { id: res.id, token: res.token }; if (!S.admin) store.set('gwimun-resume', { ...S.resume, name: res.name, at: Date.now() }); // 운영자 접속은 기기에 남기지 않는다
     S.me = res.id; S.myName = res.name; S.items = res.items; S.unlocked = res.unlocked || 0; S.hearts = res.hearts || 0; S.unlockedBy = res.unlockedBy || {}; S.scenarios = res.scenarios || [];
     S.shop = res.shop || {}; S.hiddenOk = !!res.hiddenOk;
+    setChamp(res.champ || null); voice.setIce(res.ice); S.lastStateAt = performance.now();
     voice.myId = res.id; dropOther(res.id); // 혹시 내 캐릭터가 '다른 사람'으로 그려져 있었다면 지운다
     $('#login').classList.add('hidden'); $('#hud').classList.remove('hidden');
     pvLoop = false;
@@ -330,7 +361,7 @@ function enterLobby(pos) {
   resetInput();
   restoreFaded(); graphics.leave(); // 반투명해진 물체를 먼저 정리하고, 바꿔 둔 재질을 원래대로 돌린 뒤 세계를 지운다
   disposeWorld(scene, S.world);
-  S.world = buildLobby(scene, { hidden: !!(S.hiddenOk || S.admin) });
+  S.world = buildLobby(scene, { hidden: !!(S.hiddenOk || S.admin), champ: S.champ });
   S.room = 'lobby'; S.chapter = null; S.dark = false; S.objState = {}; S.mount = null; S.perch = null; me.y = 0;
   cam.dist = CAM_START; // 살짝 줌인된 상태로 시작
   me.x = pos.x; me.z = pos.z;
@@ -664,10 +695,10 @@ function netSend(dt) {
   sendT += dt; if (sendT < 0.1 || !S.me) return; sendT = 0; // 1초에 10번, 바뀌었을 때만
   // 놀이기구에 탄 동안에는 위치를 보내지 않는다 (다른 사람 화면은 놀이기구 자리로 직접 계산한다 — 빙글빙글 도는 내내 보낼 필요가 없다)
   const rd = rideTag();
-  const k = rd ? `ride,${rd},${S.em},${S.eid},${S.riding},${S.holdSword}` : `${(me.y || 0).toFixed(2)},${me.x.toFixed(2)},${me.z.toFixed(2)},${me.ry.toFixed(2)},${me.moving},${S.run},${S.crouch},${!!S.sneak},${S.em},${S.eid},${rd},${S.riding},${S.holdSword}`;
+  const k = rd ? `ride,${rd},${S.em},${S.eid},${S.riding},${holdCode()}` : `${(me.y || 0).toFixed(2)},${me.x.toFixed(2)},${me.z.toFixed(2)},${me.ry.toFixed(2)},${me.moving},${S.run},${S.crouch},${!!S.sneak},${S.em},${S.eid},${rd},${S.riding},${holdCode()}`;
   if (k === lastSent) return; lastSent = k;
   const n2 = (v) => Math.round(v * 100) / 100;
-  socket.emit('move', { x: n2(me.x), z: n2(me.z), y: n2(me.y || 0), ry: n2(me.ry), anim: me.moving, run: S.run && me.moving, crouch: S.crouch || S.sneak, sneak: !!S.sneak, em: S.em, eid: S.eid, ride: rideTag(), mount: !!S.riding, sword: !!S.holdSword });
+  socket.emit('move', { x: n2(me.x), z: n2(me.z), y: n2(me.y || 0), ry: n2(me.ry), anim: me.moving, run: S.run && me.moving, crouch: S.crouch || S.sneak, sneak: !!S.sneak, em: S.em, eid: S.eid, ride: rideTag(), mount: !!S.riding, sword: holdCode() });
 }
 function rideTag() { return S.mount?.kind === 'ride' && S.room === 'lobby' ? `${S.mount.ride}:${S.mount.seat}` : ''; }
 function updateStatus() {
@@ -895,6 +926,7 @@ socket.on('look', ({ id, lv, look: lk }) => {
   syncOther(S.net.get(id)); // 가만히 서 있는 사람은 새 소식이 오지 않으므로, 외형을 받는 즉시 그린다
 });
 socket.on('state', (m) => {
+  S.lastStateAt = performance.now();
   const seen = m.f ? new Set() : null; // f: 방 안 전체 목록 (여기 없는 사람은 나간 사람)
   for (const e of m.p || []) {
     const p = applyPlayer(e); seen?.add(p.id);
@@ -2330,6 +2362,7 @@ function openPlayerMenu(id, name, x, y) {
 const voice = new Voice(socket, {
   onLevel: (id, lv) => { S.vlv.set(id, lv); const m = document.querySelector(`.mic[data-id="${id}"]`); if (m) m.classList.toggle('speak', lv > 0.06); },
   onError: (msg) => toast('🎙️ ' + msg),
+  onChange: () => renderVoiceUI(), // 마이크가 스스로 꺼졌을 때(끊겨서 다시 열지 못함) 버튼 모양을 맞춘다
 });
 // 듣기 범위: 'party' 파티원만 · 'all' 같은 곳(로비 · 같은 게임)의 모두
 S.voiceMode = store.get('gwimun-voice', 'party');
@@ -2363,7 +2396,7 @@ function saveSettings() {
   audio.setVolume(SET.volume); voice.setVolume(SET.voice);
   fx.brightness = SET.brightness;
 }
-audio.setVolume(SET.volume);
+audio.setVolume(SET.volume); voice.setVolume(SET.voice);
 $('#settingsBtn').onclick = () => {
   const wrap = el('div');
   const row = (label, input) => { const r = el('div', 'set-row'); r.append(el('span', null, label), input); wrap.appendChild(r); };
@@ -2532,9 +2565,14 @@ async function loadShareInfo() {
 }
 
 // ─────────────────────────── 레벨 · 코인 · 상점 · 내 물건 · 선물
-const SHOP_ORDER = ['popper', 'rocket', 'wings_fairy', 'mount_pony', 'wings_angel', 'mount_broom', 'mount_cat', 'mount_dog', 'mount_unicorn', 'wings_devil', 'mount_trex', 'wings_dragon', 'sword', 'mount_ufo', 'costume_robot', 'mount_carriage'];
+const GOLD_ORDER = ['gold_hat', 'gold_mask', 'gold_gloves', 'gold_top', 'gold_bottom', 'gold_shoes', 'gold_tail']; // 황금 고양이 세트 (비매품 · 주간랭킹 1위 보상)
+const SHOP_ORDER = ['popper', 'rocket', 'wings_fairy', 'mount_pony', 'wings_angel', 'mount_broom', 'mount_cat', 'mount_dog', 'mount_unicorn', 'wings_devil', 'mount_trex', 'wings_dragon', 'sword', 'mount_ufo', 'costume_robot', 'mount_carriage', ...GOLD_ORDER, 'gold_staff'];
 const coinsText = () => (S.profile?.coins === -1 ? '∞' : String(S.profile?.coins ?? 0));
-const myGear = () => { const e = S.profile?.equip || {}; return `${e.wings || ''}|${e.mount || ''}|${S.riding && e.mount ? 1 : 0}|${S.holdSword && S.profile?.items?.sword ? 1 : 0}|${e.costume || ''}`; };
+// 손에 든 것: 0 없음 · 1 전설의 검 · 2 황금 고양이 지팡이
+function holdCode() { const it = S.profile?.items; return S.holdStaff && it?.gold_staff ? 2 : S.holdSword && it?.sword ? 1 : 0; }
+/** 착용 중인 황금 고양이 부위 글자 (가진 것만) */
+const goldWorn = () => { const on = S.profile?.equip?.gold || '', it = S.profile?.items || {}; let out = ''; for (const id of GOLD_ORDER) { const c = S.shop[id]?.part; if (c && it[id] && on.includes(c)) out += c; } return out; };
+const myGear = () => { const e = S.profile?.equip || {}; return `${e.wings || ''}|${e.mount || ''}|${S.riding && e.mount ? 1 : 0}|${holdCode()}|${e.costume || ''}|${goldWorn()}`; };
 // 맨 아래 얇은 경험치 바 + 왼쪽 위 레벨·코인
 const xpBar = el('div'); xpBar.id = 'xpBar'; xpBar.innerHTML = '<div id="xpFill"></div><div id="xpLabel"></div>'; $('#hud').appendChild(xpBar);
 const lvChip = el('div'); lvChip.id = 'lvChip'; $('#onlineChip').after(lvChip);
@@ -2548,6 +2586,7 @@ function renderXp() {
   lvChip.title = '내 물건 🎒 (I)';
   if (!pf.equip?.mount) S.riding = false;
   if (!pf.items?.sword) S.holdSword = false;
+  if (!pf.items?.gold_staff) S.holdStaff = false;
   updateGearButtons();
 }
 socket.on('profile', (pf) => {
@@ -2564,6 +2603,17 @@ socket.on('xp', ({ add, why, lv, up }) => {
   if (up) { audio.play('bell'); if (myAvatar) burstHearts(myAvatar, 10); }
 });
 socket.on('gift', ({ from, icon, name }) => { toast(`🎁 ${from} 님이 ${icon} ${name}을(를) 선물했어요! (🎒 내 물건)`); audio.play('pickup'); if (myAvatar) burstHearts(myAvatar, 8); });
+// 우편: 주간랭킹 1위 보상처럼 꼭 알려야 하는 소식 (접속해 있지 않았다면 다음에 들어올 때 온다)
+socket.on('mail', ({ text }) => {
+  const w = el('div', 'bag'); w.appendChild(el('div', 'mail-text', text));
+  const b = el('button', 'btn primary', '🎒 내 물건 보기'); b.onclick = () => openBag(); w.appendChild(b);
+  openModal('🏆 축하합니다!', '주간랭킹 1위 보상', w);
+  audio.play('bell'); if (myAvatar) burstHearts(myAvatar, 12);
+  addChat({ channel: 'system', text: '🎁 ' + text });
+});
+// 분수대 위 큰 글씨: 주간랭킹 1위
+function setChamp(c) { S.champ = c || null; if (S.room === 'lobby') S.world?.setChamp?.(S.champ); }
+socket.on('champ', (c) => setChamp(c));
 socket.on('rank:changed', () => openRank(S.rankTab?.() || { main: 'theme' }));
 const celeb = el('div', 'hidden'); celeb.id = 'celebrate'; document.body.appendChild(celeb);
 socket.on('celebrate', ({ name, text }) => {
@@ -2590,11 +2640,18 @@ function toggleRide() {
   updateGearButtons();
 }
 function swingSword() {
-  if (!S.profile?.items?.sword) { toast('🗡️ 전설의 검이 없어요. (🛒 상점)'); return; }
-  if (!S.holdSword) { S.holdSword = true; toast(`🗡️ 전설의 검을 들었다! B: 휘두르기 · 남은 횟수 ${S.profile.swordUses}/30`); updateGearButtons(); return; }
+  const it = S.profile?.items || {};
+  if (!it.sword && !it.gold_staff) { toast('🗡️ 전설의 검이 없어요. (🛒 상점)'); return; }
+  if (!holdCode()) { // 아무것도 들고 있지 않으면 먼저 든다 (지팡이가 있으면 지팡이부터: 횟수 제한이 없다)
+    S.holdStaff = !!it.gold_staff; S.holdSword = !it.gold_staff;
+    toast(S.holdStaff ? '🪄 황금 고양이 지팡이를 들었다! B: 휘두르기 · 귀신 퇴치 무제한' : `🗡️ 전설의 검을 들었다! B: 휘두르기 · 남은 횟수 ${S.profile.swordUses}/30`);
+    updateGearButtons(); return;
+  }
   if (myAvatar) myAvatar.userData.swingT = 0.45;
-  socket.emit('shop:use', 'sword');
+  socket.emit('shop:use', holdCode() === 2 ? 'gold_staff' : 'sword');
 }
+/** 손에 드는 것 바꾸기: '' 넣기 · 'sword' · 'staff' (둘 중 하나만 든다) */
+function holdWeapon(kind) { S.holdSword = kind === 'sword'; S.holdStaff = kind === 'staff'; updateGearButtons(); }
 socket.on('fx:item', (f) => {
   const d = Math.hypot(f.x - me.x, f.z - me.z); if (d > 40) return;
   const g = avatarById(f.id);
@@ -2604,10 +2661,13 @@ socket.on('fx:item', (f) => {
     if (g && f.id !== S.me) g.userData.swingT = 0.45;
     swordFx(f.x, f.y, f.z, f.ry, f.hit); audio.play(f.hit ? 'slay' : 'sword');
     if (f.broke) { shatterFx(f.x, f.y, f.z); audio.play('shatter'); if (f.id === S.me) S.holdSword = false; }
+  } else if (f.type === 'staff') { // 황금 고양이 지팡이: 황금빛 궤적
+    if (g && f.id !== S.me) g.userData.swingT = 0.45;
+    swordFx(f.x, f.y, f.z, f.ry, f.hit, true); audio.play(f.hit ? 'slay' : 'sword');
   }
 });
 function useShopItem(id) {
-  if (id === 'sword') return swingSword();
+  if (id === 'sword' || id === 'gold_staff') { holdWeapon(id === 'sword' ? 'sword' : 'staff'); return swingSword(); }
   if (!S.profile?.items?.[id]) { toast('남은 게 없어요. 🛒 상점에서 더 살 수 있어요.'); return; }
   socket.emit('shop:use', id);
 }
@@ -2655,7 +2715,7 @@ function previewItem(id) {
   const pv = shopPreview(); const it = S.shop[id] || {};
   if (!pv.av) { pv.av = createAvatar(look); pv.sc.add(pv.av); }
   pv.walk = it.kind === 'mount' || it.kind === 'costume';
-  pv.gear = it.kind === 'wings' ? `${id}||0|0|` : it.kind === 'mount' ? `|${id}|1|0|` : it.kind === 'sword' ? '|||1|' : it.kind === 'costume' ? `||0|0|${id}` : '';
+  pv.gear = it.kind === 'wings' ? `${id}||0|0|` : it.kind === 'mount' ? `|${id}|1|0|` : it.kind === 'sword' ? '|||1|' : it.kind === 'staff' ? '|||2||hmgtbsl' : it.kind === 'gold' ? `||0|0||${it.part}` : it.kind === 'costume' ? `||0|0|${id}` : '';
   const big = ['mount_cat', 'mount_dog', 'mount_carriage', 'mount_trex'].includes(id); pv.cam.position.set(0, it.kind === 'mount' ? (big ? 2.2 : 1.6) : 1.3, it.kind === 'mount' ? (big ? 6.2 : 4.8) : 4.2); pv.cam.lookAt(0, it.kind === 'mount' ? (big ? 1.2 : 0.9) : 0.75, 0);
 }
 function openShop() {
@@ -2672,12 +2732,21 @@ function openShop() {
       const it = S.shop[id]; if (!it) continue;
       const have = pf.items?.[id] || 0, locked = !pf.admin && pf.lv < it.lv, full = have >= it.max;
       const c = el('div', 'shop-card' + (sel === id ? ' sel' : '') + (locked ? ' locked' : ''));
-      c.innerHTML = `<div class="si">${it.icon}</div><div class="sn">${it.name}</div><div class="sp">🪙 ${it.price.toLocaleString()}</div><div class="sl">${locked ? `🔒 Lv.${it.lv}` : it.max > 1 ? `${have}/${it.max}개` : have ? '✅ 보유' : `Lv.${it.lv}+`}</div>`;
+      if (it.nosale) { c.classList.add('nosale'); c.innerHTML = `<div class="si">${it.icon}</div><div class="sn">${it.name}</div><div class="sp">비매품</div><div class="sl">${have ? '✅ 보유' : it.kind === 'staff' ? '세트 7종 보상' : '🏆 주간 1위 보상'}</div>`; }
+      else c.innerHTML = `<div class="si">${it.icon}</div><div class="sn">${it.name}</div><div class="sp">🪙 ${it.price.toLocaleString()}</div><div class="sl">${locked ? `🔒 Lv.${it.lv}` : it.max > 1 ? `${have}/${it.max}개` : have ? '✅ 보유' : `Lv.${it.lv}+`}</div>`;
       c.onclick = () => { sel = id; previewItem(id); draw(); };
       grid.appendChild(c);
     }
-    const it = S.shop[sel]; const have = pf.items?.[sel] || 0; const locked = !pf.admin && pf.lv < it.lv;
-    info.innerHTML = `<div class="sh-t">${it.icon} ${it.name}</div><div class="sh-d">${it.desc}</div><div class="sh-lv${locked ? ' locked' : ''}">${it.lv > 1 ? `🔒 Lv.${it.lv} 이상 구매 가능` : '🔓 누구나 구매 가능'}${locked ? ` · 현재 Lv.${pf.lv}` : ' ✓'}</div><div class="muted">${it.max > 1 ? `최대 ${it.max}개까지 가질 수 있어요 · 지금 ${have}개` : '1개만 살 수 있어요'}${it.kind === 'mount' ? ' · 탄 동안 이동 속도 1.5배 (Z)' : ''}${it.kind === 'sword' ? ' · 귀신 30번 베면 깨져요' : ''}</div>`;
+    const it = S.shop[sel]; const have = pf.items?.[sel] || 0; const locked = !it.nosale && !pf.admin && pf.lv < it.lv;
+    if (it.nosale) { // 비매품: 전시만 한다 (살 수 없다)
+      const goldHave = GOLD_ORDER.filter((id) => pf.items?.[id]).length;
+      info.innerHTML = `<div class="sh-t">${it.icon} ${it.name}</div><div class="sh-d">${it.desc}</div><div class="sh-d muted">${it.tip || ''}</div><div class="sh-lv">${have ? '✅ 가지고 있어요' : it.kind === 'staff' ? `황금 고양이 세트 ${goldHave}/7 모음` : '🏆 주간랭킹 1위가 되면 받을 수 있어요'}</div><div class="muted">아이템별 1개만 가질 수 있어요 · 황금 고양이 세트 ${goldHave}/7${it.kind === 'staff' ? '' : ' · 7종을 다 모으면 🪄 황금 고양이 지팡이(귀신 퇴치 무제한)'}</div>`;
+      const nb = el('button', 'btn primary', '비매품 (살 수 없어요)'); nb.disabled = true;
+      const bag2 = el('button', 'btn', '🎒 내 물건'); bag2.onclick = () => openBag();
+      const row2 = el('div', 'row'); row2.append(nb, bag2); info.appendChild(row2);
+      return;
+    }
+    info.innerHTML = `<div class="sh-t">${it.icon} ${it.name}</div><div class="sh-d">${it.desc}</div><div class="sh-lv${locked ? ' locked' : ''}">${it.lv > 1 ? `🔒 Lv.${it.lv} 이상 구매 가능` : '🔓 누구나 구매 가능'}${locked ? ` · 현재 Lv.${pf.lv}` : ' ✓'}</div><div class="muted">${it.max > 1 ? `최대 ${it.max}개까지 가질 수 있어요 · 지금 ${have}개` : '아이템별 1개만 가질 수 있어요'}${it.kind === 'mount' ? ' · 탄 동안 이동 속도 1.5배 (Z)' : ''}${it.kind === 'sword' ? ' · 귀신 30번 베면 깨져요' : ''}</div>`;
     const buy = el('button', 'btn primary', locked ? `🔒 Lv.${it.lv} 부터` : have >= it.max ? (it.max > 1 ? '가득 찼어요' : '이미 있어요') : `🪙 ${it.price.toLocaleString()} 코인에 사기`);
     buy.disabled = locked || have >= it.max;
     buy.onclick = () => { socket.emit('shop:buy', sel); audio.play('click'); };
@@ -2688,7 +2757,7 @@ function openShop() {
   w.append(head, top, grid);
   previewItem(sel); draw();
   S.shopRefresh = () => { if ($('#modalBody').firstChild === w) draw(); else S.shopRefresh = null; };
-  openModal('🛒 코인 상점', '날개 · 탈것 · 코스튬 · 폭죽 · 전설의 검', w);
+  openModal('🛒 코인 상점', '날개 · 탈것 · 코스튬 · 폭죽 · 전설의 검 · 🏆 주간랭킹 1위 보상(비매품)', w);
   $('#modal .modal-card').classList.add('shop-mode'); // 위는 고정, 아래 물건 목록만 스크롤
   const stop = () => { if ($('#modalBody').firstChild !== w || $('#modal').classList.contains('hidden')) { pv.on = false; S.shopRefresh = null; } else setTimeout(stop, 500); }; setTimeout(stop, 500);
 }
@@ -2700,34 +2769,42 @@ function openBag() {
   const draw = () => {
     w.innerHTML = ''; const pf = S.profile;
     const ids = SHOP_ORDER.filter((id) => pf.items?.[id]);
-    w.appendChild(el('div', 'muted', `Lv.${pf.lv} · 🪙 ${coinsText()} 코인 · 단축키: Z 탈것 타기/내리기 · B 검 들기/휘두르기`));
+    w.appendChild(el('div', 'muted', `Lv.${pf.lv} · 🪙 ${coinsText()} 코인 · 단축키: Z 탈것 타기/내리기 · B 검·지팡이 들기/휘두르기`));
+    const goldHave = GOLD_ORDER.filter((id) => pf.items?.[id]).length;
+    if (goldHave) w.appendChild(el('div', 'muted gold-note', `🏆 황금 고양이 세트 ${goldHave}/7${goldHave >= 7 ? ' — 세트 완성! 🪄 지팡이로 귀신을 횟수 제한 없이 물리칠 수 있어요' : ' · 7종을 다 모으면 🪄 황금 고양이 지팡이를 받아요'}`));
     if (!ids.length) { w.appendChild(el('div', 'bag-empty', '물건이 없습니다 😀 상점에서 구매하세요')); }
     for (const id of ids) {
       const it = S.shop[id]; const n = pf.items[id];
       const row = el('div', 'bag-row');
       row.appendChild(el('span', 'bi', it.icon));
-      row.appendChild(el('span', 'bn', `${it.name}${it.max > 1 ? ` ×${n}` : ''}${it.kind === 'sword' ? ` (남은 ${pf.swordUses}/30)` : ''}`));
+      row.appendChild(el('span', 'bn', `${it.name}${it.max > 1 ? ` ×${n}` : ''}${it.kind === 'sword' ? ` (남은 ${pf.swordUses}/30)` : ''}${it.kind === 'staff' ? ' (무제한)' : ''}`));
       const acts = el('span', 'ba');
       if (it.kind === 'wings' || it.kind === 'mount' || it.kind === 'costume') {
         const on = pf.equip?.[it.kind] === id;
         const b = el('button', 'btn tiny' + (on ? ' primary' : ''), on ? '착용 중 ✓' : '착용'); b.onclick = () => { socket.emit('shop:equip', { id, on: !on }); if (it.kind === 'mount') { S.riding = !on; if (!on) { if (S.mount) dismount(); S.perch = null; me.y = 0; toast(`${it.icon} ${it.name}에 탔어요! 이동 속도 1.5배 (Z: 내리기/타기)`); } updateGearButtons(); } };
         acts.appendChild(b);
         if (it.kind === 'mount' && on) { const r = el('button', 'btn tiny', S.riding ? '내리기 (Z)' : '타기 (Z)'); r.onclick = () => { toggleRide(); draw(); }; acts.appendChild(r); }
-      } else if (it.kind === 'sword') {
-        const b = el('button', 'btn tiny' + (S.holdSword ? ' primary' : ''), S.holdSword ? '넣기' : '들기'); b.onclick = () => { S.holdSword = !S.holdSword; updateGearButtons(); draw(); };
-        const sw = el('button', 'btn tiny', '휘두르기 (B)'); sw.onclick = () => { S.holdSword = true; closeModal(); swingSword(); };
+      } else if (it.kind === 'gold') { // 황금 고양이 부위: 부위마다 따로 입고 벗는다
+        const on = (pf.equip?.gold || '').includes(it.part);
+        const b = el('button', 'btn tiny' + (on ? ' primary' : ''), on ? '착용 중 ✓' : '착용'); b.onclick = () => socket.emit('shop:equip', { id, on: !on });
+        acts.appendChild(b);
+      } else if (it.kind === 'sword' || it.kind === 'staff') {
+        const kind = it.kind, held = kind === 'sword' ? S.holdSword : S.holdStaff;
+        const b = el('button', 'btn tiny' + (held ? ' primary' : ''), held ? '넣기' : '들기'); b.onclick = () => { holdWeapon(held ? '' : kind); draw(); };
+        const sw = el('button', 'btn tiny', '휘두르기 (B)'); sw.onclick = () => { holdWeapon(kind); closeModal(); swingSword(); };
         acts.append(b, sw);
       } else {
         const b = el('button', 'btn tiny primary', it.kind === 'pop' ? '🎉 펑!' : '🎆 쏘기'); b.onclick = () => { closeModal(); useShopItem(id); };
         acts.appendChild(b);
       }
-      const gb = el('button', 'btn tiny', '🎁'); gb.title = '친구에게 선물하기'; gb.onclick = () => pickGiftTarget(id); acts.appendChild(gb);
+      if (!it.nosale || pf.admin) { const gb = el('button', 'btn tiny', '🎁'); gb.title = '친구에게 선물하기'; gb.onclick = () => pickGiftTarget(id); acts.appendChild(gb); } // 비매품은 선물할 수 없다
+      else acts.appendChild(el('span', 'bag-tag', '비매품'));
       row.appendChild(acts); w.appendChild(row);
     }
   };
   draw();
   S.bagRefresh = () => { if ($('#modalBody').firstChild === w) draw(); else S.bagRefresh = null; };
-  openModal('🎒 내 물건', '날개·탈것·코스튬은 착용하면 모두에게 보여요', w);
+  openModal('🎒 내 물건', '날개·탈것·코스튬은 착용하면 모두에게 보여요 · 아이템별 1개만 가질 수 있어요 (폭죽은 여러 개)', w);
   footBtn('🛒 상점', () => openShop());
   footBtn('🎫 도장표', () => openStamps());
 }
@@ -2741,7 +2818,7 @@ function pickGiftTarget(id) {
 function openGift(toId, name) {
   if (!S.profile) return;
   const w = el('div', 'bag'); const pf = S.profile;
-  const ids = SHOP_ORDER.filter((id) => pf.items?.[id] || pf.admin);
+  const ids = SHOP_ORDER.filter((id) => S.shop[id] && (pf.admin || (pf.items?.[id] && !S.shop[id].nosale)));
   if (!ids.length) w.appendChild(el('div', 'muted', '선물할 물건이 없어요. 🛒 상점에서 먼저 사 보세요!'));
   for (const id of ids) { const it = S.shop[id]; const b = el('button', 'btn small', `${it.icon} ${it.name}${pf.items?.[id] > 1 ? ` (${pf.items[id]}개)` : ''}`); b.onclick = () => { socket.emit('shop:gift', { to: toId, id }); closeModal(); }; w.appendChild(b); }
   openModal(`🎁 ${name} 님에게 선물하기`, '내 물건 중 하나를 골라 보내요', w);
@@ -2751,7 +2828,7 @@ $('#sideBtns').insertBefore(Object.assign(el('button', 'btn small', '🎒 내 �
 function updateGearButtons() {
   const rb = $('.abtn.ride'), sb = $('.abtn.sword');
   if (rb) { rb.classList.toggle('hidden', !S.profile?.equip?.mount); rb.classList.toggle('on', !!S.riding); rb.firstChild.textContent = S.shop[S.profile?.equip?.mount]?.icon || '🐴'; }
-  if (sb) { sb.classList.toggle('hidden', !S.profile?.items?.sword); sb.classList.toggle('on', !!S.holdSword); }
+  if (sb) { const it = S.profile?.items; const staff = holdCode() === 2 || (!holdCode() && it?.gold_staff); sb.classList.toggle('hidden', !(it?.sword || it?.gold_staff)); sb.classList.toggle('on', !!holdCode()); sb.firstChild.textContent = staff ? '🪄' : '🗡️'; const sm = sb.querySelector('small'); if (sm) sm.textContent = staff ? '지팡이' : '검'; }
 }
 // ───── 운영자: 방문 통계 (일간 · 주간 · 월간)
 const fmtDur = (ms) => { const m = Math.round(ms / 60000); return m >= 60 ? `${Math.floor(m / 60)}시간 ${m % 60}분` : `${m}분`; };

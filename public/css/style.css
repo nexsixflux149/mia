@@ -618,6 +618,13 @@ body.mobile #xpLabel { left: auto; right: 8px; }
 .shop-card:hover { transform: translateY(-2px); border-color: #ffd36a; }
 .shop-card.sel { border-color: #ffd36a; background: rgba(255,211,106,.12); box-shadow: 0 0 12px rgba(255,211,106,.25); }
 .shop-card.locked { opacity: .55; }
+/* 비매품 (주간랭킹 1위 보상 · 황금 고양이 세트): 황금 테두리로 전시만 한다 */
+.shop-card.nosale { border-color: rgba(255,201,64,.55); background: linear-gradient(160deg, rgba(255,201,64,.16), rgba(255,255,255,.03)); }
+.shop-card.nosale .sp { color: #ffc940; font-weight: 700; }
+.shop-card.nosale .si { filter: drop-shadow(0 0 8px rgba(255,201,64,.85)); }
+.gold-note { color: #ffd766; }
+.bag-tag { font-size: 11px; color: #ffc940; border: 1px solid rgba(255,201,64,.5); border-radius: 8px; padding: 2px 6px; align-self: center; }
+.mail-text { font-size: 16px; line-height: 1.6; color: #ffe9a8; padding: 10px 4px 14px; text-align: center; word-break: keep-all; }
 .shop-card .si { font-size: 30px; animation: shopBob 2.4s ease-in-out infinite; filter: drop-shadow(0 0 6px rgba(255,233,168,.55)); }
 .shop-card:nth-child(2n) .si { animation-delay: -1.2s; }
 @keyframes shopBob { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-4px) rotate(3deg); } }

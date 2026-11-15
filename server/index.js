@@ -14,7 +14,7 @@ import { hasBadWord } from './filter.js';
 import { isAdminPassword, looksLikeAdmin, ADMIN_NAME } from './admin.js';
 import { ITEMS, START_ITEMS } from './items.js';
 import { openStore, persist, flushAll, storeKind } from './store.js';
-import { MAX_LV, HIDDEN_LV, ADMIN_LV, levelOf, xpAt, CLEAR_COINS, CHAPTER_XP, clearXp, timeLimitMs, SHOP, isWear, blankProfile, profileView, dayKey, statRange, pruneStats, addPeriodXp, levelBoard, weekKey, monthKey } from './progress.js';
+import { MAX_LV, HIDDEN_LV, ADMIN_LV, levelOf, xpAt, CLEAR_COINS, CHAPTER_XP, clearXp, timeLimitMs, SHOP, isWear, blankProfile, profileView, dayKey, statRange, pruneStats, addPeriodXp, levelBoard, weekKey, monthKey, GOLD_IDS, GOLD_STAFF, isGold, giveGold, randomGold, goldWorn, weekWinner } from './progress.js';
 import { Accounts, clientIp } from './accounts.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -110,10 +110,17 @@ accounts.prune(profiles); setInterval(() => accounts.prune(profiles), 24 * 3600 
 // ───── 고객소리함 (버그 · 건의)
 feedback.list ||= [];
 const saveFeedback = () => persist(DATA_DIR, 'feedback', feedback);
-const prof = (name) => { const pf = (profiles[name] ||= blankProfile()); pf.items ||= {}; pf.equip ||= { wings: '', mount: '' }; pf.equip.costume ??= ''; return pf; };
+const profChecked = new Set(); // 서버가 켜진 뒤 처음 볼 때 한 번씩만 정리한다
+const prof = (name) => {
+  const pf = (profiles[name] ||= blankProfile()); pf.items ||= {}; pf.equip ||= { wings: '', mount: '' }; pf.equip.costume ??= ''; pf.equip.gold ??= '';
+  // 탈것 · 코스튬 · 날개 · 검 · 비매품은 아이템별 1개만 (폭죽은 max 개까지): 혹시 예전 기록에 더 들어 있으면 줄여 둔다
+  if (!profChecked.has(name)) { profChecked.add(name); for (const [id, n] of Object.entries(pf.items)) { const it = SHOP[id]; if (it && n > it.max) pf.items[id] = it.max; } }
+  return pf;
+};
 const findByName = (name) => [...players.values()].find((p) => p.name === name && !p.offline);
 const sendProfile = (p) => { if (p) io.to(p.id).emit('profile', { ...profileView(prof(p.name), p.admin), hiddenOk: hiddenOk(p.name) }); };
-const gearOf = (p) => { const e = prof(p.name).equip; return `${e.wings || ''}|${e.mount || ''}|${p.riding && e.mount ? 1 : 0}|${p.sword ? 1 : 0}|${e.costume || ''}`; };
+// 장비 문자열: 날개|탈것|타는 중|손에 든 것(0 없음 · 1 전설의 검 · 2 황금 고양이 지팡이)|코스튬|황금 고양이 부위 글자
+const gearOf = (p) => { const pf = prof(p.name), e = pf.equip; return `${e.wings || ''}|${e.mount || ''}|${p.riding && e.mount ? 1 : 0}|${Number(p.sword) || 0}|${e.costume || ''}|${goldWorn(pf)}`; };
 /** 모든 테마를 한 번씩 깼거나 만렙이면 히든 테마가 열린다 */
 function hiddenOk(name) {
   const p = findByName(name); if (p?.admin) return true;
@@ -124,6 +131,7 @@ function addXp(name, amt, why) {
   if (!name || !(amt > 0)) return;
   const pf = prof(name); const before = levelOf(pf.xp);
   pf.xp += Math.round(amt); addPeriodXp(pf, Math.round(amt)); saveProfiles();
+  if (!stats.weekly?.champ?.name) { boardCache = null; pushChamp(); } // 아직 확정된 주간 1위가 없을 때는 '이번 주 지금 1위'를 분수대에 띄운다
   const after = levelOf(pf.xp); const p = findByName(name);
   if (p) { io.to(p.id).emit('xp', { add: Math.round(amt), why, lv: after, up: after > before }); sendProfile(p); }
   if (after > before) {
@@ -134,6 +142,9 @@ function addXp(name, amt, why) {
 }
 function addCoins(name, n) { const pf = prof(name); pf.coins = Math.max(0, (pf.coins || 0) + n); saveProfiles(); sendProfile(findByName(name)); }
 
+// 음성(WebRTC) 중계 서버(TURN) — 선택. 통신사 데이터망처럼 서로 직접 이어지지 않는 곳에서는 중계 서버가 있어야 목소리가 들린다
+//  TURN_URLS="turn:호스트:3478,turns:호스트:5349"  TURN_USER=...  TURN_PASS=...  (없으면 STUN 만 쓴다)
+const ICE_EXTRA = process.env.TURN_URLS ? [{ urls: process.env.TURN_URLS.split(',').map((u) => u.trim()).filter(Boolean), username: process.env.TURN_USER || '', credential: process.env.TURN_PASS || '' }] : null;
 const players = new Map();   // socket.id -> player
 // 채팅 욕설 경고: 닉네임별로 기억해 다시 접속해도 이어진다 (5번이면 5분 채팅 금지)
 const CHAT_WARN_MAX = 5, CHAT_MUTE_MS = 5 * 60 * 1000;
@@ -240,7 +251,7 @@ io.on('connection', (sock) => {
   // 입장 · 이어 접속 때 화면에 돌려주는 내 정보
   const helloInfo = (p, extra = {}) => {
     const a = p.acct ? accountData.list[p.acct] : null;
-    return { id: p.id, token: p.token, name: p.name, admin: !!p.admin, items: ITEMS, unlocked: saves[p.name] ?? 0, unlockedBy: unlockedFor(p.name), scenarios: scenarioList(), hearts: hearts[p.name] || 0, hiddenOk: hiddenOk(p.name), shop: SHOP, account: a ? { id: a.id, key: a.key, name: a.name } : null, ...extra };
+    return { id: p.id, token: p.token, name: p.name, admin: !!p.admin, items: ITEMS, unlocked: saves[p.name] ?? 0, unlockedBy: unlockedFor(p.name), scenarios: scenarioList(), hearts: hearts[p.name] || 0, hiddenOk: hiddenOk(p.name), shop: SHOP, account: a ? { id: a.id, key: a.key, name: a.name } : null, champ: champView(), ice: ICE_EXTRA, ...extra };
   };
 
   sock.on('hello', (h, ack) => {
@@ -304,6 +315,7 @@ io.on('connection', (sock) => {
       if (i && me.room === 'inst:' + party.instId) sock.emit('game:sync', i.fullState());
       else if (me.room === 'lobby') sock.emit('enter:lobby', { x: me.x, z: me.z });
       broadcastRoster();
+      flushMail(me);
       return;
     }
     if (asAdmin) {
@@ -319,15 +331,19 @@ io.on('connection', (sock) => {
     const np = { id: pid, sid: sock.id, token: randomBytes(16).toString('hex'), name, admin: asAdmin, acct: account?.id || null, lv: 1, look: sanitizeLook(look), x: 0, z: 5, ry: Math.PI, anim: 0, light: false, room: null, partyId: null, inv: [...START_ITEMS], mic: false };
     players.set(pid, np); setMe(np);
     sock.join(pid);
+    if (asAdmin) adminKit(prof(name)); // 운영자는 황금 고양이 세트와 지팡이를 처음부터 가지고 있다
     toLobby(np);
     ack(helloInfo(np));
     sendProfile(np);
+    flushMail(np);
     // 방문 통계: 오늘 방문 수 + 방문자
     if (!asAdmin) { const d = (stats.days[dayKey()] ||= { v: 0, u: {} }); d.v++; d.u[name] ||= 0; saveStats(); }
     io.emit('chat', { channel: 'system', text: `${name} 님이 접속했습니다.` });
   });
   // 방을 옮긴 화면이 '지금 이 방에 있는 사람 전부'를 다시 달라고 할 때
   // (너무 자주 오면 버리지 않고 0.4초에 한 번으로 모아서 보낸다 — 버리면 그 화면에는 다음 전체 방송까지 아무도 안 보인다)
+  // 휴대폰이 잠들었다 깨어났을 때: 화면이 '아직 붙어 있나?' 하고 묻는다. 답이 없으면 화면이 스스로 다시 접속한다
+  sock.on('alive', (ack) => { if (typeof ack === 'function') ack(me && !me.offline && players.has(me.id) && me.sid === sock.id ? me.id : ''); });
   sock.on('state:full', () => {
     const p = me; if (!p?.room || p.offline) return;
     const send = () => { p.fullTimer = null; p.fullReqAt = Date.now(); if (p.room && !p.offline && p.sid === sock.id) sock.emit('state', fullState(p.room)); };
@@ -342,7 +358,7 @@ io.on('connection', (sock) => {
     me.em = typeof m.em === 'string' ? m.em.slice(0, 10) : ''; me.eid = Number(m.eid) | 0;
     me.ride = typeof m.ride === 'string' && /^[a-z0-9]{1,12}:\d{1,2}$/.test(m.ride) ? m.ride : '';
     me.riding = !!m.mount && !!prof(me.name).equip.mount;
-    me.sword = !!m.sword && !!prof(me.name).items.sword;
+    { const its = prof(me.name).items; me.sword = m.sword === 2 ? (its[GOLD_STAFF] ? 2 : 0) : m.sword ? (its.sword ? 1 : 0) : 0; } // 손에 든 것: 1 전설의 검 · 2 황금 고양이 지팡이
   });
 
   // 외형은 바뀔 때만 전송 (사진 얼굴은 용량이 크므로 매 틱 보내지 않는다)
@@ -456,6 +472,7 @@ io.on('connection', (sock) => {
   sock.on('shop:buy', (id) => {
     if (!me) return; const it = SHOP[id]; if (!it) return;
     const pf = prof(me.name); const lv = levelOf(pf.xp); const have = pf.items[id] || 0;
+    if (it.nosale) return sock.emit('toast', { text: it.kind === 'staff' ? `${it.icon} ${it.name}은(는) 비매품이에요. 황금 고양이 세트 7종을 모두 모으면 받아요.` : `${it.icon} ${it.name}은(는) 비매품이에요. 매주 주간랭킹 1위에게 랜덤으로 주어져요.` });
     if (!me.admin && lv < it.lv) return sock.emit('toast', { text: `🔒 Lv.${it.lv} 부터 살 수 있어요. (지금 Lv.${lv})` });
     if (have >= it.max) return sock.emit('toast', { text: it.max > 1 ? `${it.icon} ${it.name}은(는) ${it.max}개까지만 가질 수 있어요.` : `${it.icon} ${it.name}은(는) 이미 가지고 있어요.` });
     if (!me.admin && (pf.coins || 0) < it.price) return sock.emit('toast', { text: `🪙 코인이 모자라요. (${it.price}코인 필요 · 지금 ${pf.coins || 0}코인)` });
@@ -468,18 +485,31 @@ io.on('connection', (sock) => {
     sock.emit('toast', { text: `${it.icon} ${it.name}을(를) 샀어요!${isWear(id) ? ' (🎒 내 물건에서 착용/해제)' : ' (🎒 내 물건에서 사용)'}` });
   });
   sock.on('shop:equip', ({ id, on } = {}) => {
-    if (!me) return; const it = SHOP[id]; if (!it || !isWear(id)) return;
+    if (!me) return; const it = SHOP[id]; if (!it || !(isWear(id) || isGold(id))) return;
     const pf = prof(me.name); if (!pf.items[id]) return;
+    if (isGold(id)) { // 황금 고양이 부위는 부위마다 따로 입고 벗는다 (여러 개 함께 착용)
+      const cur = new Set(pf.equip.gold || ''); if (on) cur.add(it.part); else cur.delete(it.part);
+      pf.equip.gold = GOLD_IDS.map((g) => SHOP[g].part).filter((c) => cur.has(c)).join('');
+      saveProfiles(); sendProfile(me); return;
+    }
     pf.equip[it.kind] = on ? id : (pf.equip[it.kind] === id ? '' : pf.equip[it.kind]);
     if (it.kind === 'mount' && !on) me.riding = false;
     saveProfiles(); sendProfile(me);
   });
   sock.on('shop:use', (id) => {
-    if (!me || !['popper', 'rocket', 'sword'].includes(id)) return;
+    if (!me || !['popper', 'rocket', 'sword', GOLD_STAFF].includes(id)) return;
     const pf = prof(me.name); if (!pf.items[id]) return;
     const now = Date.now(); if (now - (me.lastFx || 0) < 900) return; me.lastFx = now;
     const room = me.room; if (!room) return;
     const fx = { type: id, id: me.id, x: me.x, z: me.z, y: me.y || 0, ry: me.ry };
+    if (id === GOLD_STAFF) { // 황금 고양이 지팡이: 전설의 검처럼 가까운 귀신을 물리치지만 횟수가 줄지 않는다
+      const hit = inst()?.slay?.(me, 'staff');
+      fx.type = 'staff'; fx.hit = hit ? { x: hit.x, z: hit.z, name: hit.name } : null;
+      if (hit) sock.emit('toast', { text: `🪄 ${hit.name}을(를) 물리쳤다! (황금 고양이 지팡이 · 횟수 제한 없음)` });
+      else if (!inst()) sock.emit('toast', { text: '🪄 휘익— (귀신은 방탈출 안에서만 물리칠 수 있어요)' });
+      else sock.emit('toast', { text: '🪄 휘익— 가까이에 귀신이 없다. (귀신 가까이서 휘두르세요)' });
+      io.to(room).emit('fx:item', fx); return;
+    }
     if (id === 'sword') {
       const hit = inst()?.slay?.(me);
       fx.hit = hit ? { x: hit.x, z: hit.z, name: hit.name } : null;
@@ -501,9 +531,19 @@ io.on('connection', (sock) => {
     if (!me) return; const t = players.get(to); const it = SHOP[id];
     if (!t || t === me || !it) return;
     const a = prof(me.name), b = prof(t.name);
+    if (it.nosale && !me.admin) return sock.emit('toast', { text: `${it.icon} ${it.name}은(는) 비매품이라 선물할 수 없어요.` });
     if (!a.items[id] && !me.admin) return sock.emit('toast', { text: '가지고 있지 않은 물건이에요.' });
-    if ((b.items[id] || 0) >= it.max) return sock.emit('toast', { text: `${t.name} 님은 ${it.name}을(를) 더 받을 수 없어요. (최대 ${it.max}개)` });
+    if ((b.items[id] || 0) >= it.max) return sock.emit('toast', { text: it.max > 1 ? `${t.name} 님은 ${it.name}을(를) 더 받을 수 없어요. (최대 ${it.max}개)` : `${t.name} 님은 ${it.icon} ${it.name}을(를) 이미 가지고 있어요. (아이템별 1개만 가질 수 있어요)` });
     const now = Date.now(); if (now - (me.lastGift || 0) < 1500) return; me.lastGift = now;
+    if (it.nosale) { // 운영자가 직접 주는 비매품
+      const r = isGold(id) ? giveGold(b, id) : (b.items[id] = 1, { staff: false });
+      saveProfiles(); sendProfile(t);
+      sock.emit('toast', { text: `🎁 ${t.name} 님에게 ${it.icon} ${it.name}을(를) 주었어요!${r.staff ? ' (세트 완성 → 지팡이도 지급)' : ''}` });
+      io.to(t.id).emit('gift', { from: me.name, id, icon: it.icon, name: it.name });
+      if (r.staff) io.to(t.id).emit('mail', { text: goldSetText() });
+      if (t.room === me.room) io.to(me.room).emit('heartFx', { from: me.id, to: t.id });
+      return;
+    }
     const uses = it.kind === 'sword' ? (me.admin ? it.uses : a.swordUses || it.uses) : 0;
     if (!me.admin) { a.items[id] -= 1; if (a.items[id] <= 0) { delete a.items[id]; if (a.equip[it.kind] === id) a.equip[it.kind] = ''; if (it.kind === 'sword') a.swordUses = 0; } }
     b.items[id] = (b.items[id] || 0) + 1;
@@ -774,6 +814,47 @@ function levelBoards() {
   boardCache = { week: levelBoard(profiles, 'week', 20, skip), month: levelBoard(profiles, 'month', 20, skip), total: levelBoard(profiles, 'total', 20, skip) };
   boardAt = Date.now(); return boardCache;
 }
+
+// ───── 주간랭킹 1위: 주(월요일 0시, 한국 시간)가 바뀌면 지난주 1위를 확정한다
+//  → 분수대 위 큰 글씨 '주간랭킹 1위는 "○○"님 입니다' + 황금 고양이 세트 중 아직 없는 것 하나를 랜덤으로 지급 (7종을 다 모으면 지팡이)
+//  서버가 그 시각에 꺼져 있었어도, 다시 켜졌을 때 지난주 것을 한 번 확정한다 (stats.weekly.done = 마지막으로 확정한 주)
+stats.weekly ||= { done: '', champ: null, log: [] };
+const goldSetText = () => `황금 고양이 세트 7종을 모두 모았어요! ${SHOP[GOLD_STAFF].icon} ${SHOP[GOLD_STAFF].name}을(를) 받았습니다. (귀신 퇴치 무제한 · 🎒 내 물건에서 들기)`;
+const adminKit = (pf) => { let ch = false; for (const id of [...GOLD_IDS, GOLD_STAFF]) if (!pf.items[id]) { pf.items[id] = 1; ch = true; } if (ch) saveProfiles(); };
+/** 분수대에 띄울 이름: 지난주에 확정된 1위. 아직 없으면(기능이 켜진 첫 주 · 지난주에 아무도 안 했을 때) 이번 주 지금 1위 */
+function champView() {
+  const c = stats.weekly?.champ;
+  if (c?.name) return { name: c.name, week: c.k, last: true };
+  const top = levelBoards().week.rows[0];
+  return top ? { name: top.name, week: weekKey(), last: false } : null;
+}
+let champSent = null;
+function pushChamp(force) { const v = champView(); const key = v ? `${v.name}|${v.week}|${v.last}` : ''; if (!force && key === champSent) return; champSent = key; io.emit('champ', v); }
+/** 우편: 접속해 있으면 바로, 아니면 다음에 들어올 때 보여 준다 (보상 알림) */
+function mail(name, text) { const pf = prof(name); (pf.mail ||= []).push({ text, at: Date.now() }); if (pf.mail.length > 10) pf.mail.splice(0, pf.mail.length - 10); saveProfiles(); flushMail(findByName(name)); }
+function flushMail(p) { if (!p || p.offline) return; const pf = prof(p.name); if (!pf.mail?.length) return; const list = pf.mail; pf.mail = []; saveProfiles(); for (const m of list) io.to(p.id).emit('mail', m); }
+function checkWeek(now = Date.now()) {
+  const w = stats.weekly, prev = weekKey(now - 7 * 86400000);
+  if (w.done === prev) return null;
+  const first = !w.done; w.done = prev;
+  if (first) { saveStats(); return null; } // 이 기능이 처음 켜진 주: 지난주 기록이 온전하지 않으므로 지급 없이 넘어간다 (다음 월요일부터 시작)
+  const top = weekWinner(profiles, prev, (n) => n === ADMIN_NAME || n.startsWith(ADMIN_NAME + '#'));
+  boardCache = null;
+  if (!top) { w.champ = null; saveStats(); pushChamp(); return null; } // 지난주에 아무도 경험치를 얻지 못했다
+  const pf = prof(top.name);
+  const id = randomGold(pf); const r = id ? giveGold(pf, id) : { added: false, staff: false };
+  w.champ = { k: prev, name: top.name, gain: top.gain, lv: top.lv, item: id || '', at: now };
+  (w.log ||= []).push(w.champ); if (w.log.length > 60) w.log.shift();
+  saveStats(); saveProfiles();
+  const it = id ? SHOP[id] : null;
+  io.emit('celebrate', { name: top.name, kind: 'weekly', text: it ? `🏆 지난주 주간랭킹 1위는 ${top.name} 님! ${it.icon} ${it.name}을(를) 받았습니다!` : `🏆 지난주 주간랭킹 1위는 ${top.name} 님!` });
+  mail(top.name, it ? `🏆 지난주 주간랭킹 1위! 보상으로 ${it.icon} ${it.name}을(를) 받았어요. (🎒 내 물건에서 입고 벗을 수 있어요)` : '🏆 지난주 주간랭킹 1위! 황금 고양이 세트는 이미 모두 가지고 있어요.');
+  if (r.staff) mail(top.name, goldSetText());
+  sendProfile(findByName(top.name));
+  pushChamp(true);
+  return w.champ;
+}
+checkWeek(); setInterval(() => checkWeek(), 60 * 1000).unref?.();
 
 function unlockedFor(name) {
   const out = {};

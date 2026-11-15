@@ -15,6 +15,8 @@ export const clearXp = (difficulty, fear, full) => Math.round((300 + difficulty 
 /** 제한 시간: 쉬운 테마(난이도 2 이하) 60분, 어려운 테마 120분 */
 export const timeLimitMs = (difficulty) => (difficulty <= 2 ? 60 : 120) * 60 * 1000;
 
+/** 주간랭킹 1위 보상(비매품)의 설명 */
+export const GOLD_NOTE = '비매품 - 매주 주간랭킹 1위에게 랜덤 지급되는 아이템';
 // 상점 물건. kind: wings(등에 다는 날개) · mount(타는 것, 탄 동안 이동 속도 1.5배) · pop(파티 꼬깔 폭죽) · rocket(쏘아 올리는 폭죽) · sword(전설의 검)
 export const SHOP = {
   popper: { name: '파티 꼬깔 폭죽', icon: '🎉', kind: 'pop', price: 3, lv: 1, max: 10, desc: '앞에 있는 친구를 향해 펑! 색종이가 쏟아지고 아주 큰 소리가 나요.' },
@@ -33,10 +35,38 @@ export const SHOP = {
   costume_robot: { name: '로봇 코스튬', icon: '🤖', kind: 'costume', price: 400, lv: 50, max: 1, desc: '머리부터 발끝까지 반짝이는 로봇으로 변신! 눈과 가슴 불빛이 깜빡여요.' },
   mount_carriage: { name: '황금 마차', icon: '👑', kind: 'mount', price: 2000, lv: 100, max: 1, desc: '번쩍이는 황금 마차. 최고 레벨만 탈 수 있는 전설의 탈것. 탄 동안 이동 속도 1.5배!' },
   sword: { name: '전설의 검', icon: '🗡️', kind: 'sword', price: 1000, lv: 30, max: 1, uses: 30, desc: '푸른 빛을 내뿜는 크리스탈 검. 가까운 귀신을 베어 없앨 수 있어요. 귀신을 30번 없애면 깨져 버려요.' },
+  // ── 황금 고양이 세트 (비매품 · kind: gold): 매주 주간랭킹 1위에게 아직 없는 것 하나를 랜덤으로 준다. part = 몸의 어느 부위인지 (착용 글자)
+  gold_hat: { name: '황금 고양이 모자', icon: '🎩', kind: 'gold', part: 'h', price: 0, lv: 1, max: 1, nosale: true, desc: GOLD_NOTE, tip: '쫑긋한 귀가 달린 황금 고양이 모자.' },
+  gold_mask: { name: '황금 고양이 가면', icon: '🎭', kind: 'gold', part: 'm', price: 0, lv: 1, max: 1, nosale: true, desc: GOLD_NOTE, tip: '눈이 반짝이는 황금 고양이 얼굴 가면.' },
+  gold_gloves: { name: '황금 고양이 장갑', icon: '🧤', kind: 'gold', part: 'g', price: 0, lv: 1, max: 1, nosale: true, desc: GOLD_NOTE, tip: '분홍 발바닥 젤리가 달린 황금 고양이 장갑.' },
+  gold_top: { name: '황금 고양이 상의', icon: '👕', kind: 'gold', part: 't', price: 0, lv: 1, max: 1, nosale: true, desc: GOLD_NOTE, tip: '가슴에 방울이 달린 황금 고양이 윗옷.' },
+  gold_bottom: { name: '황금 고양이 하의', icon: '👖', kind: 'gold', part: 'b', price: 0, lv: 1, max: 1, nosale: true, desc: GOLD_NOTE, tip: '반짝이는 황금 고양이 바지.' },
+  gold_shoes: { name: '황금 고양이 신발', icon: '👢', kind: 'gold', part: 's', price: 0, lv: 1, max: 1, nosale: true, desc: GOLD_NOTE, tip: '사뿐사뿐 황금 고양이 발 신발.' },
+  gold_tail: { name: '황금 고양이 꼬리', icon: '🐾', kind: 'gold', part: 'l', price: 0, lv: 1, max: 1, nosale: true, desc: GOLD_NOTE, tip: '살랑살랑 흔들리는 황금 고양이 꼬리.' },
+  // 황금 고양이 지팡이 (비매품 · kind: staff): 세트 7종을 모두 모으면 받는다. 전설의 검처럼 귀신을 물리치지만 횟수 제한이 없다
+  gold_staff: { name: '황금 고양이 지팡이', icon: '🪄', kind: 'staff', price: 0, lv: 1, max: 1, nosale: true, desc: '비매품 - 황금 고양이 코스튬 세트 7종을 모두 모으면 받는 지팡이', tip: '가까운 귀신을 횟수 제한 없이 물리칠 수 있어요. (귀신 퇴치 무제한)' },
 };
 export const isWear = (id) => ['wings', 'mount', 'costume'].includes(SHOP[id]?.kind);
+// ───── 황금 고양이 세트
+export const GOLD_IDS = ['gold_hat', 'gold_mask', 'gold_gloves', 'gold_top', 'gold_bottom', 'gold_shoes', 'gold_tail'];
+export const GOLD_STAFF = 'gold_staff';
+export const isGold = (id) => SHOP[id]?.kind === 'gold';
+export const hasGoldSet = (pf) => GOLD_IDS.every((id) => pf.items?.[id]);
+/** 지금 착용 중인 황금 고양이 부위 글자 (가진 것만, 정해진 순서로) — 다른 사람 화면에 보내는 장비 문자열에 들어간다 */
+export const goldWorn = (pf) => { const on = pf.equip?.gold || ''; if (!on) return ''; let out = ''; for (const id of GOLD_IDS) if (pf.items?.[id] && on.includes(SHOP[id].part)) out += SHOP[id].part; return out; };
+/** 아직 없는 황금 고양이 부위 중 하나를 랜덤으로 고른다 (다 가졌으면 null) */
+export function randomGold(pf, rnd = Math.random) { const left = GOLD_IDS.filter((id) => !pf.items?.[id]); return left.length ? left[Math.min(left.length - 1, Math.floor(rnd() * left.length))] : null; }
+/** 황금 고양이 부위 하나를 준다: 아이템별 1개만 · 받자마자 착용 · 7종이 다 모이면 지팡이도 준다 → { added, staff } */
+export function giveGold(pf, id) {
+  pf.items ||= {}; pf.equip ||= {};
+  const added = isGold(id) && !pf.items[id];
+  if (added) { pf.items[id] = 1; const part = SHOP[id].part; if (!(pf.equip.gold || '').includes(part)) pf.equip.gold = (pf.equip.gold || '') + part; }
+  const staff = hasGoldSet(pf) && !pf.items[GOLD_STAFF];
+  if (staff) pf.items[GOLD_STAFF] = 1;
+  return { added, staff };
+}
 
-export function blankProfile() { return { xp: 0, coins: 0, items: {}, swordUses: 0, equip: { wings: '', mount: '', costume: '' }, at: Date.now() }; }
+export function blankProfile() { return { xp: 0, coins: 0, items: {}, swordUses: 0, equip: { wings: '', mount: '', costume: '', gold: '' }, at: Date.now() }; }
 export function profileView(pf, admin) {
   const lv = admin ? ADMIN_LV : levelOf(pf.xp); // 운영자는 Lv.1000
   return { xp: pf.xp, lv, max: MAX_LV, hiddenLv: HIDDEN_LV, cur: admin ? 0 : xpAt(lv), next: admin ? 0 : lv >= MAX_LV ? xpAt(lv) : xpAt(lv + 1), coins: admin ? -1 : pf.coins, items: pf.items, swordUses: pf.swordUses, equip: pf.equip, admin: !!admin };
@@ -50,9 +80,21 @@ export const monthKey = (t = Date.now()) => dayKey(t).slice(0, 7);
 /** 경험치를 얻을 때마다: 이번 주 · 이번 달 몫에 더한다 (주·달이 바뀌었으면 0부터) */
 export function addPeriodXp(pf, amt, t = Date.now()) {
   const wk = weekKey(t), mo = monthKey(t);
-  if (pf.wk?.k !== wk) pf.wk = { k: wk, xp: 0 };
+  if (pf.wk?.k !== wk) { if (pf.wk?.xp > 0) pf.pwk = pf.wk; pf.wk = { k: wk, xp: 0 }; } // 지난주 몫(pwk)은 남겨 둔다 → 주간 1위를 확정할 때 쓴다
   if (pf.mo?.k !== mo) pf.mo = { k: mo, xp: 0 };
   pf.wk.xp += amt; pf.mo.xp += amt;
+}
+/** wk 주(그 주 월요일 날짜)에 경험치를 가장 많이 얻은 사람 (없으면 null). 순서는 주간 랭킹 표와 같다: 얻은 경험치 → 총 경험치 → 이름 */
+export function weekWinner(profiles, wk, skip = () => false) {
+  let best = null;
+  for (const [name, pf] of Object.entries(profiles)) {
+    if (!pf || skip(name)) continue;
+    const gain = pf.wk?.k === wk ? pf.wk.xp : pf.pwk?.k === wk ? pf.pwk.xp : 0;
+    if (!(gain > 0)) continue;
+    const xp = pf.xp || 0;
+    if (!best || gain > best.gain || (gain === best.gain && (xp > best.xp || (xp === best.xp && name < best.name)))) best = { name, gain, xp, lv: levelOf(xp) };
+  }
+  return best;
 }
 /** 레벨 랭킹 표: kind = 'week' | 'month' | 'total'. 상위 n명 + 내 순위 */
 export function levelBoard(profiles, kind, n = 20, skip = () => false) {

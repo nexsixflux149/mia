@@ -625,6 +625,48 @@ export function buildLobby(scene, opts = {}) {
     };
   })();
 
+  // ── 분수대 바로 위 큰 글씨: 주간랭킹 1위는 "○○"님 입니다 (이름은 서버가 매주 정해 준다 — main.js 의 setChamp)
+  const champSign = (() => {
+    const cv = document.createElement('canvas'); cv.width = 2048; cv.height = 256;
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, fog: false, toneMapped: false }));
+    const W0 = 11.5; sp.position.set(0, 4.5, 0); sp.scale.set(W0, W0 / 8, 1); sp.visible = false; sp.userData.noOcc = true; sp.renderOrder = 3; root.add(sp);
+    let cur = null;
+    const FIX = '"Do Hyeon", "Gowun Dodum", sans-serif', NAME = '"Gowun Dodum", sans-serif';
+    const draw = () => {
+      const x = cv.getContext('2d'), W = cv.width, H = cv.height; x.clearRect(0, 0, W, H);
+      if (!cur?.name) { tex.needsUpdate = true; return; }
+      const parts = [['🏆 ', FIX, '#fff4d6'], ['주간랭킹 1위는 ', FIX, '#fff4d6'], [`"${cur.name}"`, NAME, '#ffd24a'], ['님 입니다', FIX, '#fff4d6']];
+      let size = 132; const widthAt = (px) => parts.reduce((a, [t, f]) => { x.font = `${px}px ${f}`; return a + x.measureText(t).width; }, 0);
+      let tw = widthAt(size); if (tw > W - 150) { size = Math.max(60, Math.floor(size * (W - 150) / tw)); tw = widthAt(size); }
+      // 어두운 반투명 띠 + 황금 테두리
+      const pw = Math.min(W - 8, tw + 130), ph = Math.min(H - 12, size + 78), px0 = (W - pw) / 2, py0 = (H - ph) / 2, r = ph / 2;
+      x.beginPath(); x.moveTo(px0 + r, py0); x.arcTo(px0 + pw, py0, px0 + pw, py0 + ph, r); x.arcTo(px0 + pw, py0 + ph, px0, py0 + ph, r); x.arcTo(px0, py0 + ph, px0, py0, r); x.arcTo(px0, py0, px0 + pw, py0, r); x.closePath();
+      x.fillStyle = 'rgba(18,8,14,.72)'; x.fill(); x.lineWidth = 6; x.strokeStyle = 'rgba(255,201,64,.9)'; x.stroke();
+      x.textBaseline = 'middle'; x.textAlign = 'left'; x.lineJoin = 'round';
+      let cx = (W - tw) / 2; const cy = H / 2 + size * 0.04;
+      for (const [t, f, col] of parts) {
+        x.font = `${size}px ${f}`;
+        x.lineWidth = Math.max(6, size * 0.09); x.strokeStyle = 'rgba(20,6,0,.95)'; x.strokeText(t, cx, cy);
+        if (col === '#ffd24a') { x.shadowColor = 'rgba(255,190,40,.9)'; x.shadowBlur = 26; }
+        x.fillStyle = col; x.fillText(t, cx, cy); x.shadowBlur = 0;
+        cx += x.measureText(t).width;
+      }
+      tex.needsUpdate = true;
+    };
+    return {
+      /** c = { name, week, last } | null */
+      set(c) {
+        const key = c?.name ? `${c.name}|${c.week}` : ''; if (key === (cur?.key || '') && sp.visible === !!key) return;
+        cur = c?.name ? { ...c, key } : null; sp.visible = !!cur; draw();
+        // 글꼴이 늦게 오면 다시 그린다 (처음엔 기기 글꼴로 보일 수 있다)
+        if (cur && document.fonts?.load) Promise.all([document.fonts.load(`100px ${FIX.split(',')[0]}`, '주간랭킹 1위는 님 입니다'), document.fonts.load(`100px ${NAME.split(',')[0]}`, cur.name)]).then(() => { if (sp.parent) draw(); }).catch(() => {});
+      },
+      update(t) { if (!sp.visible) return; sp.position.y = 4.5 + Math.sin(t * 1.1) * 0.07; const k = 1 + Math.sin(t * 2.3) * 0.012; sp.scale.set(W0 * k, (W0 / 8) * k, 1); },
+    };
+  })();
+  champSign.set(opts.champ || null);
+
   // ── 상사화: 광장을 빙 둘러 붉은 꽃밭 (꽃잎이 뒤로 말린 붉은 꽃 + 긴 수술)
   {
     const spots = [];
@@ -690,7 +732,7 @@ export function buildLobby(scene, opts = {}) {
   colliders.push(...ringColliders(30.5));
   scene.add(root);
   const update = (t) => {
-    park.update(t); outer.update(t); fountain.update(t); fireflies.update(t); extra.update(t);
+    park.update(t); outer.update(t); fountain.update(t); champSign.update(t); fireflies.update(t); extra.update(t);
     clouds.rotation.y = t * 0.006; clouds.children.forEach((c) => (c.position.y += Math.sin(t * 0.3 + c.userData.ph) * 0.004));
     flies.rotation.y = t * 0.02; flies.position.y = Math.sin(t) * 0.2;
     exhibits.forEach((e, i) => {
@@ -701,7 +743,7 @@ export function buildLobby(scene, opts = {}) {
       e.spin.forEach((s) => (s.rotation.z = Math.sin(t * 1.2 + i) * 0.15));
     });
   };
-  return { root, colliders, walls: [], objects: {}, flickers: [], ceiling: [], update, bounds: 28.5, outdoor: true, themes, exhibits, hiddenGate: !!opts.hidden, shopFace: extra.shopFace, clickables: extra.clickables, interactives: [...park.interactives, ...outer.interactives, ...extra.interactives], rides: { ...park.rides, ...extra.rides } };
+  return { root, colliders, walls: [], objects: {}, flickers: [], ceiling: [], update, bounds: 28.5, outdoor: true, themes, exhibits, hiddenGate: !!opts.hidden, setChamp: (c) => champSign.set(c), shopFace: extra.shopFace, clickables: extra.clickables, interactives: [...park.interactives, ...outer.interactives, ...extra.interactives], rides: { ...park.rides, ...extra.rides } };
 }
 
 // ───── 로비 쉼터: 불멍 캠프파이어 + 통나무 벤치 · 타면 움직이는 그네 · 코인 상점

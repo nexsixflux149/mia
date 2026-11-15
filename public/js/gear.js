@@ -292,6 +292,120 @@ export function buildSword() {
   return g;
 }
 
+// ───────────── 황금 고양이 세트 (비매품 · 주간랭킹 1위 보상)
+//  부위마다 따로 입는다 — h 모자 · m 가면 · g 장갑 · t 상의 · b 하의 · s 신발 · l 꼬리. 원래 옷 위에 덧입는 모양이라 몸을 숨기지 않는다.
+const goldM = () => M('#ffd04a', { metalness: 0.32, roughness: 0.27, emissive: '#c79a00', emissiveIntensity: 0.5 });
+const goldD = () => M('#e5a520', { metalness: 0.36, roughness: 0.36, emissive: '#946400', emissiveIntensity: 0.46 });
+const goldPink = () => M('#ff9ec4', { roughness: 0.5, emissive: '#ff5f9e', emissiveIntensity: 0.3 });
+const goldDark = () => M('#1c1408', { roughness: 0.4 });
+function goldParts(u, set) {
+  const parts = [], anims = [], hidden = [];
+  const gold = goldM(), dk = goldD(), pink = goldPink(), black = goldDark();
+  const add = (parent, geo, mat, x = 0, y = 0, z = 0) => { const m = mesh(geo, mat, x, y, z, parent); m.userData.gold = true; parts.push(m); return m; };
+  const has = (c) => set.includes(c);
+  // 모자: 귀가 쫑긋한 황금 모자 (원래 쓰고 있던 모자 · 동물 귀는 잠시 감춘다)
+  if (has('h')) {
+    u.head.traverse((o) => { if ((o.userData.hatPart || o.userData.earPart) && o.visible) { o.visible = false; hidden.push(o); } });
+    const cap = add(u.head, new THREE.SphereGeometry(0.47, 36, 18, 0, Math.PI * 2, 0, Math.PI / 2.15), gold, 0, 0.05, 0); cap.scale.set(1.08, 0.97, 1.03);
+    const band = add(u.head, new THREE.TorusGeometry(0.468, 0.042, 12, 44), dk, 0, 0.1, 0); band.rotation.x = Math.PI / 2; band.scale.set(1.08, 1.03, 1);
+    for (const s of [-1, 1]) {
+      const ear = add(u.head, new THREE.ConeGeometry(0.135, 0.27, 14), gold, 0.25 * s, 0.5, 0.0); ear.rotation.z = -0.32 * s; ear.scale.z = 0.62;
+      const inn = add(ear, new THREE.ConeGeometry(0.075, 0.17, 12), pink, 0, -0.025, 0.05); inn.scale.z = 0.4;
+    }
+    add(u.head, new THREE.OctahedronGeometry(0.05), glowM('#ff4d6d', 1.1), 0, 0.2, 0.488).scale.set(1, 1.25, 0.6); // 이마의 붉은 보석
+  }
+  // 가면: 눈이 반짝이는 황금 고양이 얼굴 (입은 보인다)
+  if (has('m')) {
+    const plate = add(u.head, new THREE.SphereGeometry(0.455, 36, 14, Math.PI / 2 - 0.8, 1.6, Math.PI / 2 - 0.5, 0.7), gold, 0, 0, 0); plate.scale.set(1.08, 0.95, 1);
+    let hatOn = has('h'); if (!hatOn) u.head.traverse((o) => { if (o.userData.hatPart && o.isMesh && o.visible) hatOn = true; }); // 모자를 쓰고 있으면 가면의 귀는 달지 않는다 (모자를 뚫고 나온다)
+    const on = (ang, y, r = 0.462) => [Math.sin(ang) * r * 1.08 * Math.sqrt(Math.max(0, 1 - (y / (r * 0.95)) ** 2)), y, Math.cos(ang) * r * Math.sqrt(Math.max(0, 1 - (y / (r * 0.95)) ** 2))];
+    const eyes = [];
+    for (const s of [-1, 1]) {
+      const [x, y, z] = on(0.36 * s, 0.06);
+      const hole = add(u.head, new THREE.SphereGeometry(0.075, 16, 12), black, x, y, z); hole.scale.set(1.15, 0.72, 0.28); hole.rotation.y = 0.36 * s; hole.rotation.z = 0.22 * s;
+      const pupil = add(u.head, new THREE.SphereGeometry(0.04, 12, 10), glowM('#7dffb5', 1.5), x * 1.012, y, z * 1.012 + 0.006); pupil.scale.set(0.36, 0.95, 0.3); pupil.rotation.y = 0.36 * s; eyes.push(pupil);
+      // 가면 위쪽 모서리의 뾰족한 귀 (모자를 쓰고 있으면 뺀다)
+      if (!hatOn) { const tip = add(u.head, new THREE.ConeGeometry(0.07, 0.15, 10), dk, 0.3 * s, 0.27, 0.3); tip.rotation.z = -0.5 * s; tip.rotation.x = 0.25; tip.scale.z = 0.5; }
+      // 수염 세 가닥
+      for (let k = -1; k <= 1; k++) { const [wx, wy, wz] = on(0.62 * s, -0.045 + k * 0.035); const w = add(u.head, new THREE.CylinderGeometry(0.004, 0.004, 0.2, 5), dk, wx + 0.07 * s, wy + k * 0.012, wz + 0.01); w.rotation.z = Math.PI / 2 + k * 0.16 * s; w.rotation.y = -0.55 * s; }
+    }
+    add(u.head, new THREE.SphereGeometry(0.03, 12, 10), pink, 0, -0.07, 0.468).scale.set(1.2, 0.8, 0.6); // 분홍 코
+    anims.push((t) => { const k = 1.1 + Math.sin(t * 2.4) * 0.5; for (const e of eyes) e.material.emissiveIntensity = k; });
+  }
+  // 장갑: 분홍 젤리가 달린 고양이 발
+  if (has('g')) for (const a of u.arms || []) {
+    const s = a.position.x > 0 ? 1 : -1;
+    add(a, new THREE.SphereGeometry(0.09, 20, 14), gold, 0.09 * s, -0.315, 0).scale.set(1, 0.96, 1.06);
+    add(a, new THREE.SphereGeometry(0.042, 12, 10), gold, 0.07 * s, -0.28, 0.062);
+    const cuff = add(a, new THREE.TorusGeometry(0.075, 0.025, 10, 26), dk, 0.076 * s, -0.25, 0); cuff.rotation.order = 'ZXY'; cuff.rotation.set(Math.PI / 2, 0, 0.32 * s);
+    add(a, new THREE.SphereGeometry(0.034, 12, 10), pink, 0.09 * s, -0.33, 0.082).scale.set(1.1, 0.9, 0.45);
+    for (let k = -1; k <= 1; k++) add(a, new THREE.SphereGeometry(0.017, 10, 8), pink, 0.09 * s + k * 0.034, -0.376 + Math.abs(k) * 0.012, 0.066).scale.z = 0.5;
+  }
+  // 상의: 황금 윗옷 + 소매 + 목 방울
+  if (has('t') && u.torso?.parent) {
+    const up = u.torso.parent;
+    add(up, new THREE.CapsuleGeometry(0.294, 0.22, 10, 30), gold, 0, 0.52, 0);
+    const collar = add(up, new THREE.TorusGeometry(0.175, 0.036, 10, 30), dk, 0, 0.83, 0); collar.rotation.x = Math.PI / 2;
+    const hem = add(up, new THREE.TorusGeometry(0.262, 0.03, 10, 34), dk, 0, 0.3, 0); hem.rotation.x = Math.PI / 2;
+    const bell = add(up, new THREE.SphereGeometry(0.052, 14, 10), glowM('#ffe27a', 0.9, { metalness: 0.4 }), 0, 0.76, 0.2);
+    add(up, new THREE.BoxGeometry(0.012, 0.03, 0.02), black, 0, 0.725, 0.245);
+    // 가슴의 발바닥 무늬
+    add(up, new THREE.SphereGeometry(0.045, 12, 10), pink, 0, 0.52, 0.292).scale.set(1.15, 0.95, 0.3);
+    for (let k = -1; k <= 1; k++) add(up, new THREE.SphereGeometry(0.02, 10, 8), pink, k * 0.045, 0.592 - Math.abs(k) * 0.014, 0.288 - Math.abs(k) * 0.006).scale.z = 0.35;
+    for (const a of u.arms || []) { const s = a.position.x > 0 ? 1 : -1; const sl = add(a, new THREE.CapsuleGeometry(0.081, 0.2, 8, 20), gold, 0.035 * s, -0.15, 0); sl.rotation.z = 0.32 * s; }
+    anims.push((t) => { bell.position.x = Math.sin(t * 5) * 0.006; });
+  }
+  // 하의: 황금 반바지 (치마를 입고 있었다면 그 동안 감춘다)
+  if (has('b')) {
+    u.rig.traverse((o) => { if (o.userData.skirtPart && o.visible) { o.visible = false; hidden.push(o); } });
+    const sh = add(u.rig, new THREE.SphereGeometry(0.27, 34, 20, 0, Math.PI * 2, Math.PI * 0.3, Math.PI * 0.7), gold, 0, 0.186, 0); sh.scale.set(0.8, 0.56, 0.8);
+    const belt = add(u.rig, new THREE.TorusGeometry(0.2, 0.024, 10, 34), dk, 0, 0.235, 0); belt.rotation.x = Math.PI / 2;
+    for (const l of u.legs || []) { add(l, new THREE.CapsuleGeometry(0.104, 0.04, 8, 22), gold, 0, -0.062, 0); const cf = add(l, new THREE.TorusGeometry(0.1, 0.018, 8, 24), dk, 0, -0.1, 0); cf.rotation.x = Math.PI / 2; }
+  }
+  // 신발: 발가락 젤리가 달린 고양이 발 신발
+  if (has('s')) for (const l of u.legs || []) {
+    add(l, new THREE.SphereGeometry(0.11, 24, 16), gold, 0, -0.108, 0.036).scale.set(1.03, 0.67, 1.43);
+    add(l, new THREE.CylinderGeometry(0.113, 0.117, 0.028, 26), dk, 0, -0.147, 0.036).scale.set(1.03, 1, 1.43);
+    const an = add(l, new THREE.TorusGeometry(0.086, 0.022, 10, 26), dk, 0, -0.052, 0.0); an.rotation.x = Math.PI / 2;
+    for (let k = -1; k <= 1; k++) add(l, new THREE.SphereGeometry(0.022, 10, 8), pink, k * 0.042, -0.086, 0.172 - Math.abs(k) * 0.016).scale.set(1, 0.7, 0.6);
+  }
+  // 꼬리: 살랑살랑 흔들린다
+  if (has('l')) {
+    const piv = new THREE.Group(); piv.position.set(0, 0.2, -0.15); u.rig.add(piv); piv.userData.gold = true; parts.push(piv);
+    const curve = new THREE.CatmullRomCurve3([[0, 0, 0], [0, 0.03, -0.17], [0.01, 0.18, -0.3], [0.03, 0.38, -0.31], [0.05, 0.52, -0.22]].map((p) => new THREE.Vector3(...p)));
+    const tube = mesh(new THREE.TubeGeometry(curve, 22, 0.042, 10, false), gold, 0, 0, 0, piv); tube.userData.gold = true;
+    const tipM = mesh(new THREE.SphereGeometry(0.058, 14, 10), dk, 0.05, 0.52, -0.22, piv); tipM.userData.gold = true;
+    const ring = mesh(new THREE.TorusGeometry(0.05, 0.016, 8, 18), pink, 0, 0.02, -0.1, piv); ring.userData.gold = true;
+    anims.push((t) => { piv.rotation.y = Math.sin(t * 2.2) * 0.38; piv.rotation.x = Math.sin(t * 1.3) * 0.08; });
+  }
+  return { parts, set, hidden, anim: (t) => { for (const f of anims) f(t); } };
+}
+function setGold(g, set) {
+  const u = g.userData;
+  if (u.gGold) { u.gGold.parts.forEach((m) => m.parent?.remove(m)); u.gGold.hidden.forEach((o) => { o.visible = true; }); u.gGold = null; }
+  u.gGoldSet = set;
+  if (set) u.gGold = goldParts(u, set);
+}
+/** 황금 고양이 지팡이: 고양이 머리 장식이 달린 황금 지팡이 (귀신 퇴치 무제한) */
+export function buildStaff() {
+  const g = new THREE.Group(); const gold = goldM(), dk = goldD();
+  mesh(new THREE.CylinderGeometry(0.018, 0.024, 1.5, 10), dk, 0, 0.5, 0, g);
+  mesh(new THREE.SphereGeometry(0.032, 10, 8), gold, 0, -0.26, 0, g);
+  for (const y of [0.06, 0.6, 1.14]) { const r = mesh(new THREE.TorusGeometry(0.028, 0.011, 8, 16), gold, 0, y, 0, g); r.rotation.x = Math.PI / 2; }
+  const head = new THREE.Group(); head.position.y = 1.34; head.scale.setScalar(1.25); g.add(head);
+  mesh(new THREE.SphereGeometry(0.082, 18, 14), gold, 0, 0, 0, head).scale.set(1.08, 0.94, 0.95);
+  for (const s of [-1, 1]) {
+    const ear = mesh(new THREE.ConeGeometry(0.036, 0.08, 10), gold, 0.05 * s, 0.085, 0, head); ear.rotation.z = -0.3 * s; ear.scale.z = 0.6;
+    mesh(new THREE.SphereGeometry(0.017, 10, 8), glowM('#7dffb5', 1.6), 0.03 * s, 0.012, 0.072, head).scale.set(0.5, 1, 0.5);
+  }
+  mesh(new THREE.SphereGeometry(0.011, 8, 6), goldPink(), 0, -0.014, 0.08, head);
+  const halo = mesh(new THREE.TorusGeometry(0.13, 0.009, 8, 30), glowM('#ffe27a', 1.0), 0, 0, -0.01, head);
+  const gem = mesh(new THREE.OctahedronGeometry(0.028), glowM('#ff4d6d', 1.4), 0, -0.115, 0.01, head);
+  const glow = glowSprite('#ffd766', 0.95, 0.5); glow.position.y = 1.34; g.add(glow);
+  g.userData.anim = (t) => { glow.material.opacity = 0.38 + Math.sin(t * 3.5) * 0.16; halo.rotation.z = t * 1.2; halo.material.emissiveIntensity = 0.9 + Math.sin(t * 4) * 0.35; gem.rotation.y = t * 2; };
+  return g;
+}
+
 function robotParts(u) {
   const parts = [];
   const metal = M('#dfe6f0', { metalness: 0.25, roughness: 0.35, emissive: '#4a5a70', emissiveIntensity: 0.25 }), dark = M('#5a6478', { metalness: 0.3, roughness: 0.45 }), blue = (i) => glowM('#4ad8ff', i);
@@ -319,32 +433,37 @@ function setCostume(g, id) {
   if (u.gCostume) { u.gCostume.parts.forEach((m) => m.parent?.remove(m)); u.gCostume = null; }
   // 원래 몸(옷·얼굴·머리카락·장신구)을 숨기거나 되돌린다 — 상점 날개·탈것·검은 그대로
   const keep = new Set([u.gWings, u.gMount, u.gSword].filter(Boolean));
-  const walk = (o) => { if (keep.has(o)) return; if (o.isMesh && !o.userData.robot) { if (id) { if (o.userData.vis0 == null) o.userData.vis0 = o.visible; o.visible = false; } else if (o.userData.vis0 != null) { o.visible = o.userData.vis0; delete o.userData.vis0; } } o.children.forEach(walk); };
+  const walk = (o) => { if (keep.has(o) || o.userData.gold) return; if (o.isMesh && !o.userData.robot) { if (id) { if (o.userData.vis0 == null) o.userData.vis0 = o.visible; o.visible = false; } else if (o.userData.vis0 != null) { o.visible = o.userData.vis0; delete o.userData.vis0; } } o.children.forEach(walk); };
   walk(u.rig);
   if (id === 'costume_robot') u.gCostume = robotParts(u);
   u.gCostumeId = id;
 }
-/** gear = "날개|탈것|타는중(1/0)|검 듦(1/0)|코스튬" */
+/** gear = "날개|탈것|타는중(1/0)|손에 든 것(0 없음 · 1 전설의 검 · 2 황금 고양이 지팡이)|코스튬|황금 고양이 부위 글자(hmgtbsl)" */
 export function applyGear(g, gear = '') {
   const u = g.userData; if (!u.rig) return;
   if (u.gearStr === gear) return; u.gearStr = gear;
-  const [w = '', m = '', riding = '0', sword = '0', costume = ''] = gear.split('|');
+  const [w = '', m = '', riding = '0', sword = '0', costume = '', gold = ''] = gear.split('|');
   if (u.gWingsId !== w) { if (u.gWings) u.rig.remove(u.gWings); u.gWings = w ? buildWings(w) : null; if (u.gWings) u.rig.add(u.gWings); u.gWingsId = w; }
   const mid = riding === '1' ? m : '';
   if (u.gMountId !== mid) { if (u.gMount) g.remove(u.gMount); u.gMount = mid ? buildMount(mid) : null; if (u.gMount) g.add(u.gMount); u.gMountId = mid; }
-  const sw = sword === '1';
-  if (!!u.gSword !== sw) {
+  const sw = sword === '1' || sword === '2' ? sword : '';
+  if ((u.gSwordKind || '') !== sw) {
     if (u.gSword) u.gSword.parent?.remove(u.gSword);
-    u.gSword = null;
-    if (sw && u.arms?.[0]) { const s = buildSword(); s.position.set(-0.09, -0.33, 0.04); s.rotation.set(Math.PI / 2 - 0.25, 0, 0); s.scale.setScalar(1.25); u.arms[0].add(s); u.gSword = s; }
+    u.gSword = null; u.gSwordKind = sw;
+    if (sw === '1' && u.arms?.[0]) { const s = buildSword(); s.position.set(-0.09, -0.33, 0.04); s.rotation.set(Math.PI / 2 - 0.25, 0, 0); s.scale.setScalar(1.25); u.arms[0].add(s); u.gSword = s; }
+    if (sw === '2' && u.arms?.[0]) { const s = buildStaff(); s.position.set(-0.1, -0.33, 0.05); s.rotation.set(0.66, 0, 0.36); u.arms[0].add(s); u.gSword = s; } // 머리에 묻히지 않게 바깥으로 기울여 든다
   }
-  if ((u.gCostumeId || '') !== costume) setCostume(g, costume);
+  // 로봇 코스튬은 온몸을 덮으므로 그 동안에는 황금 고양이 부위를 그리지 않는다 (코스튬을 벗으면 다시 보인다)
+  const gset = costume ? '' : gold;
+  if ((u.gCostumeId || '') !== costume) { if (u.gGold) setGold(g, ''); setCostume(g, costume); }
+  if ((u.gGoldSet || '') !== gset) setGold(g, gset);
 }
 /** animateAvatar 다음에 부른다: 날개·탈것 움직임 + 탄 자세 + 검 휘두르기 */
 export function animateGear(g, t, dt, moving) {
   const u = g.userData;
   u.gWings?.userData.anim(t);
   u.gCostume?.anim(t);
+  u.gGold?.anim(t);
   if (u.gMount) {
     u.gMount.userData.anim(t, moving);
     const seat = u.gMount.userData.seat + (u.gMount.userData.float ? u.gMount.position.y : u.gMount.position.y * 0.6);
@@ -357,6 +476,7 @@ export function animateGear(g, t, dt, moving) {
   if (u.gSword) {
     u.gSword.userData.anim(t);
     if (u.swingT > 0) { u.swingT -= dt; const k = 1 - Math.max(0, u.swingT) / 0.45; u.arms[0].rotation.x = -2.6 + Math.sin(k * Math.PI) * 2.4; u.arms[0].rotation.z = -0.3; }
+    else if (u.gSwordKind === '2' && !u.gMount) { u.arms[0].rotation.x = -0.5 + (moving ? Math.sin(t * 9) * 0.07 : 0); } // 지팡이: 걸을 때도 세워서 든다 (긴 지팡이가 땅을 휘젓지 않게)
     else if (!moving) { u.arms[0].rotation.x = -0.5; }
   }
 }
@@ -424,12 +544,12 @@ function boom(x, y, z) {
   }
 }
 /** 검 휘두르기: 푸른 빛 궤적 (+귀신을 베면 빛가루가 흩어진다) */
-export function swordFx(x, y, z, ry, hit) {
-  const arc = new THREE.Mesh(new THREE.RingGeometry(0.7, 1.15, 32, 1, -0.9, 1.8), new THREE.MeshBasicMaterial({ color: '#7fd8ff', transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+export function swordFx(x, y, z, ry, hit, gold = false) {
+  const arc = new THREE.Mesh(new THREE.RingGeometry(0.7, 1.15, 32, 1, -0.9, 1.8), new THREE.MeshBasicMaterial({ color: gold ? '#ffd24a' : '#7fd8ff', transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
   arc.position.set(x, y + 0.75, z); arc.rotation.set(-Math.PI / 2, 0, -ry + Math.PI / 2);
   addFx(arc, 0.35, (o, t) => { o.material.opacity = 0.8 * (1 - t / 0.35); o.rotation.z += 0.18; });
   if (hit) {
-    const n = 120; const pts = particles(n, ['#9ae8ff', '#ffffff', '#5ab8ff'], 0.22); const p = pts.geometry.attributes.position; const v = [];
+    const n = 120; const pts = particles(n, gold ? ['#ffe27a', '#ffffff', '#ffb02e'] : ['#9ae8ff', '#ffffff', '#5ab8ff'], 0.22); const p = pts.geometry.attributes.position; const v = [];
     for (let i = 0; i < n; i++) { v.push([(Math.random() - 0.5) * 3, Math.random() * 4, (Math.random() - 0.5) * 3]); p.setXYZ(i, hit.x, 1 + Math.random() * 0.8, hit.z); }
     addFx(pts, 1.8, (o, t, dt) => { for (let i = 0; i < n; i++) { const q = v[i]; p.setXYZ(i, p.getX(i) + q[0] * dt, p.getY(i) + q[1] * dt, p.getZ(i) + q[2] * dt); q[1] *= 0.96; } p.needsUpdate = true; o.material.opacity = 1 - t / 1.8; });
   }

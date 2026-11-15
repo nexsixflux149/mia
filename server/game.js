@@ -400,8 +400,8 @@ export class GameInstance {
     for (const g of act) { g.mode = 'wander'; g.target = null; g.wp = [x, z]; g.wpUntil = Date.now() + 9000; g.lureUntil = Date.now() + 9000; }
     if (act.length) this.emit('toast', { text: `🎆 ${by} 님의 폭죽 소리에 ${act.map((g) => g.name).join(', ')}이(가) 그쪽을 돌아본다…` });
   }
-  // 전설의 검: 3.2m 안의 가장 가까운 귀신을 베어 없앤다 (90초 뒤 처음 자리에서 다시 나타난다)
-  slay(p) {
+  // 전설의 검 · 황금 고양이 지팡이(by = 'staff'): 3.2m 안의 가장 가까운 귀신을 베어 없앤다 (90초 뒤 처음 자리에서 다시 나타난다)
+  slay(p, by = 'sword') {
     let best = null, bd = 3.2;
     for (const g of this.ghosts) {
       if (!g.active || Date.now() < g.repelUntil) continue;
@@ -412,7 +412,7 @@ export class GameInstance {
     best.repelUntil = Date.now() + 90000; best.mode = 'wander'; best.target = null;
     best.x = best.cfg.spawn[0]; best.z = best.cfg.spawn[1];
     this.emit('game:sound', 'talisman');
-    this.emit('toast', { text: `🗡️ ${p.name} 님이 전설의 검으로 ${hit.name}을(를) 베었다! (잠시 동안 나타나지 않는다)` });
+    this.emit('toast', { text: by === 'staff' ? `🪄 ${p.name} 님이 황금 고양이 지팡이로 ${hit.name}을(를) 물리쳤다! (잠시 동안 나타나지 않는다)` : `🗡️ ${p.name} 님이 전설의 검으로 ${hit.name}을(를) 베었다! (잠시 동안 나타나지 않는다)` });
     return hit;
   }
 

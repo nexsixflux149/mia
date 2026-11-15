@@ -235,9 +235,13 @@ export function createAvatar(look) {
   }
 
   addHair(inner, head, look, hairM);
-  addEars(head, look, skin, accent);
+  // 모자 · 동물 귀에는 표시를 해 둔다 (황금 고양이 모자를 쓰면 그 동안 감춘다 — gear.js)
+  const tagNew = (from, key) => { for (const o of head.children.slice(from)) o.traverse((x) => { x.userData[key] = true; }); };
+  let hc = head.children.length;
+  addEars(head, look, skin, accent); tagNew(hc, 'earPart'); hc = head.children.length;
   if (look.hat !== 'none') addHat(head, look, accent, white);
   else addOutfitHeadwear(head, look);
+  tagNew(hc, 'hatPart');
 
   // 발밑 그림자
   const blob = new THREE.Mesh(new THREE.CircleGeometry(0.42, 40), new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: 0.35, depthWrite: false }));
@@ -299,7 +303,7 @@ function outfitColors(l) {
 
 function addOutfit(rig, l, O) {
   const add = (geo, c, x, y, z, rx = 0, ry = 0, rz = 0, o) => { const m = new THREE.Mesh(geo, mat(c, o)); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); rig.add(m); return m; };
-  const skirt = (c, top, bot, h, y) => add(new THREE.CylinderGeometry(top, bot, h, 32, 1, true), c, 0, y, 0, 0, 0, 0, { side: THREE.DoubleSide });
+  const skirt = (c, top, bot, h, y) => { const m = add(new THREE.CylinderGeometry(top, bot, h, 32, 1, true), c, 0, y, 0, 0, 0, 0, { side: THREE.DoubleSide }); m.userData.skirtPart = true; return m; }; // (황금 고양이 하의를 입으면 치마는 잠시 감춘다 — gear.js)
   switch (l.outfit) {
     case 'cowboy':
       for (const s of [-1, 1]) add(new THREE.BoxGeometry(0.16, 0.34, 0.05), '#6a4426', 0.11 * s, 0.56, 0.24);
@@ -391,7 +395,7 @@ function addOutfit(rig, l, O) {
       skirt('#1f2f5a', 0.27, 0.4, 0.22, 0.33);
       // 주름선: 치마 경사를 그대로 따라 붙는다 (위는 좁고 아래는 넓게)
       { const slope = Math.atan2(0.4 - 0.27, 0.22), len = Math.hypot(0.13, 0.22) * 0.92, pm = mat('#16224a');
-        for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; const pg = new THREE.Group(); pg.position.y = 0.33; pg.rotation.y = a; rig.add(pg);
+        for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; const pg = new THREE.Group(); pg.position.y = 0.33; pg.rotation.y = a; pg.userData.skirtPart = true; rig.add(pg);
           const ln = new THREE.Mesh(new THREE.BoxGeometry(0.012, len, 0.006), pm); ln.position.z = 0.338; ln.rotation.x = -slope; pg.add(ln); } }
       break;
     case 'blazer':
