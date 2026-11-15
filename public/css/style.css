@@ -374,9 +374,6 @@ body.mobile .abtn.use { right: auto; left: calc(50% - 39px); bottom: calc(205px 
 #voicePanel .vp-tip { font-size: 11px; color: var(--muted); line-height: 1.4; }
 body.mobile .modal-card { width: 96vw; padding: 14px; max-height: 90vh; }
 body.mobile .story-card { width: 96vw; padding: 20px 18px; }
-body.mobile #login .login-card { padding: 12px; }
-body.mobile #preview { width: 180px; height: 228px; }
-body.mobile .logo-han { font-size: 40px; }
 @media (orientation: landscape) and (max-height: 500px) {
   body.mobile #joy { bottom: 64px; width: 104px; height: 104px; }
   body.mobile #mbar { max-height: calc(100vh - 16px); }
@@ -386,7 +383,6 @@ body.mobile .logo-han { font-size: 40px; }
   body.mobile #chatLog { height: 40vh; }
 }
 body.mobile #enterBtn { flex: 1; }
-body.mobile #login .row:has(#enterBtn) { position: sticky; bottom: -12px; background: #120e10; padding: 10px 0; margin-bottom: -12px; z-index: 2; }
 body.mobile #cine .skip { bottom: auto; top: calc(11vh + 10px); right: 10px; }
 body.mobile #cine .cap { font-size: 15px; padding: 6px 12px; }
 /* v7.1 확인창 · 반투명 조사 버튼 */
@@ -656,20 +652,6 @@ body:not(.mobile) .abtn.ride, body:not(.mobile) .abtn.sword { display: none; }
 .abtn.use { width: 62px; height: 62px; font-size: 22px; }
 .abtn.use small { font-size: 11px; }
 body.mobile .abtn.use { left: calc(50% - 31px); }
-/* 모바일 캐릭터 꾸미기: 위(미리보기·닉네임·탭)는 고정, 아래 선택지만 손가락으로 끌어 스크롤 */
-body.mobile #login .login-card { display: flex; flex-direction: column; height: calc(100dvh - 16px); max-height: none; overflow: hidden; }
-body.mobile #login .login-body { flex: 1; min-height: 0; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 8px; }
-body.mobile #login .pv-wrap { align-self: center; flex: 0 0 auto; }
-body.mobile #login .custom { flex: 1; min-height: 0; min-width: 0; gap: 8px; }
-body.mobile #login .cpanels { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; padding-right: 2px; }
-body.mobile #login .row:has(#enterBtn) { position: static; margin-bottom: 0; padding: 6px 0 0; }
-body.mobile #login .warn { margin: 0; font-size: 11px; }
-body.mobile #login .logo { margin-bottom: 4px; }
-body.mobile #login #preview { width: 150px; height: 190px; }
-body.mobile #login .logo-han { font-size: 34px; }
-body.mobile #login .logo-ko { font-size: 17px; }
-body.mobile #login .logo-sub { font-size: 11px; margin-top: 2px; }
-body.mobile #login .cpanels { min-height: 160px; }
 .limit-tag { margin-left: 8px; font-size: 12px; font-weight: 700; color: #ffe9a8; opacity: .85; vertical-align: middle; white-space: nowrap; }
 .limit-tag:empty { display: none; }
 .limit-tag.over { color: #ff6a5a; }
@@ -797,3 +779,49 @@ body.mobile .stamp-ring { width: 46px; height: 46px; font-size: 22px; }
 .set-acct { color: #ffe9a8; }
 .set-btns .btn.wide { flex-basis: 100%; border-color: rgba(138, 255, 90, .45); color: #d6ffc4; }
 .rank-tabs .btn.tiny { margin-left: 0; padding: 4px 10px; font-size: 12px; }
+
+/* ─────────────────────────── 로그인 · 캐릭터 만들기: 입장 막대
+   데스크톱은 예전 그대로 오른쪽 열 아래에 두고, 모바일은 맨 위로 올린다. */
+.login-bar { display: flex; flex-direction: column; gap: 12px; }
+.nick-note .more { opacity: .85; }
+
+/* ─────────────────────────── 모바일 로그인
+   · 입장 막대(🎲 랜덤 · 입장하기 · 🔑 운영자 로그인)를 맨 위에 둔다. 아래에 두면 주소창 · 제스처 바 · 키보드에 가려져 입장을 못 하는 화면이 있었다.
+   · 카드는 '지금 실제로 보이는 영역'(main.js fitLogin 이 --app-h · --app-top 을 정해 준다)에 맞춘다.
+   · 보이는 영역이 좁아지면 로고 → 미리보기 순으로 줄이거나 숨기고(.short · .tiny), 옵션 목록(.cpanels)만 따로 스크롤한다.
+   · 그래도 모자란 아주 작은 화면에서는 카드 전체가 스크롤되며, 입장 막대는 맨 위에 붙어 있다. */
+body.mobile #login { inset: auto 0 auto 0; top: var(--app-top, 0px); height: var(--app-h, 100%); padding: 8px; align-items: stretch; justify-content: center; box-sizing: border-box; }
+body.mobile #login .login-card { width: min(640px, 100%); height: 100%; max-height: none; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)); overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+body.mobile #login .login-body, body.mobile #login .custom { display: contents; }
+/* 줄어들어도 되는 것은 옵션 목록(.cpanels)뿐이다 — 나머지는 찌그러지지 않게 (탭 · 버튼이 잘리던 문제) */
+body.mobile #login .login-card > *, body.mobile #login .login-bar, body.mobile #login #nickRow, body.mobile #login .ctabs, body.mobile #login .logo, body.mobile #login .pv-wrap, body.mobile #login .warn { flex-shrink: 0; }
+body.mobile #login .login-bar { order: -1; position: sticky; top: -10px; z-index: 5; gap: 4px; margin: -10px -12px 2px; padding: 10px 12px 8px; background: #0e0b0d; border-bottom: 1px solid var(--line); }
+body.mobile #login .login-bar .row { margin: 0; gap: 8px; }
+body.mobile #login .login-bar .btn { min-height: 48px; font-size: 16px; border-radius: 12px; touch-action: manipulation; }
+body.mobile #login #randomBtn { flex: 0 0 34%; }
+body.mobile #login #enterBtn { flex: 1; font-size: 17px; font-weight: 700; }
+body.mobile #login #adminToggle { align-self: flex-end; margin: 0; padding: 4px 6px; min-height: 28px; font-size: 12px; }
+body.mobile #login #adminRow { margin: 2px 0 0; }
+body.mobile #login #adminRow input { font-size: 16px; padding: 10px 12px; }
+body.mobile #login .logo { order: 1; margin: 0; }
+body.mobile #login .logo-han { font-size: 34px; }
+body.mobile #login .logo-ko { font-size: 17px; }
+body.mobile #login .logo-sub { font-size: 11px; margin-top: 2px; }
+body.mobile #login .pv-wrap { order: 2; align-self: center; flex: 0 0 auto; }
+body.mobile #login #preview { width: 150px; height: 190px; }
+body.mobile #login #nickRow { order: 3; gap: 4px; }
+body.mobile #login #nickRow input { padding: 9px 12px; }
+body.mobile #login .nick-note { font-size: 11.5px; line-height: 1.3; }
+body.mobile #login .nick-note .more { display: none; }
+body.mobile #login .ctabs { order: 4; flex-wrap: nowrap; overflow-x: auto; gap: 2px; padding-bottom: 6px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+body.mobile #login .ctabs::-webkit-scrollbar { display: none; }
+body.mobile #login .ctab { flex: 0 0 auto; padding: 6px 9px; font-size: 13px; white-space: nowrap; }
+body.mobile #login .cpanels { order: 5; flex: 1 1 0; min-height: 110px; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; padding-right: 2px; }
+body.mobile #login .warn { order: 6; margin: 0; font-size: 10.5px; line-height: 1.4; }
+/* 화면이 낮을 때 (주소창이 보일 때 · 작은 폰) */
+body.mobile #login.short .logo-sub, body.mobile #login.short .pv-tip { display: none; }
+body.mobile #login.short .logo-han { font-size: 28px; }
+body.mobile #login.short .logo-ko { font-size: 15px; margin-top: -4px; }
+body.mobile #login.short #preview { width: 104px; height: 132px; }
+/* 아주 낮을 때 (키보드가 올라왔거나 가로 모드) */
+body.mobile #login.tiny .logo, body.mobile #login.tiny .pv-wrap, body.mobile #login.tiny .nick-note { display: none; }

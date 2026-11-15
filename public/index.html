@@ -107,12 +107,15 @@
               <p class="muted">사진은 이 컴퓨터에서 작게 줄여서 사용하며, 같은 서버에 접속한 사람들에게 내 얼굴로 보입니다.</p>
             </div>
           </div>
-          <div class="row">
-            <button id="randomBtn" class="btn">🎲 랜덤</button>
-            <button id="enterBtn" class="btn primary">입장하기</button>
+          <!-- 입장 막대 (랜덤 · 입장하기 · 운영자 로그인): 모바일에서는 화면 맨 위에 고정한다 — 아래에 두면 주소창 · 제스처 바 · 키보드에 가려졌다 -->
+          <div class="login-bar">
+            <div class="row">
+              <button id="randomBtn" class="btn" type="button">🎲 랜덤</button>
+              <button id="enterBtn" class="btn primary" type="button">입장하기</button>
+            </div>
+            <button id="adminToggle" class="linkbtn" type="button">🔑 운영자 로그인</button>
+            <div id="adminRow" class="hidden"><input id="adminPass" type="password" placeholder="운영자 비밀번호" autocomplete="current-password" maxlength="100" /></div>
           </div>
-          <div id="adminRow" class="hidden"><input id="adminPass" type="password" placeholder="운영자 비밀번호" autocomplete="current-password" maxlength="100" /></div>
-          <button id="adminToggle" class="linkbtn" type="button">🔑 운영자 로그인</button>
           <p class="warn">⚠ 강한 공포 연출(점프스케어·큰 소리·잔혹 묘사)이 포함되어 있습니다. 헤드폰 사용을 권장합니다.</p>
         </div>
       </div>

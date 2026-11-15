@@ -64,10 +64,26 @@ $('#nick').value = store.get('gwimun-nick', '') || RAND_NICK();
 // 고정 계정: 이 기기에 계정이 있으면 닉네임이 정해져 있다 (바꿀 수 없음)
 function applyAccountLock() {
   const a = store.get('mia-account', null); const n = $('#nick'), note = $('#nickNote');
-  if (a?.name) { n.value = a.name; n.readOnly = true; n.classList.add('locked'); if (note) note.textContent = '🔒 이 기기의 고정 계정 닉네임이에요. (레벨 · 코인 · 도장표가 여기에 쌓여요)'; }
-  else { n.readOnly = false; n.classList.remove('locked'); if (note) note.textContent = '처음 정한 닉네임이 이 기기 · IP의 고정 계정이 돼요. 나중에 바꿀 수 없으니 신중하게!'; }
+  // 안내 문구는 한 줄(짧은 글)이 기본이고, 자세한 설명(.more)은 넓은 화면에서만 보인다 — 두 줄이 되면 모바일에서 아래 버튼을 밀어냈다
+  const say = (short, more) => { if (!note) return; note.textContent = short; note.appendChild(Object.assign(document.createElement('span'), { className: 'more', textContent: ' ' + more })); };
+  if (a?.name) { n.value = a.name; n.readOnly = true; n.classList.add('locked'); say('🔒 이 기기의 고정 계정 닉네임이에요.', '(레벨 · 코인 · 도장표가 여기에 쌓여요)'); }
+  else { n.readOnly = false; n.classList.remove('locked'); say('⚠️ 정한 닉네임은 고정 계정이 되어 못 바꿔요.', '(이 기기 · IP에 묶여 레벨 · 코인이 쌓이니 신중하게!)'); }
 }
 applyAccountLock();
+// 로그인 화면을 '지금 실제로 보이는 영역'에 맞춘다: 주소창이 늘었다 줄었다 하거나 키보드가 올라와도 입장 막대가 화면 밖으로 밀려나지 않게
+// (--app-h · --app-top 은 css 의 body.mobile #login 이 쓴다. 영역이 좁으면 .short · .tiny 로 로고 · 미리보기를 줄인다)
+function fitLogin() {
+  const vv = window.visualViewport, lg = document.getElementById('login'); if (!lg) return;
+  const zoomed = vv && vv.scale > 1.02; // 손가락으로 확대한 상태에서는 맞추지 않는다
+  const h = Math.round(!vv || zoomed ? innerHeight : vv.height), top = zoomed || !vv ? 0 : Math.round(vv.offsetTop);
+  const root = document.documentElement.style; root.setProperty('--app-h', h + 'px'); root.setProperty('--app-top', top + 'px');
+  lg.classList.toggle('short', h < 700); lg.classList.toggle('tiny', h < 560);
+}
+fitLogin();
+addEventListener('resize', fitLogin); addEventListener('orientationchange', () => setTimeout(fitLogin, 250));
+window.visualViewport?.addEventListener('resize', fitLogin); window.visualViewport?.addEventListener('scroll', fitLogin);
+// 키보드를 닫은 뒤 화면이 위로 밀려 있으면 제자리로
+$('#nick').addEventListener('blur', () => setTimeout(() => { if (!document.activeElement || !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) { scrollTo(0, 0); fitLogin(); } }, 80));
 // 서버가 접속을 끊으며 남긴 안내 (업데이트 · 다른 창에서 접속)
 { let k = null; try { k = sessionStorage.getItem('mia-kick'); sessionStorage.removeItem('mia-kick'); } catch {} if (k) setTimeout(() => toast(k), 600); }
 // 초대 링크(?p=코드)로 들어왔으면 입장하자마자 친구 파티에 들어간다
@@ -152,7 +168,8 @@ if (look.photo) renderCrop();
   if (sp) {
     $('#login').classList.add('from-splash');
     let done = false;
-    const finish = () => { if (done) return; done = true; sp.classList.add('out'); setTimeout(() => sp.remove(), 1500); setTimeout(() => $('#nick')?.focus(), 900); };
+    // (휴대폰에서는 닉네임 칸에 자동으로 커서를 두지 않는다 — 키보드가 바로 올라와 화면이 좁아지고, 로고 · 미리보기가 가려졌다)
+    const finish = () => { if (done) return; done = true; sp.classList.add('out'); setTimeout(() => sp.remove(), 1500); setTimeout(() => { if (!document.body.classList.contains('mobile')) $('#nick')?.focus(); }, 900); setTimeout(() => $('#login').classList.remove('from-splash'), 3000); /* 카드 등장 효과는 처음 한 번만 (꾸미기로 다시 열 때 1초 동안 안 보이던 문제) */ };
     sp.addEventListener('click', finish);
     const onKey = (e) => { if (done) return removeEventListener('keydown', onKey); if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') { e.preventDefault(); finish(); } };
     addEventListener('keydown', onKey);
