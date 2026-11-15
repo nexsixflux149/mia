@@ -19,37 +19,20 @@ export function upgradeAvatar(avatar, look) {
   if(avatar.userData.visualUpgrade)return avatar.userData.visualUpgrade;
   const u=avatar.userData, upper=u.torso.parent, groups=[], meshes=[], replacements=[];
   const normal=clothNormal();
-  const hairMat=new THREE.MeshStandardMaterial({color:color(look.hairColor,.035),roughness:.38});
-  const hairLight=new THREE.MeshStandardMaterial({color:color(look.hairColor,.09),roughness:.42});
   const seamMat=new THREE.MeshStandardMaterial({color:color(u.torso.material.color,.09),roughness:.88});
   const stitchMat=new THREE.MeshStandardMaterial({color:'#e7dcca',roughness:.9});
   const faceMat=new THREE.MeshStandardMaterial({color:look.body,roughness:.42,emissive:look.body,emissiveIntensity:.055});
   avatar.traverse(o=>{
     if(!o.isMesh||!o.material?.isMeshStandardMaterial||o.material.transparent)return;
+    if(o.material.color.getHexString()===new THREE.Color(look.hairColor).getHexString())return;
     const old=o.material,m=old.clone();
     if(old.color.equals(u.torso.material.color)){m.normalMap=normal;m.normalScale.set(.22,.22);m.roughness=.84;}
-    if(old.color.getHexString()===new THREE.Color(look.hairColor).getHexString())m.roughness=.36;
     if(old.color.getHexString()===new THREE.Color(look.body).getHexString())m.roughness=.46;
     replacements.push({mesh:o,old,material:m});
   });
   const group=parent=>{const g=new THREE.Group();g.name='Sculpted avatar detail';parent.add(g);groups.push(g);return g;};
   const head=group(u.head), body=group(upper);
-  // Curved overlapping locks give the scalp a shaped silhouette, rather than a smooth helmet.
-  if(look.hair!=='none') {
-    const core=batch(head,hairMat), fine=batch(head,hairLight,1);
-    for(let i=0;i<12;i++){
-      const angle=(i/12)*Math.PI*2;
-      const points=[];
-      for(let j=0;j<5;j++){const theta=.18+j*.31, a=angle+Math.sin(j*.6)*.13;points.push([Math.cos(a)*Math.sin(theta)*.462,Math.cos(theta)*.435,Math.sin(a)*Math.sin(theta)*.445]);}
-      // Keep the existing face and eyes clear, and respect original hair coverage.
-      if(Math.sin(angle)>.45)points.splice(3);
-      core.add(tube(points,.026+(i%3)*.004,10,6));
-      if(i%2===0)fine.add(tube(points.map(([x,y,z])=>[x*1.008,y*1.008,z*1.008]),.0045,12,4));
-    }
-    const backLength=['long','twintail','ponytail'].includes(look.hair)? .34:.08;
-    for(let i=0;i<5;i++){const x=(i-2)*.105;core.add(tube([[x,.18,-.415],[x*1.15,.02,-.452],[x*.9,-.13-backLength,-.31]],.043,9,6));}
-    meshes.push(core.finish(),fine.finish());
-  }
+  // Keep the original hair geometry and materials unchanged.
   const cheeks=batch(head,faceMat);
   if(!look.photoOn&&!['mask','clown'].includes(look.extra))cheeks.add(new THREE.SphereGeometry(.026,18,12),[0,-.065,.424],[1,.8,1.1]);
   meshes.push(cheeks.finish());
@@ -75,7 +58,7 @@ export function upgradeAvatar(avatar, look) {
   const detail={ enabled:true,quality:'low',
     setEnabled(on){this.enabled=on;groups.forEach(g=>g.visible=on);for(const r of replacements)r.mesh.material=on?r.material:r.old;},
     setQuality(q){this.quality=q;for(const m of meshes.filter(Boolean))m.visible=(m.userData.detailMin||0)<=LEVEL[q];},
-    dispose(){this.setEnabled(false);for(const g of groups){g.parent?.remove(g);g.traverse(o=>{o.geometry?.dispose();});}for(const m of new Set([...replacements.map(r=>r.material),hairMat,hairLight,seamMat,stitchMat,faceMat,...meshes.filter(Boolean).map(m=>m.material)]))m.dispose();normal.dispose();}
+    dispose(){this.setEnabled(false);for(const g of groups){g.parent?.remove(g);g.traverse(o=>{o.geometry?.dispose();});}for(const m of new Set([...replacements.map(r=>r.material),seamMat,stitchMat,faceMat,...meshes.filter(Boolean).map(m=>m.material)]))m.dispose();normal.dispose();}
   };
   avatar.userData.visualUpgrade=detail;detail.setEnabled(true);detail.setQuality('low');return detail;
 }

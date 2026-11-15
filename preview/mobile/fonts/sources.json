@@ -1,0 +1,44 @@
+[
+  {
+    "file": "gowun-dodum-400.woff2",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/gowundodum/GowunDodum-Regular.ttf",
+    "source_sha256": "a6e457933227483a11758fd0947bc74422a106d46f0bf057fdaa5af94a30067d",
+    "woff2_sha256": "961ff0dca212b49d3109cd947ebcc80c2afcd31a08269110bbc2ca1c8816555f"
+  },
+  {
+    "file": "nanum-myeongjo-400.woff2",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/nanummyeongjo/NanumMyeongjo-Regular.ttf",
+    "source_sha256": "7ed9e8653a8ed04285d51dc343ffea6eb3d9c73afc27383ea8929ee4ffd03205",
+    "woff2_sha256": "b51bf4c9685fb2b077a6595543a2574169b2c436c8a9b43508fd008a9f4e8257"
+  },
+  {
+    "file": "nanum-myeongjo-800.woff2",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/nanummyeongjo/NanumMyeongjo-ExtraBold.ttf",
+    "source_sha256": "60c0077fce069ba90ae97c0a3679f6eb3712e0ca637bdd0c15b72d335ec46db7",
+    "woff2_sha256": "e19d029fbd4b9671035775144c6adf722363cd155af37e2f5b123679c6acd23e"
+  },
+  {
+    "file": "nanum-pen-script-400.woff2",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/nanumpenscript/NanumPenScript-Regular.ttf",
+    "source_sha256": "6f0d1ab29c7894010dc88831fb7a0a51edb79136e450344183de5b1a8b52bd43",
+    "woff2_sha256": "02b4d040522367c2e6e9f75944b701baf532512823c143d7b3f153cfd408fa5e"
+  },
+  {
+    "file": "gaegu-400.woff2",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/gaegu/Gaegu-Regular.ttf",
+    "source_sha256": "aa52c98336f7c62e2896fc8b12b56a75d5b476d88a2f104b0980f4f7ce0adfc3",
+    "woff2_sha256": "bfc9d351cd3d7f6d2225672bd0f0b8a62249f80d0b2c3da606123f75c9d43411"
+  },
+  {
+    "file": "gaegu-700.woff2",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/gaegu/Gaegu-Bold.ttf",
+    "source_sha256": "cc38a4af9506a45254d1ce07c589ec473d9e5f0be319e5a77b17c214903f8c1c",
+    "woff2_sha256": "934705468c2bc2c124e5c7fa1a1d05d0d3539810978fc3540cc447bb3e5119de"
+  },
+  {
+    "file": "do-hyeon-400.woff2",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/dohyeon/DoHyeon-Regular.ttf",
+    "source_sha256": "35644be7f28e0a68a447b1f7af351dcde5674b870f24f7b5f43e26d00b4ab653",
+    "woff2_sha256": "1b574d182b25b2746b3a065882980ecc9bcc404da32f3399ea60e9a55d39b65e"
+  }
+]

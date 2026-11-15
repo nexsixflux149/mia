@@ -83,6 +83,8 @@ window.addEventListener('mia:solo-complete',event=>{
   const replay=document.createElement('button');replay.textContent='처음부터 다시 플레이';replay.onclick=()=>transport.start(true);
   card.append(title,text,replay);panel.append(card);document.body.append(panel);
 });
+// Canvas labels must use the same original font as DOM documents.
+await document.fonts.load('16px "Gowun Dodum"').catch(() => []);
 await import('/js/main.js');
 // Enter directly on mobile; the original fading splash could intercept the first tap.
 document.getElementById('splash')?.remove();

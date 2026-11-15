@@ -1,0 +1,93 @@
+{
+  "checks": [
+    "All seven original font faces load locally without Google/network dependencies",
+    "All nine hair selections match original geometry, transforms and material roughness",
+    "Actual memo renders in original Nanum Pen Script with original mobile 21px sizing",
+    "No browser errors or external requests"
+  ],
+  "errors": [],
+  "external": [],
+  "fonts": [
+    {
+      "spec": "400 16px \"Gowun Dodum\"",
+      "loaded": true
+    },
+    {
+      "spec": "400 24px \"Nanum Myeongjo\"",
+      "loaded": true
+    },
+    {
+      "spec": "800 24px \"Nanum Myeongjo\"",
+      "loaded": true
+    },
+    {
+      "spec": "400 24px \"Nanum Pen Script\"",
+      "loaded": true
+    },
+    {
+      "spec": "400 24px \"Gaegu\"",
+      "loaded": true
+    },
+    {
+      "spec": "700 24px \"Gaegu\"",
+      "loaded": true
+    },
+    {
+      "spec": "400 24px \"Do Hyeon\"",
+      "loaded": true
+    }
+  ],
+  "hair": [
+    {
+      "hair": "short",
+      "equal": true,
+      "count": 8
+    },
+    {
+      "hair": "bob",
+      "equal": true,
+      "count": 5
+    },
+    {
+      "hair": "long",
+      "equal": true,
+      "count": 6
+    },
+    {
+      "hair": "twintail",
+      "equal": true,
+      "count": 10
+    },
+    {
+      "hair": "ponytail",
+      "equal": true,
+      "count": 4
+    },
+    {
+      "hair": "bun",
+      "equal": true,
+      "count": 4
+    },
+    {
+      "hair": "spiky",
+      "equal": true,
+      "count": 17
+    },
+    {
+      "hair": "bowl",
+      "equal": true,
+      "count": 3
+    },
+    {
+      "hair": "none",
+      "equal": true,
+      "count": 0
+    }
+  ],
+  "note": {
+    "family": "\"Nanum Pen Script\", Gaegu, cursive",
+    "size": "21px",
+    "lineHeight": "32px",
+    "text": "셔터 손잡이 옆에 삐뚤빼뚤한 할머니 글씨.\n  \"자물쇠 번호는 우리 미아 잃어버린 날.\n   잊어버리면 안 되니까.\"\n(숫자 네 자리: 월·일)"
+  }
+}

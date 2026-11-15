@@ -30,10 +30,11 @@ app.get('/api/info', (_, res) => {
 });
 // 게임 파일은 매번 최신인지 확인하게 한다 (휴대폰이 예전 버전을 캐시해 수정이 안 보이는 문제 방지)
 if (process.env.MIA_PREVIEW === '1') {
+  app.use('/fonts', express.static(path.join(ROOT, 'preview/mobile/fonts')));
   app.get(['/', '/index.html'], (_, res) => {
     let html = fs.readFileSync(path.join(ROOT, 'public/index.html'), 'utf8');
     html = html.replace(/<link[^>]+https:\/\/fonts\.googleapis\.com[^>]*>/g, '');
-    html = html.replace('<head>', '<head><script>window.MIA_PREVIEW = true;</script>');
+    html = html.replace('<head>', '<head><link rel="stylesheet" href="/fonts/fonts.css"><script>window.MIA_PREVIEW = true;</script>');
     res.setHeader('Cache-Control', 'no-store'); res.type('html').send(html);
   });
 }

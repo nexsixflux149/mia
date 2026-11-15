@@ -1,0 +1,8 @@
+/* Original MIA font families and weights. Local copies avoid external requests. */
+@font-face{font-family:'Gowun Dodum';font-style:normal;font-weight:400;font-display:swap;src:url('./gowun-dodum-400.woff2') format('woff2')}
+@font-face{font-family:'Nanum Myeongjo';font-style:normal;font-weight:400;font-display:swap;src:url('./nanum-myeongjo-400.woff2') format('woff2')}
+@font-face{font-family:'Nanum Myeongjo';font-style:normal;font-weight:800;font-display:swap;src:url('./nanum-myeongjo-800.woff2') format('woff2')}
+@font-face{font-family:'Nanum Pen Script';font-style:normal;font-weight:400;font-display:swap;src:url('./nanum-pen-script-400.woff2') format('woff2')}
+@font-face{font-family:'Gaegu';font-style:normal;font-weight:400;font-display:swap;src:url('./gaegu-400.woff2') format('woff2')}
+@font-face{font-family:'Gaegu';font-style:normal;font-weight:700;font-display:swap;src:url('./gaegu-700.woff2') format('woff2')}
+@font-face{font-family:'Do Hyeon';font-style:normal;font-weight:400;font-display:swap;src:url('./do-hyeon-400.woff2') format('woff2')}
