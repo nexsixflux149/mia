@@ -194,6 +194,10 @@ export function createAvatar(look) {
     const thumb = new THREE.Mesh(new THREE.SphereGeometry(0.031, 22, 16), skin); thumb.position.set(0.07 * s, -0.28, 0.05); pivot.add(thumb);
     // 소매 끝 단 (옷 색보다 살짝 밝게)
     const cuff = new THREE.Mesh(new THREE.TorusGeometry(0.068, 0.017, 16, 38), mat(a2(O.sleeve))); cuff.position.set(0.078 * s, -0.258, 0); cuff.rotation.order = 'ZXY'; cuff.rotation.set(Math.PI / 2, 0, 0.32 * s); pivot.add(cuff);
+    // 브이(✌) 손가락 두 개: 평소엔 숨겨 두고 '브이' 감정표현(기념 사진 포즈) 때만 보인다
+    const vf = new THREE.Group(); vf.position.set(0.09 * s, -0.33, 0); vf.visible = false;
+    for (const k of [-1, 1]) { const f = new THREE.Mesh(new THREE.CapsuleGeometry(0.03, 0.11, 6, 12), skin); f.position.set(k * 0.046, -0.1, 0); f.rotation.z = k * 0.36; vf.add(f); }
+    pivot.add(vf); pivot.userData.vf = vf;
     upper.add(pivot); arms.push(pivot);
   }
   // 허리 아래: 다리와 몸통 사이 엉덩이 (반바지처럼 옷 아랫단 색)
@@ -668,6 +672,7 @@ export const EMOTES = [
   ['wave', '인사', '👋', 2.5], ['dance', '춤추기', '💃', 0], ['spin', '빙글빙글', '🌀', 0], ['jump', '뛰기', '⬆️', 0.7],
   ['lie', '엎드리기', '🛌', 0], ['sit', '앉기', '🪑', 0], ['clap', '박수', '👏', 2.5], ['heart', '하트', '🫶', 2.5],
   ['boo', '놀래키기', '👻', 1.3], ['shiver', '덜덜', '🥶', 0], ['bow', '꾸벅', '🙇', 2], ['fart', '방귀 뿡', '💨', 2.2],
+  ['v', '브이', '✌️', 0],
 ];
 // 감정표현별 표정 (눈 · 입 · 눈썹 · 볼). 사진 얼굴일 때는 사진이 그대로 유지된다
 export const EXPR = {
@@ -683,6 +688,7 @@ export const EXPR = {
   shiver: { eyes: 'teary', mouth: 'flat', brows: 'worried', cheeks: 'none' },
   bow: { eyes: 'closed', mouth: 'smile', brows: 'soft' },
   fart: { eyes: 'closed', mouth: 'grin', brows: 'soft', cheeks: 'blush' },
+  v: { eyes: 'wink', mouth: 'grin', brows: 'soft', cheeks: 'blush' },
 };
 export const EMOTE_DUR = Object.fromEntries(EMOTES.map((e) => [e[0], e[3]]));
 
@@ -705,9 +711,14 @@ export function animateAvatar(g, dt, moving, t, crouch = false, emote = null, et
   // 숨쉬기 (몸통이 아주 살짝 부풀었다 줄어든다) + 눈 깜빡임
   if (u.torso) u.torso.scale.set(1 + Math.sin(t * 2.2 + u.phase) * 0.012, 1 + Math.sin(t * 2.2 + u.phase) * 0.02, 1);
   if (u.setBlink) { u.blinkT -= dt; if (u.blinkT < 0) { u.blinkOn = !u.blinkOn; u.setBlink(u.blinkOn); u.blinkT = u.blinkOn ? 0.13 : 2.4 + Math.random() * 3.2; } }
+  const vOn = emote === 'v' && !moving;
+  for (const a of A) { const vf = a.userData.vf; if (vf && vf.visible !== vOn) vf.visible = vOn; }
   if (emote && (!moving || emote === 'jump')) {
     const w = Math.sin(et * 10);
     switch (emote) {
+      // 브이: 두 손을 얼굴 옆으로 들어 ✌ (기념 사진 포즈)
+      // (팔을 앞으로 들어 올려 손이 큰 머리에 가리지 않고 볼 옆 앞쪽에 오게 한다)
+      case 'v': { const sw = Math.sin(et * 5) * 0.07; A[0].rotation.set(-2.3 + sw, 0, -0.5); A[1].rotation.set(-2.3 - sw, 0, 0.5); head.rotation.z = Math.sin(et * 2.5) * 0.1; y = Math.abs(Math.sin(et * 5)) * 0.025; break; }
       case 'wave': A[1].rotation.z = 2.6 + w * 0.35; head.rotation.z = 0.15; break;
       case 'dance': {
         const b = Math.sin(et * 7);

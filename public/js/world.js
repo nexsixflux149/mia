@@ -509,13 +509,16 @@ function buildPark(root, colliders, add) {
     const ry = (r * Math.PI) / 180;
     interactives.push({ id: 'bench' + i, kind: 'sit', x, z, r: 1.5, label: '벤치', verb: '앉기', seat: { x: x - Math.sin(ry) * 0.04, z: z - Math.cos(ry) * 0.04, y: 0.43, ry } });
   });
-  // 피크닉 테이블 (올라가기)
+  // 피크닉 테이블 (양쪽 긴 의자에 앉기 — 테이블 위로 올라가지 않는다)
   [[-1.8, 12.5], [2.2, 12.2]].forEach(([x, z], i) => {
     const g = new THREE.Group(); g.position.set(x, 0, z); root.add(g);
     mesh(new THREE.BoxGeometry(1.8, 0.1, 0.9), pm('#c98a5a'), 0, 0.78, 0, g);
-    for (const sx of [-1, 1]) { mesh(new THREE.BoxGeometry(0.1, 0.78, 0.8), pm('#8a5a3a'), 0.75 * sx, 0.39, 0, g); mesh(new THREE.BoxGeometry(1.8, 0.07, 0.3), pm('#c98a5a'), 0, 0.45, 0.7 * sx, g); }
-    colliders.push({ x, z, hw: 0.95, hd: 0.5, perch: 'table' + i });
-    interactives.push({ id: 'table' + i, kind: 'climb', x, z, r: 1.7, label: '피크닉 테이블', verb: '올라가기', perch: { x, z, hw: 0.85, hd: 0.4, y: 0.83, id: 'table' + i } });
+    for (const sx of [-1, 1]) { mesh(new THREE.BoxGeometry(0.1, 0.78, 0.8), pm('#8a5a3a'), 0.75 * sx, 0.39, 0, g); mesh(new THREE.BoxGeometry(1.8, 0.07, 0.3), pm('#c98a5a'), 0, 0.45, 0.7 * sx, g); mesh(new THREE.BoxGeometry(0.08, 0.42, 0.24), pm('#8a5a3a'), 0.78 * sx, 0.21, 0.7, g); mesh(new THREE.BoxGeometry(0.08, 0.42, 0.24), pm('#8a5a3a'), 0.78 * sx, 0.21, -0.7, g); }
+    colliders.push({ x, z, hw: 0.95, hd: 0.5 });
+    // 의자 자리 넷: 테이블을 마주 보고 앉는다 (back: 일어날 때는 뒤로)
+    const seats = [];
+    for (const sz of [-1, 1]) for (const sx of [-1, 1]) seats.push({ x: x + 0.45 * sx, z: z + 0.7 * sz, y: 0.41, ry: sz > 0 ? Math.PI : 0, back: true });
+    interactives.push({ id: 'table' + i, kind: 'sit', x, z, r: 1.9, label: '피크닉 테이블', verb: '의자에 앉기', seats });
   });
   // 장식: 풍선 · 포장마차 · 입구 아치 · 깃발 줄
   const BAL = ['#ff6f91', '#ffc75f', '#6fd6ff', '#b39dff', '#7ee0a8', '#ff9671'];
@@ -698,7 +701,7 @@ export function buildLobby(scene, opts = {}) {
       e.spin.forEach((s) => (s.rotation.z = Math.sin(t * 1.2 + i) * 0.15));
     });
   };
-  return { root, colliders, walls: [], objects: {}, flickers: [], ceiling: [], update, bounds: 28.5, outdoor: true, themes, exhibits, hiddenGate: !!opts.hidden, shopFace: extra.shopFace, interactives: [...park.interactives, ...outer.interactives, ...extra.interactives], rides: { ...park.rides, ...extra.rides } };
+  return { root, colliders, walls: [], objects: {}, flickers: [], ceiling: [], update, bounds: 28.5, outdoor: true, themes, exhibits, hiddenGate: !!opts.hidden, shopFace: extra.shopFace, clickables: extra.clickables, interactives: [...park.interactives, ...outer.interactives, ...extra.interactives], rides: { ...park.rides, ...extra.rides } };
 }
 
 // ───── 로비 쉼터: 불멍 캠프파이어 + 통나무 벤치 · 타면 움직이는 그네 · 코인 상점
@@ -870,7 +873,42 @@ function buildLobbyExtras(root, colliders, add) {
     colliders.push({ x: cx, z: cz, hw: 1.7, hd: 1.7 });
     interactives.push({ id: 'shop', kind: 'shop', x: cx, z: cz, r: 3.0, label: '미아 상회', verb: '구경하기' });
   }
-  return { interactives, rides, update: (t) => anim.forEach((f) => f(t)), shopFace: (x, z) => shopFace(x, z) };
+  // ── 고객소리함 (광장 동쪽, 상점 옆) — 빨간 우편함. 버그 · 건의사항을 적어 넣는다
+  const clickables = [];
+  {
+    const cx = 3.9, cz = 3.5; const g = new THREE.Group(); g.position.set(cx, 0, cz); g.rotation.y = Math.atan2(0 - cx, 7 - cz); root.add(g); // 입장하는 사람들 쪽을 바라보게
+    const red = pm('#d4202a', { roughness: 0.35, metalness: 0.25 }), redD = pm('#9a1018', { roughness: 0.4, metalness: 0.25 }), dark = pm('#1a1216', { roughness: 0.6 }), gold = pm('#ffd36a', { roughness: 0.3, metalness: 0.6, emissive: '#a06a10', emissiveIntensity: 0.35 });
+    mesh(new THREE.CylinderGeometry(0.3, 0.36, 0.1, 20), dark, 0, 0.05, 0, g); // 받침
+    mesh(new THREE.CylinderGeometry(0.075, 0.09, 0.72, 14), dark, 0, 0.46, 0, g); // 기둥
+    mesh(new THREE.BoxGeometry(0.62, 0.06, 0.5), redD, 0, 0.84, 0, g); // 몸통 아래 테
+    mesh(new THREE.BoxGeometry(0.56, 0.62, 0.44), red, 0, 1.17, 0, g); // 몸통
+    const top = mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.44, 24, 1, false, 0, Math.PI), red, 0, 1.48, 0, g); top.rotation.set(Math.PI / 2, Math.PI / 2, 0); // 둥근 지붕
+    mesh(new THREE.BoxGeometry(0.6, 0.05, 0.48), redD, 0, 1.475, 0, g);
+    mesh(new THREE.BoxGeometry(0.36, 0.045, 0.03), dark, 0, 1.36, 0.225, g); // 편지 넣는 구멍
+    const flap = mesh(new THREE.BoxGeometry(0.4, 0.03, 0.07), gold, 0, 1.395, 0.25, g); flap.rotation.x = 0.5; // 구멍 위 처마
+    // 앞면 이름판
+    const pc = document.createElement('canvas'); pc.width = 256; pc.height = 150; const px = pc.getContext('2d');
+    px.fillStyle = '#fff6e4'; px.fillRect(0, 0, 256, 150); px.strokeStyle = '#d4202a'; px.lineWidth = 8; px.strokeRect(6, 6, 244, 138);
+    px.fillStyle = '#d4202a'; px.textAlign = 'center'; px.font = '800 44px "Gowun Dodum", "Malgun Gothic", sans-serif'; px.fillText('고객소리함', 128, 64);
+    px.fillStyle = '#5a3a30'; px.font = '700 24px "Gowun Dodum", "Malgun Gothic", sans-serif'; px.fillText('버그 · 건의사항', 128, 108);
+    const pt = new THREE.CanvasTexture(pc); pt.colorSpace = THREE.SRGBColorSpace; pt.anisotropy = 4;
+    const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.44, 0.26), new THREE.MeshStandardMaterial({ map: pt, roughness: 0.7 })); plate.position.set(0, 1.12, 0.223); g.add(plate);
+    // 구멍에 반쯤 꽂힌 편지 (살짝 들썩인다)
+    const letter = new THREE.Group(); letter.position.set(0.02, 1.36, 0.27); g.add(letter);
+    mesh(new THREE.BoxGeometry(0.26, 0.012, 0.17), pm('#fffdf4', { roughness: 0.8 }), 0, 0, 0, letter);
+    mesh(new THREE.BoxGeometry(0.05, 0.014, 0.05), pm('#d4202a'), 0.08, 0.002, 0.04, letter);
+    // 옆에 달린 깃발 (새 소식이 있다는 표시처럼 까딱인다)
+    const flag = new THREE.Group(); flag.position.set(0.3, 1.2, 0.05); g.add(flag);
+    mesh(new THREE.BoxGeometry(0.03, 0.34, 0.03), gold, 0, 0.17, 0, flag); mesh(new THREE.BoxGeometry(0.03, 0.14, 0.2), gold, 0, 0.3, 0.09, flag);
+    const glow = new THREE.PointLight('#ff8a7a', coarse ? 0 : 3.2, 4.5, 1.6); glow.position.set(0, 1.6, 0.9); g.add(glow);
+    const sign = textSprite('📮 고객소리함', { size: 30, bg: 'rgba(120,16,24,.9)', color: '#fff3e0', border: '#ffd36a' }); sign.position.set(cx, 2.35, cz); root.add(sign);
+    g.traverse((m) => { if (m.isMesh) m.userData.noOcc = true; });
+    anim.push((t) => { flag.rotation.z = -0.25 + Math.sin(t * 2.2) * 0.22; letter.position.y = 1.36 + Math.max(0, Math.sin(t * 1.6)) * 0.03; letter.rotation.x = -0.25 + Math.sin(t * 1.6) * 0.06; sign.position.y = 2.35 + Math.sin(t * 1.4) * 0.05; });
+    colliders.push({ x: cx, z: cz, hw: 0.33, hd: 0.33 });
+    interactives.push({ id: 'mailbox', kind: 'mailbox', x: cx, z: cz, r: 1.9, label: '고객소리함', verb: '의견 보내기' });
+    clickables.push({ id: 'mailbox', group: g });
+  }
+  return { interactives, rides, clickables, update: (t) => anim.forEach((f) => f(t)), shopFace: (x, z) => shopFace(x, z) };
 }
 
 // ───── 로비 공포 장식: 바닥의 핏자국 · 벽 낙서("살려줘" "무서워" …) · 핏빛 손자국

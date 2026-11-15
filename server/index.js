@@ -4,6 +4,7 @@ import http from 'http';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import zlib from 'zlib';
 import { fileURLToPath } from 'url';
 import { Server } from 'socket.io';
 import { randomBytes } from 'crypto';
@@ -13,7 +14,8 @@ import { hasBadWord } from './filter.js';
 import { isAdminPassword, looksLikeAdmin, ADMIN_NAME } from './admin.js';
 import { ITEMS, START_ITEMS } from './items.js';
 import { openStore, persist, flushAll, storeKind } from './store.js';
-import { MAX_LV, HIDDEN_LV, ADMIN_LV, levelOf, xpAt, CLEAR_COINS, CHAPTER_XP, clearXp, timeLimitMs, SHOP, isWear, blankProfile, profileView, dayKey, statRange, pruneStats } from './progress.js';
+import { MAX_LV, HIDDEN_LV, ADMIN_LV, levelOf, xpAt, CLEAR_COINS, CHAPTER_XP, clearXp, timeLimitMs, SHOP, isWear, blankProfile, profileView, dayKey, statRange, pruneStats, addPeriodXp, levelBoard, weekKey, monthKey } from './progress.js';
+import { Accounts, clientIp } from './accounts.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
@@ -28,16 +30,65 @@ app.get('/api/info', (_, res) => {
   try { url = url || fs.readFileSync(path.join(DATA_DIR, 'public_url.txt'), 'utf8').trim(); } catch {}
   res.json({ publicUrl: url, lan: lanIps().map((ip) => `http://${ip}:${PORT}`) });
 });
-// 게임 파일은 매번 최신인지 확인하게 한다 (휴대폰이 예전 버전을 캐시해 수정이 안 보이는 문제 방지)
-app.use(express.static(path.join(ROOT, 'public'), { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
-app.use('/vendor/three', express.static(path.join(ROOT, 'node_modules/three')));
+// ───── 정적 파일 (전송량 줄이기)
+// · 글자 파일(js·css·html)은 압축(brotli/gzip)해서 보낸다 → 처음 접속할 때 받는 양이 4분의 1 정도로 준다. 한 번 압축한 것은 메모리에 두고 다시 쓴다.
+// · 게임 파일은 매번 최신인지 확인하게 한다 (휴대폰이 예전 버전을 캐시해 수정이 안 보이는 문제 방지) — 안 바뀌었으면 내용 없이 '그대로'(304)만 답한다.
+// · three.js 는 버전이 붙은 주소로 보내 오래 캐시한다 (버전이 바뀌면 주소도 바뀐다). 그림 파일은 하루 캐시.
+const TEXT_TYPES = { '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.html': 'text/html; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.xml': 'application/xml; charset=utf-8', '.txt': 'text/plain; charset=utf-8' };
+const zcache = new Map();
+function zstatic(root, { cache = 'no-cache', transform, tag = '' } = {}) {
+  root = path.resolve(root);
+  return (req, res, next) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+    let rel; try { rel = decodeURIComponent(req.path); } catch { return next(); }
+    if (rel.includes('\0') || /(^|[\\/])\./.test(rel)) return next(); // 숨김 파일(.env 등)은 다루지 않는다
+    if (rel.endsWith('/')) rel += 'index.html';
+    const file = path.join(root, rel);
+    if (!file.startsWith(root + path.sep)) return next();
+    const type = TEXT_TYPES[path.extname(file).toLowerCase()]; if (!type) return next();
+    const ae = String(req.headers['accept-encoding'] || '');
+    const enc = /\bbr\b/.test(ae) ? 'br' : /\bgzip\b/.test(ae) ? 'gzip' : ''; if (!enc) return next();
+    fs.stat(file, (err, st) => {
+      if (err || !st.isFile()) return next();
+      const key = file + '|' + enc;
+      const send = (c) => {
+        res.setHeader('Content-Type', type); res.setHeader('Content-Encoding', enc); res.setHeader('Vary', 'Accept-Encoding');
+        res.setHeader('Cache-Control', cache); res.setHeader('ETag', c.etag);
+        if (req.headers['if-none-match'] === c.etag) { res.statusCode = 304; return res.end(); }
+        res.setHeader('Content-Length', c.buf.length);
+        res.end(req.method === 'HEAD' ? undefined : c.buf);
+      };
+      const hit = zcache.get(key);
+      if (hit && hit.mtimeMs === st.mtimeMs && hit.size === st.size) return send(hit);
+      fs.readFile(file, (e2, raw) => {
+        if (e2) return next();
+        if (transform) raw = Buffer.from(transform(rel, raw.toString('utf8')));
+        const done = (e3, buf) => { if (e3) return next(); const c = { mtimeMs: st.mtimeMs, size: st.size, buf, etag: `W/"${st.size.toString(16)}-${Math.round(st.mtimeMs).toString(16)}-${enc}${tag}"` }; if (zcache.size > 400) zcache.clear(); zcache.set(key, c); send(c); };
+        if (enc === 'br') zlib.brotliCompress(raw, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 9, [zlib.constants.BROTLI_PARAM_SIZE_HINT]: raw.length } }, done);
+        else zlib.gzip(raw, { level: 9 }, done);
+      });
+    });
+  };
+}
+const THREE_DIR = path.join(ROOT, 'node_modules/three');
+let THREE_TAG = 'three'; try { THREE_TAG = 't' + JSON.parse(fs.readFileSync(path.join(THREE_DIR, 'package.json'), 'utf8')).version.replace(/\W/g, '_'); } catch {}
+const PUBLIC_DIR = path.join(ROOT, 'public');
+const YEAR = 'public, max-age=31536000, immutable';
+app.use('/vendor/' + THREE_TAG, zstatic(THREE_DIR, { cache: YEAR }), express.static(THREE_DIR, { maxAge: '365d', immutable: true }));
+app.use('/vendor/three', zstatic(THREE_DIR, { cache: 'public, max-age=3600' }), express.static(THREE_DIR, { maxAge: '1h' }));
+// index.html 의 three.js 주소를 버전이 붙은 주소로 바꿔서 보낸다
+const pageTransform = (rel, text) => (rel === '/index.html' ? text.replaceAll('/vendor/three/', `/vendor/${THREE_TAG}/`) : text);
+app.use(zstatic(PUBLIC_DIR, { cache: 'no-cache', transform: pageTransform, tag: '-' + THREE_TAG }));
+app.use(express.static(PUBLIC_DIR, { setHeaders: (res, file) => res.setHeader('Cache-Control', /\.(png|jpe?g|ico|webp|gif)$/i.test(file) ? 'public, max-age=86400' : 'no-cache') }));
 const server = http.createServer(app);
 const io = new Server(server, { maxHttpBufferSize: 2e5 });
+// 화면(클라이언트)과 서버가 주고받는 방식의 버전. 예전 화면이 새 서버에 붙으면 새로고침시킨다.
+const PROTO = 2;
 
 // ───── 저장 (파티장 닉네임별 도달 챕터)
 const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, 'data');
 // DATABASE_URL 이 있으면 무료 DB에, 없으면 data 폴더 파일에 저장 (server/store.js)
-const { saves, hearts, ranks, profiles, stats } = await openStore(DATA_DIR, ['saves', 'hearts', 'ranks', 'profiles', 'stats']).catch((e) => {
+const { saves, hearts, ranks, profiles, stats, accounts: accountData, feedback } = await openStore(DATA_DIR, ['saves', 'hearts', 'ranks', 'profiles', 'stats', 'accounts', 'feedback']).catch((e) => {
   console.error('\n  [DB] 데이터베이스에 연결하지 못했어요. DATABASE_URL 주소를 확인해 주세요.\n  ', e.message, '\n'); process.exit(1);
 });
 const saveHearts = () => persist(DATA_DIR, 'hearts', hearts);
@@ -53,6 +104,12 @@ const save = () => persist(DATA_DIR, 'saves', saves, true);
 const saveProfiles = () => persist(DATA_DIR, 'profiles', profiles);
 const saveStats = () => persist(DATA_DIR, 'stats', stats);
 stats.days ||= {};
+// ───── 고정 계정 (IP · 기기) — server/accounts.js
+const accounts = new Accounts(accountData, () => persist(DATA_DIR, 'accounts', accountData));
+accounts.prune(profiles); setInterval(() => accounts.prune(profiles), 24 * 3600 * 1000).unref?.();
+// ───── 고객소리함 (버그 · 건의)
+feedback.list ||= [];
+const saveFeedback = () => persist(DATA_DIR, 'feedback', feedback);
 const prof = (name) => { const pf = (profiles[name] ||= blankProfile()); pf.items ||= {}; pf.equip ||= { wings: '', mount: '' }; pf.equip.costume ??= ''; return pf; };
 const findByName = (name) => [...players.values()].find((p) => p.name === name && !p.offline);
 const sendProfile = (p) => { if (p) io.to(p.id).emit('profile', { ...profileView(prof(p.name), p.admin), hiddenOk: hiddenOk(p.name) }); };
@@ -66,7 +123,7 @@ function hiddenOk(name) {
 function addXp(name, amt, why) {
   if (!name || !(amt > 0)) return;
   const pf = prof(name); const before = levelOf(pf.xp);
-  pf.xp += Math.round(amt); saveProfiles();
+  pf.xp += Math.round(amt); addPeriodXp(pf, Math.round(amt)); saveProfiles();
   const after = levelOf(pf.xp); const p = findByName(name);
   if (p) { io.to(p.id).emit('xp', { add: Math.round(amt), why, lv: after, up: after > before }); sendProfile(p); }
   if (after > before) {
@@ -87,8 +144,22 @@ const instances = new Map(); // instId -> GameInstance
 const invites = new Map();   // targetId -> Set(partyId)
 let seq = 1;
 
-const pub = (p) => ({ id: p.id, name: p.name, lv: p.lv, x: p.x, z: p.z, y: p.y || 0, ry: p.ry, anim: p.anim, crouch: p.crouch ? 1 : 0, light: p.light, partyId: p.partyId, em: p.em || '', eid: p.eid || 0, ride: p.room === 'lobby' ? p.ride || '' : '', gear: gearOf(p) });
-const lobbyList = () => [...players.values()].map((p) => ({ id: p.id, name: p.name, partyId: p.partyId, inGame: p.room !== 'lobby', room: p.room || '', hearts: hearts[p.name] || 0, admin: !!p.admin, lv: p.admin ? ADMIN_LV : levelOf(prof(p.name).xp) }));
+// ───── 위치 방송 (전송량 줄이기): 1초에 10번, '바뀐 사람'만, 숫자는 소수 둘째 자리까지
+//  한 사람 = [id, x, z, y, ry, 깃발(걷기1·웅크림2·손전등4)] (+ 이름·외형 번호·파티·장비·감정표현이 바뀌었을 때만 뒤에 덧붙인다)
+//  아무도 움직이지 않으면 아무것도 보내지 않는다. 방에 새로 들어온 화면에는 전체를 한 번 보낸다.
+const TICK_MS = 100;
+const r2 = (v) => Math.round(v * 100) / 100;
+const dynOf = (p) => [r2(p.x), r2(p.z), r2(p.y || 0), r2(p.ry), (p.anim ? 1 : 0) | (p.crouch ? 2 : 0) | (p.light ? 4 : 0)];
+const extOf = (p) => ({ n: p.name, lv: p.lv, pt: p.partyId || '', g: gearOf(p), em: p.em || '', eid: p.eid || 0, rd: p.room === 'lobby' ? p.ride || '' : '' });
+const roomMeta = new Map(); // room -> { gk: 마지막으로 보낸 귀신 상태, ghosts, full: 다음 번에 전체를 보낼지, fullAt }
+const metaOf = (room) => { let m = roomMeta.get(room); if (!m) { m = { gk: 'null', ghosts: null, full: true, fullAt: 0 }; roomMeta.set(room, m); } return m; };
+const needFull = (room) => { if (room) metaOf(room).full = true; };
+function fullState(room) {
+  const list = [];
+  for (const p of players.values()) if (p.room === room && !p.offline) list.push([p.id, ...dynOf(p), extOf(p)]);
+  return { f: 1, p: list, g: roomMeta.get(room)?.ghosts ?? null };
+}
+const lobbyList = () => [...players.values()].filter((p) => !p.offline).map((p) => ({ id: p.id, name: p.name, partyId: p.partyId, inGame: p.room !== 'lobby', room: p.room || '', hearts: hearts[p.name] || 0, admin: !!p.admin, lv: p.admin ? ADMIN_LV : levelOf(prof(p.name).xp) }));
 const broadcastRoster = () => io.emit('roster', lobbyList());
 
 function partyInfo(party) {
@@ -115,8 +186,20 @@ function joinRoom(p, room) {
   if (!sock) return;
   if (p.room) sock.leave(p.room);
   io.to(p.room).emit('player:leave', p.id);
-  p.room = room; p.y = 0;
+  p.room = room; p.y = 0; p._sr = null;
   sock.join(room);
+  needFull(room); // 새로 들어온 화면이 방 안 모두를 볼 수 있게 다음 번에는 전체를 보낸다
+}
+/** 접속이 완전히 끝난 사람을 지운다 (끊긴 뒤 3분이 지났거나, 다른 접속이 자리를 이어받지 않은 경우) */
+function dropPlayer(p) {
+  if (!players.has(p.id) || !p.offline) return;
+  clearTimeout(p.dropTimer);
+  leaveParty(p);
+  io.to(p.room).emit('player:leave', p.id);
+  players.delete(p.id);
+  invites.delete(p.id);
+  broadcastRoster();
+  io.emit('chat', { channel: 'system', text: `${p.name} 님이 나갔습니다.` });
 }
 
 function toLobby(p) {
@@ -153,28 +236,67 @@ function leaveParty(p) {
 io.on('connection', (sock) => {
   let me = null;
 
-  sock.on('hello', ({ name, look, resume, admin }, ack) => {
+  const setMe = (p) => { me = p; sock.data.pid = p ? p.id : null; };
+  // 입장 · 이어 접속 때 화면에 돌려주는 내 정보
+  const helloInfo = (p, extra = {}) => {
+    const a = p.acct ? accountData.list[p.acct] : null;
+    return { id: p.id, token: p.token, name: p.name, admin: !!p.admin, items: ITEMS, unlocked: saves[p.name] ?? 0, unlockedBy: unlockedFor(p.name), scenarios: scenarioList(), hearts: hearts[p.name] || 0, hiddenOk: hiddenOk(p.name), shop: SHOP, account: a ? { id: a.id, key: a.key, name: a.name } : null, ...extra };
+  };
+
+  sock.on('hello', (h, ack) => {
+    let { name, look, resume, admin, acct, v } = h || {};
+    if (typeof ack !== 'function') ack = () => {};
+    // 업데이트 전에 열어 둔 예전 화면은 새로고침시킨다 (주고받는 방식이 달라 캐릭터가 보이지 않는다)
+    if ((Number(v) || 0) < PROTO) { sock.emit('kicked', { text: '🔄 게임이 업데이트되었어요! 확인을 누르면 새 버전으로 다시 접속합니다.' }); return; }
     // 운영자 로그인: 비밀번호가 맞으면 '운영자' 닉네임으로 입장 (틀리면 5번까지만 시도 가능)
     let asAdmin = false;
+    const ip = clientIp(sock);
     if (admin) {
       // 비밀번호 맞히기 공격 막기: 접속마다 5번, 같은 IP 는 10분에 10번까지만
-      const ip = String(sock.handshake.headers['x-forwarded-for'] || sock.handshake.address || '').split(',')[0].trim();
       const f = adminFails.get(ip) || { n: 0, t: Date.now() }; if (Date.now() - f.t > 10 * 60 * 1000) { f.n = 0; f.t = Date.now(); }
       sock.data.adminTries = (sock.data.adminTries || 0) + 1;
-      if (f.n >= 10 || sock.data.adminTries > 5) return ack?.({ error: 'badadmin', message: '비밀번호를 너무 많이 틀렸어요. 10분 뒤에 다시 시도하세요.' });
-      if (!isAdminPassword(admin)) { f.n++; adminFails.set(ip, f); return ack?.({ error: 'badadmin', message: '운영자 비밀번호가 맞지 않아요.' }); }
-      asAdmin = true; name = ADMIN_NAME; resume = null;
+      if (f.n >= 10 || sock.data.adminTries > 5) return ack({ error: 'badadmin', message: '비밀번호를 너무 많이 틀렸어요. 10분 뒤에 다시 시도하세요.' });
+      if (!isAdminPassword(admin)) { f.n++; adminFails.set(ip, f); return ack({ error: 'badadmin', message: '운영자 비밀번호가 맞지 않아요.' }); }
+      asAdmin = true; name = ADMIN_NAME; resume = null; acct = null;
     }
-    // 모바일에서 앱 전환 등으로 연결이 끊겼다 다시 붙으면, 같은 플레이어로 이어서 한다
-    const old = resume && players.get(resume.id);
-    if (old && resume.token && old.token === resume.token) {
+    // ① 이어 접속: 모바일에서 앱 전환 등으로 연결이 끊겼다 다시 붙으면, 같은 플레이어로 이어서 한다
+    let old = resume && players.get(resume.id);
+    if (!(old && resume.token && old.token === resume.token)) old = null;
+    // 이 연결에 이미 내 캐릭터가 있는데 '입장'이 또 왔다 (입장 버튼 연타 · 늦게 도착한 중복 요청)
+    // → 새로 만들지 않고 그대로 돌려준다. (예전에는 캐릭터가 하나 더 생겨, 아무도 조종하지 않는 채 광장에 영영 남았다)
+    if (!old && me && players.has(me.id) && !me.offline && !!me.admin === asAdmin) return ack(helloInfo(me, { again: true }));
+    if (me && me !== old && players.has(me.id)) { const gone = me; setMe(null); gone.offline = true; dropPlayer(gone); }
+    // ② 고정 계정: 이 기기(열쇠) 또는 이 IP 에 묶인 계정으로 들어온다
+    let account = null, viaAccount = false;
+    if (!asAdmin && !old) {
+      name = String(name || '').trim().slice(0, 12);
+      if (!accounts.byToken(acct)) {
+        if (!name) name = '익명' + Math.floor(Math.random() * 9000 + 1000);
+        if (hasBadWord(name)) return ack({ error: 'badname', message: '욕설·비방이 들어간 닉네임은 쓸 수 없어요. 다른 닉네임을 정해 주세요.' });
+        if (looksLikeAdmin(name)) return ack({ error: 'badname', message: '운영자로 오해할 수 있는 닉네임은 쓸 수 없어요. 다른 닉네임을 정해 주세요.' });
+      }
+      const r = accounts.claim({ name, ip, tok: acct });
+      if (r.error === 'toomany') return ack({ error: 'badname', keep: true, message: '이 인터넷 주소에서 오늘 만들 수 있는 계정 수를 넘었어요. 내일 다시 시도해 주세요.' });
+      if (r.error) return ack({ error: 'badname', message: `'${name}' 은(는) 이미 다른 분의 고정 계정 닉네임이에요. 다른 닉네임을 정해 주세요.` });
+      account = r.acct; name = account.name;
+      // 같은 계정이 이미 들어와 있으면 (다른 창 · 다른 기기 · 끊긴 채 기다리는 중) 그 자리를 그대로 이어받는다
+      old = [...players.values()].find((p) => p.acct === account.id) || null;
+      viaAccount = !!old;
+    }
+    if (old) {
       clearTimeout(old.dropTimer); old.dropTimer = null; old.offline = false;
       const prev = io.sockets.sockets.get(old.sid);
-      if (prev && prev.id !== sock.id) { prev.data.replaced = true; prev.disconnect(true); }
-      old.sid = sock.id; me = old;
-      if (look) { me.look = sanitizeLook(look); me.lv++; } // 창을 다시 열며 고른 외형으로
-      sock.join(me.id); if (me.room) sock.join(me.room);
-      ack?.({ id: me.id, token: me.token, name: me.name, items: ITEMS, unlocked: saves[me.name] ?? 0, unlockedBy: unlockedFor(me.name), scenarios: scenarioList(), hearts: hearts[me.name] || 0, resumed: true, room: me.room, hiddenOk: hiddenOk(me.name), shop: SHOP, admin: !!me.admin });
+      if (prev && prev.id !== sock.id) {
+        prev.data.replaced = true;
+        if (viaAccount && prev.connected) prev.emit('kicked', { text: '다른 창(또는 다른 기기)에서 같은 계정으로 접속해서, 이 창의 접속이 끊겼어요.' });
+        prev.disconnect(true);
+      }
+      if (viaAccount) old.token = randomBytes(16).toString('hex'); // 예전 창이 다시 붙어 자리를 되가져가지 못하게
+      old.sid = sock.id; setMe(old); old._sr = null;
+      // 외형은 정말 바뀌었을 때만 새로 알린다 (다시 붙을 때마다 모두가 사진 얼굴을 다시 내려받지 않게)
+      if (look) { const nl = sanitizeLook(look); if (JSON.stringify(nl) !== JSON.stringify(me.look)) { me.look = nl; me.lv++; } }
+      sock.join(me.id); if (me.room) { sock.join(me.room); needFull(me.room); }
+      ack(helloInfo(me, { resumed: true, room: me.room }));
       sock.emit('inv', me.inv); sendProfile(me);
       const party = parties.get(me.partyId);
       if (party) sock.emit('party', partyInfo(party));
@@ -184,27 +306,33 @@ io.on('connection', (sock) => {
       broadcastRoster();
       return;
     }
-    name = String(name || '').trim().slice(0, 12) || '익명' + Math.floor(Math.random() * 1000);
-    if (hasBadWord(name)) return ack?.({ error: 'badname', message: '욕설·비방이 들어간 닉네임은 쓸 수 없어요. 다른 닉네임을 정해 주세요.' });
-    if (!asAdmin && looksLikeAdmin(name)) return ack?.({ error: 'badname', message: '운영자로 오해할 수 있는 닉네임은 쓸 수 없어요. 다른 닉네임을 정해 주세요.' });
-    // 같은 닉네임이 남아 있으면: 끊긴 채 기다리던(창을 닫았거나 시간 초과된) 예전 접속이면 정리하고 그 이름을 그대로 쓴다
-    // 정말 다른 사람이 지금 접속 중일 때만 #번호를 붙인다
-    const clash = [...players.values()].find((p) => p.name === name);
-    if (clash) {
-      const live = !clash.offline && io.sockets.sockets.get(clash.sid)?.connected;
-      if (!live) { clash.offline = true; clearTimeout(clash.dropTimer); dropPlayer(clash); }
-      else name = name.slice(0, 9) + '#' + Math.floor(Math.random() * 90 + 10);
+    if (asAdmin) {
+      // 운영자가 이미 들어와 있으면: 끊긴 채 남은 예전 접속은 정리하고, 정말 접속 중이면 #번호를 붙인다
+      const clash = [...players.values()].find((p) => p.name === name);
+      if (clash) {
+        const live = !clash.offline && io.sockets.sockets.get(clash.sid)?.connected;
+        if (!live) { clash.offline = true; dropPlayer(clash); }
+        else name = name.slice(0, 9) + '#' + Math.floor(Math.random() * 90 + 10);
+      }
     }
     const pid = 'p' + randomBytes(6).toString('hex');
-    me = { id: pid, sid: sock.id, token: randomBytes(16).toString('hex'), name, admin: asAdmin, lv: 1, look: sanitizeLook(look), x: 0, z: 5, ry: Math.PI, anim: 0, light: false, room: null, partyId: null, inv: [...START_ITEMS], mic: false };
-    players.set(pid, me);
+    const np = { id: pid, sid: sock.id, token: randomBytes(16).toString('hex'), name, admin: asAdmin, acct: account?.id || null, lv: 1, look: sanitizeLook(look), x: 0, z: 5, ry: Math.PI, anim: 0, light: false, room: null, partyId: null, inv: [...START_ITEMS], mic: false };
+    players.set(pid, np); setMe(np);
     sock.join(pid);
-    toLobby(me);
-    ack?.({ id: pid, token: me.token, name, admin: asAdmin, items: ITEMS, unlocked: saves[name] ?? 0, unlockedBy: unlockedFor(name), scenarios: scenarioList(), hearts: hearts[name] || 0, hiddenOk: hiddenOk(name), shop: SHOP });
-    sendProfile(me);
+    toLobby(np);
+    ack(helloInfo(np));
+    sendProfile(np);
     // 방문 통계: 오늘 방문 수 + 방문자
     if (!asAdmin) { const d = (stats.days[dayKey()] ||= { v: 0, u: {} }); d.v++; d.u[name] ||= 0; saveStats(); }
     io.emit('chat', { channel: 'system', text: `${name} 님이 접속했습니다.` });
+  });
+  // 방을 옮긴 화면이 '지금 이 방에 있는 사람 전부'를 다시 달라고 할 때
+  // (너무 자주 오면 버리지 않고 0.4초에 한 번으로 모아서 보낸다 — 버리면 그 화면에는 다음 전체 방송까지 아무도 안 보인다)
+  sock.on('state:full', () => {
+    const p = me; if (!p?.room || p.offline) return;
+    const send = () => { p.fullTimer = null; p.fullReqAt = Date.now(); if (p.room && !p.offline && p.sid === sock.id) sock.emit('state', fullState(p.room)); };
+    const left = 400 - (Date.now() - (p.fullReqAt || 0));
+    if (left <= 0) send(); else if (!p.fullTimer) p.fullTimer = setTimeout(send, left);
   });
 
   sock.on('move', (m) => {
@@ -218,7 +346,7 @@ io.on('connection', (sock) => {
   });
 
   // 외형은 바뀔 때만 전송 (사진 얼굴은 용량이 크므로 매 틱 보내지 않는다)
-  sock.on('look', (look) => { if (!me) return; me.look = sanitizeLook(look); me.lv++; });
+  sock.on('look', (look) => { if (!me) return; const nl = sanitizeLook(look); if (JSON.stringify(nl) !== JSON.stringify(me.look)) { me.look = nl; me.lv++; } });
   // 놀래키기: 3.5m 안의 같은 방 사람들에게
   sock.on('boo', () => {
     if (!me) return;
@@ -395,7 +523,7 @@ io.on('connection', (sock) => {
   }));
   sock.on('admin:stats', adminOnly((ack) => {
     if (typeof ack !== 'function') return;
-    ack({ players: [...players.values()].map((p) => ({ id: p.id, name: p.name, room: p.room === 'lobby' ? '로비' : p.room ? '게임 중' : '-', offline: !!p.offline, admin: !!p.admin, muted: Math.max(0, Math.ceil(((chatPenalty.get(p.name)?.muteUntil || 0) - Date.now()) / 1000)), warns: chatPenalty.get(p.name)?.warns || 0, lv: levelOf(prof(p.name).xp) })), games: instances.size,
+    ack({ players: [...players.values()].map((p) => ({ id: p.id, name: p.name, room: p.room === 'lobby' ? '로비' : p.room ? '게임 중' : '-', offline: !!p.offline, admin: !!p.admin, muted: Math.max(0, Math.ceil(((chatPenalty.get(p.name)?.muteUntil || 0) - Date.now()) / 1000)), warns: chatPenalty.get(p.name)?.warns || 0, lv: levelOf(prof(p.name).xp) })), games: instances.size, accounts: accounts.size, feedbackNew: feedback.list.filter((f) => !f.done).length,
       visit: { day: statRange(stats, 1), week: statRange(stats, 7), month: statRange(stats, 30) },
       daily: Array.from({ length: 14 }, (_, i) => { const k = dayKey(Date.now() - i * 86400000); const r = stats.days[k]; const u = Object.values(r?.u || {}); return { day: k, visitors: u.length, visits: r?.v || 0, totalMs: u.reduce((a, b) => a + b, 0) }; }) });
   }));
@@ -457,6 +585,35 @@ io.on('connection', (sock) => {
     for (const s of Object.values(SCENARIOS)) out[s.id] = (ranks[s.id] || []).slice(0, 10).map((r) => ({ names: r.names, ms: r.ms, fear: r.fear, ending: r.ending, at: r.at, hints: r.hints ?? null }));
     if (typeof ack === 'function') ack(out);
   });
+  // 랭킹 한꺼번에: 주간 · 월간 · 총 레벨 랭킹 + 테마별 클리어 시간
+  sock.on('rank:all', (ack) => {
+    if (typeof ack !== 'function') return;
+    const themes = {};
+    for (const s of Object.values(SCENARIOS)) themes[s.id] = (ranks[s.id] || []).slice(0, 10).map((r) => ({ names: r.names, ms: r.ms, fear: r.fear, ending: r.ending, at: r.at, hints: r.hints ?? null }));
+    const boards = levelBoards();
+    const level = {};
+    for (const k of ['week', 'month', 'total']) level[k] = { rows: boards[k].rows, total: boards[k].total, me: me && !me.admin ? boards[k].rankOf(me.name) : null };
+    ack({ themes, level, week: weekKey(), month: monthKey() });
+  });
+  // ───── 고객소리함: 버그 · 건의사항 보내기
+  sock.on('feedback:send', ({ kind, text } = {}, ack) => {
+    if (!me || typeof ack !== 'function') return;
+    text = String(text || '').trim().slice(0, 1000);
+    if (text.length < 5) return ack({ error: '내용을 조금만 더 자세히 적어 주세요. (5자 이상)' });
+    const now = Date.now();
+    if (!me.admin && now - (me.lastFb || 0) < 30000) return ack({ error: '방금 보내셨어요. 30초 뒤에 다시 보낼 수 있어요.' });
+    if (!me.admin && feedback.list.filter((f) => f.name === me.name && now - f.at < 86400000).length >= 10) return ack({ error: '하루에 10개까지만 보낼 수 있어요. 내일 다시 보내 주세요!' });
+    me.lastFb = now;
+    const g = inst();
+    feedback.list.push({ id: 'f' + now.toString(36) + randomBytes(2).toString('hex'), at: now, name: me.name, lv: levelOf(prof(me.name).xp), kind: ['bug', 'idea'].includes(kind) ? kind : 'etc', text,
+      where: me.room === 'lobby' ? '로비' : g ? `${g.sc.short} · ${g.ch.title}` : '-', ua: String(sock.handshake.headers['user-agent'] || '').slice(0, 160) });
+    if (feedback.list.length > 500) feedback.list.splice(0, feedback.list.length - 500);
+    saveFeedback(); ack({ ok: true });
+    for (const p of players.values()) if (p.admin && !p.offline) io.to(p.id).emit('toast', { text: `📮 고객소리함에 새 글이 도착했어요 (${me.name})` });
+  });
+  sock.on('admin:feedback', adminOnly((ack) => { if (typeof ack === 'function') ack(feedback.list.slice(-200).reverse()); }));
+  sock.on('admin:feedbackDone', adminOnly((id) => { const f = feedback.list.find((x) => x.id === id); if (f) { f.done = !f.done; saveFeedback(); } }));
+  sock.on('admin:feedbackDel', adminOnly((id) => { const i = feedback.list.findIndex((x) => x.id === id); if (i >= 0) { feedback.list.splice(i, 1); saveFeedback(); } }));
   // 파티장이 테마·공포도·챕터를 바꾸면 파티원에게도 보여 준다
   sock.on('party:pick', (pk) => {
     const party = parties.get(me?.partyId);
@@ -514,10 +671,11 @@ io.on('connection', (sock) => {
       onEnd: ({ ms, full, type, hints = 0, over = false } = {}) => {
         const names = party.members.map((id) => players.get(id)?.name).filter(Boolean);
         const wasOpen = new Map(names.map((n) => [n, hiddenOk(n)]));
-        saves[saveName] = sc.chapters.length - 1; saves[saveName + ':clear'] = 1;
-        for (const n of names) saves[sc.saveKey(n) + ':clear'] = 1; // 함께 깬 파티원 모두 '클리어'로 기록 (히든 테마 조건)
+        saves[saveName] = sc.chapters.length - 1;
+        // 함께 깬 파티원 모두 '클리어'로 기록 (히든 테마 조건 · 도장표). 값은 처음 깬 시각 (예전 기록은 1)
+        for (const n of new Set([me.name, ...names])) { const k = sc.saveKey(n) + ':clear'; if (!(saves[k] > 1)) saves[k] = Date.now(); }
         save();
-        setTimeout(() => { for (const n of names) if (!wasOpen.get(n) && hiddenOk(n) && levelOf(prof(n).xp) < HIDDEN_LV) io.emit('celebrate', { name: n, kind: 'clear', text: `🧟 ${n} 님이 모든 테마를 클리어해 히든 테마 '데드 시티'가 열렸습니다!` }); for (const n of names) sendProfile(findByName(n)); }, 300);
+        setTimeout(() => { for (const n of names) if (!wasOpen.get(n) && hiddenOk(n) && levelOf(prof(n).xp) < HIDDEN_LV) io.emit('celebrate', { name: n, kind: 'clear', text: `🧟 ${n} 님이 모든 테마를 클리어해 히든 테마 '데드 시티'가 열렸습니다!` }); for (const n of names) { const pl = findByName(n); sendProfile(pl); if (pl) io.to(pl.id).emit('clears', unlockedFor(n)); } }, 300);
         // 보상: 깰 때마다 10코인 · 제한 시간 안에 깨면 경험치 (시간 초과면 순위표·경험치 제외)
         for (const m of inst.members()) {
           addCoins(m.name, CLEAR_COINS);
@@ -598,26 +756,29 @@ io.on('connection', (sock) => {
   sock.on('disconnect', () => {
     if (!me || sock.data.replaced || me.sid !== sock.id) return;
     // 바로 지우지 않고 잠시 기다린다 (모바일 백그라운드 → 복귀 시 이어하기)
+    // 기다리는 동안에는 다른 사람 화면과 접속자 목록에서 빠진다 (실제로는 없는 사람이 광장에 서 있던 문제)
     const p = me;
     p.offline = true;
+    io.to(p.room).emit('player:leave', p.id);
+    broadcastRoster();
     clearTimeout(p.dropTimer);
     p.dropTimer = setTimeout(() => dropPlayer(p), 3 * 60 * 1000);
   });
-  function dropPlayer(me) {
-    if (!players.has(me.id) || !me.offline) return;
-    leaveParty(me);
-    io.to(me.room).emit('player:leave', me.id);
-    players.delete(me.id);
-    invites.delete(me.id);
-    broadcastRoster();
-    io.emit('chat', { channel: 'system', text: `${me.name} 님이 나갔습니다.` });
-  }
 });
+
+// 레벨 랭킹 표는 10초에 한 번만 다시 만든다
+let boardCache = null, boardAt = 0;
+function levelBoards() {
+  if (boardCache && Date.now() - boardAt < 10000) return boardCache;
+  const skip = (n) => n === ADMIN_NAME || n.startsWith(ADMIN_NAME + '#');
+  boardCache = { week: levelBoard(profiles, 'week', 20, skip), month: levelBoard(profiles, 'month', 20, skip), total: levelBoard(profiles, 'total', 20, skip) };
+  boardAt = Date.now(); return boardCache;
+}
 
 function unlockedFor(name) {
   const out = {};
   if (!name) return out;
-  for (const s of Object.values(SCENARIOS)) out[s.id] = { chapter: saves[s.saveKey(name)] ?? 0, cleared: !!saves[s.saveKey(name) + ':clear'] };
+  for (const s of Object.values(SCENARIOS)) { const c = saves[s.saveKey(name) + ':clear']; out[s.id] = { chapter: saves[s.saveKey(name)] ?? 0, cleared: !!c, at: c > 1 ? c : 0 }; }
   return out;
 }
 function carryItems(ch) {
@@ -654,18 +815,48 @@ function sanitizeLook(l = {}) {
   return out;
 }
 
-// ───── 상태 브로드캐스트 (15Hz)
+// ───── 상태 브로드캐스트 (10Hz · 바뀐 것만)
 let last = Date.now();
 setInterval(() => {
   const now = Date.now(); const dt = (now - last) / 1000; last = now;
-  const byRoom = {};
-  for (const p of players.values()) { if (p.room) (byRoom[p.room] ||= []).push(pub(p)); }
-  for (const [room, list] of Object.entries(byRoom)) {
+  const byRoom = new Map();
+  for (const p of players.values()) { if (!p.room || p.offline) continue; let l = byRoom.get(p.room); if (!l) byRoom.set(p.room, (l = [])); l.push(p); }
+  for (const [room, list] of byRoom) {
+    const meta = metaOf(room);
     let ghosts = null;
-    if (room.startsWith('inst:')) { const i = instances.get(room.slice(5)); i?.checkTime?.(); ghosts = i?.tick(dt) || null; }
-    io.to(room).emit('state', { players: list, ghosts });
+    if (room.startsWith('inst:')) {
+      const i = instances.get(room.slice(5)); i?.checkTime?.(); ghosts = i?.tick(dt) || null;
+      if (ghosts) for (const g of ghosts) { g.x = r2(g.x); g.z = r2(g.z); g.ry = r2(g.ry || 0); delete g.name; }
+    }
+    const full = meta.full || now - meta.fullAt > 10000; // 가끔은 전체를 보내 혹시 어긋난 화면을 바로잡는다
+    const out = [];
+    for (const p of list) {
+      const d = dynOf(p), dk = d.join(), e = extOf(p), ek = `${e.n}|${e.lv}|${e.pt}|${e.g}|${e.em}|${e.eid}|${e.rd}`;
+      if (full || p._sr !== room || ek !== p._ek) out.push([p.id, ...d, e]);
+      else if (dk !== p._dk) out.push([p.id, ...d]);
+      p._dk = dk; p._ek = ek; p._sr = room;
+    }
+    const gk = ghosts ? JSON.stringify(ghosts) : 'null';
+    const gChanged = gk !== meta.gk;
+    meta.gk = gk; meta.ghosts = ghosts;
+    if (!out.length && !gChanged && !full) continue; // 아무것도 안 바뀌었으면 보내지 않는다
+    const msg = { p: out };
+    if (gChanged || full) msg.g = ghosts;
+    if (full) { msg.f = 1; meta.full = false; meta.fullAt = now; }
+    io.to(room).emit('state', msg);
   }
-}, 66);
+  for (const room of roomMeta.keys()) if (!byRoom.has(room)) roomMeta.delete(room);
+}, TICK_MS);
+
+// 주인 없는 캐릭터 청소: 연결이 사라졌는데 '접속 중'으로 남은 캐릭터를 30초마다 찾아 정리한다 (혹시 모를 경우의 안전장치)
+setInterval(() => {
+  for (const p of [...players.values()]) {
+    if (p.offline) continue;
+    const s = io.sockets.sockets.get(p.sid);
+    if (s && s.connected && s.data.pid === p.id) continue;
+    p.offline = true; dropPlayer(p);
+  }
+}, 30000).unref?.();
 
 // 방문 통계: 1분마다 접속 중인 사람의 머문 시간을 더한다 (서버가 갑자기 꺼져도 거의 정확하게 남는다)
 setInterval(() => {

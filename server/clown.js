@@ -358,9 +358,11 @@ B · L · U · E   M · O · O · N
       { t: 'vanity_bulb', x: -9.5, z: -7.2 }, { t: 'vanity_bulb', x: -6.5, z: -7.2 }, { t: 'vanity_bulb', x: 5, z: -7.2 }, { t: 'kimono_rack', x: 9.7, z: 2, r: -90 },
       { t: 'kimono_rack', x: 9.7, z: -2.5, r: -90 }, { t: 'mannequin', x: -10, z: 2 }, { t: 'chest', x: 6, z: 6.8 }, { t: 'juggling_pins', x: -3, z: 1 }, { t: 'unicycle', x: -10, z: 6.6, r: 20 },
       { t: 'rug', x: -4, z: 0 },
+      { t: 'chair', x: -2.3, z: -6.7 }, // 분장 노트를 올려 둔 의자
     ],
     objects: [
-      { id: 'diary', t: 'book', x: -3.5, z: -6.9, y: 0.85, label: '뽀삐의 분장 노트', kind: 'examine', once: true,
+      // 노트는 분장대 위가 아니라 옆 의자 위에 둔다 (분장대와 겹쳐 있으면 분장대를 누를 수 없었다)
+      { id: 'diary', t: 'book', x: -2.3, z: -6.7, y: 0.48, label: '뽀삐의 분장 노트', kind: 'examine', once: true,
         on: { flag: 'diary', sound: 'musicbox' },
         text: `【 뽀삐(오세진)의 분장 노트 】
 
@@ -435,7 +437,7 @@ B · L · U · E   M · O · O · N
     ghost: { type: 'crawler', speed: 2.8, sense: 6, teleport: 16, spawn: [8, -5], name: '거꾸로 기는 곡예사 리나', auto: true },
     ghosts: [{ type: 'ringmaster', speed: 2.4, sense: 6, teleport: 24, startFlag: 'trunk', spawn: [-9, -6], name: '단장 마르코' }],
     objectives: [
-      { until: 'diary', text: '분장실을 조사하자', hints: ['가운데 분장대 위 뽀삐의 노트.'] },
+      { until: 'diary', text: '분장실을 조사하자', hints: ['뽀삐의 분장대 바로 오른쪽, 의자 위에 놓인 노트.'] },
       { until: 'makeup', text: '뽀삐의 순서대로 분장하자', hints: ['옆 분장대 거울에 꽂힌 사진 네 장.', '분칠 → 눈매 → 눈물 → 입술 → 코(맨 마지막)'] },
       { until: 'photo', text: '찢어진 단체 사진을 맞추자', hints: ['가운데 이젤. 빈칸 옆 조각을 밀어 1~8 순서로.'] },
       { until: 'trunk', text: '단장의 트렁크를 열자', hints: ['오른쪽 벽의 단장 포스터에 이름이 있다.', 'M · A · R · C · O'] },

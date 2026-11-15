@@ -44,6 +44,29 @@ export function profileView(pf, admin) {
 
 // ───── 방문 통계 (한국 시간 기준 날짜별)
 export const dayKey = (t = Date.now()) => new Date(t + 9 * 3600 * 1000).toISOString().slice(0, 10);
+// ───── 주간 · 월간 레벨 랭킹: 그 주(월요일 시작) · 그 달에 얻은 경험치를 따로 센다 (한국 시간 기준)
+export const weekKey = (t = Date.now()) => { const d = new Date(t + 9 * 3600 * 1000); const dow = (d.getUTCDay() + 6) % 7; return dayKey(t - dow * 86400000); };
+export const monthKey = (t = Date.now()) => dayKey(t).slice(0, 7);
+/** 경험치를 얻을 때마다: 이번 주 · 이번 달 몫에 더한다 (주·달이 바뀌었으면 0부터) */
+export function addPeriodXp(pf, amt, t = Date.now()) {
+  const wk = weekKey(t), mo = monthKey(t);
+  if (pf.wk?.k !== wk) pf.wk = { k: wk, xp: 0 };
+  if (pf.mo?.k !== mo) pf.mo = { k: mo, xp: 0 };
+  pf.wk.xp += amt; pf.mo.xp += amt;
+}
+/** 레벨 랭킹 표: kind = 'week' | 'month' | 'total'. 상위 n명 + 내 순위 */
+export function levelBoard(profiles, kind, n = 20, skip = () => false) {
+  const wk = weekKey(), mo = monthKey(); const rows = [];
+  for (const [name, pf] of Object.entries(profiles)) {
+    if (!pf || skip(name)) continue;
+    const xp = pf.xp || 0;
+    const gain = kind === 'week' ? (pf.wk?.k === wk ? pf.wk.xp : 0) : kind === 'month' ? (pf.mo?.k === mo ? pf.mo.xp : 0) : xp;
+    if (!(gain > 0)) continue;
+    rows.push({ name, lv: levelOf(xp), xp, gain });
+  }
+  rows.sort((a, b) => b.gain - a.gain || b.xp - a.xp || (a.name < b.name ? -1 : 1));
+  return { rows: rows.slice(0, n), total: rows.length, rankOf: (name) => { const i = rows.findIndex((r) => r.name === name); return i < 0 ? null : { no: i + 1, ...rows[i] }; } };
+}
 /** stats.days[날짜] = { v: 방문 수, u: { 닉네임: 머문 시간(ms) } } */
 export function statRange(stats, days) {
   const now = Date.now(); const names = new Map(); let visits = 0;

@@ -761,6 +761,18 @@ export class Cinema {
       { dur: 5, setup: (c) => { c._zs = 0; c.show(); c.scene.background = new THREE.Color('#000'); c.title('데드 시티', '— 마지막 헬기 —'); A()?.play(c.fear >= 2 ? 'sting' : 'bell'); } },
     ];
     const roof = (c) => { c.show('city'); c.night(0.012, '#10141a'); c.cityRain.visible = true; c.cityHeli.visible = true; c.cityZ.forEach((z) => (z.visible = false)); c.cityCrew.forEach((a, i) => { a.visible = true; a.position.set(-3 + i * 1.2, 26.1, Z0 - 39); a.rotation.y = Math.PI; }); c.cityPilot.visible = true; c.cityPilot.position.set(2.4, 26.1, Z0 - 42); c.cityPilot.rotation.y = 0; A()?.ambient(null); };
+    // 미리보기 영상 (설정 → 히든 테마 미리보기): 거리 → 무전 → 몰려오는 좀비 → 옥상 헬기 → 제목
+    if (kind === 'zombie_preview') return [
+      { dur: 7, caption: '2026년 11월 13일, 새벽 3시 50분. 한빛시.\n\'R-9\' 감염 사태 사흘째 — 도시에 산 사람이 보이지 않는다.', setup: (c) => { c.show('city'); c.night(0.016, '#0a0c12'); c.cityHeli.visible = false; c.cityKid.visible = false; c.cityPilot.visible = false; c.cityRain.visible = false; A()?.ambient('zombie'); },
+        update: (c, t, k, dt) => { blink(c, t); c.cityCrew.forEach((a) => { a.position.z = 22 - t * 0.9; animateAvatar(a, dt, true, t); }); c.cityZ.forEach((z, i) => { z.position.x += Math.sin(t * 0.3 + i) * dt * 0.3; animateGhost(z, dt, t, { mode: 'wander' }, 20); }); c.look(4 - k * 6, 3.2, Z0 + 30 - k * 4, 0, 4, Z0 - 20); } },
+      { dur: 6.5, caption: '"…여기는 구조 헬기 매-7.\n05시 정각, 그랜드 한빛 백화점 옥상. 마지막 비행이다."', capAt: 0.5, setup: (c) => { c.show('city'); c.night(0.012, '#0a0c12'); A()?.play('tune_static'); },
+        update: (c, t, k, dt) => { blink(c, t); c.cityZ.forEach((z) => animateGhost(z, dt, t, { mode: 'wander' }, 20)); c.look(0, 4 + k * 20, Z0 - 8 - k * 6, 0, 24, Z0 - 44); } },
+      { dur: 6.5, caption: '지하주차장부터 옥상까지 — 좀비로 가득한 백화점 일곱 층.\n역대급 퍼즐이 기다린다.', capAt: 0.8, setup: (c) => { c.show('city'); c.night(0.025, '#0a0c0a'); A()?.play(c.fear >= 2 ? 'zombie' : 'whisper'); },
+        update: (c, t, k, dt) => { c.cityZ.forEach((z, i) => { const dx = 0 - z.position.x, dz = 14 - z.position.z; const d = Math.hypot(dx, dz) || 1; z.position.x += (dx / d) * dt * 1.6; z.position.z += (dz / d) * dt * 1.6; z.rotation.y = Math.atan2(dx, dz); animateGhost(z, dt, t + i, { mode: 'hunt' }, 4); }); c.look(0.4, 1.6, Z0 + 16 - k * 1.5, 0, 1.4, Z0 - 6); } },
+      { dur: 7, caption: '그리고 — 노란 풍선을 든 아이를 찾아서.', capAt: 1, setup: (c) => { roof(c); c.cityCrew.forEach((a) => (a.visible = false)); c.cityPilot.visible = false; c.cityKid.visible = true; c.cityKid.position.set(-3.5, 26.1, Z0 - 40.5); c.cityKid.rotation.y = 0.5; A()?.play('heli'); },
+        update: (c, t, k, dt) => { spin(c, t); rain(c, dt); blink(c, t); animateAvatar(c.cityKid, dt, false, t, false, 'wave', t); c.look(-11 + k * 3, 28.6 + k * 0.6, Z0 - 31, -1.5, 27.2, Z0 - 43); } },
+      { dur: 6, setup: (c) => { c.show(); c.scene.background = new THREE.Color('#000'); c.title('데드 시티', '히든 테마 · 모든 테마를 클리어하거나 Lv.20을 달성하면 열립니다'); A()?.ambient(null); A()?.play('bell'); } },
+    ];
     if (kind === 'zombie_true') return [
       { dur: 11, caption: '05시 00분. "하린아!" — "아빠!!"\n비에 젖은 조종사가 딸을 끌어안았다.', setup: (c) => { roof(c); c.cityKid.visible = true; c.cityKid.position.set(-1, 26.1, Z0 - 38); A()?.play('heli'); },
         update: (c, t, k, dt) => { spin(c, t); rain(c, dt); const kz = Math.min(1, t / 3.5); c.cityKid.position.set(-1 + kz * 3.2, 26.1, Z0 - 38 - kz * 3.6); c.cityKid.rotation.y = Math.PI * 0.8; animateAvatar(c.cityKid, dt, t < 3.5, t, false, t > 3.5 ? 'heart' : null, t); animateAvatar(c.cityPilot, dt, false, t, false, t > 3.5 ? 'heart' : 'wave', t); c.cityCrew.forEach((a) => animateAvatar(a, dt, false, t, false, 'clap', t)); c.look(-6 + k * 2, 28.5, Z0 - 32, 0.5, 26.9, Z0 - 41); } },

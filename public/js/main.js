@@ -9,16 +9,23 @@ import { jumpscare, pickScare } from './scare.js';
 import { Voice } from './voice.js';
 import { FX, makeBeam } from './fx.js';
 import { applyGear, animateGear, initFx, updateFx, popperFx, rocketFx, swordFx, shatterFx, fartFx } from './gear.js';
+import { FRAMES, shootPhoto, composePhoto, drawStampCard, loadPhotoFonts } from './photo.js';
 
 const $ = (s) => document.querySelector(s);
-const socket = io();
+// 화면(클라이언트)과 서버가 주고받는 방식의 버전 — 서버(server/index.js 의 PROTO)와 맞춘다
+const PROTO = 2;
+// 웹소켓으로 바로 붙는다 (막힌 곳에서는 예전 방식으로 자동 전환) — 처음 붙을 때 오가는 양이 줄어든다
+const socket = io({ transports: ['websocket', 'polling'], tryAllTransports: true });
 // 연결이 끊겼다 다시 붙으면(모바일 앱 전환 등) 같은 플레이어로 이어서 접속
 socket.on('connect', () => {
   if (!S?.resume) return;
-  socket.emit('hello', { name: S.myName, look, resume: S.resume }, (res) => {
-    if (!res.resumed) { S.me = res.id; S.myName = res.name; voice.myId = res.id; rebuildMyAvatar(); toast('연결이 오래 끊겨 로비에서 다시 시작합니다.'); }
+  socket.emit('hello', { v: PROTO, name: S.myName, look, resume: S.resume, acct: S.admin ? undefined : store.get('mia-account', null) || undefined }, (res) => {
+    if (!res || res.error) return;
+    if (!res.resumed) { S.me = res.id; S.myName = res.name; voice.myId = res.id; dropOther(res.id); rebuildMyAvatar(); toast('연결이 오래 끊겨 로비에서 다시 시작합니다.'); }
     S.resume = { id: res.id, token: res.token }; if (!S.admin) store.set('gwimun-resume', { ...S.resume, name: res.name, at: Date.now() });
-    S.items = res.items; if (res.shop) S.shop = res.shop; if (res.hiddenOk != null) S.hiddenOk = res.hiddenOk; renderInv(); renderParty();
+    if (res.account && !S.admin) store.set('mia-account', res.account);
+    S.items = res.items; if (res.shop) S.shop = res.shop; if (res.hiddenOk != null) S.hiddenOk = res.hiddenOk; if (res.unlockedBy) S.unlockedBy = res.unlockedBy; renderInv(); renderParty();
+    clearOthers(); // 끊긴 동안 바뀐 것이 있을 수 있으니 방 안 사람들을 처음부터 다시 받는다
   });
 });
 // 창을 닫거나 숨길 때 '마지막 접속 시각'을 남겨 둔다 → 금방 다시 열면 같은 플레이어로 이어서
@@ -54,6 +61,15 @@ let look = { ...DEFAULT_LOOK, ...store.get('gwimun-look', {}) };
 // 닉네임을 비워 두면 입장을 못 해서 그냥 나가 버린다 → 처음 온 사람에게는 무서운 닉네임을 미리 채워 둔다
 const RAND_NICK = () => ['겁쟁이', '떨리는', '도망치는', '숨은', '용감한', '길잃은', '소심한', '울보'][Math.random() * 8 | 0] + ['토끼', '고양이', '여우', '곰', '유령', '탐정', '인형', '미아'][Math.random() * 8 | 0] + (10 + (Math.random() * 90 | 0));
 $('#nick').value = store.get('gwimun-nick', '') || RAND_NICK();
+// 고정 계정: 이 기기에 계정이 있으면 닉네임이 정해져 있다 (바꿀 수 없음)
+function applyAccountLock() {
+  const a = store.get('mia-account', null); const n = $('#nick'), note = $('#nickNote');
+  if (a?.name) { n.value = a.name; n.readOnly = true; n.classList.add('locked'); if (note) note.textContent = '🔒 이 기기의 고정 계정 닉네임이에요. (레벨 · 코인 · 도장표가 여기에 쌓여요)'; }
+  else { n.readOnly = false; n.classList.remove('locked'); if (note) note.textContent = '처음 정한 닉네임이 이 기기 · IP의 고정 계정이 돼요. 나중에 바꿀 수 없으니 신중하게!'; }
+}
+applyAccountLock();
+// 서버가 접속을 끊으며 남긴 안내 (업데이트 · 다른 창에서 접속)
+{ let k = null; try { k = sessionStorage.getItem('mia-kick'); sessionStorage.removeItem('mia-kick'); } catch {} if (k) setTimeout(() => toast(k), 600); }
 // 초대 링크(?p=코드)로 들어왔으면 입장하자마자 친구 파티에 들어간다
 const JOIN_CODE = new URLSearchParams(location.search).get('p');
 if (JOIN_CODE) history.replaceState(null, '', location.pathname);
@@ -146,6 +162,7 @@ if (look.photo) renderCrop();
 
 $('#enterBtn').onclick = enter;
 $('#nick').addEventListener('keydown', (e) => { if (e.key === 'Enter') enter(); });
+let entering = 0; // 입장 버튼을 연달아 눌러도 한 번만 보낸다
 function enter() {
   audio.init();
   store.set('gwimun-look', look);
@@ -164,14 +181,19 @@ function enter() {
   const adminPw = $('#adminRow').classList.contains('hidden') ? '' : $('#adminPass').value;
   const saved = adminPw ? null : store.get('gwimun-resume', null);
   const resume = saved && saved.name && saved.name.replace(/#\d+$/, '') === name && Date.now() - (saved.at || 0) < 10 * 60 * 1000 ? { id: saved.id, token: saved.token } : undefined;
-  socket.emit('hello', { name, look, resume, admin: adminPw || undefined }, (res) => {
+  if (Date.now() - entering < 6000) return; entering = Date.now();
+  $('#enterBtn').disabled = true; setTimeout(() => { $('#enterBtn').disabled = false; }, 6000);
+  socket.emit('hello', { v: PROTO, name, look, resume, admin: adminPw || undefined, acct: adminPw ? undefined : store.get('mia-account', null) || undefined }, (res) => {
+    entering = 0; $('#enterBtn').disabled = false;
     if (res?.error === 'badadmin') { $('#adminPass').value = ''; $('#adminPass').focus(); toast(res.message); return; }
-    if (res?.error) { const n = $('#nick'); n.value = ''; n.placeholder = '다른 닉네임을 입력하세요'; n.focus(); toast(res.message); return; }
+    if (res?.error && res.keep) { toast(res.message); return; }
+    if (res?.error) { const n = $('#nick'); store.set('mia-account', null); applyAccountLock(); n.value = ''; n.placeholder = '다른 닉네임을 입력하세요'; n.focus(); toast(res.message); return; }
+    if (res.account && !res.admin) { store.set('mia-account', res.account); store.set('gwimun-nick', res.account.name); applyAccountLock(); }
     S.admin = !!res.admin; $('#adminBtn').classList.toggle('hidden', !S.admin); document.body.classList.toggle('is-admin', S.admin); $('#adminPass').value = '';
     S.resume = { id: res.id, token: res.token }; if (!S.admin) store.set('gwimun-resume', { ...S.resume, name: res.name, at: Date.now() }); // 운영자 접속은 기기에 남기지 않는다
     S.me = res.id; S.myName = res.name; S.items = res.items; S.unlocked = res.unlocked || 0; S.hearts = res.hearts || 0; S.unlockedBy = res.unlockedBy || {}; S.scenarios = res.scenarios || [];
     S.shop = res.shop || {}; S.hiddenOk = !!res.hiddenOk;
-    voice.myId = res.id;
+    voice.myId = res.id; dropOther(res.id); // 혹시 내 캐릭터가 '다른 사람'으로 그려져 있었다면 지운다
     $('#login').classList.add('hidden'); $('#hud').classList.remove('hidden');
     pvLoop = false;
     rebuildMyAvatar(); updateHiddenGate(true);
@@ -270,7 +292,7 @@ function enterLobby(pos) {
   me.x = pos.x; me.z = pos.z;
   removeGhost(); clearOthers(); clearPings();
   $('#placeTitle').textContent = '미아 광장';
-  $('#placeSub').textContent = '일곱 개의 관문 · 파티를 모아 이야기를 고르세요';
+  $('#placeSub').textContent = `${(S.scenarios || []).filter((x) => !x.hidden).length || 10}개의 테마 · 파티를 모아 테마를 고르세요`;
   S.themeNear = null; S.themeBubble = null; S.themeAnchor = null;
   $('#objective').classList.add('hidden');
   $('#lookBtn').classList.remove('hidden');
@@ -298,13 +320,18 @@ function enterChapter(state, showIntro = true) {
   $('#lookBtn').classList.add('hidden');
   setObjective(state.objective, state.relics);
   applyObjState(); applyDark();
-  audio.ambient({ gwimun: ch.rain ? 'rain' : 'gwimun', ophelia: 'ship', doll: 'doll', hospital: 'hospital', camp: 'camp', west: 'west', kimono: 'kimono', clown: 'clown', park: 'park', mia: 'mia', zombie: 'zombie' }[S.scenario?.id] || 'horror');
+  audio.ambient(roomAmbient());
   renderer.toneMappingExposure = 1.82;
   if (showIntro && ch.intro) { queueStory({ ...ch.intro, sound: 'story' }); addJournal(ch.intro.title, ch.intro.text, 'story'); }
   if (!document.body.classList.contains('mobile') && !store.get('gwimun-tutorial', false)) { store.set('gwimun-tutorial', true); setTimeout(() => toast('팁: F 손전등 · C 웅크리기(귀신에게 덜 들킴) · G 위치 찍기 · J 수첩'), 4000); }
   renderParty();
 }
-function clearOthers() { for (const [, g] of S.others) removeAvatar(g); S.others.clear(); }
+// 지금 있는 곳의 배경음 이름
+function roomAmbient() {
+  if (S.room !== 'game' || !S.chapter) return 'lobby';
+  return { gwimun: S.chapter.rain ? 'rain' : 'gwimun', ophelia: 'ship', doll: 'doll', hospital: 'hospital', camp: 'camp', west: 'west', kimono: 'kimono', clown: 'clown', park: 'park', mia: 'mia', zombie: 'zombie' }[S.scenario?.id] || 'horror';
+}
+function clearOthers() { for (const [, g] of S.others) removeAvatar(g); S.others.clear(); S.net.clear(); if (S.me) socket.emit('state:full'); }
 function applyObjState() {
   if (!S.world?.objects) return;
   for (const [id, e] of Object.entries(S.world.objects)) {
@@ -426,6 +453,7 @@ function hoverCheck(e) {
   let label = null;
   const th = S.room === 'lobby' ? pickTheme(e.clientX, e.clientY) : null;
   if (th) label = `${THEME_INFO[th]?.title || ''} — 클릭해서 시작`;
+  else if (S.room === 'lobby' && pickClickable(e.clientX, e.clientY) === 'mailbox') label = '📮 고객소리함 — 버그 · 건의사항 보내기';
   if (id) { const ent = S.world.objects[id]; label = (ent.done ? '✓ ' : '') + (ent.data.label || '') + (distTo(ent) > reach(ent) ? '  (클릭하면 다가감)' : ''); }
   else if (!th) { const av = pickAvatar(e.clientX, e.clientY); if (av) label = `${av.userData.name} (클릭: 메뉴)`; }
   canvas.style.cursor = label ? 'pointer' : 'default';
@@ -433,7 +461,7 @@ function hoverCheck(e) {
 }
 function onClick(e) {
   if (!S.me || S.modalOpen) return;
-  if (S.room === 'lobby') { const th = pickTheme(e.clientX, e.clientY); if (th) { openThemePop(th); return; } }
+  if (S.room === 'lobby') { const th = pickTheme(e.clientX, e.clientY); if (th) { openThemePop(th); return; } const ck = pickClickable(e.clientX, e.clientY); if (ck) { lobbyAct(ck); return; } }
   const id = S.room === 'game' ? pickObject(e.clientX, e.clientY) : null;
   if (id) {
     const ent = S.world.objects[id];
@@ -587,10 +615,13 @@ function updateMove(dt) {
 }
 let sendT = 0, lastSent = '';
 function netSend(dt) {
-  sendT += dt; if (sendT < 0.066 || !S.me) return; sendT = 0;
-  const k = `${(me.y || 0).toFixed(2)},${me.x.toFixed(2)},${me.z.toFixed(2)},${me.ry.toFixed(2)},${me.moving},${S.run},${S.crouch},${!!S.sneak},${S.em},${S.eid},${rideTag()},${S.riding},${S.holdSword}`;
+  sendT += dt; if (sendT < 0.1 || !S.me) return; sendT = 0; // 1초에 10번, 바뀌었을 때만
+  // 놀이기구에 탄 동안에는 위치를 보내지 않는다 (다른 사람 화면은 놀이기구 자리로 직접 계산한다 — 빙글빙글 도는 내내 보낼 필요가 없다)
+  const rd = rideTag();
+  const k = rd ? `ride,${rd},${S.em},${S.eid},${S.riding},${S.holdSword}` : `${(me.y || 0).toFixed(2)},${me.x.toFixed(2)},${me.z.toFixed(2)},${me.ry.toFixed(2)},${me.moving},${S.run},${S.crouch},${!!S.sneak},${S.em},${S.eid},${rd},${S.riding},${S.holdSword}`;
   if (k === lastSent) return; lastSent = k;
-  socket.emit('move', { x: me.x, z: me.z, y: me.y || 0, ry: me.ry, anim: me.moving, run: S.run && me.moving, crouch: S.crouch || S.sneak, sneak: !!S.sneak, em: S.em, eid: S.eid, ride: rideTag(), mount: !!S.riding, sword: !!S.holdSword });
+  const n2 = (v) => Math.round(v * 100) / 100;
+  socket.emit('move', { x: n2(me.x), z: n2(me.z), y: n2(me.y || 0), ry: n2(me.ry), anim: me.moving, run: S.run && me.moving, crouch: S.crouch || S.sneak, sneak: !!S.sneak, em: S.em, eid: S.eid, ride: rideTag(), mount: !!S.riding, sword: !!S.holdSword });
 }
 function rideTag() { return S.mount?.kind === 'ride' && S.room === 'lobby' ? `${S.mount.ride}:${S.mount.seat}` : ''; }
 function updateStatus() {
@@ -750,12 +781,15 @@ function updateNearest(t) {
   S.nearest = null; S.nearestVerb = null;
   if (S.room === 'lobby' && S.world?.interactives) { lobbyNearest(); return; }
   if (!S.world?.objects || S.room !== 'game') { $('#prompt').classList.add('hidden'); return; }
+  // 여러 물건이 손 닿는 곳에 겹쳐 있으면: 이미 끝낸 것 · 읽기만 하는 쪽지보다, 아직 풀거나 주울 것이 남은 물건을 먼저 고른다
+  // (쪽지가 자물쇠 바로 앞에 놓여 있어 버튼으로는 자물쇠를 누를 수 없던 문제)
   let best = 1e9;
   for (const [id, ent] of Object.entries(S.world.objects)) {
     if (!ent.visible || ent.data.kind === 'deco') continue;
     const d = distTo(ent);
     if (ent.marker) { ent.marker.material.opacity = d < 6 ? (ent.done ? 0.15 : 0.45 + Math.sin(t * 3 + d) * 0.25) : 0; ent.marker.material.color.set(ent.done ? '#888' : '#ffe9a8'); }
-    if (d <= reach(ent) && d < best) { best = d; S.nearest = id; }
+    const score = d + (ent.done ? 0.7 : 0) + (ent.data.kind === 'examine' || ent.data.kind === 'signal' ? 0.3 : 0);
+    if (d <= reach(ent) && score < best) { best = score; S.nearest = id; }
   }
   for (const [id, ent] of Object.entries(S.world.objects)) {
     const on = id === S.nearest;
@@ -771,34 +805,57 @@ function updateNearest(t) {
 }
 
 // ─────────────────────────── 다른 플레이어 & 귀신
+// 서버는 1초에 10번, '바뀐 사람'만 보낸다 → 사람마다 마지막 상태를 기억해 두고 고쳐 쓴다
+//  한 사람 = [id, x, z, y, ry, 깃발(걷기1·웅크림2·손전등4), { n 이름, lv 외형 번호, pt 파티, g 장비, em·eid 감정표현, rd 놀이기구 }?]
+S.net = new Map();
+function applyPlayer(e) {
+  let p = S.net.get(e[0]); if (!p) { p = { id: e[0] }; S.net.set(e[0], p); }
+  p.x = e[1]; p.z = e[2]; p.y = e[3]; p.ry = e[4]; p.anim = e[5] & 1; p.crouch = e[5] & 2 ? 1 : 0; p.light = !!(e[5] & 4);
+  const x = e[6]; if (x) { p.name = x.n; p.lv = x.lv; p.partyId = x.pt || null; p.gear = x.g; p.em = x.em; p.eid = x.eid; p.ride = x.rd; }
+  return p;
+}
+/** 다른 사람 한 명을 화면에 맞춘다 (캐릭터 만들기 · 외형 받기 · 감정표현 · 손전등 · 파티 표시) */
+function syncOther(p) {
+  if (!p || p.id === S.me || p.name == null) return; // 이름을 아직 못 받았으면 곧 오는 전체 상태를 기다린다
+  const lk = S.looks.get(p.id);
+  if (!lk || lk.lv !== p.lv) { if (!S.lookReq.has(p.id)) { S.lookReq.add(p.id); socket.emit('look:get', p.id); } if (!lk) return; }
+  let g = S.others.get(p.id);
+  if (!g || g.userData.lv !== lk.lv) {
+    const pos = g ? g.position.clone() : new THREE.Vector3(p.x, 0, p.z);
+    if (g) removeAvatar(g);
+    g = makeAvatar(p.id, p.name, lk.look, false);
+    g.userData.lv = lk.lv; g.position.copy(pos);
+    S.others.set(p.id, g);
+  }
+  if (g.userData.eid !== p.eid || g.userData.em !== p.em) { const fresh = g.userData.eid != null; g.userData.eid = p.eid; g.userData.em = p.em; g.userData.emT = 0; if (p.em === 'jump' && fresh) audio.play('pickup'); if (p.em === 'fart' && fresh) doFart(g, p.x, p.y || 0, p.z, p.ry); }
+  g.userData.target = p;
+  setLight(g, p.light);
+  const inParty = !!S.party?.members.some((m) => m.id === p.id);
+  if (g.userData.inParty !== inParty) { g.userData.inParty = inParty; setTag(g, (inParty ? '★ ' : '') + p.name, inParty ? '#8fd3ff' : '#fff'); }
+}
+const syncAllOthers = () => { for (const p of S.net.values()) syncOther(p); };
+function dropOther(id) { S.net.delete(id); const g = S.others.get(id); if (g) { removeAvatar(g); S.others.delete(id); } }
 socket.on('look', ({ id, lv, look: lk }) => {
   S.lookReq.delete(id);
   S.looks.set(id, { lv, look: lk });
-  const g = S.others.get(id);
-  if (g) { removeAvatar(g); S.others.delete(id); }
+  syncOther(S.net.get(id)); // 가만히 서 있는 사람은 새 소식이 오지 않으므로, 외형을 받는 즉시 그린다
 });
-socket.on('state', ({ players, ghosts }) => {
-  const seen = new Set();
-  for (const p of players) {
-    if (p.id === S.me) { if (myAvatar) setLight(myAvatar, p.light); continue; }
-    seen.add(p.id);
-    const lk = S.looks.get(p.id);
-    if (!lk || lk.lv !== p.lv) { if (!S.lookReq.has(p.id)) { S.lookReq.add(p.id); socket.emit('look:get', p.id); } if (!lk) continue; }
-    let g = S.others.get(p.id);
-    if (!g || g.userData.lv !== lk.lv) {
-      const pos = g ? g.position.clone() : new THREE.Vector3(p.x, 0, p.z);
-      if (g) removeAvatar(g);
-      g = makeAvatar(p.id, p.name, lk.look, false);
-      g.userData.lv = lk.lv; g.position.copy(pos);
-      S.others.set(p.id, g);
+socket.on('state', (m) => {
+  const seen = m.f ? new Set() : null; // f: 방 안 전체 목록 (여기 없는 사람은 나간 사람)
+  for (const e of m.p || []) {
+    const p = applyPlayer(e); seen?.add(p.id);
+    if (p.id === S.me) {
+      S.myLight = p.light;
+      // 서버와 손전등 상태가 어긋났으면 서버에 맞춘다 (방금 내가 누른 직후에는 잠깐 기다린다)
+      if (p.light !== S.light && performance.now() - (S.lightAt || 0) > 900) { S.light = p.light; renderInv(); }
+      continue;
     }
-    if (g.userData.eid !== p.eid || g.userData.em !== p.em) { const fresh = g.userData.eid != null; g.userData.eid = p.eid; g.userData.em = p.em; g.userData.emT = 0; if (p.em === 'jump') audio.play('pickup'); if (p.em === 'fart' && fresh) doFart(g, p.x, p.y || 0, p.z, p.ry); }
-    g.userData.target = p;
-    setLight(g, p.light);
-    const inParty = !!S.party?.members.some((m) => m.id === p.id);
-    if (g.userData.inParty !== inParty) { g.userData.inParty = inParty; setTag(g, (inParty ? '★ ' : '') + p.name, inParty ? '#8fd3ff' : '#fff'); }
+    syncOther(p);
   }
-  for (const [id, g] of S.others) if (!seen.has(id)) { removeAvatar(g); S.others.delete(id); }
+  if (seen) for (const id of [...S.net.keys()]) if (!seen.has(id)) dropOther(id);
+  if ('g' in m) syncGhosts(m.g);
+});
+function syncGhosts(ghosts) {
   const live = new Set();
   if (ghosts && S.room === 'game') {
     for (const gs of ghosts) {
@@ -810,9 +867,9 @@ socket.on('state', ({ players, ghosts }) => {
   }
   for (const [i, e] of S.ghosts) if (!live.has(i)) { scene.remove(e.G); S.ghosts.delete(i); }
   if (!S.ghosts.size) { S.danger = 0; $('#vignette').classList.remove('danger'); audio.chase(0); }
-});
+}
 function removeGhost() { for (const e of S.ghosts.values()) scene.remove(e.G); S.ghosts.clear(); S.danger = 0; $('#vignette').classList.remove('danger'); }
-socket.on('player:leave', (id) => { const g = S.others.get(id); if (g) { removeAvatar(g); S.others.delete(id); } });
+socket.on('player:leave', (id) => dropOther(id));
 
 let ghostSoundT = 0;
 function updateOthers(dt, t) {
@@ -831,6 +888,7 @@ function updateOthers(dt, t) {
     applyGear(g, p.gear || ''); animateGear(g, t, dt, !!p.anim);
   }
   S.danger = 0;
+  if (myAvatar) setLight(myAvatar, S.myLight ?? S.light);
   for (const e of S.ghosts.values()) {
     const gs = e.st, G = e.G;
     const frozen = gs.lit && (gs.type === 'woman' || gs.type === 'doll');
@@ -987,7 +1045,7 @@ function themeBubbleSprite(info) {
   x.font = fG; x.fillStyle = '#b8a8b4'; x.fillText(info.tag, pad, y); y += 36;
   x.font = '800 24px "Gowun Dodum", sans-serif'; x.fillStyle = '#ffd36a'; x.fillText(diffText(info.diff || 3), pad, y); y += 40 + 12;
   x.font = fS; x.fillStyle = '#f2ece8'; sl.forEach((l) => { x.fillText(l, pad, y); y += 36; });
-  y += 14; x.font = fH; x.fillStyle = info.color; x.fillText('▶ 파티 패널에서 이 이야기를 고르고 [방탈출 시작]', pad, y);
+  y += 14; x.font = fH; x.fillStyle = info.color; x.fillText('▶ 관문을 누르거나, 파티 패널에서 이 테마를 고르고 [바로 시작]', pad, y);
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true, toneMapped: false, fog: false }));
   const k = 0.0046; sp.scale.set(W * k, H * k, 1); sp.renderOrder = 11; return sp;
@@ -1041,13 +1099,17 @@ socket.on('inv', (inv) => { const before = S.inv.length; S.inv = inv; if (!inv.i
 // 욕설 채팅 경고 · 채팅 금지
 socket.on('chat:blocked', (b) => { addChat({ channel: 'system', text: b.text }); toast(b.text); if (b.muted) { S.chatMutedUntil = Date.now() + b.left * 1000; } });
 socket.on('game:start', async (st) => {
+  if (cinema.active) cinema.skip(); // 미리보기 영상을 보던 중이면 끝내고 게임으로
+  closePhotoPop();
   closeModal(); S.fear = st.fear ?? 2;
   S.scenario = st.scenario || null; updateFearBadge();
   if (st.chapterIdx === 0 && (st.elapsed ?? 0) < 8000 && S.scenario?.id) resetJournalFor(S.scenario.id); // 처음부터 새로 시작
   if (st.chapterIdx === 0 && !S.skipPrologue) { resetInput(); await cinema.play(st.scenario?.cine?.intro || 'prologue', { looks: partyLooks(), audio, fear: S.fear }); }
   enterChapter(st, true);
 });
-socket.on('game:chapter', (st) => { closeModal(); S.storyQueue = []; closeStory(true); fadeTransition(() => enterChapter(st, true)); });
+// 챕터 이동: 같은 소식이 겹쳐 와도 마지막 것 하나만 반영한다 (이야기 창이 두 번 뜨지 않게)
+let chapSeq = 0;
+socket.on('game:chapter', (st) => { closeModal(); S.storyQueue = []; closeStory(true); const my = ++chapSeq; fadeTransition(() => { if (my !== chapSeq) return; S.storyQueue = []; closeStory(true); enterChapter(st, true); }); });
 socket.on('game:sync', (st) => {
   setHintsUsed(st.hintsUsed); if (st.elapsed != null && S.clock && !S.clock.stop) setGameClock(st.elapsed);
   if (st.fear != null && st.fear !== S.fear) { S.fear = st.fear; updateFearBadge(); }
@@ -1114,6 +1176,7 @@ socket.on('game:caught', ({ x, z, by, type }) => {
 socket.on('game:coopPulse', () => audio.play('creak'));
 socket.on('game:ending', (e) => {
   if (S.clock) S.clock.stop = e.ms ?? (performance.now() - S.clock.base);
+  rememberClear(e); // 기념 사진에 쓸 정보 (파티원 · 귀신 · 시간)를 지금 챙겨 둔다
   closeModal(); S.storyQueue = []; closeStory(true);
   addJournal(e.title, e.text, 'story');
   setTimeout(async () => {
@@ -1123,11 +1186,129 @@ socket.on('game:ending', (e) => {
     $('#endRelics').textContent = icons.map((ic, i) => (i < e.relics ? ic : '·')).join(' ') + `   (${e.relics}/${e.total || 7})`;
     let tm = $('#endTime'); if (!tm) { tm = el('div', 'end-time'); tm.id = 'endTime'; $('#endRelics').after(tm); }
     tm.textContent = e.ms ? `⏱ 클리어 시간 ${fmtMs(e.ms)} · 💡 힌트 ${e.hints ?? 0}개${e.over ? ' — ⏰ 제한 시간을 넘겨 순위표·경험치에서 빠졌어요 (코인은 받아요)' : e.full ? ' — 🏆 랭킹에 기록되었습니다' : ' (이어하기는 랭킹에 기록되지 않아요)'}` : '';
+    showEndExtras();
     $('#ending').classList.remove('hidden');
     audio.ambient(null); audio.play(e.type === 'true' || S.fear === 0 ? 'bell' : 'scream');
   }, 1200);
 });
 $('#endBtn').onclick = () => { $('#ending').classList.add('hidden'); socket.emit('party:quit'); };
+socket.on('clears', (ub) => { S.unlockedBy = ub || {}; if (!$('#ending').classList.contains('hidden')) showEndExtras(); });
+
+// ─────────────────────────── 클리어 기념 사진 · 클리어 도장표
+const THEME_ICON = { mia: '🔰', gwimun: '👻', ophelia: '⚓', doll: '🎎', hospital: '🏥', camp: '🏕️', west: '🤠', kimono: '🏮', clown: '🎪', park: '🎡', zombie: '🧟' };
+const themeColor = (id) => THEME_INFO[id]?.color || '#ff3a2a';
+/** 도장표에 찍을 테마 목록 (히든 테마는 따로). nowId: 방금 깬 테마 */
+function stampList(nowId) {
+  const ub = S.unlockedBy || {};
+  const list = (S.scenarios || []).filter((x) => !x.hidden).map((x) => ({ id: x.id, icon: THEME_ICON[x.id] || '★', short: x.short, cleared: !!ub[x.id]?.cleared || x.id === nowId, at: ub[x.id]?.at || 0, now: x.id === nowId }));
+  const h = (S.scenarios || []).find((x) => x.hidden);
+  const hidden = h ? { id: h.id, icon: THEME_ICON[h.id] || '🧟', short: h.short, cleared: !!ub[h.id]?.cleared || h.id === nowId, at: ub[h.id]?.at || 0 } : null;
+  return { list, hidden };
+}
+function rememberClear(e) {
+  const sc = S.scenario; if (!sc) return;
+  const members = [{ name: S.myName, look: { ...look }, gear: myGear() }];
+  for (const m of S.party?.members || []) { if (m.id === S.me) continue; const lk = S.looks.get(m.id)?.look; if (lk) members.push({ name: m.name, look: lk, gear: S.net.get(m.id)?.gear || '' }); }
+  S.lastClear = { id: sc.id, title: sc.short || sc.title, icon: THEME_ICON[sc.id] || '', ending: e.type, timeText: e.ms && e.full ? fmtMs(e.ms) : '', hints: e.ms && e.full ? e.hints ?? 0 : null, members, ghostTypes: sc.ghostTypes || [], tint: themeColor(sc.id), date: new Date(), photo: null };
+}
+// 엔딩 창 아래: 도장이 찍힌 도장표 + 기념 사진 버튼
+function showEndExtras() {
+  let box = $('#endExtras'); if (!box) { box = el('div'); box.id = 'endExtras'; $('#endBtn').before(box); }
+  box.innerHTML = '';
+  const lc = S.lastClear; const { list, hidden } = stampList(lc?.id);
+  const cv = el('canvas', 'end-stamps'); cv.width = 720; cv.height = 420;
+  const h = drawStampCard(cv.getContext('2d'), 12, 10, 696, { stamps: list, hidden }); cv.height = Math.ceil(h + 34);
+  drawStampCard(cv.getContext('2d'), 12, 10, 696, { stamps: list, hidden });
+  const done = list.filter((x) => x.cleared).length;
+  const msg = el('div', 'end-stamp-msg', hidden?.cleared ? '🧟 히든 테마까지 모두 클리어! 전설의 탈출가예요.' : done >= list.length ? '🎉 모든 테마 클리어! 히든 테마 「데드 시티」가 열렸어요.' : `🎫 도장 ${done}개 — ${list.length - done}개만 더 모으면 히든 테마가 열려요!`);
+  const pb = el('button', 'btn primary end-photo', '📸 클리어 기념 사진 받기'); pb.onclick = () => openClearPhoto();
+  box.append(cv, msg, pb);
+}
+const photoPop = el('div', 'ppop hidden'); photoPop.id = 'photoPop'; document.body.appendChild(photoPop);
+function closePhotoPop() { if (photoPop.classList.contains('hidden')) return; photoPop.classList.add('hidden'); photoPop.innerHTML = ''; }
+photoPop.addEventListener('pointerdown', (e) => { if (e.target === photoPop) closePhotoPop(); });
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && !photoPop.classList.contains('hidden')) { e.stopPropagation(); closePhotoPop(); } }, true);
+/** 인화 사진 창: 왼쪽 위 테두리 고르기 · 오른쪽 위 닫기 · 아래 저장 / 공유 */
+async function openClearPhoto() {
+  const lc = S.lastClear; if (!lc) { toast('방탈출을 클리어하면 기념 사진을 받을 수 있어요!'); return; }
+  audio.play('click');
+  photoPop.innerHTML = ''; photoPop.classList.remove('hidden');
+  const card = el('div', 'ppop-card');
+  const frameBtn = el('button', 'ppop-frame', '🖼️ 테두리'); frameBtn.title = '사진 테두리 바꾸기';
+  const closeBtn = el('button', 'ppop-x', '✕'); closeBtn.title = '닫기'; closeBtn.onclick = closePhotoPop;
+  const chooser = el('div', 'ppop-frames hidden');
+  const stage = el('div', 'ppop-stage'); const img = el('img', 'ppop-img'); img.alt = '클리어 기념 사진'; img.draggable = false;
+  const wait = el('div', 'ppop-wait', '📸 찰칵! 사진을 인화하는 중…'); stage.append(img, wait);
+  const btns = el('div', 'ppop-btns');
+  const save = el('button', 'btn primary', '💾 저장'), share = el('button', 'btn primary', '📤 공유');
+  btns.append(save, share);
+  const tip = el('div', 'ppop-tip', document.body.classList.contains('mobile') ? '사진을 길게 눌러도 저장할 수 있어요' : '테두리를 바꾼 뒤 저장하거나 친구에게 공유해 보세요');
+  card.append(frameBtn, closeBtn, chooser, stage, btns, tip); photoPop.appendChild(card);
+  save.disabled = share.disabled = true;
+  let frame = store.get('mia-frame', 'polaroid'); if (!FRAMES.some((f) => f.id === frame)) frame = 'polaroid';
+  let final = null;
+  const info = () => { const { list, hidden } = stampList(lc.id); return { icon: lc.icon, title: lc.title, ending: lc.ending, timeText: lc.timeText, hints: lc.hints, names: lc.members.map((m) => m.name), date: lc.date, tint: lc.tint, site: location.host.includes('localhost') || /^[\d.:]+$/.test(location.host) ? 'mia-escape.kr' : location.host, stamps: list, hidden }; };
+  const paint = () => {
+    if (!lc.photo) return;
+    final = composePhoto(lc.photo, info(), frame);
+    img.src = final.toDataURL('image/jpeg', 0.92); wait.classList.add('hidden'); save.disabled = share.disabled = false;
+    chooser.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.id === frame));
+    frameBtn.textContent = `🖼️ 테두리: ${FRAMES.find((f) => f.id === frame)?.name || ''}`;
+  };
+  FRAMES.forEach((f) => { const b = el('button', 'btn small', `${f.icon} ${f.name}`); b.dataset.id = f.id; b.onclick = () => { frame = f.id; store.set('mia-frame', frame); audio.play('click'); paint(); }; chooser.appendChild(b); });
+  frameBtn.onclick = () => chooser.classList.toggle('hidden');
+  const fileName = () => `mia-clear-${lc.id}-${lc.date.getFullYear()}${String(lc.date.getMonth() + 1).padStart(2, '0')}${String(lc.date.getDate()).padStart(2, '0')}.jpg`;
+  const toBlob = () => new Promise((res) => final.toBlob(res, 'image/jpeg', 0.92));
+  save.onclick = async () => {
+    if (!final) return;
+    const blob = await toBlob(); if (!blob) return toast('사진을 만들지 못했어요. 다시 시도해 주세요.');
+    const url = URL.createObjectURL(blob); const a = el('a'); a.href = url; a.download = fileName(); document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000);
+    toast(document.body.classList.contains('mobile') ? '💾 사진을 저장했어요! (안 되면 사진을 길게 눌러 저장하세요)' : '💾 사진을 저장했어요! (다운로드 폴더)');
+  };
+  share.onclick = async () => {
+    if (!final) return;
+    const site = 'https://' + info().site;
+    const text = `${lc.members.map((m) => m.name).join(', ')} — 공포 방탈출 '${lc.title}' 클리어!${lc.timeText ? ` (${lc.timeText})` : ''} 👻\n같이 하자 👉 ${site}`;
+    try {
+      const blob = await toBlob(); const file = blob && new File([blob], fileName(), { type: 'image/jpeg' });
+      if (file && navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: '미아 — 방탈출 클리어!', text }); return; }
+      if (navigator.share) { await navigator.share({ title: '미아 — 방탈출 클리어!', text, url: site }); toast('사진은 💾 저장을 눌러 함께 보내 주세요!'); return; }
+    } catch (err) { if (err?.name === 'AbortError') return; }
+    try { await navigator.clipboard.writeText(text); toast('📋 자랑 글과 게임 주소를 복사했어요! 사진은 💾 저장으로 받아 함께 올려 주세요.'); } catch { toast('이 브라우저에서는 바로 공유할 수 없어요. 💾 저장을 눌러 사진을 받아 주세요.'); }
+  };
+  try {
+    await loadPhotoFonts();
+    if (!lc.photo) lc.photo = await shootPhoto({ members: lc.members, ghostTypes: lc.ghostTypes, tint: lc.tint });
+    if (photoPop.classList.contains('hidden')) return;
+    paint(); audio.play('pickup');
+  } catch (err) { console.error(err); wait.textContent = '사진을 만들지 못했어요. 😢 닫고 다시 눌러 주세요.'; }
+}
+/** 클리어 도장표 (설정 · 내 물건에서 언제든 볼 수 있다) */
+function openStamps() {
+  const { list, hidden } = stampList(null);
+  const w = el('div', 'stamps');
+  const done = list.filter((x) => x.cleared).length;
+  w.appendChild(el('div', 'stamps-head', hidden?.cleared ? `🧟 히든 테마까지 모두 클리어! (${done}/${list.length} + 히든)` : done >= list.length ? `🎉 ${done}/${list.length} — 모든 테마 클리어! 히든 테마가 열렸어요.` : `도장 ${done} / ${list.length} — ${list.length - done}개 더 모으면 히든 테마 「데드 시티」가 열려요!`));
+  const grid = el('div', 'stamps-grid');
+  const fmtDay = (t) => { const d = new Date(t); return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`; };
+  for (const x of [...list, ...(hidden && (hidden.cleared || S.hiddenOk || S.admin) ? [{ ...hidden, hid: true }] : [])]) {
+    const c = el('div', 'stamp' + (x.cleared ? ' on' : '') + (x.hid ? ' hid' : ''));
+    c.append(el('div', 'stamp-ring', x.icon), el('div', 'stamp-name', x.short), el('div', 'stamp-date', x.cleared ? (x.at ? fmtDay(x.at) : 'CLEAR') : '아직'));
+    grid.appendChild(c);
+  }
+  w.appendChild(grid);
+  w.appendChild(el('div', 'muted', '테마를 끝까지 클리어하면 도장이 찍혀요. 클리어할 때마다 귀신들과 함께 찍은 기념 사진도 받을 수 있어요!'));
+  if (S.lastClear) { const b = el('button', 'btn primary', '📸 방금 받은 기념 사진 다시 보기'); b.onclick = () => { closeModal(); openClearPhoto(); }; w.appendChild(b); }
+  openModal('🎫 클리어 도장표', '', w);
+}
+// 히든 테마 「데드 시티」 미리보기 영상 (설정 → 미리보기)
+async function playHiddenPreview() {
+  if (S.room !== 'lobby') { toast('미리보기 영상은 로비(미아 광장)에서 볼 수 있어요.'); return; }
+  if (cinema.active) return;
+  resetInput(); S.mobileClose?.(); audio.init();
+  await cinema.play('zombie_preview', { looks: partyLooks(), audio, fear: 1 });
+  if (S.room === 'lobby') { audio.ambient('lobby'); toast(S.hiddenOk || S.admin ? '🧟 히든 테마 「데드 시티」가 열려 있어요! 광장 북쪽 관문에서 시작해 보세요.' : '🔒 모든 테마를 한 번씩 클리어하거나 Lv.20이 되면 「데드 시티」가 열려요.'); }
+}
 $('#hintBtn').onclick = () => socket.emit('game:hint');
 $('#journalBtn').onclick = openJournal;
 
@@ -1637,7 +1818,7 @@ function primaryItem(it, i, slotEl) {
 }
 function useItem(it) {
   if (!S.inv.includes(it)) return;
-  if (it === 'flashlight') { S.light = !S.light; audio.play('click'); if (myAvatar) setLight(myAvatar, S.light); renderInv(); }
+  if (it === 'flashlight') { S.light = !S.light; S.myLight = S.light; S.lightAt = performance.now(); audio.play('click'); if (myAvatar) setLight(myAvatar, S.light); renderInv(); }
   socket.emit('inv:use', it);
 }
 function hideMenus() { $('#itemMenu').classList.add('hidden'); $('#playerMenu').classList.add('hidden'); }
@@ -1697,14 +1878,15 @@ socket.on('chat', addChat);
 $('#adminToggle').onclick = () => { const r = $('#adminRow'); r.classList.toggle('hidden'); $('#nickRow').classList.toggle('hidden', !r.classList.contains('hidden')); if (!r.classList.contains('hidden')) $('#adminPass').focus(); };
 $('#adminPass').addEventListener('keydown', (e) => { if (e.key === 'Enter') enter(); });
 socket.on('notice', ({ text }) => { const b = $('#noticeBanner'); b.textContent = '📢 ' + text; b.classList.remove('hidden'); audio.play('bell'); clearTimeout(b._t); b._t = setTimeout(() => b.classList.add('hidden'), 9000); });
-socket.on('kicked', ({ text }) => { alert(text); store.set('gwimun-resume', null); location.reload(); });
+socket.on('kicked', ({ text }) => { store.set('gwimun-resume', null); S.resume = null; try { sessionStorage.setItem('mia-kick', text); } catch {} location.reload(); });
 function openAdmin() {
   const w = el('div', 'admin-pop');
   const ta = el('textarea'); ta.placeholder = '모든 접속자에게 보낼 공지'; ta.maxLength = 200; ta.onkeydown = (e) => e.stopPropagation();
   const send = el('button', 'btn primary', '📢 공지 보내기'); send.onclick = () => { if (ta.value.trim()) { socket.emit('admin:notice', ta.value); ta.value = ''; } };
   const list = el('div', 'admin-list'); const head = el('div', 'muted', '불러오는 중…');
   const load = () => socket.emit('admin:stats', (st) => {
-    head.textContent = `접속자 ${st.players.length}명 · 진행 중인 게임 ${st.games}개`; list.innerHTML = '';
+    head.textContent = `접속자 ${st.players.filter((p) => !p.offline).length}명 · 진행 중인 게임 ${st.games}개 · 고정 계정 ${st.accounts ?? '-'}개`; list.innerHTML = '';
+    fbB.textContent = '📮 고객소리함 보기' + (st.feedbackNew ? ` (새 글 ${st.feedbackNew})` : '');
     statBox.innerHTML = ''; if (st.visit) statBox.appendChild(visitStats(st));
     for (const p of st.players) {
       const row = el('div', 'admin-row');
@@ -1720,15 +1902,68 @@ function openAdmin() {
   });
   const re = el('button', 'btn small', '🔄 새로고침'); re.onclick = load;
   const statBox = el('div', 'visit-box');
-  const rk = el('button', 'btn small', '🏆 랭킹 관리 (기록 지우기)'); rk.onclick = () => openRank();
-  w.append(ta, send, statBox, rk, head, list, re); load();
-  openModal('🛡️ 운영자', '공지 · 방문 통계 · 랭킹 관리 · 채팅 금지 · 내보내기 · 머니 무한', w);
+  const rk = el('button', 'btn small', '🏆 랭킹 관리 (기록 지우기)'); rk.onclick = () => openRank({ main: 'theme' });
+  const fbB = el('button', 'btn small', '📮 고객소리함 보기'); fbB.onclick = () => openFeedbackAdmin();
+  const tools = el('div', 'row admin-tools'); tools.append(rk, fbB);
+  w.append(ta, send, statBox, tools, head, list, re); load();
+  openModal('🛡️ 운영자', '공지 · 방문 통계 · 랭킹 관리 · 고객소리함 · 채팅 금지 · 내보내기 · 머니 무한', w);
+}
+// ─────────────────────────── 고객소리함 (버그 · 건의사항)
+const FB_KIND = { bug: '🐞 버그', idea: '💡 건의', etc: '💬 기타' };
+function openFeedback() {
+  const w = el('div', 'fb');
+  let kind = 'bug';
+  const chips = el('div', 'fb-kinds');
+  [['bug', '🐞 버그 신고'], ['idea', '💡 건의 · 아이디어'], ['etc', '💬 그 밖의 이야기']].forEach(([k, label]) => { const b = el('button', 'btn small', label); b.dataset.k = k; b.onclick = () => { kind = k; paint(); ta.focus(); }; chips.appendChild(b); });
+  const ta = el('textarea', 'fb-text'); ta.maxLength = 1000; ta.rows = 6; ta.onkeydown = (e) => e.stopPropagation();
+  const cnt = el('div', 'muted fb-count', '0 / 1000'); ta.oninput = () => { cnt.textContent = `${ta.value.length} / 1000`; };
+  const paint = () => {
+    chips.querySelectorAll('button').forEach((b) => b.classList.toggle('primary', b.dataset.k === kind));
+    ta.placeholder = kind === 'bug' ? '어디에서(테마 · 몇 장), 무엇을 했을 때, 어떻게 됐는지 적어 주세요.\n예) 삐에로 4장에서 분장대가 눌리지 않아요.'
+      : kind === 'idea' ? '이런 게 있으면 좋겠어요!\n새 테마 · 새 기능 · 고쳤으면 하는 점을 자유롭게 적어 주세요.' : '하고 싶은 이야기를 자유롭게 적어 주세요.';
+  };
+  const send = el('button', 'btn primary fb-send', '📮 우편함에 넣기');
+  send.onclick = () => {
+    const text = ta.value.trim(); if (text.length < 5) { toast('내용을 조금만 더 자세히 적어 주세요. (5자 이상)'); ta.focus(); return; }
+    send.disabled = true;
+    const back = setTimeout(() => { send.disabled = false; toast('보내지 못했어요. 잠시 후 다시 눌러 주세요.'); }, 6000);
+    socket.emit('feedback:send', { kind, text }, (r) => {
+      clearTimeout(back); send.disabled = false;
+      if (r?.error) { toast(r.error); return; }
+      closeModal(); audio.play('pickup'); toast('📮 소중한 의견 고마워요! 운영자가 꼭 읽어 볼게요.'); if (myAvatar) burstHearts(myAvatar, 6);
+    });
+  };
+  w.append(chips, ta, cnt, send, el('div', 'muted fb-note', '보낸 글은 운영자만 볼 수 있어요. 닉네임 · 지금 있는 곳 · 브라우저 종류가 함께 전달됩니다.'));
+  paint();
+  openModal('📮 고객소리함', '버그를 발견했거나 바라는 점이 있다면 알려 주세요. 하나하나 읽고 고칩니다!', w);
+  if (!document.body.classList.contains('mobile')) setTimeout(() => ta.focus(), 60);
+}
+function openFeedbackAdmin() {
+  const w = el('div', 'fb-admin'); w.appendChild(el('div', 'muted', '불러오는 중…'));
+  const fmtAt = (t) => { const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+  const load = () => socket.emit('admin:feedback', (list) => {
+    if ($('#modalBody').firstChild !== w) return;
+    w.innerHTML = '';
+    w.appendChild(el('div', 'muted', `모두 ${list.length}개 · 아직 확인 안 한 글 ${list.filter((f) => !f.done).length}개`));
+    if (!list.length) w.appendChild(el('div', 'bag-empty', '아직 도착한 글이 없어요 📭'));
+    for (const f of list) {
+      const d = el('div', 'fb-item' + (f.done ? ' done' : ''));
+      d.append(el('div', 'fb-head', `${FB_KIND[f.kind] || ''} · ${f.name} (Lv.${f.lv ?? '?'}) · ${f.where || '-'} · ${fmtAt(f.at)}`), el('div', 'fb-body', f.text), el('div', 'fb-ua', f.ua || ''));
+      const row = el('div', 'row');
+      const ok = el('button', 'btn tiny', f.done ? '↩ 다시 열기' : '✅ 확인함'); ok.onclick = () => { socket.emit('admin:feedbackDone', f.id); setTimeout(load, 200); };
+      const del = el('button', 'btn tiny danger', '🗑️ 지우기'); del.onclick = () => { socket.emit('admin:feedbackDel', f.id); setTimeout(load, 200); };
+      row.append(ok, del); d.appendChild(row); w.appendChild(d);
+    }
+  });
+  openModal('📮 고객소리함 (운영자)', '최근 200개까지 보여요. 확인한 글은 흐리게 표시됩니다.', w);
+  footBtn('← 운영자 창', () => openAdmin());
+  load();
 }
 $('#adminBtn').onclick = openAdmin;
 
 // ─────────────────────────── 파티 & 접속자
 socket.on('roster', (list) => { S.roster = list; renderRoster(); updateVoiceTargets(); });
-socket.on('party', (p) => { S.party = p; renderParty(); if (p && p.leader === S.me && !p.instId && (!p.pick || p.pick.n !== p.members.length)) sendPick(); renderRoster(); updateVoiceTargets(); });
+socket.on('party', (p) => { S.party = p; syncAllOthers(); renderParty(); if (p && p.leader === S.me && !p.instId && (!p.pick || p.pick.n !== p.members.length)) sendPick(); renderRoster(); updateVoiceTargets(); });
 socket.on('party:invite', ({ partyId, from }) => {
   audio.play('bell');
   $('#inviteText').textContent = `📨 ${from} 님이 파티에 초대했습니다.`;
@@ -1740,7 +1975,7 @@ socket.on('toast', ({ text }) => toast(text));
 function renderParty() {
   const p = S.party; const box = $('#partyMembers'); box.innerHTML = '';
   const amLeader = !p || p.leader === S.me;
-  if (!p) box.appendChild(el('div', 'muted', '파티 없음 · 접속자 목록에서 초대하거나 혼자 시작하세요'));
+  if (!p) box.appendChild(el('div', 'muted', '파티 없음 · 접속자 목록에서 초대하거나 바로 시작하세요'));
   else p.members.forEach((m) => {
     const d = el('div', 'member');
     if (m.id === p.leader) d.appendChild(el('span', 'crown', '👑'));
@@ -1768,7 +2003,7 @@ function renderParty() {
   $('#scenarioDesc').textContent = scInfo ? diffText(scInfo.difficulty || 3) + '\n' + scInfo.desc + (ub[scInfo.id]?.cleared ? ' · ✅ 클리어' : '') : '';
   (scInfo?.chapters || []).forEach((t, i) => { if (i <= unlocked) { const o = el('option', null, (i === 0 ? '처음부터: ' : '이어하기: ') + t); o.value = i; sel.appendChild(o); } });
   if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
-  $('#startBtn').textContent = p && p.members.length > 1 ? '방탈출 시작' : '혼자 시작';
+  $('#startBtn').textContent = p && p.members.length > 1 ? '방탈출 시작' : '바로 시작';
   // 파티원: 파티장이 고른 내용을 그대로 보여 주고, 시작 대신 '시작 요청'
   const member = !!p && !amLeader;
   for (const id of ['#scenarioSel', '#fearSel', '#chapterSel']) $(id).disabled = member;
@@ -1812,13 +2047,14 @@ function dismount() {
     const ex = S.world?.rides?.[m.ride]?.exit;
     if (ex) { me.x = ex.x; me.z = ex.z; }
     else if (it) { const a = Math.atan2(me.x - it.x, me.z - it.z); const d = m.ride === 'carousel' ? 3.9 : 0; me.x = it.x + Math.sin(a) * d; me.z = m.ride === 'wheel' ? it.z + 0.6 : it.z + Math.cos(a) * d; if (m.ride === 'wheel') me.x = it.x; }
-  } else { me.x += Math.sin(me.ry) * 0.7; me.z += Math.cos(me.ry) * 0.7; }
+  } else { const k = m.seat?.back ? -0.75 : 0.7; me.x += Math.sin(me.ry) * k; me.z += Math.cos(me.ry) * k; } // 테이블을 보고 앉는 자리는 뒤로 일어난다
   [me.x, me.z] = collide(me.x, me.z);
   if (S.wasRiding && S.profile?.equip?.mount) { S.riding = true; updateGearButtons(); } S.wasRiding = false;
 }
 function lobbyAct(id) {
   if (S.mount) { dismount(); toast('내렸어요.'); return; }
   if (id === 'shop') { setTimeout(openShop, 160); return; }
+  if (id === 'mailbox') { setTimeout(openFeedback, 160); return; }
   if (S.riding) { S.riding = false; S.wasRiding = true; } // 벤치·놀이기구에서 내리면 다시 탈것에 탄다
   if (S.perch && id === 'off') { S.perch = null; me.y = 0; [me.x, me.z] = collide(me.x + Math.sin(me.ry) * 1.2, me.z + Math.cos(me.ry) * 1.2); return; }
   const it = S.world?.interactives?.find((i) => i.id === id); if (!it) return;
@@ -1834,10 +2070,17 @@ function lobbyAct(id) {
     if (r.sit) { S.em = 'sit'; S.emT = 0; S.eid++; }
     toast(it.id === 'coaster' ? `🎢 롤러코스터 ${Math.floor(seat / 2) + 1}번째 칸에 탔어요! (움직이거나 다시 누르면 탑승장에서 내려요)` : `${it.label}에 탔어요! (움직이거나 다시 누르면 내려요)`);
   } else if (it.kind === 'sit') {
-    S.mount = { kind: 'sit', seat: { ...it.seat } }; S.perch = null; S.em = 'sit'; S.emT = 0; S.eid++;
+    // 자리가 여럿이면(피크닉 테이블 의자) 가장 가까운 빈자리에 앉는다
+    let seat = it.seat;
+    if (it.seats) {
+      const taken = (q) => [...S.others.values()].some((g) => Math.hypot(g.position.x - q.x, g.position.z - q.z) < 0.3);
+      seat = it.seats.filter((q) => !taken(q)).sort((a, b) => Math.hypot(a.x - me.x, a.z - me.z) - Math.hypot(b.x - me.x, b.z - me.z))[0];
+      if (!seat) { toast(`${it.label} 자리가 꽉 찼어요.`); return; }
+    }
+    S.mount = { kind: 'sit', seat: { ...seat } }; S.perch = null; S.em = 'sit'; S.emT = 0; S.eid++;
   } else if (it.kind === 'climb') {
     S.perch = it.perch; me.x = it.perch.x; me.z = it.perch.z; me.y = it.perch.y; S.mount = null;
-    toast('테이블 위에 올라갔어요! (가장자리로 걸어가면 내려와요)');
+    toast(`${it.label} 위에 올라갔어요! (가장자리로 걸어가면 내려와요)`);
   }
 }
 function lobbyNearest() {
@@ -1858,6 +2101,13 @@ function pickTheme(cx, cy) {
   const ex = S.world?.exhibits; if (!ex) return null;
   ndc.set((cx / innerWidth) * 2 - 1, -(cy / innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera);
   for (const h of ray.intersectObjects(ex.map((e) => e.group), true)) { const e = ex.find((x) => { let o = h.object; while (o) { if (o === x.group) return true; o = o.parent; } return false; }); if (e) return e.id; }
+  return null;
+}
+// 로비에서 직접 누를 수 있는 물건 (우편함 등)
+function pickClickable(cx, cy) {
+  const list = S.world?.clickables; if (!list?.length) return null;
+  ndc.set((cx / innerWidth) * 2 - 1, -(cy / innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera);
+  for (const c of list) if (ray.intersectObject(c.group, true).length) return c.id;
   return null;
 }
 const themePop = el('div', 'tpop hidden'); themePop.id = 'themePop';
@@ -1890,7 +2140,7 @@ function openThemePop(id) {
     if (p.pick && p.pick.scenario !== id) card.appendChild(el('div', 'tpop-note', '파티장이 다른 테마를 고르고 있어요.'));
   } else {
     const cancel = el('button', 'btn', '닫기'); cancel.onclick = closeThemePop;
-    const go = el('button', 'btn primary tpop-go', p && p.members.length > 1 ? `▶ ${sc?.short || ''} 시작` : `▶ 혼자 시작`);
+    const go = el('button', 'btn primary tpop-go', p && p.members.length > 1 ? `▶ ${sc?.short || ''} 시작` : `▶ 바로 시작`);
     go.onclick = () => { $('#fearSel').value = fear.value; $('#chapterSel').value = chap.value; closeThemePop(); $('#startBtn').onclick(); };
     btns.append(cancel, go);
     card.appendChild(el('div', 'tpop-note', '친구와 하려면 오른쪽 위 👥 파티에서 먼저 초대하세요.'));
@@ -1912,24 +2162,45 @@ socket.on('lobby:notice', ({ text }) => {
 // ─────────────────────────── 랭킹
 const FEAR_SHORT = { 0: '왕초보', 1: '순한맛', 2: '보통', 3: '매운맛' };
 const fmtMs = (ms) => { const d = Math.round(ms / 100); const m = Math.floor(d / 600), s = (d % 600) / 10; return `${m}분 ${s.toFixed(1).padStart(4, '0')}초`; }; // 0.1초 단위
-function openRank(tab) {
+// 🏆 버튼 하나에 모두 모았다: 주간 · 월간 · 총 랭킹(레벨 기준) + 테마별 클리어 시간 랭킹
+function openRank(opt = {}) {
+  if (typeof opt === 'string') opt = { main: 'theme', theme: opt };
   // 창은 바로 띄우고, 서버 응답이 오면 채운다 (응답이 없으면 안내)
   const holder = el('div', 'rank'); holder.appendChild(el('div', 'muted', '랭킹을 불러오는 중…'));
-  openModal('🏆 클리어 랭킹', '테마를 1장부터 끝까지 클리어한 시간 순위 (상위 10팀)', holder);
+  openModal('🏆 랭킹', '', holder);
   let done = false;
   const timer = setTimeout(() => { if (done || $('#modalBody').firstChild !== holder) return; holder.innerHTML = ''; holder.appendChild(el('div', 'muted', '랭킹을 불러오지 못했어요. 잠시 후 다시 눌러 주세요. (계속 안 되면 서버를 다시 켜 주세요)')); }, 5000);
-  socket.emit('rank:get', (data) => {
+  socket.emit('rank:all', (data) => {
     done = true; clearTimeout(timer);
     if ($('#modal').classList.contains('hidden') || $('#modalBody').firstChild !== holder) return; // 그새 닫았거나 다른 창을 열었다
     const wrap = holder; wrap.innerHTML = '';
-    const tabs = el('div', 'rank-tabs'); const list = el('div', 'rank-list');
-    S.rankTab = () => cur;
+    const mains = el('div', 'rank-main'); const sub = el('div', 'rank-sub'); const tabs = el('div', 'rank-tabs'); const list = el('div', 'rank-list'); const mine = el('div', 'rank-mine');
     const scs = (S.scenarios || []).filter((x) => !x.hidden || S.hiddenOk);
-    let cur = tab || scs[0]?.id;
-    const draw = () => {
-      tabs.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.id === cur));
-      list.innerHTML = '';
-      const rows = data?.[cur] || [];
+    let main = opt.main || S.rankMain || 'week';
+    let cur = opt.theme || S.rankTheme || scs[0]?.id;
+    S.rankTab = () => ({ main, theme: cur });
+    const md = (k) => `${Number(k.slice(5, 7))}월 ${Number(k.slice(8, 10))}일`;
+    const SUB = {
+      week: () => `이번 주(${md(data.week)} 월요일부터)에 얻은 경험치 순위예요. 매주 월요일 0시에 새로 시작해요.`,
+      month: () => `이번 달(${Number(data.month.slice(5, 7))}월)에 얻은 경험치 순위예요. 매달 1일에 새로 시작해요.`,
+      total: () => '지금까지 쌓은 레벨 순위예요. (같은 레벨이면 경험치가 많은 순)',
+      theme: () => '테마를 1장부터 끝까지 클리어한 시간 순위예요. (테마마다 상위 10팀)',
+    };
+    const drawLevel = () => {
+      const b = data.level?.[main] || { rows: [] };
+      if (!b.rows.length) list.appendChild(el('div', 'muted', main === 'total' ? '아직 기록이 없어요.' : '아직 이번 기간에 경험치를 얻은 사람이 없어요. 챕터를 넘기거나 테마를 클리어하면 첫 번째 주인공이 됩니다!'));
+      b.rows.forEach((r, i) => {
+        const row = el('div', 'rank-row lv' + (r.name === S.myName ? ' me' : ''));
+        row.append(el('span', 'rank-no', ['🥇', '🥈', '🥉'][i] || String(i + 1)), el('span', 'rank-names', r.name), el('span', 'rank-time', `Lv.${r.lv}`),
+          el('span', 'rank-meta', main === 'total' ? `누적 ${r.xp.toLocaleString()} XP` : `${main === 'week' ? '이번 주' : '이번 달'} +${r.gain.toLocaleString()} XP`));
+        list.appendChild(row);
+      });
+      if (S.admin) return;
+      const m = b.me;
+      mine.textContent = m ? `내 순위 ${m.no}위 / ${b.total}명 · Lv.${m.lv} · ${main === 'total' ? `누적 ${m.xp.toLocaleString()} XP` : `+${m.gain.toLocaleString()} XP`}` : main === 'total' ? '아직 경험치가 없어요. 챕터를 넘기면 +40 XP, 테마를 클리어하면 더 많이 받아요!' : '이번 기간에는 아직 순위에 없어요. 챕터를 넘기면 +40 XP!';
+    };
+    const drawTheme = () => {
+      const rows = data.themes?.[cur] || [];
       if (!rows.length) { list.appendChild(el('div', 'muted', '아직 기록이 없어요. 처음부터 클리어하면 첫 기록이 됩니다!')); return; }
       rows.forEach((r, i) => {
         const row = el('div', 'rank-row' + (r.names.includes(S.myName) ? ' me' : ''));
@@ -1939,8 +2210,18 @@ function openRank(tab) {
         list.appendChild(row);
       });
     };
-    scs.forEach((s) => { const b = el('button', 'btn tiny', s.short); b.dataset.id = s.id; b.onclick = () => { cur = s.id; draw(); }; tabs.appendChild(b); });
-    wrap.append(tabs, list);
+    const draw = () => {
+      S.rankMain = main; S.rankTheme = cur;
+      mains.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.id === main));
+      tabs.classList.toggle('hidden', main !== 'theme');
+      tabs.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.id === cur));
+      sub.textContent = SUB[main](); list.innerHTML = ''; mine.textContent = '';
+      if (main === 'theme') drawTheme(); else drawLevel();
+      mine.classList.toggle('hidden', !mine.textContent);
+    };
+    [['week', '📅 주간 랭킹'], ['month', '🗓️ 월간 랭킹'], ['total', '👑 총 랭킹'], ['theme', '🚪 테마 랭킹']].forEach(([id, label]) => { const b = el('button', 'btn small', label); b.dataset.id = id; b.onclick = () => { main = id; draw(); }; mains.appendChild(b); });
+    scs.forEach((x) => { const b = el('button', 'btn tiny', x.short); b.dataset.id = x.id; b.onclick = () => { cur = x.id; draw(); }; tabs.appendChild(b); });
+    wrap.append(mains, sub, tabs, list, mine);
     try { draw(); } catch (e) { list.innerHTML = ''; list.appendChild(el('div', 'muted', '랭킹을 표시하지 못했어요.')); console.error(e); }
   });
 }
@@ -2039,11 +2320,15 @@ $('#settingsBtn').onclick = () => {
   const q = el('select'); [['high', '높음 (가장 선명)'], ['medium', '보통 (선명 · 가벼움)']].forEach(([v, t]) => { const o = el('option', null, t); o.value = v; q.appendChild(o); });
   q.value = SET.quality; q.onchange = () => { SET.quality = q.value; fx.setQuality(SET.quality); saveSettings(); rebuildMyAvatar(); };
   row('그래픽 품질', q);
+  if (!S.admin && S.myName) row('내 고정 계정', el('b', 'set-acct', `🔒 ${S.myName}`));
   const btns = el('div', 'set-btns');
-  const sb = (label, fn) => { const b = el('button', 'btn', label); b.onclick = fn; btns.appendChild(b); };
+  const sb = (label, fn) => { const b = el('button', 'btn', label); b.onclick = fn; btns.appendChild(b); return b; };
   sb(SET.minimap ? '🗺 지도 끄기' : '🗺 지도 보기', () => { SET.minimap = !SET.minimap; saveSettings(); closeModal(); toast(SET.minimap ? '지도를 켰어요' : '지도를 껐어요'); });
   sb('👗 옷 갈아입기', () => { closeModal(); $('#lookBtn').click(); });
   sb('❔ 도움말', () => { closeModal(); $('#helpBtn').click(); });
+  sb('🧟 히든 「데드 시티」 미리보기 영상 ▶', () => { closeModal(); playHiddenPreview(); }).classList.add('wide');
+  sb('🎫 클리어 도장표', () => { closeModal(); openStamps(); });
+  sb('📮 고객소리함', () => { closeModal(); openFeedback(); });
   wrap.appendChild(btns);
   // 만든이 · 링크 · 후원
   const cr = el('div', 'credits');
@@ -2218,7 +2503,7 @@ socket.on('xp', ({ add, why, lv, up }) => {
   if (up) { audio.play('bell'); if (myAvatar) burstHearts(myAvatar, 10); }
 });
 socket.on('gift', ({ from, icon, name }) => { toast(`🎁 ${from} 님이 ${icon} ${name}을(를) 선물했어요! (🎒 내 물건)`); audio.play('pickup'); if (myAvatar) burstHearts(myAvatar, 8); });
-socket.on('rank:changed', () => openRank(S.rankTab?.()));
+socket.on('rank:changed', () => openRank(S.rankTab?.() || { main: 'theme' }));
 const celeb = el('div', 'hidden'); celeb.id = 'celebrate'; document.body.appendChild(celeb);
 socket.on('celebrate', ({ name, text }) => {
   celeb.innerHTML = `<div class="cb-spark">✦ ✧ ✦</div><div class="cb-text"></div><div class="cb-sub">축하합니다! 🎉</div>`; celeb.querySelector('.cb-text').textContent = text;
@@ -2383,6 +2668,7 @@ function openBag() {
   S.bagRefresh = () => { if ($('#modalBody').firstChild === w) draw(); else S.bagRefresh = null; };
   openModal('🎒 내 물건', '날개·탈것·코스튬은 착용하면 모두에게 보여요', w);
   footBtn('🛒 상점', () => openShop());
+  footBtn('🎫 도장표', () => openStamps());
 }
 function pickGiftTarget(id) {
   const it = S.shop[id]; const w = el('div', 'bag');
@@ -2449,7 +2735,10 @@ applyMobile(); addEventListener('resize', applyMobile);
     for (const [key, sel] of Object.entries(panels)) $(sel).classList.toggle('m-open', open === key);
     bar.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.k === open));
     if (open === 'chat') { $('#chatDot')?.classList.add('hidden'); const log = $('#chatLog'); log.scrollTop = log.scrollHeight; }
+    tipSync();
   };
+  // '게임 시작' 말풍선: 로비에서 오른쪽 패널이 모두 닫혀 있을 때만 보인다 (패널을 여는 즉시 숨겨 그 위를 가리지 않게)
+  const tipSync = () => $('#startTip')?.classList.toggle('hidden', !(S.me && S.room === 'lobby' && !open && !S.modalOpen));
   S.mobileClose = () => { if (open) setOpen(open); };
   for (const [k, icon, label] of btns) {
     const b = el('button', 'mbtn'); b.dataset.k = k; b.title = label; b.textContent = icon;
@@ -2516,8 +2805,7 @@ applyMobile(); addEventListener('resize', applyMobile);
     useBtn.classList.toggle('hidden', !show);
     if (show) { const ent = S.world?.objects?.[S.nearest]; useBtn.querySelector('small').textContent = S.nearestVerb || ({ examine: '조사', pickup: '줍기', lock: '풀기', use: '사용', coop: '당기기', door: '들어가기' })[ent?.data.kind] || '조사'; }
     lightBtn.classList.toggle('lit', !!S.light);
-    // 로비에서 파티 패널이 닫혀 있으면 👥 옆에 '게임시작' 말풍선
-    $('#startTip')?.classList.toggle('hidden', !(S.me && S.room === 'lobby' && open !== 'party' && !S.modalOpen));
+    tipSync();
   }, 150);
 
   // 두 손가락으로 확대/축소
@@ -2536,4 +2824,4 @@ applyMobile(); addEventListener('resize', applyMobile);
   });
   $('#inventory').addEventListener('click', (e) => { const s = e.target.closest('.slot'); if (s?.dataset.lp) { e.stopImmediatePropagation(); e.preventDefault(); delete s.dataset.lp; } }, true);
 }
-if (window.__dbg) Object.assign(window.__dbg, { S, me, cam, openShop, openBag, toggleRide, swingSword, doEmote, interact, lobbyAct, scene, camera, cinema });
+if (window.__dbg) Object.assign(window.__dbg, { S, me, cam, openShop, openBag, toggleRide, swingSword, doEmote, interact, lobbyAct, scene, camera, cinema, openRank, openFeedback, openStamps, openClearPhoto, rememberClear, showEndExtras, playHiddenPreview, openJournal });

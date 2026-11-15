@@ -43,6 +43,7 @@ export class GameInstance {
   loadChapter(idx) {
     this.chapterIdx = idx;
     this.ch = this.chapters[idx];
+    this.loadedAt = Date.now(); this.goingTo = null; clearTimeout(this.goTimer); this.goTimer = null;
     this.dark = !!this.ch.startDark;
     this.coopPress = {};
     // 한 챕터에 귀신이 여럿일 수 있다: ghost(주 귀신) + ghosts(추가 귀신, startFlag 로 등장)
@@ -102,7 +103,9 @@ export class GameInstance {
   }
 
   relicCount() { return this.sc.relics.filter((r) => this.flags.has(r)).length; }
-  scenarioInfo() { return { id: this.sc.id, title: this.sc.title, relicName: this.sc.relicName, difficulty: this.sc.difficulty || 3, relicTotal: this.sc.relics.length, relicIcons: relicIcons(this.sc), cine: this.sc.cine }; }
+  scenarioInfo() { return { id: this.sc.id, title: this.sc.title, short: this.sc.short, relicName: this.sc.relicName, difficulty: this.sc.difficulty || 3, relicTotal: this.sc.relics.length, relicIcons: relicIcons(this.sc), cine: this.sc.cine, ghostTypes: this.ghostTypes() }; }
+  /** 이 테마에 나오는 귀신 종류 (클리어 기념 사진 뒤에 세운다) */
+  ghostTypes() { return [...new Set(this.chapters.flatMap((c) => [c.ghost, ...(c.ghosts || [])]).filter(Boolean).map((g) => g.type || 'woman'))]; }
 
   hintsUsed() { return Object.values(this.hintLevel).reduce((a, b) => a + b, 0); }
   fullState() {
@@ -164,6 +167,7 @@ export class GameInstance {
 
   // ───── 상호작용
   interact(p, objId) {
+    if (this.ended || Date.now() - (this.loadedAt || 0) < 900) return; // 챕터가 막 바뀐 직후의 연타는 무시
     const o = this.ch.objects.find((x) => x.id === objId);
     if (!o || o.kind === 'deco') return;
     const st = this.objState()[o.id];
@@ -222,7 +226,8 @@ export class GameInstance {
         const times = o.use.times || 1;
         const have = this.counters[o.id] || 0;
         if (have >= times) {
-          if (o.toChapter != null) return this.gotoChapter(o.toChapter);
+          // 이미 다음 챕터로 넘어가는 중이면(열쇠를 쓰고 1.2초 기다리는 동안 한 번 더 누른 경우) 또 넘기지 않는다 — 이야기 창이 두 번 뜨던 문제
+          if (o.toChapter != null) { if (this.goingTo == null) this.gotoChapter(o.toChapter); return; }
           this.emitTo(p.id, 'ui:examine', { title, text: o.doneText || this.textFor(o) });
           return;
         }
@@ -236,7 +241,7 @@ export class GameInstance {
         this.counters[o.id] = have + 1;
         if (this.counters[o.id] >= times) {
           this.apply(o.on, p);
-          if (o.toChapter != null) setTimeout(() => this.gotoChapter(o.toChapter), 1200);
+          if (o.toChapter != null) this.goLater(o.toChapter, 1200);
         } else {
           this.emit('toast', { text: `${p.name}: ${o.progressText || '사용했다.'} (${this.counters[o.id]}/${times})` });
           this.syncAll();
@@ -411,7 +416,14 @@ export class GameInstance {
     return hit;
   }
 
+  /** 잠시 뒤 다음 챕터로 (문이 열리는 소리가 난 다음). 같은 이동이 두 번 예약되거나 두 번 실행되지 않는다 */
+  goLater(idx, ms) {
+    if (this.goingTo != null) return;
+    this.goingTo = idx; const from = this.chapterIdx;
+    this.goTimer = setTimeout(() => { this.goTimer = null; if (this.ended || this.chapterIdx !== from) { this.goingTo = null; return; } this.goingTo = null; this.gotoChapter(idx); }, ms);
+  }
   gotoChapter(idx) {
+    if (this.ended || idx === this.chapterIdx) return; // 같은 챕터를 다시 불러오지 않는다 (이야기 창 · 위치가 처음으로 돌아가던 문제)
     if (idx > this.chapterIdx) this.onAdvance?.();
     if (idx >= this.chapters.length) return this.finish();
     this.loadChapter(idx);
@@ -451,7 +463,7 @@ export class GameInstance {
     const base = { x: g.x, z: g.z, ry: g.ry, type: g.type, name: g.name, mode: g.mode, lit: false };
     if (now < g.repelUntil) return { ...base, v: false };
     if (now < g.pauseUntil) return { ...base, v: true, mode: 'pause' };
-    const ms = this.members();
+    const ms = this.members().filter((m) => !m.offline); // 연결이 끊겨 자리를 비운 사람은 쫓지 않는다
     const [W, D] = this.ch.size;
 
     // 손전등에 비춰지고 있는가
@@ -486,7 +498,7 @@ export class GameInstance {
     else if (g.mode === 'hunt') {
       const t = this.players.get(g.target);
       // 손전등을 끄고 숨으면 더 빨리 놓친다
-      if (t && t.room === this.room && !t.sneak && now - g.lastSeen < (t.light ? 5000 : 1800)) { target = t; best = Math.hypot(t.x - g.x, t.z - g.z); }
+      if (t && t.room === this.room && !t.offline && !t.sneak && now - g.lastSeen < (t.light ? 5000 : 1800)) { target = t; best = Math.hypot(t.x - g.x, t.z - g.z); }
       else g.mode = 'wander';
     }
 
