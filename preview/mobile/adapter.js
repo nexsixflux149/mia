@@ -95,3 +95,5 @@ const panel=document.querySelector('[aria-label="독립 그래픽 테스트"]');
 if(panel){panel.id='soloGraphics';panel.querySelector('details').open=false;panel.querySelector('summary').textContent='그래픽 · 원본 비교';panel.querySelector('[data-start]').textContent='처음부터 다시';panel.querySelector('[data-start]').onclick=()=>{if(confirm('첫 챕터의 테스트 진행을 초기화할까요?'))transport.start(true);};}
 for(const id of ['micBtn','voiceModeBtn','shareCopy','adminToggle','adminBtn','shopBtn','bagBtn','rankBtn','rosterToggle','chatInput']){const e=document.getElementById(id);if(e){e.disabled=true;e.setAttribute('aria-disabled','true');}}
 if(new URLSearchParams(location.search).has('debug'))window.__solo=transport;
+
+const ghostButton=document.createElement('button');ghostButton.textContent='귀신 외형 미리보기';ghostButton.dataset.ghostPreview='';ghostButton.onclick=async()=>{const {openGhostPreview}=await import('/solo/ghost-preview.js');openGhostPreview();};panel?.querySelector('details')?.append(ghostButton);

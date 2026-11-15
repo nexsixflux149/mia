@@ -1,0 +1,561 @@
+{
+  "chapters": [
+    {
+      "theme": "mia",
+      "id": 0,
+      "title": "1장 · 달동네 골목",
+      "surfaces": 3,
+      "objects": 6,
+      "rendered": true,
+      "ms": 1533
+    },
+    {
+      "theme": "mia",
+      "id": 1,
+      "title": "2장 · 달빛 문방구",
+      "surfaces": 11,
+      "objects": 7,
+      "rendered": true,
+      "ms": 888
+    },
+    {
+      "theme": "mia",
+      "id": 2,
+      "title": "3장 · 옥상 놀이터",
+      "surfaces": 3,
+      "objects": 7,
+      "rendered": true,
+      "ms": 2252
+    },
+    {
+      "theme": "gwimun",
+      "id": 0,
+      "title": "프롤로그 · 막차",
+      "surfaces": 9,
+      "objects": 16,
+      "rendered": true,
+      "ms": 2430
+    },
+    {
+      "theme": "gwimun",
+      "id": 1,
+      "title": "1장 · 마지막 수업",
+      "surfaces": 2,
+      "objects": 21,
+      "rendered": true,
+      "ms": 1969
+    },
+    {
+      "theme": "gwimun",
+      "id": 2,
+      "title": "2장 · 숙직실의 밤",
+      "surfaces": 6,
+      "objects": 19,
+      "rendered": true,
+      "ms": 2029
+    },
+    {
+      "theme": "gwimun",
+      "id": 3,
+      "title": "3장 · 이장댁",
+      "surfaces": 14,
+      "objects": 18,
+      "rendered": true,
+      "ms": 2257
+    },
+    {
+      "theme": "gwimun",
+      "id": 4,
+      "title": "4장 · 당산나무 아래 우물",
+      "surfaces": 7,
+      "objects": 18,
+      "rendered": true,
+      "ms": 2614
+    },
+    {
+      "theme": "gwimun",
+      "id": 5,
+      "title": "5장 · 청솔당",
+      "surfaces": 3,
+      "objects": 18,
+      "rendered": true,
+      "ms": 2152
+    },
+    {
+      "theme": "gwimun",
+      "id": 6,
+      "title": "6장 · 귀문",
+      "surfaces": 13,
+      "objects": 16,
+      "rendered": true,
+      "ms": 2944
+    },
+    {
+      "theme": "ophelia",
+      "id": 0,
+      "title": "1장 · 안개 낀 등대섬",
+      "surfaces": 25,
+      "objects": 9,
+      "rendered": true,
+      "ms": 2251
+    },
+    {
+      "theme": "ophelia",
+      "id": 1,
+      "title": "2장 · 3등 선실",
+      "surfaces": 8,
+      "objects": 18,
+      "rendered": true,
+      "ms": 2024
+    },
+    {
+      "theme": "ophelia",
+      "id": 2,
+      "title": "3장 · 무전실과 선장실",
+      "surfaces": 7,
+      "objects": 13,
+      "rendered": true,
+      "ms": 2086
+    },
+    {
+      "theme": "ophelia",
+      "id": 3,
+      "title": "4장 · 화물칸",
+      "surfaces": 11,
+      "objects": 17,
+      "rendered": true,
+      "ms": 2354
+    },
+    {
+      "theme": "doll",
+      "id": 0,
+      "title": "1장 · 현관홀",
+      "surfaces": 6,
+      "objects": 9,
+      "rendered": true,
+      "ms": 2764
+    },
+    {
+      "theme": "doll",
+      "id": 1,
+      "title": "2장 · 서재와 인형 작업실",
+      "surfaces": 11,
+      "objects": 10,
+      "rendered": true,
+      "ms": 2849
+    },
+    {
+      "theme": "doll",
+      "id": 2,
+      "title": "3장 · 클라라의 방",
+      "surfaces": 11,
+      "objects": 11,
+      "rendered": true,
+      "ms": 2018
+    },
+    {
+      "theme": "doll",
+      "id": 3,
+      "title": "4장 · 다락 — 끝나지 않는 파티",
+      "surfaces": 11,
+      "objects": 8,
+      "rendered": true,
+      "ms": 2264
+    },
+    {
+      "theme": "hospital",
+      "id": 0,
+      "title": "1장 · 접수 로비",
+      "surfaces": 11,
+      "objects": 8,
+      "rendered": true,
+      "ms": 2551
+    },
+    {
+      "theme": "hospital",
+      "id": 1,
+      "title": "2장 · 7병동",
+      "surfaces": 8,
+      "objects": 9,
+      "rendered": true,
+      "ms": 2403
+    },
+    {
+      "theme": "hospital",
+      "id": 2,
+      "title": "3장 · 원장실",
+      "surfaces": 9,
+      "objects": 10,
+      "rendered": true,
+      "ms": 2374
+    },
+    {
+      "theme": "hospital",
+      "id": 3,
+      "title": "4장 · 지하 영안실",
+      "surfaces": 22,
+      "objects": 10,
+      "rendered": true,
+      "ms": 2618
+    },
+    {
+      "theme": "camp",
+      "id": 0,
+      "title": "1장 · 캠프장",
+      "surfaces": 4,
+      "objects": 9,
+      "rendered": true,
+      "ms": 2665
+    },
+    {
+      "theme": "camp",
+      "id": 1,
+      "title": "2장 · 통나무 숙소",
+      "surfaces": 5,
+      "objects": 6,
+      "rendered": true,
+      "ms": 2422
+    },
+    {
+      "theme": "camp",
+      "id": 2,
+      "title": "3장 · 담력 시험 숲길",
+      "surfaces": 4,
+      "objects": 10,
+      "rendered": true,
+      "ms": 2262
+    },
+    {
+      "theme": "camp",
+      "id": 3,
+      "title": "4장 · 호숫가 — 마지막 캠프파이어",
+      "surfaces": 3,
+      "objects": 10,
+      "rendered": true,
+      "ms": 2597
+    },
+    {
+      "theme": "west",
+      "id": 0,
+      "title": "1장 · 레드 메사 중심가",
+      "surfaces": 3,
+      "objects": 7,
+      "rendered": true,
+      "ms": 2118
+    },
+    {
+      "theme": "west",
+      "id": 1,
+      "title": "2장 · 살롱과 은행",
+      "surfaces": 8,
+      "objects": 8,
+      "rendered": true,
+      "ms": 2319
+    },
+    {
+      "theme": "west",
+      "id": 2,
+      "title": "3장 · 교회와 공동묘지",
+      "surfaces": 5,
+      "objects": 12,
+      "rendered": true,
+      "ms": 2097
+    },
+    {
+      "theme": "west",
+      "id": 3,
+      "title": "4장 · 폐광 — 마지막 진실",
+      "surfaces": 8,
+      "objects": 6,
+      "rendered": true,
+      "ms": 2428
+    },
+    {
+      "theme": "kimono",
+      "id": 0,
+      "title": "1장 · 동백 정원",
+      "surfaces": 2,
+      "objects": 5,
+      "rendered": true,
+      "ms": 2521
+    },
+    {
+      "theme": "kimono",
+      "id": 1,
+      "title": "2장 · 여관 복도와 동백실",
+      "surfaces": 9,
+      "objects": 6,
+      "rendered": true,
+      "ms": 2235
+    },
+    {
+      "theme": "kimono",
+      "id": 2,
+      "title": "3장 · 연회장 — 치르지 못한 혼례",
+      "surfaces": 14,
+      "objects": 9,
+      "rendered": true,
+      "ms": 2160
+    },
+    {
+      "theme": "kimono",
+      "id": 3,
+      "title": "4장 · 별채 창고와 동백 우물",
+      "surfaces": 3,
+      "objects": 10,
+      "rendered": true,
+      "ms": 2013
+    },
+    {
+      "theme": "clown",
+      "id": 0,
+      "title": "1장 · 블루문 카니발",
+      "surfaces": 13,
+      "objects": 9,
+      "rendered": true,
+      "ms": 2223
+    },
+    {
+      "theme": "clown",
+      "id": 1,
+      "title": "2장 · 거울의 집",
+      "surfaces": 8,
+      "objects": 8,
+      "rendered": true,
+      "ms": 2450
+    },
+    {
+      "theme": "clown",
+      "id": 2,
+      "title": "3장 · 동물 우리",
+      "surfaces": 21,
+      "objects": 10,
+      "rendered": true,
+      "ms": 2760
+    },
+    {
+      "theme": "clown",
+      "id": 3,
+      "title": "4장 · 분장실",
+      "surfaces": 12,
+      "objects": 7,
+      "rendered": true,
+      "ms": 2656
+    },
+    {
+      "theme": "clown",
+      "id": 4,
+      "title": "5장 · 대형 천막",
+      "surfaces": 16,
+      "objects": 9,
+      "rendered": true,
+      "ms": 3214
+    },
+    {
+      "theme": "clown",
+      "id": 5,
+      "title": "6장 · 무대 아래",
+      "surfaces": 9,
+      "objects": 7,
+      "rendered": true,
+      "ms": 2962
+    },
+    {
+      "theme": "clown",
+      "id": 6,
+      "title": "7장 · 마지막 앵콜",
+      "surfaces": 13,
+      "objects": 8,
+      "rendered": true,
+      "ms": 3327
+    },
+    {
+      "theme": "park",
+      "id": 0,
+      "title": "1장 · 정문 — 폐장하지 않는 밤",
+      "surfaces": 3,
+      "objects": 8,
+      "rendered": true,
+      "ms": 3291
+    },
+    {
+      "theme": "park",
+      "id": 1,
+      "title": "2장 · 회전목마 광장",
+      "surfaces": 3,
+      "objects": 6,
+      "rendered": true,
+      "ms": 2176
+    },
+    {
+      "theme": "park",
+      "id": 2,
+      "title": "3장 · 유령의 집",
+      "surfaces": 15,
+      "objects": 8,
+      "rendered": true,
+      "ms": 1996
+    },
+    {
+      "theme": "park",
+      "id": 3,
+      "title": "4장 · 정비 관리동 — 첫 번째 진실",
+      "surfaces": 13,
+      "objects": 7,
+      "rendered": true,
+      "ms": 1905
+    },
+    {
+      "theme": "park",
+      "id": 4,
+      "title": "5장 · 대관람차",
+      "surfaces": 3,
+      "objects": 7,
+      "rendered": true,
+      "ms": 2027
+    },
+    {
+      "theme": "park",
+      "id": 5,
+      "title": "6장 · 바이킹",
+      "surfaces": 3,
+      "objects": 6,
+      "rendered": true,
+      "ms": 2030
+    },
+    {
+      "theme": "park",
+      "id": 6,
+      "title": "7장 · 거울 미궁 — 두 번째 진실",
+      "surfaces": 19,
+      "objects": 5,
+      "rendered": true,
+      "ms": 1851
+    },
+    {
+      "theme": "park",
+      "id": 7,
+      "title": "8장 · 스카이드롭",
+      "surfaces": 3,
+      "objects": 6,
+      "rendered": true,
+      "ms": 2166
+    },
+    {
+      "theme": "park",
+      "id": 8,
+      "title": "9장 · 방송실 — 세 번째 진실",
+      "surfaces": 25,
+      "objects": 5,
+      "rendered": true,
+      "ms": 1948
+    },
+    {
+      "theme": "park",
+      "id": 9,
+      "title": "10장 · 마지막 퍼레이드",
+      "surfaces": 2,
+      "objects": 4,
+      "rendered": true,
+      "ms": 2013
+    },
+    {
+      "theme": "zombie",
+      "id": 0,
+      "title": "1장 · 무너진 거리",
+      "surfaces": 11,
+      "objects": 18,
+      "rendered": true,
+      "ms": 2244
+    },
+    {
+      "theme": "zombie",
+      "id": 1,
+      "title": "2장 · 지하주차장",
+      "surfaces": 30,
+      "objects": 12,
+      "rendered": true,
+      "ms": 2363
+    },
+    {
+      "theme": "zombie",
+      "id": 2,
+      "title": "3장 · 1층 화장품·명품관",
+      "surfaces": 36,
+      "objects": 8,
+      "rendered": true,
+      "ms": 2116
+    },
+    {
+      "theme": "zombie",
+      "id": 3,
+      "title": "4장 · 3층 아동·완구관",
+      "surfaces": 25,
+      "objects": 8,
+      "rendered": true,
+      "ms": 2442
+    },
+    {
+      "theme": "zombie",
+      "id": 4,
+      "title": "5장 · 4층 식당가와 약국",
+      "surfaces": 38,
+      "objects": 10,
+      "rendered": true,
+      "ms": 2170
+    },
+    {
+      "theme": "zombie",
+      "id": 5,
+      "title": "6장 · 5층 보안실",
+      "surfaces": 22,
+      "objects": 11,
+      "rendered": true,
+      "ms": 2569
+    },
+    {
+      "theme": "zombie",
+      "id": 6,
+      "title": "7장 · 옥상 헬리포트",
+      "surfaces": 7,
+      "objects": 6,
+      "rendered": true,
+      "ms": 1998
+    }
+  ],
+  "errors": [],
+  "functional": [
+    "Two clients join/start the same instance",
+    "Position and animation sync",
+    "Flashlight clue and item acquisition",
+    "Wrong/correct lock answers synchronized",
+    "Chapter advance in multiplayer",
+    "Original voice signaling relay",
+    "Actual full client movement",
+    "Three presets and original comparison in actual full client",
+    "Ghost appearance preview opens, compares and disposes"
+  ],
+  "ghostTypes": [
+    "woman",
+    "child",
+    "dalgyal",
+    "janitor",
+    "elder",
+    "headless",
+    "mudang",
+    "slender",
+    "sailor",
+    "shadow",
+    "doll",
+    "nurse",
+    "father",
+    "gasmask",
+    "scarecrow",
+    "clown",
+    "marionette",
+    "ringmaster",
+    "crawler",
+    "mascot",
+    "zombie"
+  ]
+}

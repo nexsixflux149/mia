@@ -18,6 +18,7 @@ import { MAX_LV, HIDDEN_LV, ADMIN_LV, levelOf, xpAt, CLEAR_COINS, CHAPTER_XP, cl
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const PORT = process.env.PORT || 3000;
+const CLIENT_ROOT = path.join(ROOT, process.env.MIA_FULL_REMASTER === '1' ? '.remaster-client' : 'public');
 const MAX_PARTY = 4;
 
 const app = express();
@@ -32,13 +33,13 @@ app.get('/api/info', (_, res) => {
 if (process.env.MIA_PREVIEW === '1') {
   app.use('/fonts', express.static(path.join(ROOT, 'preview/mobile/fonts')));
   app.get(['/', '/index.html'], (_, res) => {
-    let html = fs.readFileSync(path.join(ROOT, 'public/index.html'), 'utf8');
+    let html = fs.readFileSync(path.join(CLIENT_ROOT, 'index.html'), 'utf8');
     html = html.replace(/<link[^>]+https:\/\/fonts\.googleapis\.com[^>]*>/g, '');
-    html = html.replace('<head>', '<head><link rel="stylesheet" href="/fonts/fonts.css"><script>window.MIA_PREVIEW = true;</script>');
+    if (process.env.MIA_FULL_REMASTER !== '1') html = html.replace('<head>', '<head><link rel="stylesheet" href="/fonts/fonts.css"><script>window.MIA_PREVIEW = true;</script>');
     res.setHeader('Cache-Control', 'no-store'); res.type('html').send(html);
   });
 }
-app.use(express.static(path.join(ROOT, 'public'), { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
+app.use(express.static(CLIENT_ROOT, { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
 app.use('/vendor/three', express.static(path.join(ROOT, 'node_modules/three')));
 const server = http.createServer(app);
 const io = new Server(server, { maxHttpBufferSize: 2e5 });

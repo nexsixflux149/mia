@@ -1,0 +1,16 @@
+# NEW SERVICE ONLY. Do not attach this to the existing live MIA service.
+services:
+  - type: web
+    name: mia-full-remaster-test
+    runtime: node
+    autoDeploy: false
+    buildCommand: npm ci --omit=dev && npm run remaster:build
+    startCommand: npm run remaster
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: REMASTER_PORT
+        value: "10000"
+      - key: REMASTER_HOST
+        value: "0.0.0.0"

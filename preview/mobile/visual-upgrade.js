@@ -87,15 +87,34 @@ function treeGeometry() {
 function brickTexture() {return texture((x,n)=>{const r=seeded(113);x.fillStyle='#5b5045';x.fillRect(0,0,n,n);for(let y=0;y<16;y++)for(let j=-1;j<9;j++){const px=j*34+(y%2)*17;x.fillStyle=`rgb(${90+r()*35},${69+r()*24},${54+r()*20})`;x.fillRect(px,y*16,32,14);x.fillStyle='rgba(220,199,172,.10)';x.fillRect(px+1,y*16,30,1);}for(let i=0;i<1200;i++){x.fillStyle=`rgba(10,16,13,${r()*.14})`;x.fillRect(r()*n,r()*n,r()*16,1+r()*12);}},256);}
 function pavingTexture() {return texture((x,n)=>{const r=seeded(391);x.fillStyle='#555954';x.fillRect(0,0,n,n);for(let i=0;i<8000;i++){const v=35+r()*70;x.fillStyle=`rgba(${v},${v+3},${v+1},.25)`;x.fillRect(r()*n,r()*n,1+r()*2,1+r()*2);}for(let i=0;i<11;i++){x.strokeStyle='#292f2b';x.lineWidth=.6+r();let px=r()*n,py=r()*n;x.beginPath();x.moveTo(px,py);for(let j=0;j<6;j++){px+=r()*24-12;py+=r()*22;x.lineTo(px,py);}x.stroke();}},512);}
 
-export function upgradeWorld(world,ch) {
+function concreteTexture() {return texture((x,n)=>{
+  const r=seeded(739);x.fillStyle='#82847b';x.fillRect(0,0,n,n);
+  const cell=n/3;
+  for(let row=0;row<3;row++)for(let col=0;col<3;col++){
+    const v=116+r()*25;x.fillStyle=`rgb(${v+4},${v+5},${v})`;x.fillRect(col*cell+2,row*cell+2,cell-4,cell-4);
+    x.strokeStyle='rgba(25,31,27,.64)';x.lineWidth=3;x.strokeRect(col*cell,row*cell,cell,cell);
+    x.strokeStyle='rgba(211,211,191,.32)';x.lineWidth=1;x.strokeRect(col*cell+3,row*cell+3,cell-6,cell-6);
+  }
+  for(let i=0;i<8000;i++){x.fillStyle=`rgba(25,31,27,${r()*.2})`;x.fillRect(r()*n,r()*n,1+r()*2,1+r()*2);}
+  for(let i=0;i<14;i++){x.strokeStyle='rgba(34,39,34,.4)';x.lineWidth=.8;let xx=r()*n,yy=r()*n;x.beginPath();x.moveTo(xx,yy);for(let j=0;j<5;j++){xx+=r()*18-9;yy+=r()*18;x.lineTo(xx,yy);}x.stroke();}
+},512);}
+function alleyTexture() {return texture((x,n)=>{
+  const r=seeded(137);x.fillStyle='#303732';x.fillRect(0,0,n,n);
+  for(let i=0;i<16000;i++){const v=20+r()*80;x.fillStyle=`rgba(${v},${v+3},${v+1},.24)`;x.fillRect(r()*n,r()*n,1+r()*2,1+r()*2);}
+  for(const side of [0,n-1]){const edge=x.createLinearGradient(side,0,side===0?28:n-29,0);edge.addColorStop(0,'rgba(12,16,13,.9)');edge.addColorStop(1,'rgba(12,16,13,0)');x.fillStyle=edge;x.fillRect(side===0?0:n-30,0,30,n);}
+  for(let i=0;i<14;i++){let xx=r()*n,yy=r()*n;x.strokeStyle='#151d17';x.lineWidth=1+r()*2;x.beginPath();x.moveTo(xx,yy);for(let j=0;j<6;j++){xx+=r()*42-21;yy+=r()*35;x.lineTo(xx,yy);}x.stroke();}
+  x.fillStyle='rgba(177,180,157,.2)';for(let y=0;y<n;y+=13)for(const px of [8,n-11])if(r()>.2)x.fillRect(px,y,3,7+r()*5);
+},512);}
+
+export function upgradeWorld(world,ch,theme='mia') {
   const root=new THREE.Group();root.name='Detailed first chapter scenery';world.root.add(root);
   const originals=[], groups=[],materials=[],textures=[], geometries=[];
   let forestMeshes=[], forestSource=[];
   const remember=m=>{originals.push({mesh:m,visible:m.visible});};
   const originalMaterials=[];
   const mat=(opts)=>{const m=new THREE.MeshStandardMaterial(opts);materials.push(m);return m;};
-  const brick=brickTexture(),paving=pavingTexture(),needles=foliageTexture();textures.push(brick,paving,needles);
-  const forest=world.root.children.filter(o=>o.userData.previewForest);
+  const brick=brickTexture(),paving=concreteTexture(),road=alleyTexture(),needles=foliageTexture();textures.push(brick,paving,road,needles);
+  const forest=world.root.children.filter(o=>o.userData.previewForest && !['bamboo','mesa'].includes(o.userData.previewForestKind));
   if(forest.length){
     const geo=treeGeometry();geometries.push(geo.bark,geo.leaf);
     const trunk=new THREE.InstancedMesh(geo.bark,mat({color:'#554237',roughness:.95}),forest.length);
@@ -107,18 +126,23 @@ export function upgradeWorld(world,ch) {
   // Bent, tapered blades replace the three-sided grass spikes at exactly the same positions.
   for(const old of world.root.children.filter(o=>o.isInstancedMesh&&o.geometry.type==='ConeGeometry'&&o.geometry.parameters.height===.34)){
     remember(old);const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute([-.02,0,0,.02,0,0,-.015,.17,.025,.015,.17,.025,0,.34,.07],3));geometry.setAttribute('uv',new THREE.Float32BufferAttribute([0,0,1,0,0,.5,1,.5,.5,1],2));geometry.setIndex([0,1,2,1,3,2,2,3,4]);geometry.computeVertexNormals();geometries.push(geometry);
-    const grass=new THREE.InstancedMesh(geometry,mat({color:'#566348',roughness:.96,side:THREE.DoubleSide}),old.count);grass.instanceMatrix.copy(old.instanceMatrix);grass.computeBoundingSphere();root.add(grass);grass.userData.fullCount=old.count;groups.push(grass);
+    const grass=new THREE.InstancedMesh(geometry,mat({color:old.material.color,roughness:.96,side:THREE.DoubleSide}),old.count);grass.instanceMatrix.copy(old.instanceMatrix);grass.computeBoundingSphere();root.add(grass);grass.userData.fullCount=old.count;groups.push(grass);
   }
   // Surface replacement leaves the ground geometry, walkable height and all colliders intact.
-  for(const mesh of world.root.children.filter(o=>o.isMesh&&o.geometry.type==='PlaneGeometry'&&o.rotation.x< -1)){
+  for(const mesh of (theme==='mia'&&ch.id===0?world.root.children:[]).filter(o=>o.isMesh&&o.geometry.type==='PlaneGeometry'&&o.rotation.x< -1)){
     if(mesh.geometry.parameters.width<2)continue;
-    const old=mesh.material,m=old.clone();m.map=paving.clone();textures.push(m.map);m.map.repeat.set(mesh.geometry.parameters.width/3,mesh.geometry.parameters.height/3);m.roughness=.91;m.bumpMap=m.map;m.bumpScale=.022;materials.push(m);originalMaterials.push({mesh,old,material:m});
+    const isRoad=Math.abs(mesh.geometry.parameters.width-2.6)<.001&&mesh.position.y>.005;
+    const old=mesh.material,m=old.clone();m.map=(isRoad?road:paving).clone();textures.push(m.map);
+    m.map.repeat.set(isRoad?1:mesh.geometry.parameters.width/2.4,mesh.geometry.parameters.height/(isRoad?4:2.4));
+    m.color.set('#ffffff');m.roughness=isRoad?.96:.91;m.bumpMap=m.map;m.bumpScale=isRoad?.025:.016;
+    m.name=isRoad?'미아 골목 · 아스팔트':'미아 골목 · 콘크리트 타일';
+    materials.push(m);originalMaterials.push({mesh,old,material:m});
   }
   const trim=mat({color:'#81766a',roughness:.86}),metal=mat({color:'#454b4b',roughness:.68,metalness:.45}),glass=mat({color:'#30464b',roughness:.24,metalness:.2}),wood=mat({color:'#6d5642',roughness:.88});
   for(const house of world.root.children.filter(o=>o.userData.propKind==='house')){
     const detail=new THREE.Group();detail.position.copy(house.position);detail.rotation.copy(house.rotation);root.add(detail);
     const body=house.children.find(o=>o.isMesh&&o.geometry.type==='BoxGeometry'&&o.geometry.parameters.width===4.6);
-    if(body){const old=body.material,m=old.clone();m.map=brick;m.bumpMap=brick;m.bumpScale=.035;m.color.set('#c1b4a4');m.roughness=.96;materials.push(m);originalMaterials.push({mesh:body,old,material:m});}
+    if(body&&['mia','gwimun','hospital','zombie'].includes(theme)){const old=body.material,m=old.clone();m.map=brick;m.bumpMap=brick;m.bumpScale=.035;m.color.set('#c1b4a4');m.roughness=.96;materials.push(m);originalMaterials.push({mesh:body,old,material:m});}
     const frame=batch(detail,trim),panes=batch(detail,glass),gutters=batch(detail,metal),boards=batch(detail,wood,1);
     for(const [x,z,ry] of [[-1.2,1.835,0],[0,-1.835,Math.PI]]){
       const w=.86,h=.78,y=1.39;
@@ -134,7 +158,7 @@ export function upgradeWorld(world,ch) {
     for(const b of [frame,panes,gutters,boards]){const m=b.finish();if(m){groups.push(m);geometries.push(m.geometry);}}
     // Tiles follow the existing hip roof; they don't extend its silhouette/collision footprint.
     const tiles=batch(detail,mat({color:'#514741',roughness:.9}),1);
-    for(let side=0;side<4;side++)for(let row=0;row<4;row++)for(let col=-4;col<=4;col++){
+    for(let side=0;side<(['mia','gwimun','kimono','hospital'].includes(theme)?4:0);side++)for(let row=0;row<4;row++)for(let col=-4;col<=4;col++){
       const a=side*Math.PI/2,r=1.9-row*.35,w=.23,y=2.45+row*.31;
       const t=new THREE.CylinderGeometry(.09,.09,.35,7,1,true,0,Math.PI);const p=V(col*w,y,r);p.applyAxisAngle(V(0,1,0),a);
       tiles.add(t,p.toArray(),[1,1,1],[Math.PI/2-.55,a,0]);
@@ -158,7 +182,7 @@ export function upgradeWorld(world,ch) {
         for(const mesh of forestMeshes){mesh.setMatrixAt(i,m);mesh.instanceMatrix.needsUpdate=true;}
       }
     },
-    dispose(){this.setEnabled(false);world.root.remove(root);for(const g of new Set(geometries))g.dispose();for(const m of new Set(materials))m.dispose();for(const t of new Set(textures))t.dispose();}
+    dispose(){this.setEnabled(false);root.traverse(o=>{if(o.isInstancedMesh)o.dispose();});world.root.remove(root);for(const g of new Set(geometries))g.dispose();for(const m of new Set(materials))m.dispose();for(const t of new Set(textures))t.dispose();}
   };
   detail.setEnabled(enabled);detail.setQuality('low');return detail;
 }

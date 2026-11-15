@@ -1,0 +1,123 @@
+{
+  "source_ref": "22106601b139e09b453cbb0962c9d74e899ed76d",
+  "origin": "https://mia-escape.kr",
+  "captured_at": "2026-11-15T03:32:01.538Z",
+  "scope": "Public client assets and repository source only; production server runtime, secrets and database are not backed up.",
+  "files": [
+    {
+      "file": "apple-touch-icon.png",
+      "sha256": "3eba5c2e44d5f21ea193f2a4e39dd12c26c9e140f43700b9bdca096daf8a5a2a",
+      "matches_repository": true
+    },
+    {
+      "file": "css/style.css",
+      "sha256": "7fb1e572efefe02863510e959a227101d139af89592b88fed356259b89dc9e14",
+      "matches_repository": true
+    },
+    {
+      "file": "favicon-32.png",
+      "sha256": "ee61761bfb5b888ef830ade33b82bb3d7275ec1443b2c5a24daa1b2bf4e748df",
+      "matches_repository": true
+    },
+    {
+      "file": "favicon.ico",
+      "sha256": "27ae4f342c291acc3723c36c957f72b3de47d25c8333a8da48d1e138c03a3452",
+      "matches_repository": true
+    },
+    {
+      "file": "icon-192.png",
+      "sha256": "4561e4fdb16cc17c484aeba5d694abd4ffbfa9a284a624cf900c68a34b02302a",
+      "matches_repository": true
+    },
+    {
+      "file": "icon-512.png",
+      "sha256": "651368192a88958590e301920ef4c88c3116340b2b51606bc2ffb908081fb201",
+      "matches_repository": true
+    },
+    {
+      "file": "index.html",
+      "sha256": "aeca719b1aa02576a038a89477c85c641062936c1abbf0a42d466ac142874458",
+      "matches_repository": true
+    },
+    {
+      "file": "js/audio.js",
+      "sha256": "525901c568fc6c88413a76ac6f07b34a9a813a833acad3a5a362b0ce31e581a8",
+      "matches_repository": true
+    },
+    {
+      "file": "js/avatar.js",
+      "sha256": "086ece617b39330226266fbd6765496476531dfc83276e7b94f832777a348036",
+      "matches_repository": true
+    },
+    {
+      "file": "js/cinema.js",
+      "sha256": "d76dae39f0e73d569573b62bba0928f774db33f778df09041b0257db4f14527c",
+      "matches_repository": true
+    },
+    {
+      "file": "js/fx.js",
+      "sha256": "1ee4b01c2c5f0abf23b1ceeabeda301cbc7b7a7f08df8ed710db40030dc8a4c7",
+      "matches_repository": true
+    },
+    {
+      "file": "js/gear.js",
+      "sha256": "93e30c3adf0af235195636c5881c42dad71db284adddd61338962de27aecf986",
+      "matches_repository": true
+    },
+    {
+      "file": "js/ghosts.js",
+      "sha256": "62ec99bcd74afb433096afff6aaa3718f08f11b2af0b2a4cfc43513d206e83a3",
+      "matches_repository": true
+    },
+    {
+      "file": "js/main.js",
+      "sha256": "543c90bb412adcb01f0458d630c824d17059f65efce011e15a7a2eec23018c98",
+      "matches_repository": true
+    },
+    {
+      "file": "js/paper.js",
+      "sha256": "4d2fb12d63552b37063736d19bd25ae60bf95b239678edb2b0b21256671211c3",
+      "matches_repository": true
+    },
+    {
+      "file": "js/props.js",
+      "sha256": "f955b6e7f28622c50b8d95d049557912443474d4b8c463ecb1333abc1bc5afd6",
+      "matches_repository": true
+    },
+    {
+      "file": "js/scare.js",
+      "sha256": "06e183706c20089150495f8db279449f1e80e99beaf830d324da81215a3a6d50",
+      "matches_repository": true
+    },
+    {
+      "file": "js/voice.js",
+      "sha256": "9550f1d461b6e9befb3ecb2289db5d1954e60c204466194f4b6a7a6aa6d09df2",
+      "matches_repository": true
+    },
+    {
+      "file": "js/world.js",
+      "sha256": "be12b23d6a4c5c36f2fcc6015ff989133581e72e058d9ee1d281c23811c55c9e",
+      "matches_repository": true
+    },
+    {
+      "file": "kakaopay.png",
+      "sha256": "680ebd5ea3441daa405c212a161df532d2f64db95aeec453dc51bdaffe043924",
+      "matches_repository": true
+    },
+    {
+      "file": "og.jpg",
+      "sha256": "d456b5d0e5cc25f12348c5a4abf9f18cdcdbe7352965f7889e27bda763b712c5",
+      "matches_repository": true
+    },
+    {
+      "file": "robots.txt",
+      "sha256": "3e4b7d7bcc181f50b8a2e3810f3eb2330de7c9b38d8e507d9264bf76ccb894bb",
+      "matches_repository": true
+    },
+    {
+      "file": "sitemap.xml",
+      "sha256": "2ec6fcc96410783d7411d587a97e0928f65f2eb51c0f776e3ef179a5f0fb94fc",
+      "matches_repository": true
+    }
+  ]
+}

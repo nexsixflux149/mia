@@ -20,3 +20,8 @@ promo/
 .preview-test-data/
 
 .mobile-site/
+
+.remaster-client/
+.remaster-data/
+
+release-output/

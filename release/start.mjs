@@ -1,0 +1,11 @@
+import './build-client.mjs';
+import {spawn} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
+import path from 'node:path';
+const root=fileURLToPath(new URL('../',import.meta.url)),env={};
+for(const key of ['PATH','Path','SystemRoot','WINDIR','TEMP','TMP','TMPDIR','LANG'])if(process.env[key])env[key]=process.env[key];
+Object.assign(env,{MIA_PREVIEW:'1',MIA_FULL_REMASTER:'1',PORT:process.env.REMASTER_PORT||'3200',PREVIEW_HOST:process.env.REMASTER_HOST||'127.0.0.1',DATA_DIR:path.join(root,'.remaster-data'),NODE_ENV:'development'});
+console.log(`MIA 전체 수정본: http://localhost:${env.PORT}\n원본 웹사이트·DB·기록과 분리됩니다. 종료: Ctrl+C`);
+const child=spawn(process.execPath,[path.join(root,'server/index.js')],{cwd:root,env,stdio:'inherit'});
+for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>child.kill(signal));
+child.on('error',e=>{console.error(e.message);process.exitCode=1});child.on('exit',code=>process.exitCode=code??0);
