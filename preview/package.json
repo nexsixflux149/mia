@@ -1,0 +1,7 @@
+{
+  "name": "mia-preview-validation",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node test.mjs" },
+  "devDependencies": { "playwright": "1.65.1", "socket.io-client": "4.8.1" }
+}

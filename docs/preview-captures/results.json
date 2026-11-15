@@ -1,0 +1,43 @@
+{
+  "checks": [
+    "Isolated server: ignores production DB/public URL, local assets/fonts",
+    "Two clients: party/start, position and animation sync, voice signaling relay",
+    "Poster, flashlight reveal, relic pickup, wrong/correct lock and chapter transition sync",
+    "Existing ghost activation and movement (engine test; first chapter has no chase AI)",
+    "Browser: first scene, keyboard movement, camera control, offline assets",
+    "Three quality levels, original/remaster toggle, unchanged colliders/object IDs, effects slider",
+    "Browser: actual chapter progression restores original rendering in chapter two",
+    "No browser JavaScript/console errors or external network asset requests"
+  ],
+  "browserErrors": [],
+  "externalRequests": [],
+  "measurements": [
+    {
+      "quality": "low",
+      "dpr": 0.5,
+      "shadows": false,
+      "metric": "2 FPS · 196 calls · 62.6k triangles · 18 textures · DPR 0.50",
+      "geometries": 107,
+      "textures": 18,
+      "renderer": "WebKit WebGL"
+    },
+    {
+      "quality": "medium",
+      "dpr": 0.5,
+      "shadows": false,
+      "metric": "2 FPS · 200 calls · 62.6k triangles · 18 textures · DPR 0.50",
+      "geometries": 108,
+      "textures": 18,
+      "renderer": "WebKit WebGL"
+    },
+    {
+      "quality": "high",
+      "dpr": 0.5,
+      "shadows": true,
+      "metric": "1 FPS · 295 calls · 110.1k triangles · 19 textures · DPR 0.50",
+      "geometries": 108,
+      "textures": 19,
+      "renderer": "WebKit WebGL"
+    }
+  ]
+}

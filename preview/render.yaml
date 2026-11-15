@@ -1,0 +1,19 @@
+# Prepare only. Deploy a NEW service manually after owner approval.
+# Select this file explicitly; do not use the production render.yaml.
+services:
+  - type: web
+    name: mia-graphics-preview-ch1
+    runtime: node
+    plan: free
+    branch: preview/graphics-remaster-ch1
+    autoDeploy: false
+    buildCommand: npm ci --omit=dev
+    startCommand: npm run preview
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: PREVIEW_PORT
+        value: "10000"
+      - key: PREVIEW_HOST
+        value: "0.0.0.0"

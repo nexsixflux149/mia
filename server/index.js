@@ -29,6 +29,14 @@ app.get('/api/info', (_, res) => {
   res.json({ publicUrl: url, lan: lanIps().map((ip) => `http://${ip}:${PORT}`) });
 });
 // 게임 파일은 매번 최신인지 확인하게 한다 (휴대폰이 예전 버전을 캐시해 수정이 안 보이는 문제 방지)
+if (process.env.MIA_PREVIEW === '1') {
+  app.get(['/', '/index.html'], (_, res) => {
+    let html = fs.readFileSync(path.join(ROOT, 'public/index.html'), 'utf8');
+    html = html.replace(/<link[^>]+https:\/\/fonts\.googleapis\.com[^>]*>/g, '');
+    html = html.replace('<head>', '<head><script>window.MIA_PREVIEW = true;</script>');
+    res.setHeader('Cache-Control', 'no-store'); res.type('html').send(html);
+  });
+}
 app.use(express.static(path.join(ROOT, 'public'), { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
 app.use('/vendor/three', express.static(path.join(ROOT, 'node_modules/three')));
 const server = http.createServer(app);
@@ -678,7 +686,7 @@ setInterval(() => {
 // (GitHub 예약 작업은 한 시간에 한 번 정도밖에 돌지 않아 이것만으로는 부족했다)
 const SELF_URL = process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL || '';
 if (SELF_URL) setInterval(() => { fetch(SELF_URL.replace(/\/$/, '') + '/health', { headers: { 'user-agent': 'mia-keepalive' } }).catch(() => {}); }, 10 * 60 * 1000).unref?.();
-server.listen(PORT, () => {
+server.listen(PORT, process.env.MIA_PREVIEW === '1' ? (process.env.PREVIEW_HOST || '127.0.0.1') : undefined, () => {
   const ips = lanIps();
   console.log(`\n  미아 — 파티형 메타버스 공포 방탈출 서버 실행 중`);
   console.log(storeKind() === 'db' ? '  기록 저장:        무료 데이터베이스 (DATABASE_URL)' : `  기록 저장:        ${DATA_DIR} 폴더`);

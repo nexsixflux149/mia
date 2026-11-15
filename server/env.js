@@ -5,6 +5,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-for (const f of ['.env.local', '.env']) {
+for (const f of (process.env.MIA_PREVIEW === '1' ? [] : ['.env.local', '.env'])) {
   try { process.loadEnvFile?.(path.join(ROOT, f)); } catch {}
 }

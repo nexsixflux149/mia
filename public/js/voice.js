@@ -1,5 +1,5 @@
 // 파티 전용 음성 채팅 (WebRTC P2P 메시, 신호는 소켓으로 중계)
-const ICE = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }];
+const ICE = window.MIA_PREVIEW ? [] : [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }];
 
 export class Voice {
   constructor(socket, { onLevel, onError } = {}) {

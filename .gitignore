@@ -12,3 +12,9 @@ data/
 
 # 소개 영상 (용량이 커서 저장소에는 올리지 않는다)
 promo/
+
+# Isolated graphics preview saves and test captures
+.preview-data/
+.preview-artifacts/
+
+.preview-test-data/

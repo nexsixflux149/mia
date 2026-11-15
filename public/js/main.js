@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RemasterPreview } from './remaster-preview.js';
 import { createAvatar, animateAvatar, textSprite, OPTIONS, SKIN, ACCENT, HAIRC, EYEC, DEFAULT_LOOK, EMOTES, EMOTE_DUR } from './avatar.js';
 import { Cinema } from './cinema.js';
 import { createGhost, animateGhost } from './ghosts.js';
@@ -47,7 +48,7 @@ const S = {
   profile: null, shop: {}, riding: false, holdSword: false, hiddenOk: false, vlv: new Map(), vrings: [],
 };
 const SET = Object.assign({ volume: 0.8, voice: 1, sens: 1, quality: (matchMedia('(pointer: coarse)').matches || innerWidth < 760) ? 'medium' : 'high', brightness: 1, minimap: true }, store.get('gwimun-settings', {}));
-if (SET.quality === 'low') SET.quality = 'medium'; // '낮음'은 없어졌다 → 보통
+if (!window.MIA_PREVIEW && SET.quality === 'low') SET.quality = 'medium'; // '낮음'은 없어졌다 → 보통
 
 // ─────────────────────────── 꾸미기
 let look = { ...DEFAULT_LOOK, ...store.get('gwimun-look', {}) };
@@ -209,6 +210,13 @@ fitCamera();
 addEventListener('resize', () => { fitCamera(); fx.resize(); });
 
 const overlay = new THREE.Scene();
+const remaster = window.MIA_PREVIEW ? new RemasterPreview({ scene, camera, renderer, fx, settings: SET }) : null;
+if (remaster) remaster.onStart = () => {
+  if (!S.me) return toast('닉네임을 입력하고 먼저 입장해 주세요.');
+  if (S.room !== 'lobby') return toast('로비로 돌아온 뒤 시작해 주세요.');
+  audio.init(); S.skipPrologue = true;
+  socket.emit('party:start', { scenario: 'mia', chapter: 0, fear: 2 });
+};
 const cinema = new Cinema(renderer);
 function addLabel(owner, sprite, y) { overlay.add(sprite); S.labels.push({ owner, sprite, y }); return sprite; }
 function removeLabel(sprite) { overlay.remove(sprite); S.labels = S.labels.filter((l) => l.sprite !== sprite); sprite.material.map?.dispose(); sprite.material.dispose(); }
@@ -245,7 +253,7 @@ function makeAvatar(id, name, lk, isMe) {
   return g;
 }
 function setTag(g, name, color) { if (g.userData.tag) removeLabel(g.userData.tag); g.userData.tag = addLabel(g, textSprite(name, { size: 30, color, bg: 'rgba(10,8,12,.72)', stroke: 'rgba(0,0,0,.85)' }), 1.55); }
-function setLight(g, on) { g.userData.spot.intensity = on ? 160 : 0; g.userData.beam.visible = false; } // 빛줄기 효과는 눈부셔서 표시하지 않는다
+function setLight(g, on) { g.userData.spot.intensity = on ? 160 : 0; g.userData.beam.visible = !!(on && remaster?.active && remaster.quality !== 'low'); } // 미리보기 보통/높음에서만 제한적인 빛줄기
 function rebuildMyAvatar() {
   removeAvatar(myAvatar);
   myAvatar = makeAvatar(S.me, S.myName, look, true);
@@ -263,6 +271,7 @@ function setBubble(g, text) {
 function resetInput() { S.joy = null; S.moveTarget = null; S.pendingInteract = null; for (const k in keys) keys[k] = false; const kb = document.getElementById('joyKnob'); if (kb) kb.style.transform = ''; document.getElementById('joy')?.classList.remove('act'); }
 function enterLobby(pos) {
   resetInput();
+  remaster?.leave();
   disposeWorld(scene, S.world);
   S.world = buildLobby(scene, { hidden: !!(S.hiddenOk || S.admin) });
   S.room = 'lobby'; S.chapter = null; S.dark = false; S.objState = {}; S.mount = null; S.perch = null; me.y = 0;
@@ -282,6 +291,7 @@ function enterChapter(state, showIntro = true) {
   resetInput();
   setGameClock(state.elapsed, state.timed); setHintsUsed(state.hintsUsed ?? 0); S.limitMs = state.limitMs || 0;
   if (state.fear != null) { S.fear = state.fear; if (state.scenario) S.scenario = state.scenario; updateFearBadge(); }
+  remaster?.leave();
   disposeWorld(scene, S.world);
   const ch = state.chapter;
   S.chapter = ch; S.room = 'game'; S.mount = null; S.perch = null; me.y = 0; closeThemePop(); noticeBox.classList.add('hidden');
@@ -300,6 +310,7 @@ function enterChapter(state, showIntro = true) {
   applyObjState(); applyDark();
   audio.ambient({ gwimun: ch.rain ? 'rain' : 'gwimun', ophelia: 'ship', doll: 'doll', hospital: 'hospital', camp: 'camp', west: 'west', kimono: 'kimono', clown: 'clown', park: 'park', mia: 'mia', zombie: 'zombie' }[S.scenario?.id] || 'horror');
   renderer.toneMappingExposure = 1.82;
+  remaster?.enter(S.world, ch, S.scenario?.id);
   if (showIntro && ch.intro) { queueStory({ ...ch.intro, sound: 'story' }); addJournal(ch.intro.title, ch.intro.text, 'story'); }
   if (!document.body.classList.contains('mobile') && !store.get('gwimun-tutorial', false)) { store.set('gwimun-tutorial', true); setTimeout(() => toast('팁: F 손전등 · C 웅크리기(귀신에게 덜 들킴) · G 위치 찍기 · J 수첩'), 4000); }
   renderParty();
@@ -727,7 +738,7 @@ function updateCamera(dt) {
     if (len > 0.01) { dir.divideScalar(len); camRay.set(from, dir); camRay.far = len + 0.3; const h = camRay.intersectObjects(walls, false)[0]; if (h) wallPull(camera.position, from, dir, h.distance, ty); }
   }
   camera.lookAt(tx, ty, tz);
-  if (S.shake > 0) { S.shake -= dt; camera.position.x += (Math.random() - 0.5) * 0.15; camera.position.y += (Math.random() - 0.5) * 0.15; }
+  if (S.shake > 0) { S.shake -= dt; camera.position.x += (Math.random() - 0.5) * 0.15 * (remaster?.intensity ?? 1); camera.position.y += (Math.random() - 0.5) * 0.15 * (remaster?.intensity ?? 1); }
   updateOccluders(dt, tx, ty, tz);
   // 카메라가 캐릭터에 바짝 붙으면 내 캐릭터와 이름표를 반투명하게
   if (myAvatar) {
@@ -853,8 +864,8 @@ function updateOthers(dt, t) {
     audio.heartbeat(lvl);
     audio.chase(gs.mode === 'hunt' && lvl > 0.35 ? lvl : 0);
     $('#vignette').classList.toggle('danger', lvl > 0.45);
-    if (lvl > 0.55 && S.world?.ceiling) for (const c of S.world.ceiling) if (!S.dark) c.light.intensity = Math.random() < 0.3 ? 0 : c.base;
-    if (myAvatar && S.light && lvl > 0.5) setLight(myAvatar, Math.random() > 0.25);
+    if ((remaster?.intensity ?? 1) > 0 && lvl > 0.55 && S.world?.ceiling) for (const c of S.world.ceiling) if (!S.dark) c.light.intensity = Math.random() < 0.3 ? 0 : c.base;
+    if ((remaster?.intensity ?? 1) > 0 && myAvatar && S.light && lvl > 0.5) setLight(myAvatar, Math.random() > 0.25);
     e.soundT -= dt;
     if (gs.v && d < 13 && e.soundT < 0) {
       const sounds = { zombie: ['zombie', 1.7], janitor: ['stomp', 0.55], elder: ['pipe', 2.2], woman: ['whisper', 2.4], mudang: ['crawl', 0.45], child: ['giggle', 3], sailor: ['water_step', 0.6], doll: ['porcelain', 0.4], father: ['snip', 1.1], dalgyal: ['hum', 2.6], slender: ['static_hiss', 1.8], nurse: ['cart', 0.9], headless: ['drag', 0.8], shadow: ['whisper', 3] };
@@ -922,7 +933,7 @@ function loop() {
     updateThemeBubble();
     // 보조광: 머리 위가 아니라 카메라 쪽에서 넓게 비춰 캐릭터 머리가 하얗게 빛나지 않게 한다
     fill.position.copy(camera.position); fill.position.y = Math.min(fill.position.y, 3.8);
-    fill.intensity = S.room === 'lobby' ? 2.2 : 2.6;
+    fill.intensity = remaster?.active ? 1.6 : S.room === 'lobby' ? 2.2 : 2.6;
     if (clickRing.material.opacity > 0) { clickRing.material.opacity -= dt * 1.5; clickRing.scale.multiplyScalar(1 + dt * 1.5); }
     const now = performance.now();
     for (const p of S.pings) { p.m.material.opacity = 0.35 + Math.sin(t * 8) * 0.25; if (now > p.until) { scene.remove(p.m); overlay.remove(p.label); } }
@@ -935,7 +946,11 @@ function loop() {
   const inLobby = S.room === 'lobby';
   if (inLobby !== S._lobbyCls) { S._lobbyCls = inLobby; document.body.classList.toggle('in-lobby', inLobby); }
   updateGameTimer();
+  remaster?.update(t, dt, S);
+  if (remaster) { renderer.info.reset(); renderer.info.autoReset = false; }
   fx.render(t, { danger: S.danger, mode: inLobby ? 'lobby' : 'game' });
+  remaster?.capture();
+  if (remaster) renderer.info.autoReset = true;
   renderer.autoClear = false; renderer.clearDepth(); renderer.render(overlay, camera); renderer.autoClear = true;
 }
 loop();
@@ -1045,6 +1060,7 @@ socket.on('game:start', async (st) => {
   S.scenario = st.scenario || null; updateFearBadge();
   if (st.chapterIdx === 0 && (st.elapsed ?? 0) < 8000 && S.scenario?.id) resetJournalFor(S.scenario.id); // 처음부터 새로 시작
   if (st.chapterIdx === 0 && !S.skipPrologue) { resetInput(); await cinema.play(st.scenario?.cine?.intro || 'prologue', { looks: partyLooks(), audio, fear: S.fear }); }
+  S.skipPrologue = false;
   enterChapter(st, true);
 });
 socket.on('game:chapter', (st) => { closeModal(); S.storyQueue = []; closeStory(true); fadeTransition(() => enterChapter(st, true)); });
@@ -2100,9 +2116,10 @@ function scare(type, src) {
   S.shake = S.fear === 1 ? 0.25 : 0.6;
   if (S.fear === 1) { audio.play(src === 'caught' ? 'sting' : 'whisper'); flashRed(); return; }
   if (S.fear === 2 && (src === 'wrong' || src === 'random')) { audio.play('sting'); flashRed(); return; }
+  if (remaster?.intensity === 0) { audio.play('whisper'); return; }
   jumpscare(pickScare(type, S.scenario?.id), audio);
 }
-function flashRed() { const v = $('#vignette'); v.classList.add('danger'); setTimeout(() => { if (S.danger < 0.45) v.classList.remove('danger'); }, 700); }
+function flashRed() { if (remaster?.intensity === 0) return; const v = $('#vignette'); v.classList.add('danger'); setTimeout(() => { if (S.danger < 0.45) v.classList.remove('danger'); }, 700); }
 
 // ─────────────────────────── 감정표현
 function doEmote(id) {

@@ -73,6 +73,15 @@ export class FX {
     this.brightness = 1;
   }
   setQuality(q) {
+    if (this.previewActive) {
+      this.quality = q;
+      const cap = { low: 0.8, medium: 1.15, high: 1.5 }[q] || 1.15;
+      this.previewCap = cap; this.previewRatio = Math.min(devicePixelRatio || 1, cap);
+      this.applyPreviewRatio();
+      this.bloom.enabled = false;
+      this.r.shadowMap.enabled = q === 'high';
+      this.resize(); return;
+    }
     this.quality = q;
     // 휴대폰은 고해상도 화면이라 픽셀이 너무 많다 — '높음'도 1.5배까지만
     const mobile = matchMedia('(pointer: coarse)').matches;
@@ -86,14 +95,21 @@ export class FX {
     this.r.shadowMap.enabled = false;
     this.resize();
   }
+  applyPreviewRatio() { this.r.setPixelRatio(this.previewRatio); this.composer.setPixelRatio(this.previewRatio); }
   resize() { this.r.setSize(innerWidth, innerHeight); this.composer.setSize(innerWidth, innerHeight); this.bloom.resolution.set(innerWidth / 2, innerHeight / 2); }
   render(t, { danger = 0, mode = 'game' } = {}) {
     const u = this.horror.uniforms;
     u.time.value = t;
+    if (this.previewActive) danger *= this.previewEffects ?? 0.35;
     u.danger.value += (danger - u.danger.value) * 0.08;
     u.brightness.value = this.brightness;
     if (mode === 'lobby') { u.grain.value = 0; u.vignette.value = 0; u.desat.value = 0.1; u.grade.value = 0.6; this.bloom.strength = 0.3; this.bloom.threshold = 1.15; }
     else { u.grain.value = 0.04; u.vignette.value = 1; u.desat.value = 0.32; u.grade.value = 1; this.bloom.strength = 0.65; this.bloom.threshold = 1.05; }
+    if (this.previewActive) {
+      u.grain.value = 0; u.vignette.value = 0.42; u.desat.value = 0.16;
+      // Low bypasses all full-screen postprocessing passes.
+      if (this.quality === 'low') { this.r.render(this.scene, this.camera); return; }
+    }
     this.composer.render();
   }
 }
