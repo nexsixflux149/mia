@@ -1074,7 +1074,7 @@ function loop() {
     netSend(dt);
     if (S.room === 'lobby' && S.world.rides?.swing) { const b = new Set(); if (S.mount?.ride === 'swing') b.add(S.mount.seat); for (const g of S.others.values()) { const rd = g.userData.target?.ride; if (rd?.startsWith('swing:')) b.add(Number(rd.split(':')[1])); } S.world.rides.swing.setBusy(b); }
     S.world.shopFace?.(me.x, me.z);
-    S.world.update?.(t, dt);
+    S.world.update?.(t, dt, camera.position);
     graphics.update(camera.position, me); watchPerf(performance.now());
     updateThemeBubble();
     // 보조광: 머리 위가 아니라 카메라 쪽에서 넓게 비춰 캐릭터 머리가 하얗게 빛나지 않게 한다
@@ -2128,7 +2128,7 @@ function openGallery() {
   };
   S.galleryRefresh = () => { if (!S.galleryBig && w.isConnected) grid(); };
   S.galleryBig = false; grid();
-  openModal('🖼 클리어 갤러리', '광장 전광판에 걸린 최근 클리어 기념 사진 30장', w);
+  openModal('🖼 클리어 갤러리', '광장 전광판에 걸린 최근 클리어 기념 사진 27장', w);
   socket.emit('snap:list', mergeClearPhotos);
 }
 function openFeedback() {
@@ -2779,7 +2779,7 @@ function doEmote(id) {
   if (id === 'jump' && S.em === 'jump' && S.emT < 0.7) return; // 공중에 떠 있는 동안(발이 땅에 닿기 전)에는 다시 뛸 수 없다
   S.em = id; S.emT = 0; S.eid++;
   if (id === 'jump') audio.play('pickup');
-  if (id === 'boo') { socket.emit('boo'); audio.play('giggle'); }
+  if (id === 'boo') { socket.emit('boo'); audio.play('sting'); }
   if (id === 'heart') { burstHearts(myAvatar, 6); }
   if (id === 'fart') doFart(myAvatar, me.x, me.y || 0, me.z, me.ry);
   $('#emotePanel').classList.add('hidden');
@@ -2798,7 +2798,7 @@ document.addEventListener('pointerdown', (e) => {
 })();
 socket.on('booed', ({ from }) => {
   toast(`👻 ${from} 님이 놀래켰다!`);
-  if (S.fear <= 1) { audio.play('giggle'); S.shake = S.fear ? 0.2 : 0; return; }
+  if (S.fear <= 1) { audio.play('sting'); S.shake = S.fear ? 0.2 : 0; return; }
   audio.play('sting'); S.shake = 0.5; flashRed();
 });
 
@@ -2882,7 +2882,7 @@ const showSnaps = () => S.world?.snapBoard?.set(S.snaps);
 function mergeClearPhotos(list) {
   if (!Array.isArray(list)) return;
   const latest = new Map([...S.snaps, ...list].map((photo) => [photo.id, photo]));
-  S.snaps = [...latest.values()].sort((a, b) => b.at - a.at || b.id.localeCompare(a.id)).slice(0, 30);
+  S.snaps = [...latest.values()].sort((a, b) => b.at - a.at || b.id.localeCompare(a.id)).slice(0, 27);
   showSnaps();
   S.galleryRefresh?.();
 }
@@ -3001,12 +3001,14 @@ function useShopItem(id) {
   if (!S.profile?.items?.[id]) { toast('남은 게 없어요. 🛒 상점에서 더 살 수 있어요.'); return; }
   socket.emit('shop:use', id);
 }
-// ───── 방귀 뿡 (먼지 + 낄낄)
+// ───── 방귀 뿡 (먼지 + 효과음)
 function doFart(g, x, y, z, ry) {
   const d = Math.hypot(x - me.x, z - me.z);
-  setTimeout(() => fartFx(x, y, z, ry), 380);
-  if (d < 16) setTimeout(() => audio.play('emote_chuckle'), 450);
-  if (g) setTimeout(() => { const b = textSprite('뿌우웅~ 💨 낄낄', { size: 26, bg: 'rgba(60,50,20,.8)', color: '#ffe9a8' }); addLabel(g, b, 2.05); setTimeout(() => removeLabel(b), 1800); }, 400);
+  setTimeout(() => {
+    fartFx(x, y, z, ry);
+    if (d < 16) audio.play('fart');
+  }, 380);
+  if (g) setTimeout(() => { const b = textSprite('뿌우웅~ 💨', { size: 26, bg: 'rgba(60,50,20,.8)', color: '#ffe9a8' }); addLabel(g, b, 2.05); setTimeout(() => removeLabel(b), 1800); }, 400);
 }
 // ───── 마이크로 말하면 발밑에 초록 링이 목소리 크기에 맞춰 퍼진다
 const ringGeo = new THREE.RingGeometry(0.9, 1, 56); ringGeo.rotateX(-Math.PI / 2);

@@ -82,7 +82,7 @@ app.use(zstatic(PUBLIC_DIR, { cache: 'no-cache', transform: pageTransform, tag: 
 app.use(express.static(PUBLIC_DIR, { setHeaders: (res, file) => res.setHeader('Cache-Control', /\.woff2$/i.test(file) ? YEAR : /\.(png|jpe?g|ico|webp|gif)$/i.test(file) ? 'public, max-age=86400' : 'no-cache') })); // 글꼴(.woff2)은 파일 이름에 해시가 붙어 있어 내용이 바뀌면 이름도 바뀐다 → 1년 캐시
 const server = http.createServer(app);
 const io = new Server(server, { maxHttpBufferSize: 2e5 });
-const SNAP_MAX = 30, PHOTO_TICKET_AGE = 7 * 24 * 60 * 60 * 1000;
+const SNAP_MAX = 27, PHOTO_TICKET_AGE = 7 * 24 * 60 * 60 * 1000;
 // 화면(클라이언트)과 서버가 주고받는 방식의 버전. 예전 화면이 새 서버에 붙으면 새로고침시킨다.
 const PROTO = 3;
 

@@ -93,7 +93,7 @@ export class AudioFX {
     this.buf = {};
     // 속삭임(영어 말소리) · 으르렁(사람 말소리처럼 들림) · 좀비(트림 소리) 녹음은 거슬려서 뺐다 → 예전 합성음
     // 비명(여자 · 아이 · 젖은 비명) · 문 두드림 · 물방울 '뽀옥' 녹음도 뺐다 (아래 play 에서도 소리를 내지 않는다)
-    const names = ['emote_chuckle', 'giggle', 'bang', 'sting_low', 'static_hiss', 'chain', 'amb_dark'];
+    const names = ['giggle', 'bang', 'sting_low', 'static_hiss', 'chain', 'amb_dark'];
     this.samplesReady = Promise.all(names.map((n) => fetch(`/sfx/${n}.mp3`).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject())).then((ab) => this.ctx.decodeAudioData(ab)).then((b) => { this.buf[n] = b; }).catch(() => {})));
     return this.samplesReady;
   }
@@ -107,7 +107,7 @@ export class AudioFX {
   playSample(name) {
     const v = (a) => 1 + (Math.random() * 2 - 1) * a;
     // 크기 맞춤: 주변에 가끔 깔리는 소리(속삭임 · 삐걱 · 킥킥 …)는 예전 합성음보다 조금만 크게(-30 LUFS 쯤), 비명은 예전보다 2~3dB 크게
-    const LV = { emote_chuckle: 0.45, giggle: 0.38, knock: 0.52, bang: 0.62, chain: 0.39, drip: 0.31, static_hiss: 0.79, sting_low: 0.72 };
+    const LV = { giggle: 0.38, knock: 0.52, bang: 0.62, chain: 0.39, drip: 0.31, static_hiss: 0.79, sting_low: 0.72 };
     const scream = name.startsWith('scream');
     return this.sample(name, { gain: (LV[name] ?? 1) * v(scream ? 0.05 : 0.15), rate: v(scream ? 0.025 : 0.06) });
   }
@@ -428,7 +428,6 @@ export class AudioFX {
       case 'slay': this.play('sword'); this.noise(0.9, { freq: 900, q: 0.8, gain: 0.35, at: 0.1, release: 0.8 }); [880, 1320, 1760, 2640].forEach((f, i) => this.tone(f, 1.4, { type: 'triangle', gain: 0.05, at: 0.15 + i * 0.07, release: 1.3 })); break;
       case 'shatter': this.play('glass'); this.tone(3000, 0.6, { type: 'sine', gain: 0.08, slide: 900 }); break;
       case 'fart': { const d = 0.55 + Math.random() * 0.35; this.tone(78 + Math.random() * 20, d, { type: 'sawtooth', gain: 0.32, slide: 52, attack: 0.02, release: 0.12, detune: 25 }); this.tone(115, d * 0.8, { type: 'square', gain: 0.08, slide: 70, at: 0.03 }); this.noise(d, { freq: 260, q: 2.5, gain: 0.35, release: 0.1 }); break; }
-      case 'emote_chuckle':
       case 'laugh': for (let i = 0; i < 7; i++) { const f = 330 + Math.random() * 80 - i * 8; this.tone(f, 0.11, { type: 'triangle', gain: 0.09, at: i * 0.14, slide: f * 0.72 }); this.noise(0.08, { freq: 1600, q: 2, gain: 0.05, at: i * 0.14 }); } break;
       case 'zombie': this.tone(85 + Math.random() * 30, 1.2, { type: 'sawtooth', gain: 0.18, slide: 60, attack: 0.1, release: 0.6, detune: 40 }); this.noise(1.1, { freq: 420, q: 2, gain: 0.25, attack: 0.15, release: 0.6 }); break;
       case 'heli': for (let i = 0; i < 16; i++) this.noise(0.07, { freq: 200, type: 'lowpass', gain: 0.6, at: i * 0.11 }); break;

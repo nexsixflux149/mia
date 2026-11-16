@@ -596,8 +596,8 @@ function buildPark(root, colliders, add) {
   return { interactives, rides, update: (t) => anim.forEach((f) => f(t)) };
 }
 
-// 클리어 사진 전광판: 미아랜드 입구 자리의 세로 사진 6×5칸.
-const SNAP_COLS = 6, SNAP_ROWS = 5, SNAP_W = 1.24, SNAP_H = 1.55, SNAP_GAP = 0.12;
+// 클리어 사진 전광판: 미아랜드 입구 자리의 세로 사진 9×3칸.
+const SNAP_COLS = 9, SNAP_ROWS = 3, SNAP_W = 1.24, SNAP_H = 1.55, SNAP_GAP = 0.12;
 function snapTileTex(img) {
   const c = document.createElement('canvas'); c.width = 256; c.height = 320;
   const x = c.getContext('2d');
@@ -735,7 +735,7 @@ function buildLobbyDeco(root, colliders, themes) {
   const ga = themes.map((th) => Math.atan2(th.z, th.x)).sort((a, b) => a - b);
   for (let i = 0; i + 1 < ga.length; i++) angs.push((ga[i] + ga[i + 1]) / 2);
   for (let k = 1; k < 8; k++) angs.push((k / 8) * Math.PI); // 남쪽 반원
-  const posts = angs.filter((a) => !onOuterPath(Math.cos(a) * (PR + 1.1), Math.sin(a) * (PR + 1.1), 0.55)).map((a) => {
+  const posts = angs.filter((a) => Math.abs(a - Math.PI / 2) > 0.01 && !onOuterPath(Math.cos(a) * (PR + 1.1), Math.sin(a) * (PR + 1.1), 0.55)).map((a) => {
     const r = PR + 1.1, x = Math.cos(a) * r, z = Math.sin(a) * r, g = add(new THREE.Group()); g.position.set(x, 0, z);
     mesh(new THREE.CylinderGeometry(0.06, 0.09, 2.6, 8), postM, 0, 1.3, 0, g);
     mesh(new THREE.BoxGeometry(0.34, 0.42, 0.34), postM, 0, 2.75, 0, g);
@@ -943,11 +943,11 @@ function buildLobbyDeco(root, colliders, themes) {
     inter.push({ id: 'gyro', kind: 'ride', x: x - Math.cos(ga) * 4.2, z: z - Math.sin(ga) * 4.2, r: 4.6, label: '자이로 드롭', verb: '타기', noSpread: true });
   }
   // 🌠 소원의 별: 광장 한가운데 떠 있는 커다란 금빛 별.
-  // 천천히 둥실둥실 → 9초마다 한 번 5바퀴를 자연스럽게 빠르게 돌며 반짝이를 흩뿌린다 (무한 반복). 다가가면 '별똥별 보기'
+  // 천천히 떠 있다가 9초마다 정면에서 한 바퀴 돌며 반짝이를 흩뿌린다.
   const clickables = []; let wishStar = null;
   {
     const x = 0, z = 0, BASE = 3.5, CYC = 9, SPIN0 = 6.0, SPIN = 2.2; // 별 가운데 높이 (아래 끝이 머리 위 2m 쯤)
-    const g = add(new THREE.Group()); g.position.set(x, 0, z); g.rotation.y = Math.atan2(6.2 - x, 5.6 - z); // 고객소리함 쪽(광장 입구)을 바라본다
+    const g = add(new THREE.Group()); g.position.set(x, 0, z); g.rotation.y = 0; // 카메라 방향을 받기 전에는 광장 입구 쪽을 본다
     const sh = new THREE.Shape(); const RO = 1.5, RI = 0.63;
     for (let i = 0; i < 10; i++) { const a = Math.PI / 2 + (i / 10) * Math.PI * 2, r = i % 2 ? RI : RO; i ? sh.lineTo(Math.cos(a) * r, Math.sin(a) * r) : sh.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
     const sg = new THREE.ExtrudeGeometry(sh, { depth: 0.4, bevelEnabled: true, bevelThickness: 0.18, bevelSize: 0.13, bevelSegments: 5, curveSegments: 4 }); sg.center(); sg.computeVertexNormals();
@@ -977,8 +977,7 @@ function buildLobbyDeco(root, colliders, themes) {
       const boost = t < boostUntil ? Math.min(1, (boostUntil - t) / 1.5, 1) : 0;
       const tc = t % CYC, inSpin = tc >= SPIN0 && tc < SPIN0 + SPIN, k = inSpin ? (tc - SPIN0) / SPIN : 0;
       spin.position.y = BASE + Math.sin(t * 1.25) * 0.28 + (inSpin ? Math.sin(Math.PI * k) * 0.35 : 0);
-      spin.rotation.y = easeIO(k) * Math.PI * 2 * 5 + Math.sin(t * 0.6) * 0.18;
-      spin.rotation.z = Math.sin(t * 0.9) * 0.06;
+      spin.rotation.z = -easeIO(k) * Math.PI * 2 + Math.sin(t * 0.9) * 0.06;
       const sc = 1 + (inSpin ? Math.sin(Math.PI * k) * 0.07 : 0) + boost * 0.08; spin.scale.setScalar(sc);
       if (inSpin) emit((Math.random() < dt * 55 ? 2 : 0) + (Math.random() < dt * 40 ? 1 : 0));
       if (boost && Math.random() < dt * 20) emit(1);
@@ -990,12 +989,17 @@ function buildLobbyDeco(root, colliders, themes) {
       og.attributes.position.needsUpdate = true; orbit.material.opacity = 0.55 + Math.sin(t * 3) * 0.2;
       for (const s of SPK) { if (!s.visible) continue; const u = s.userData; u.life -= dt; if (u.life <= 0) { s.visible = false; continue; } u.v.y -= 2.4 * dt; u.v.multiplyScalar(1 - dt * 0.9); s.position.addScaledVector(u.v, dt); const f = u.life / u.max; s.material.opacity = Math.min(1, f * 1.6) * (0.7 + 0.3 * Math.sin(t * 30 + u.sz * 50)); s.scale.setScalar(u.sz * (0.6 + f)); }
     });
-    const sign = textSprite('🌠 소원의 별 · 다가가서 소원빌기', { size: 26, bg: 'rgba(30,20,60,.85)', color: '#ffe9a8', border: '#ffd34a', maxW: 600 }); sign.position.set(x, BASE + 2.4, z); add(sign);
-    anim.push((t) => { sign.position.y = spin.position.y + 2.4; });
     inter.push({ id: 'wishstar', kind: 'wish', x, z, r: 4.2, label: '소원의 별', verb: '소원빌기', noSpread: true });
     clickables.push({ id: 'wishstar', group: spin });
     // 별똥별이 떨어지는 동안 별이 더 밝게 빛나고 반짝이를 뿌린다
-    wishStar = { x, z, y: () => spin.position.y, boost: (sec) => { boostUntil = boostT + sec; } };
+    wishStar = {
+      x, z, y: () => spin.position.y,
+      face(view) {
+        if (!view || Math.hypot(view.x - x, view.z - z) < 0.01) return;
+        g.rotation.y = Math.atan2(view.x - x, view.z - z);
+      },
+      boost: (sec) => { boostUntil = boostT + sec; },
+    };
   }
   return { interactives: inter, rides, clickables, wishStar, update: (t) => anim.forEach((f) => f(t)) };
 }
@@ -1056,7 +1060,7 @@ export function buildLobby(scene, opts = {}) {
     const cv = document.createElement('canvas'); cv.width = 2048; cv.height = 256;
     const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, fog: false, toneMapped: false }));
-    const W0 = 11.5; sp.position.set(0, 6.6, 0); sp.scale.set(W0, W0 / 8, 1); sp.visible = false; sp.userData.noOcc = true; sp.renderOrder = 3; root.add(sp);
+    const W0 = 11.5; sp.position.set(0, 6.3, 0); sp.scale.set(W0, W0 / 8, 1); sp.visible = false; sp.userData.noOcc = true; sp.renderOrder = 3; root.add(sp);
     let cur = null;
     const FIX = '"Do Hyeon", "Gowun Dodum", sans-serif', NAME = '"Gowun Dodum", sans-serif';
     const draw = () => {
@@ -1088,7 +1092,7 @@ export function buildLobby(scene, opts = {}) {
         // 글꼴이 늦게 오면 다시 그린다 (처음엔 기기 글꼴로 보일 수 있다)
         if (cur && document.fonts?.load) Promise.all([document.fonts.load(`100px ${FIX.split(',')[0]}`, '주간랭킹 1위는 님 입니다'), document.fonts.load(`100px ${NAME.split(',')[0]}`, cur.name)]).then(() => { if (sp.parent) draw(); }).catch(() => {});
       },
-      update(t, starY) { if (!sp.visible) return; sp.position.y = starY + 4.1; const k = 1 + Math.sin(t * 2.3) * 0.012; sp.scale.set(W0 * k, (W0 / 8) * k, 1); },
+      update(t, starY) { if (!sp.visible) return; sp.position.y = starY + 2.8; const k = 1 + Math.sin(t * 2.3) * 0.012; sp.scale.set(W0 * k, (W0 / 8) * k, 1); },
     };
   })();
   champSign.set(opts.champ || null);
@@ -1161,7 +1165,8 @@ export function buildLobby(scene, opts = {}) {
   const deco = buildLobbyDeco(root, colliders, themes);
   scene.add(root);
   let lastT = 0;
-  const update = (t) => {
+  const update = (t, _dt, view) => {
+    deco.wishStar.face(view);
     snapBoard.update(Math.min(0.1, Math.max(0, t - lastT))); lastT = t;
     park.update(t); outer.update(t); deco.update(t); champSign.update(t, deco.wishStar.y()); fireflies.update(t); extra.update(t);
     clouds.rotation.y = t * 0.006; clouds.children.forEach((c) => (c.position.y += Math.sin(t * 0.3 + c.userData.ph) * 0.004));
