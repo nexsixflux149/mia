@@ -1,6 +1,7 @@
 // ───── 저장소: DATABASE_URL 이 있으면 무료 Postgres(Neon·Supabase 등)에, 없으면 data 폴더의 json 파일에 저장한다.
 // 기록(이어하기·하트·랭킹)은 작아서 종류별로 한 줄(JSON)씩 통째로 저장한다.
 import fs from 'fs';
+import { randomUUID } from 'node:crypto';
 import path from 'path';
 
 const DB_URL = (process.env.DATABASE_URL || '').trim();
@@ -59,6 +60,48 @@ async function flushKey(key) {
     return;
   }
   try { fs.mkdirSync(p.dataDir, { recursive: true }); fs.writeFileSync(path.join(p.dataDir, key + '.json'), JSON.stringify(p.obj, null, p.pretty ? 2 : 0)); } catch {}
+}
+
+const CLEAR_PHOTO_PREFIX = 'clear_photo:';
+const photoDir = (dataDir) => path.join(dataDir, 'clear-photos');
+
+export async function loadClearPhotos(dataDir, limit) {
+  if (pool) {
+    const { rows } = await pool.query(
+      `SELECT value FROM ${TABLE} WHERE left(key, length($1)) = $1 ORDER BY (value->>'at')::bigint DESC, key DESC LIMIT $2`,
+      [CLEAR_PHOTO_PREFIX, limit],
+    );
+    return rows.map(({ value }) => value);
+  }
+  const dir = photoDir(dataDir);
+  const files = await fs.promises.readdir(dir).catch((err) => { if (err.code === 'ENOENT') return []; throw err; });
+  return (await Promise.all(files.filter((name) => /^\d+-[\da-f-]+\.json$/.test(name)).sort().reverse().slice(0, limit)
+    .map(async (name) => JSON.parse(await fs.promises.readFile(path.join(dir, name), 'utf8')))));
+}
+
+export async function saveClearPhoto(dataDir, photo) {
+  if (pool) {
+    const result = await pool.query(
+      `INSERT INTO ${TABLE} (key, value) VALUES ($1, $2::jsonb) ON CONFLICT (key) DO NOTHING`,
+      [CLEAR_PHOTO_PREFIX + photo.id, JSON.stringify(photo)],
+    );
+    return result.rowCount === 1;
+  }
+  const dir = photoDir(dataDir);
+  fs.mkdirSync(dir, { recursive: true });
+  const dest = path.join(dir, `${photo.at}-${photo.id}.json`);
+  if (fs.existsSync(dest)) return false;
+  const temp = path.join(dir, `.${randomUUID()}.tmp`);
+  try {
+    fs.writeFileSync(temp, JSON.stringify(photo), { flag: 'wx' });
+    fs.renameSync(temp, dest);
+    return true;
+  } catch (err) {
+    if (err.code === 'EEXIST') return false;
+    throw err;
+  } finally {
+    await fs.promises.unlink(temp).catch(() => {});
+  }
 }
 
 /** 서버가 꺼지기 직전에 남은 기록을 모두 저장한다 (무료 서버가 잠들거나 재배포될 때) */

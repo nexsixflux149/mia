@@ -334,6 +334,16 @@ export const LOBBY_THEMES = [
 // 관문은 광장 북쪽 반원에 고르게 늘어선다 (히든 테마가 열리면 하나 더 끼워서 다시 배치)
 // 로비 넓이 배율: 로비를 다 지은 뒤 spreadLobby 가 물건들 사이를 이만큼 벌린다 (물건 크기는 그대로)
 export const LS = 1.6;
+const OUTER_PATH = { ringInner: 24.6, ringOuter: 27, branchStart: 17.05, branchEnd: 26, branchHalfWidth: 1.2 };
+
+function onOuterPath(x, z, margin = 0) {
+  const { ringInner, ringOuter, branchStart, branchEnd, branchHalfWidth } = OUTER_PATH;
+  const r = Math.hypot(x, z);
+  if (r >= ringInner * LS - margin && r <= ringOuter * LS + margin) return true;
+  const along = (Math.abs(x) + Math.abs(z)) * Math.SQRT1_2;
+  const across = Math.abs(Math.abs(x) - Math.abs(z)) * Math.SQRT1_2;
+  return along >= branchStart * LS - margin && along <= branchEnd * LS + margin && across <= branchHalfWidth + margin;
+}
 function placeThemes(list) { list.forEach((th, k, all) => { const a = Math.PI + (k / (all.length - 1)) * Math.PI; th.x = +(Math.cos(a) * 15 * LS).toFixed(2); th.z = +(Math.sin(a) * 15 * LS).toFixed(2); }); return list; }
 placeThemes(LOBBY_THEMES.filter((t) => !t.hidden));
 
@@ -571,7 +581,7 @@ function buildPark(root, colliders, add) {
     for (const sz of [-1, 1]) for (const sx of [-1, 1]) seats.push({ x: x + 0.45 * sx, z: z + 0.7 * sz, y: 0.41, ry: sz > 0 ? Math.PI : 0, back: true });
     interactives.push({ id: 'table' + i, kind: 'sit', x, z, r: 1.9, label: '피크닉 테이블', verb: '의자에 앉기', seats });
   });
-  // 장식: 풍선 · 포장마차 · 입구 아치 · 깃발 줄
+  // 장식: 풍선 · 포장마차 · 깃발 줄
   const BAL = ['#ff6f91', '#ffc75f', '#6fd6ff', '#b39dff', '#7ee0a8', '#ff9671'];
   [[-12, 4.6], [12, 4.6], [-3, 17], [3, 17], [-15.5, 9], [15.5, 9]].forEach(([x, z], k) => {
     const g = new THREE.Group(); g.position.set(x, 0, z); root.add(g);
@@ -583,62 +593,75 @@ function buildPark(root, colliders, add) {
     anim.push((t) => { g.rotation.y = Math.sin(t * 0.6 + k) * 0.12; });
   });
   add({ t: 'stall', x: -15.5, z: 13, r: 60 }); add({ t: 'stall', x: 15.5, z: 13, r: -60 });
-  {
-    const g = new THREE.Group(); g.position.set(0, 0, 18.2); root.add(g);
-    for (const s of [-1, 1]) mesh(new THREE.CylinderGeometry(0.25, 0.3, 4.2, 12), pm('#ff8fd0'), 2.6 * s, 2.1, 0, g);
-    const arch = mesh(new THREE.TorusGeometry(2.6, 0.18, 10, 32, Math.PI), pm('#ffd36a', { emissive: '#ffb020', emissiveIntensity: 0.5 }), 0, 4.2, 0, g); arch.castShadow = false;
-    const sign = textSprite('🎠 미아 랜드 🎡', { size: 44, bg: 'rgba(60,10,50,.85)', color: '#ffe08a', border: '#ff8fd0' }); sign.position.set(0, 5.4, 18.2); sign.scale.multiplyScalar(1.2); root.add(sign);
-  }
   return { interactives, rides, update: (t) => anim.forEach((f) => f(t)) };
 }
 
-// 📸 캡처 전광판: 로비 남쪽 들판, 롤러코스터 뒤에 높이 세운 6×4 = 24칸 타일 화면. 맨 왼쪽 위가 가장 최근 사진
-const SNAP_COLS = 6, SNAP_ROWS = 4, SNAP_W = 1.92, SNAP_H = 1.08, SNAP_GAP = 0.12;
-function snapTileTex(img, name) {
-  const c = document.createElement('canvas'); c.width = 384; c.height = 216; const x = c.getContext('2d');
+// 클리어 사진 전광판: 미아랜드 입구 자리의 세로 사진 6×5칸.
+const SNAP_COLS = 6, SNAP_ROWS = 5, SNAP_W = 1.24, SNAP_H = 1.55, SNAP_GAP = 0.12;
+function snapTileTex(img) {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 320;
+  const x = c.getContext('2d');
   if (img) {
-    const k = Math.max(c.width / img.width, c.height / img.height), w = img.width * k, h = img.height * k;
+    x.fillStyle = '#201820'; x.fillRect(0, 0, c.width, c.height);
+    const scale = Math.min(c.width / img.width, c.height / img.height);
+    const w = img.width * scale, h = img.height * scale;
     x.drawImage(img, (c.width - w) / 2, (c.height - h) / 2, w, h);
-    if (name) { x.fillStyle = 'rgba(0,0,0,.6)'; x.fillRect(0, 186, 384, 30); x.font = '700 20px "Noto Sans KR", sans-serif'; x.fillStyle = '#ffe9a8'; x.textBaseline = 'middle'; x.fillText(`📸 ${name}`.slice(0, 22), 10, 201); }
   } else {
-    const g = x.createLinearGradient(0, 0, 0, 216); g.addColorStop(0, '#16101e'); g.addColorStop(1, '#0a070e'); x.fillStyle = g; x.fillRect(0, 0, 384, 216);
-    x.strokeStyle = 'rgba(111,214,255,.18)'; x.lineWidth = 2; x.strokeRect(6, 6, 372, 204);
-    x.font = '48px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.globalAlpha = 0.35; x.fillText('📸', 192, 92);
-    x.font = '700 20px "Noto Sans KR", sans-serif'; x.fillStyle = '#9fdcff'; x.fillText('캡처를 기다리는 중', 192, 150);
+    x.fillStyle = '#201820'; x.fillRect(0, 0, c.width, c.height);
+    x.strokeStyle = '#57414b'; x.lineWidth = 2; x.strokeRect(8, 8, 240, 304);
+    x.fillStyle = '#957581'; x.font = '24px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillText('클리어 사진', 128, 160);
   }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 function buildSnapBoard(root, colliders) {
-  const g = new THREE.Group(); g.position.set(0, 0, 29.6); g.rotation.y = Math.PI; root.add(g); // 광장(북쪽)을 바라본다
-  const W = SNAP_COLS * SNAP_W + (SNAP_COLS - 1) * SNAP_GAP, H = SNAP_ROWS * SNAP_H + (SNAP_ROWS - 1) * SNAP_GAP, CY = 7.6;
+  const z = 18.2;
+  const g = new THREE.Group(); g.position.set(0, 0, z); g.rotation.y = Math.PI; root.add(g);
+  const W = SNAP_COLS * SNAP_W + (SNAP_COLS - 1) * SNAP_GAP;
+  const H = SNAP_ROWS * SNAP_H + (SNAP_ROWS - 1) * SNAP_GAP;
+  const foot = 1.35, cy = foot + H / 2;
   const metal = new THREE.MeshStandardMaterial({ color: '#2a2530', metalness: 0.6, roughness: 0.45 });
-  const back = new THREE.Mesh(new THREE.BoxGeometry(W + 0.7, H + 0.7, 0.3), metal); back.position.set(0, CY, -0.18); g.add(back);
-  const rim = new THREE.Mesh(new THREE.BoxGeometry(W + 0.9, H + 0.9, 0.12), new THREE.MeshStandardMaterial({ color: '#6fd6ff', emissive: '#2fb6ff', emissiveIntensity: 0.9 })); rim.position.set(0, CY, -0.3); g.add(rim);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(W + 0.7, H + 0.7, 0.3), metal); back.position.set(0, cy, -0.18); g.add(back);
+  const rim = new THREE.Mesh(new THREE.BoxGeometry(W + 0.9, H + 0.9, 0.12), new THREE.MeshStandardMaterial({ color: '#ffd390', emissive: '#ff8c52', emissiveIntensity: 0.9 })); rim.position.set(0, cy, -0.3); g.add(rim);
   for (const s of [-1, 1]) {
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.45, CY - H / 2, 0.45), metal); leg.position.set(s * 5.4, (CY - H / 2) / 2, -0.2); g.add(leg);
-    colliders.push({ x: -s * 5.4, z: 29.8, hw: 0.4, hd: 0.4 });
+    const x = s * (W / 2 - 0.55);
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.45, foot, 0.45), metal);
+    leg.position.set(x, foot / 2, -0.2); g.add(leg);
+    // 간판의 위치는 확장하지만 지지대 간격은 그대로 유지한다.
+    colliders.push({ x: -x, z: z * LS + 0.2, hw: 0.4, hd: 0.4, noSpread: true });
   }
-  const title = textSprite('📸 실시간 캡처 전광판 · 화면 위 📸캡처를 눌러 보세요', { size: 30, bg: 'rgba(8,20,32,.88)', color: '#9fdcff', border: '#6fd6ff', maxW: 900 });
-  title.position.set(0, CY + H / 2 + 0.9, 0); title.scale.multiplyScalar(1.6); g.add(title);
+  const title = textSprite('📸 클리어 기념 폴라로이드', { size: 36, bg: 'rgba(34,16,26,.9)', color: '#ffe3b3', border: '#ffd390', maxW: 850 });
+  title.position.set(0, cy + H / 2 + 0.9, 0); title.scale.multiplyScalar(1.5); g.add(title);
   const geo = new THREE.PlaneGeometry(SNAP_W, SNAP_H), tiles = [];
   for (let i = 0; i < SNAP_COLS * SNAP_ROWS; i++) {
     const c = i % SNAP_COLS, r = Math.floor(i / SNAP_COLS);
-    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: snapTileTex(null), toneMapped: false }));
-    m.position.set(-W / 2 + SNAP_W / 2 + c * (SNAP_W + SNAP_GAP), CY + H / 2 - SNAP_H / 2 - r * (SNAP_H + SNAP_GAP), 0.0); g.add(m); tiles.push(m);
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: snapTileTex(), toneMapped: false }));
+    m.position.set(-W / 2 + SNAP_W / 2 + c * (SNAP_W + SNAP_GAP), cy + H / 2 - SNAP_H / 2 - r * (SNAP_H + SNAP_GAP), 0); g.add(m); tiles.push(m);
   }
-  let ids = []; let flash = 0;
-  const setTile = (m, tex) => { m.material.map?.dispose(); m.material.map = tex; m.material.needsUpdate = true; };
-  const load = (s) => new Promise((res) => { const im = new Image(); im.onload = () => res(snapTileTex(im, s.name)); im.onerror = () => res(snapTileTex(null)); im.src = s.img; });
+  let ids = '', revision = 0, flash = 0;
+  const load = (photo) => new Promise((resolve) => {
+    const im = new Image();
+    im.onload = () => resolve(snapTileTex(im));
+    im.onerror = () => resolve(snapTileTex());
+    im.src = photo.img;
+  });
   return {
-    /** 최근 사진 목록(최신이 앞)으로 타일을 다시 채운다 */
     async set(list) {
-      list = (list || []).slice(0, tiles.length); const want = list.map((s) => s.id).join();
-      if (want === ids.join()) return; ids = list.map((s) => s.id);
-      const texs = await Promise.all(list.map(load));
-      tiles.forEach((m, i) => setTile(m, texs[i] || snapTileTex(null)));
+      const photos = list.slice(0, tiles.length);
+      const want = photos.map((photo) => photo.id).join();
+      if (want === ids) return;
+      ids = want;
+      const request = ++revision;
+      const textures = await Promise.all(photos.map(load));
+      if (request !== revision || !root.parent) { textures.forEach((t) => t.dispose()); return; }
+      tiles.forEach((tile, i) => {
+        tile.material.map.dispose();
+        tile.material.map = textures[i] || snapTileTex();
+        tile.material.needsUpdate = true;
+      });
       flash = 1;
     },
-    update(dt) { if (flash > 0) { flash = Math.max(0, flash - dt * 1.5); rim.material.emissiveIntensity = 0.9 + flash * 3; tiles[0].scale.setScalar(1 + flash * 0.08); } },
+    update(dt) { if (flash > 0) { flash = Math.max(0, flash - dt * 1.5); rim.material.emissiveIntensity = 0.9 + flash * 2; } },
   };
 }
 
@@ -712,7 +735,7 @@ function buildLobbyDeco(root, colliders, themes) {
   const ga = themes.map((th) => Math.atan2(th.z, th.x)).sort((a, b) => a - b);
   for (let i = 0; i + 1 < ga.length; i++) angs.push((ga[i] + ga[i + 1]) / 2);
   for (let k = 1; k < 8; k++) angs.push((k / 8) * Math.PI); // 남쪽 반원
-  const posts = angs.map((a) => {
+  const posts = angs.filter((a) => !onOuterPath(Math.cos(a) * (PR + 1.1), Math.sin(a) * (PR + 1.1), 0.55)).map((a) => {
     const r = PR + 1.1, x = Math.cos(a) * r, z = Math.sin(a) * r, g = add(new THREE.Group()); g.position.set(x, 0, z);
     mesh(new THREE.CylinderGeometry(0.06, 0.09, 2.6, 8), postM, 0, 1.3, 0, g);
     mesh(new THREE.BoxGeometry(0.34, 0.42, 0.34), postM, 0, 2.75, 0, g);
@@ -919,11 +942,11 @@ function buildLobbyDeco(root, colliders, themes) {
     colliders.push({ x, z, hw: 3.3, hd: 3.3, noSpread: true });
     inter.push({ id: 'gyro', kind: 'ride', x: x - Math.cos(ga) * 4.2, z: z - Math.sin(ga) * 4.2, r: 4.6, label: '자이로 드롭', verb: '타기', noSpread: true });
   }
-  // 🌠 소원의 별: 광장 북동쪽(분수대와 테마 문 사이)에 떠 있는 커다란 금빛 별.
+  // 🌠 소원의 별: 광장 한가운데 떠 있는 커다란 금빛 별.
   // 천천히 둥실둥실 → 9초마다 한 번 5바퀴를 자연스럽게 빠르게 돌며 반짝이를 흩뿌린다 (무한 반복). 다가가면 '별똥별 보기'
   const clickables = []; let wishStar = null;
   {
-    const x = 8, z = -6.5, BASE = 3.5, CYC = 9, SPIN0 = 6.0, SPIN = 2.2; // 별 가운데 높이 (아래 끝이 머리 위 2m 쯤)
+    const x = 0, z = 0, BASE = 3.5, CYC = 9, SPIN0 = 6.0, SPIN = 2.2; // 별 가운데 높이 (아래 끝이 머리 위 2m 쯤)
     const g = add(new THREE.Group()); g.position.set(x, 0, z); g.rotation.y = Math.atan2(6.2 - x, 5.6 - z); // 고객소리함 쪽(광장 입구)을 바라본다
     const sh = new THREE.Shape(); const RO = 1.5, RI = 0.63;
     for (let i = 0; i < 10; i++) { const a = Math.PI / 2 + (i / 10) * Math.PI * 2, r = i % 2 ? RI : RO; i ? sh.lineTo(Math.cos(a) * r, Math.sin(a) * r) : sh.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
@@ -1010,6 +1033,7 @@ export function buildLobby(scene, opts = {}) {
   const add = (p) => { const g = place(root, p); const f = footOf(p, g); if (f) colliders.push(f); return g; };
   for (let i = 0; i < 18; i++) {
     const a = (i / 18) * Math.PI * 2 + 0.09, tx = Math.cos(a) * 19.5, tz = Math.sin(a) * 19.5;
+    if (onOuterPath(tx * LS, tz * LS, 0.75)) continue;
     if (Math.hypot(tx - PARK.wheel.x, tz - PARK.wheel.z) < 3.4) continue; // 관람차 자리의 나무는 심지 않는다
     add({ t: i % 3 ? 'pine' : 'tree', x: tx, z: tz, color: ['#c9a8ff', '#ffb7c9', '#9ad0ff'][i % 3] });
   }
@@ -1025,48 +1049,9 @@ export function buildLobby(scene, opts = {}) {
   const extra = buildLobbyExtras(root, colliders, add);
   const snapBoard = buildSnapBoard(root, colliders);
   const tip = textSprite('🚪 테마 관문을 클릭하면 바로 시작! · 🎠 놀이기구도 탈 수 있어요', { size: 26, bg: 'rgba(0,0,0,.55)', maxW: 700 });
-  tip.position.set(0, 7.9, 0); root.add(tip);
+  tip.position.set(0, 7.9, 9); root.add(tip);
 
-  // ── 광장 한가운데 분수대 (물줄기가 실제로 솟구쳤다 떨어진다)
-  const fountain = (() => {
-    const g = new THREE.Group(); g.scale.setScalar(1.5); root.add(g); // 광장이 넓어진 만큼 분수대도 크게
-    const stone = new THREE.MeshStandardMaterial({ color: '#9a948c', roughness: 0.85 }), stoneD = new THREE.MeshStandardMaterial({ color: '#77716a', roughness: 0.9 });
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(2.3, 0.22, 12, 48), stone); rim.rotation.x = Math.PI / 2; rim.position.y = 0.55; g.add(rim);
-    const wall = new THREE.Mesh(new THREE.CylinderGeometry(2.3, 2.45, 0.55, 48, 1, true), stoneD); wall.position.y = 0.27; g.add(wall);
-    const waterM = new THREE.MeshStandardMaterial({ color: '#3a7fae', roughness: 0.15, metalness: 0.2, emissive: '#0e3a5a', emissiveIntensity: 0.9, transparent: true, opacity: 0.88 });
-    const pool = new THREE.Mesh(new THREE.CircleGeometry(2.25, 48), waterM); pool.rotation.x = -Math.PI / 2; pool.position.y = 0.45; g.add(pool);
-    const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.38, 1.3, 16), stone); ped.position.y = 1.05; g.add(ped);
-    const bowl = new THREE.Mesh(new THREE.SphereGeometry(0.85, 24, 12, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), stone); bowl.position.y = 1.95; bowl.material = stone; g.add(bowl);
-    const bowlW = new THREE.Mesh(new THREE.CircleGeometry(0.78, 32), waterM); bowlW.rotation.x = -Math.PI / 2; bowlW.position.y = 1.9; g.add(bowlW);
-    const top = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.14, 0.6, 12), stone); top.position.y = 2.2; g.add(top);
-    // 물결 고리 (퍼져 나가며 옅어진다)
-    const ripples = [0, 1, 2].map((i) => { const r = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.0, 40), new THREE.MeshBasicMaterial({ color: '#cfeaff', transparent: true, opacity: 0.4, depthWrite: false })); r.rotation.x = -Math.PI / 2; r.position.y = 0.47; g.add(r); return r; });
-    // 물방울: 가운데에서 위로 솟았다가 사방으로 떨어지고, 가장자리 여섯 곳에서 안쪽으로 포물선
-    const N = 700, pos = new Float32Array(N * 3), seed = [];
-    for (let i = 0; i < N; i++) {
-      const jet = i < 380 ? -1 : (i % 6);
-      const a = Math.random() * Math.PI * 2;
-      seed.push(jet < 0 ? { o: [0, 2.5, 0], v: [Math.cos(a) * (0.5 + Math.random() * 0.5), 3.4 + Math.random() * 0.8, Math.sin(a) * (0.5 + Math.random() * 0.5)], T: 1.25, ph: Math.random() }
-        : (() => { const b = (jet / 6) * Math.PI * 2; return { o: [Math.cos(b) * 2.2, 0.75, Math.sin(b) * 2.2], v: [-Math.cos(b) * 1.55 + (Math.random() - 0.5) * 0.12, 2.3 + Math.random() * 0.2, -Math.sin(b) * 1.55 + (Math.random() - 0.5) * 0.12], T: 0.95, ph: Math.random() }; })());
-    }
-    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const drops = new THREE.Points(geo, new THREE.PointsMaterial({ color: '#d8f0ff', size: 0.09, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending }));
-    drops.frustumCulled = false; drops.userData.noOcc = true; g.add(drops);
-    const glow = new THREE.PointLight('#7ac8ff', 6, 9, 1.6); glow.position.y = 1.2; g.add(glow);
-    for (let k = 0; k < 8; k++) { const b = (k / 8) * Math.PI * 2; const l = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), new THREE.MeshBasicMaterial({ color: '#bfe6ff' })); l.position.set(Math.cos(b) * 2.3, 0.72, Math.sin(b) * 2.3); g.add(l); }
-    colliders.push({ x: 0, z: 0, hw: 3.6, hd: 3.6, noSpread: true });
-    g.traverse((m) => { if (m.isMesh) m.userData.noOcc = true; });
-    return {
-      update(t) {
-        for (let i = 0; i < N; i++) { const s = seed[i]; const k = ((t / s.T + s.ph) % 1) * s.T; pos[i * 3] = s.o[0] + s.v[0] * k; pos[i * 3 + 1] = Math.max(0.47, s.o[1] + s.v[1] * k - 4.9 * k * k); pos[i * 3 + 2] = s.o[2] + s.v[2] * k; }
-        geo.attributes.position.needsUpdate = true;
-        ripples.forEach((r, i) => { const k = (t * 0.45 + i / 3) % 1; r.scale.setScalar(0.4 + k * 1.8); r.material.opacity = 0.45 * (1 - k); });
-        pool.position.y = 0.45 + Math.sin(t * 2) * 0.01; glow.intensity = 5.5 + Math.sin(t * 3) * 0.8;
-      },
-    };
-  })();
-
-  // ── 분수대 바로 위 큰 글씨: 주간랭킹 1위는 "○○"님 입니다 (이름은 서버가 매주 정해 준다 — main.js 의 setChamp)
+  // ── 소원의 별 위에 주간랭킹 1위를 표시한다
   const champSign = (() => {
     const cv = document.createElement('canvas'); cv.width = 2048; cv.height = 256;
     const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
@@ -1103,7 +1088,7 @@ export function buildLobby(scene, opts = {}) {
         // 글꼴이 늦게 오면 다시 그린다 (처음엔 기기 글꼴로 보일 수 있다)
         if (cur && document.fonts?.load) Promise.all([document.fonts.load(`100px ${FIX.split(',')[0]}`, '주간랭킹 1위는 님 입니다'), document.fonts.load(`100px ${NAME.split(',')[0]}`, cur.name)]).then(() => { if (sp.parent) draw(); }).catch(() => {});
       },
-      update(t) { if (!sp.visible) return; sp.position.y = 6.6 + Math.sin(t * 1.1) * 0.07; const k = 1 + Math.sin(t * 2.3) * 0.012; sp.scale.set(W0 * k, (W0 / 8) * k, 1); },
+      update(t, starY) { if (!sp.visible) return; sp.position.y = starY + 4.1; const k = 1 + Math.sin(t * 2.3) * 0.012; sp.scale.set(W0 * k, (W0 / 8) * k, 1); },
     };
   })();
   champSign.set(opts.champ || null);
@@ -1111,7 +1096,7 @@ export function buildLobby(scene, opts = {}) {
   // ── 상사화: 광장을 빙 둘러 붉은 꽃밭 (꽃잎이 뒤로 말린 붉은 꽃 + 긴 수술)
   {
     const spots = [];
-    const ok = (x, z) => Math.hypot(x, z + 25.7) > 6 && Math.hypot(x, z) < 28.2;
+    const ok = (x, z) => Math.hypot(x, z + 20.8) > 6 && Math.hypot(x, z) < 28.2 && !onOuterPath(x * LS, z * LS, 0.45);
     // 광장 가장자리 띠 + 바깥 숲 사이 군락
     for (let i = 0; i < 520; i++) { const a = Math.random() * Math.PI * 2, r = 16.8 + Math.random() * 2.2; const x = Math.cos(a) * r, z = Math.sin(a) * r; if (ok(x, z)) spots.push([x, z]); }
     for (let c = 0; c < 34; c++) { const a = Math.random() * Math.PI * 2, r = 20.5 + Math.random() * 6.5; const cx = Math.cos(a) * r, cz = Math.sin(a) * r; for (let i = 0; i < 26; i++) { const x = cx + (Math.random() - 0.5) * 3.2, z = cz + (Math.random() - 0.5) * 3.2; if (ok(x, z)) spots.push([x, z]); } }
@@ -1167,7 +1152,7 @@ export function buildLobby(scene, opts = {}) {
   {
     const n = 1800; const grass = new THREE.InstancedMesh(new THREE.ConeGeometry(0.05, 0.32, 4), new THREE.MeshStandardMaterial({ color: '#3f6a40', roughness: 1 }), n);
     const m4 = new THREE.Matrix4();
-    for (let k = 0; k < n; k++) { const a = Math.random() * Math.PI * 2, r = 17 + Math.random() * 27; m4.makeRotationZ((Math.random() - 0.5) * 0.5); m4.setPosition(Math.cos(a) * r, 0.15, Math.sin(a) * r); grass.setMatrixAt(k, m4); }
+    for (let k = 0; k < n; k++) { const a = Math.random() * Math.PI * 2, r = 17 + Math.random() * 27; m4.makeRotationZ((Math.random() - 0.5) * 0.5); const x = Math.cos(a) * r, z = Math.sin(a) * r; m4.setPosition(x, onOuterPath(x * LS, z * LS) ? -1 : 0.15, z); grass.setMatrixAt(k, m4); }
     root.add(grass);
   }
   colliders.push(...ringColliders(30.5 * LS).map((c) => ({ ...c, noSpread: true })));
@@ -1178,7 +1163,7 @@ export function buildLobby(scene, opts = {}) {
   let lastT = 0;
   const update = (t) => {
     snapBoard.update(Math.min(0.1, Math.max(0, t - lastT))); lastT = t;
-    park.update(t); outer.update(t); deco.update(t); fountain.update(t); champSign.update(t); fireflies.update(t); extra.update(t);
+    park.update(t); outer.update(t); deco.update(t); champSign.update(t, deco.wishStar.y()); fireflies.update(t); extra.update(t);
     clouds.rotation.y = t * 0.006; clouds.children.forEach((c) => (c.position.y += Math.sin(t * 0.3 + c.userData.ph) * 0.004));
     flies.rotation.y = t * 0.02; flies.position.y = Math.sin(t) * 0.2;
     exhibits.forEach((e, i) => {
@@ -1452,9 +1437,9 @@ function buildLobbyHorror(root, colliders) {
   }
   // 낙서 벽: 반쯤 무너진 콘크리트 담 (광장 바깥, 롤러코스터 안쪽 둘레)
   const conc = new THREE.MeshStandardMaterial({ color: '#4a4744', roughness: 0.95 });
-  const spots = [0.35, 0.95, 1.6, 2.25, 2.9, 3.55, 4.2, 5.0, 5.5, 6.05];
+  const spots = [0.35, 0.95, 1.6, 2.19, 2.9, 3.55, 4.2, 5.0, 5.65, 6.05];
   spots.forEach((a, i) => {
-    const r = 23.6, x = Math.cos(a) * r, z = Math.sin(a) * r;
+    const r = 22.4, x = Math.cos(a) * r, z = Math.sin(a) * r;
     const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = Math.atan2(-x, -z); root.add(g);
     const wall = new THREE.Mesh(new THREE.BoxGeometry(3.4, 2.3, 0.28), conc); wall.position.y = 1.15; g.add(wall);
     const face = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 2.3), new THREE.MeshStandardMaterial({ map: graffitiTex(BLOOD_WORDS[i % BLOOD_WORDS.length], i + 3), roughness: 0.9 }));
@@ -1481,17 +1466,18 @@ function ringColliders(r) {
 // ───────────────── 넓어진 바깥 공원: 산책로 · 연못과 분수 · 꽃밭 · 먹자골목 · 야외 무대 · 바깥 숲
 function buildOuterPark(root, colliders, add, pathMat = null) {
   const anim = []; const inter = [];
-  // 둘레 산책로 (반지름 27)
-  const ring = new THREE.Mesh(new THREE.RingGeometry(24.6, 27, 96), new THREE.MeshStandardMaterial(pathMat ? { ...pathMat, roughness: 1 } : { map: (() => { const t = groundTex('#d8c8a8', 0.12); t.repeat.set(30, 2); return t; })(), roughness: 1 }));
+  const { ringInner, ringOuter, branchStart, branchEnd, branchHalfWidth } = OUTER_PATH;
+  // 둘레 산책로
+  const ring = new THREE.Mesh(new THREE.RingGeometry(ringInner, ringOuter, 96), new THREE.MeshStandardMaterial(pathMat ? { ...pathMat, roughness: 1 } : { map: (() => { const t = groundTex('#d8c8a8', 0.12); t.repeat.set(30, 2); return t; })(), roughness: 1 }));
   ring.rotation.x = -Math.PI / 2; ring.position.y = 0.012; ring.receiveShadow = true; ring.userData.spreadScale = true; root.add(ring);
   // 광장에서 산책로로 이어지는 네 갈래 길
   for (const a of [Math.PI / 4, (3 * Math.PI) / 4, (5 * Math.PI) / 4, (7 * Math.PI) / 4]) {
-    const p = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 10), new THREE.MeshStandardMaterial({ color: pathMat?.color || '#cdbf9f', roughness: 1 }));
-    p.rotation.x = -Math.PI / 2; p.rotation.z = -a + Math.PI / 2; p.position.set(Math.cos(a) * 21, 0.011, Math.sin(a) * 21); p.scale.y = LS; root.add(p);
+    const p = new THREE.Mesh(new THREE.PlaneGeometry(branchHalfWidth * 2, branchEnd - branchStart), new THREE.MeshStandardMaterial({ color: pathMat?.color || '#cdbf9f', roughness: 1 }));
+    p.rotation.x = -Math.PI / 2; p.rotation.z = -a + Math.PI / 2; const r = (branchStart + branchEnd) / 2; p.position.set(Math.cos(a) * r, 0.011, Math.sin(a) * r); p.scale.y = LS; root.add(p);
   }
   // 북쪽: 연못 + 분수
   {
-    const cx = 0, cz = -25.6;
+    const cx = 0, cz = -20.8;
     const water = new THREE.Mesh(new THREE.CircleGeometry(4.6, 40), new THREE.MeshStandardMaterial({ color: '#3f8fc8', roughness: 0.15, metalness: 0.3, emissive: '#0a3050', emissiveIntensity: 0.4 }));
     water.rotation.x = -Math.PI / 2; water.position.set(cx, 0.06, cz); root.add(water);
     const rim = new THREE.Mesh(new THREE.TorusGeometry(4.7, 0.28, 8, 48), new THREE.MeshStandardMaterial({ color: '#d8d0c4', roughness: 0.8 })); rim.rotation.x = -Math.PI / 2; rim.position.set(cx, 0.12, cz); root.add(rim);
@@ -1515,29 +1501,30 @@ function buildOuterPark(root, colliders, add, pathMat = null) {
     heads.forEach((h, i) => (h.count = cnt[i])); root.add(stem, ...heads);
     colliders.push({ x: cx, z: cz, hw: w / 2, hd: d / 2 });
   };
-  flowerBed(-27, -9, 3, 6, 1); flowerBed(-27, 9, 3, 6, 4); flowerBed(27, -9, 3, 6, 7); flowerBed(27, 9, 3, 6, 2);
-  flowerBed(-9, 27.6, 6, 2.4, 5); flowerBed(9, 27.6, 6, 2.4, 3);
+  flowerBed(-28.6, -12, 3, 6, 1); flowerBed(-28.6, 12, 3, 6, 4); flowerBed(28.6, -12, 3, 6, 7); flowerBed(28.6, 12, 3, 6, 2);
+  flowerBed(-9, 28.6, 6, 2.4, 5); flowerBed(9, 28.6, 6, 2.4, 3);
   // 동쪽: 먹자골목 (포장마차 + 풍선)
-  [[22.4, -13, -110], [25.6, -4, -90], [25.6, 4, -90], [22.4, 13, -70]].forEach(([x, z, r]) => add({ t: 'stall', x, z, r }));
+  [[20.2, -11, -110], [22.5, -4, -90], [22.5, 4, -90], [20.2, 11, -70]].forEach(([x, z, r]) => add({ t: 'stall', x, z, r }));
   add({ t: 'popcorn_cart', x: 21.6, z: 0, r: -90 });
   add({ t: 'balloon_stand', x: 21.8, z: -8.5 });
   // 서쪽: 야외 무대 + 피크닉 잔디
   {
-    const g = new THREE.Group(); g.position.set(-25.8, 0, 0); g.rotation.y = Math.PI / 2; root.add(g);
+    const stageX = -21.1;
+    const g = new THREE.Group(); g.position.set(stageX, 0, 0); g.rotation.y = Math.PI / 2; root.add(g);
     const deck = new THREE.Mesh(new THREE.BoxGeometry(8, 0.6, 4), new THREE.MeshStandardMaterial({ color: '#8a5a3a', roughness: 0.8 })); deck.position.y = 0.3; deck.receiveShadow = true; deck.castShadow = true; g.add(deck);
     const back = new THREE.Mesh(new THREE.BoxGeometry(8, 4, 0.2), new THREE.MeshStandardMaterial({ color: '#5a2a6a' })); back.position.set(0, 2.6, -1.9); g.add(back);
     const curtainM = new THREE.MeshStandardMaterial({ color: '#c0262d', roughness: 0.9 });
     for (const s of [-1, 1]) { const c = new THREE.Mesh(new THREE.BoxGeometry(1.2, 3.6, 0.25), curtainM); c.position.set(s * 3.4, 2.4, -1.6); g.add(c); }
-    const sign = textSprite('🎤 야외 무대 · 올라가서 춤춰요!', { size: 28, bg: 'rgba(60,10,50,.85)', color: '#ffe08a', border: '#ff8fd0' }); sign.position.set(-25.8, 5.2, 0); root.add(sign);
+    const sign = textSprite('🎤 야외 무대 · 올라가서 춤춰요!', { size: 28, bg: 'rgba(60,10,50,.85)', color: '#ffe08a', border: '#ff8fd0' }); sign.position.set(stageX, 5.2, 0); root.add(sign);
     const bulbs = [];
     for (let i = 0; i < 14; i++) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), new THREE.MeshBasicMaterial({ color: ['#fff2a8', '#ff9ad0', '#9ad0ff'][i % 3] })); b.position.set(-3.6 + i * 0.55, 4.7, -1.75); g.add(b); bulbs.push(b); }
     anim.push((t) => bulbs.forEach((b, i) => (b.visible = Math.sin(t * 4 + i) > -0.3)));
-    colliders.push({ x: -25.8, z: 0, hw: 2.1, hd: 4.1, perch: 'stage' });
-    inter.push({ id: 'stage', kind: 'climb', x: -23.4, z: 0, r: 2.2, label: '야외 무대', verb: '올라가기', perch: { x: -25.8, z: 0, hw: 1.8, hd: 3.7, y: 0.62, id: 'stage' } });
+    colliders.push({ x: stageX, z: 0, hw: 2.1, hd: 4.1, perch: 'stage' });
+    inter.push({ id: 'stage', kind: 'climb', x: stageX + 2.4, z: 0, r: 2.2, label: '야외 무대', verb: '올라가기', perch: { x: stageX, z: 0, hw: 1.8, hd: 3.7, y: 0.62, id: 'stage' } });
   }
-  [[-21.2, -12], [-21.2, 12]].forEach(([x, z]) => add({ t: 'bench', x, z, r: 90 }));
+  [[-20.4, -11], [-20.4, 11]].forEach(([x, z]) => add({ t: 'bench', x, z, r: 90 }));
   // 산책로 가로등 + 벤치
-  for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2 + 0.2; add({ t: 'lamp', x: Math.cos(a) * 27.6, z: Math.sin(a) * 27.6, noLight: true }); }
+  for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2 + 0.2; add({ t: 'lamp', x: Math.cos(a) * 28.4, z: Math.sin(a) * 28.4, noLight: true }); }
   // 바깥 숲 (걸어서 닿지 않는 경계 너머 풍경)
   for (let i = 0; i < 44; i++) { const a = (i / 44) * Math.PI * 2, r = 32.5 + (i % 3) * 2.5; const g = place(root, { t: i % 4 ? 'pine' : 'tree', x: Math.cos(a) * r, z: Math.sin(a) * r, color: ['#c9a8ff', '#ffb7c9', '#9ad0ff'][i % 3] }); g.scale.setScalar(1.2 + (i % 5) * 0.15); }
   return { interactives: inter, update: (t) => anim.forEach((f) => f(t)) };

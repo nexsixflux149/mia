@@ -13,7 +13,7 @@ import { SCENARIOS, scenarioList } from './scenarios.js';
 import { hasBadWord } from './filter.js';
 import { isAdminPassword, looksLikeAdmin, ADMIN_NAME } from './admin.js';
 import { ITEMS, START_ITEMS } from './items.js';
-import { openStore, persist, flushAll, storeKind } from './store.js';
+import { openStore, persist, flushAll, storeKind, loadClearPhotos, saveClearPhoto } from './store.js';
 import { MAX_LV, HIDDEN_LV, ADMIN_LV, levelOf, xpAt, CLEAR_COINS, CHAPTER_XP, clearXp, timeLimitMs, SHOP, isWear, blankProfile, profileView, dayKey, statRange, pruneStats, addPeriodXp, levelBoard, weekKey, monthKey, GOLD_IDS, GOLD_STAFF, isGold, giveGold, randomGold, goldWorn, weekWinner } from './progress.js';
 import { Accounts, clientIp } from './accounts.js';
 
@@ -82,17 +82,26 @@ app.use(zstatic(PUBLIC_DIR, { cache: 'no-cache', transform: pageTransform, tag: 
 app.use(express.static(PUBLIC_DIR, { setHeaders: (res, file) => res.setHeader('Cache-Control', /\.woff2$/i.test(file) ? YEAR : /\.(png|jpe?g|ico|webp|gif)$/i.test(file) ? 'public, max-age=86400' : 'no-cache') })); // 글꼴(.woff2)은 파일 이름에 해시가 붙어 있어 내용이 바뀌면 이름도 바뀐다 → 1년 캐시
 const server = http.createServer(app);
 const io = new Server(server, { maxHttpBufferSize: 2e5 });
-// 로비 전광판에 걸린 캡처 사진 (최신이 앞 · 메모리에만 — 서버를 다시 켜면 비어 있다)
-const SNAP_MAX = 24, snaps = [];
+const SNAP_MAX = 30, PHOTO_TICKET_AGE = 7 * 24 * 60 * 60 * 1000;
 // 화면(클라이언트)과 서버가 주고받는 방식의 버전. 예전 화면이 새 서버에 붙으면 새로고침시킨다.
-const PROTO = 2;
+const PROTO = 3;
 
 // ───── 저장 (파티장 닉네임별 도달 챕터)
 const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, 'data');
 // DATABASE_URL 이 있으면 무료 DB에, 없으면 data 폴더 파일에 저장 (server/store.js)
-const { saves, hearts, ranks, profiles, stats, accounts: accountData, feedback } = await openStore(DATA_DIR, ['saves', 'hearts', 'ranks', 'profiles', 'stats', 'accounts', 'feedback']).catch((e) => {
+const { saves, hearts, ranks, profiles, stats, accounts: accountData, feedback, clearPhotoTickets } = await openStore(DATA_DIR, ['saves', 'hearts', 'ranks', 'profiles', 'stats', 'accounts', 'feedback', 'clearPhotoTickets']).catch((e) => {
   console.error('\n  [DB] 데이터베이스에 연결하지 못했어요. DATABASE_URL 주소를 확인해 주세요.\n  ', e.message, '\n'); process.exit(1);
 });
+const snaps = await loadClearPhotos(DATA_DIR, SNAP_MAX);
+const photoOwner = (p) => p.acct ? `account:${p.acct}` : `name:${p.name}`;
+function registerClearPhoto(id, members, scenario) {
+  const now = Date.now();
+  for (const [key, value] of Object.entries(clearPhotoTickets)) {
+    if (now - value.at > PHOTO_TICKET_AGE) delete clearPhotoTickets[key];
+  }
+  clearPhotoTickets[id] = { at: now, owners: members.map(photoOwner), name: members[0]?.name || '', theme: scenario.short };
+  persist(DATA_DIR, 'clearPhotoTickets', clearPhotoTickets);
+}
 const saveHearts = () => persist(DATA_DIR, 'hearts', hearts);
 const lanIps = () => Object.values(os.networkInterfaces()).flat().filter((i) => i && i.family === 'IPv4' && !i.internal).map((i) => i.address);
 // ───── 랭킹 (테마별 클리어 시간, 처음부터 시작한 판만)
@@ -212,7 +221,7 @@ function dropPlayer(p) {
   players.delete(p.id);
   invites.delete(p.id);
   broadcastRoster();
-  io.emit('chat', { channel: 'system', text: `${p.name} 님이 나갔습니다.` });
+  io.to('lobby').emit('chat', { channel: 'system', text: `${p.name} 님이 나갔습니다.` });
 }
 
 function toLobby(p) {
@@ -340,7 +349,7 @@ io.on('connection', (sock) => {
     flushMail(np);
     // 방문 통계: 오늘 방문 수 + 방문자
     if (!asAdmin) { const d = (stats.days[dayKey()] ||= { v: 0, u: {} }); d.v++; d.u[name] ||= 0; saveStats(); }
-    io.emit('chat', { channel: 'system', text: `${name} 님이 접속했습니다.` });
+    io.to('lobby').emit('chat', { channel: 'system', text: `${name} 님이 접속했습니다.` });
   });
   // 방을 옮긴 화면이 '지금 이 방에 있는 사람 전부'를 다시 달라고 할 때
   // (너무 자주 오면 버리지 않고 0.4초에 한 번으로 모아서 보낸다 — 버리면 그 화면에는 다음 전체 방송까지 아무도 안 보인다)
@@ -372,18 +381,29 @@ io.on('connection', (sock) => {
     const now = Date.now(); if (now - (me.lastBoo || 0) < 1500) return; me.lastBoo = now;
     for (const p of players.values()) if (p !== me && p.room === me.room && Math.hypot(p.x - me.x, p.z - me.z) < 3.5) io.to(p.id).emit('booed', { from: me.name, fromId: me.id });
   });
-  // 📸 캡처: 작은 사진을 받아 로비 전광판(최근 24장)에 올리고, 로비에 있는 모두에게 바로 보낸다
+  // 클리어 이벤트를 받은 파티원만 업로드할 수 있고, 같은 클리어는 한 장만 저장한다.
   sock.on('snap:list', (ack) => { if (typeof ack === 'function') ack(snaps); });
-  sock.on('snap:post', (img, ack) => {
-    if (!me || typeof ack !== 'function') return;
-    if (typeof img !== 'string' || !/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(img) || img.length > 90000) return ack({ error: '사진이 너무 커요.' });
-    const now = Date.now();
-    if (!me.admin && now - (me.lastSnap || 0) < 8000) return ack({ error: '전광판에는 8초에 한 장씩 올라가요. (내 폰에는 저장됐어요)' });
-    me.lastSnap = now;
-    const s = { id: 's' + now.toString(36) + randomBytes(2).toString('hex'), name: me.name, at: now, img };
-    snaps.unshift(s); if (snaps.length > SNAP_MAX) snaps.length = SNAP_MAX;
-    for (const p of players.values()) if (p.room === 'lobby' && !p.offline) io.to(p.id).emit('snap:new', s);
-    ack({ ok: true });
+  sock.on('clear-photo:post', async (payload, ack) => {
+    if (typeof ack !== 'function') return;
+    if (!me) return ack({ retry: true });
+    const { id, img } = payload || {};
+    if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/.test(id)) return ack({ rejected: true });
+    const ticket = clearPhotoTickets[id];
+    if (!ticket || Date.now() - ticket.at > PHOTO_TICKET_AGE || !ticket.owners.includes(photoOwner(me))) return ack({ rejected: true });
+    if (typeof img !== 'string' || img.length > 90000 || !/^data:image\/jpeg;base64,\/9j\/[A-Za-z0-9+/=]+$/.test(img)) return ack({ rejected: true });
+    const photo = { id, img, at: ticket.at, name: ticket.name, theme: ticket.theme };
+    try {
+      if (await saveClearPhoto(DATA_DIR, photo)) {
+        snaps.push(photo);
+        snaps.sort((a, b) => b.at - a.at || b.id.localeCompare(a.id));
+        snaps.length = Math.min(snaps.length, SNAP_MAX);
+        io.to('lobby').emit('snap:new', photo);
+      }
+      ack({ ok: true });
+    } catch (err) {
+      console.warn('[클리어 사진] 저장 실패:', err.message);
+      ack({ retry: true });
+    }
   });
   // 하트 보내기
   sock.on('heart', (toId) => {
@@ -415,7 +435,7 @@ io.on('connection', (sock) => {
   });
 
   sock.on('chat', ({ channel, text }) => {
-    if (!me) return;
+    if (!me || (channel !== 'party' && me.room !== 'lobby')) return;
     text = String(text || '').trim().slice(0, 200);
     if (!text) return;
     const now = Date.now();
@@ -439,7 +459,7 @@ io.on('connection', (sock) => {
       for (const id of party.members) io.to(id).emit('chat', msg);
     } else {
       msg.channel = 'all';
-      io.emit('chat', msg);
+      io.to('lobby').emit('chat', msg);
     }
   });
 
@@ -752,7 +772,8 @@ io.on('connection', (sock) => {
       onChapter: (idx) => { if ((saves[saveName] ?? 0) < idx) { saves[saveName] = idx; save(); } },
       onAdvance: () => { if (inst.overtime()) return; for (const m of inst.members()) addXp(m.name, CHAPTER_XP, '챕터 통과'); },
       limitMs: timeLimitMs(sc.difficulty || 3),
-      onEnd: ({ ms, full, type, hints = 0, over = false } = {}) => {
+      onEnd: ({ photoId, ms, full, type, hints = 0, over = false } = {}) => {
+        registerClearPhoto(photoId, inst.members(), sc);
         const names = party.members.map((id) => players.get(id)?.name).filter(Boolean);
         const wasOpen = new Map(names.map((n) => [n, hiddenOk(n)]));
         saves[saveName] = sc.chapters.length - 1;
@@ -822,12 +843,13 @@ io.on('connection', (sock) => {
   sock.on('inv:combine', ({ a, b }) => inst()?.combine(me, a, b));
   sock.on('game:state', () => { const i = inst(); if (i) sock.emit('game:start', i.fullState()); });
 
-  // ───── 음성 (파티원끼리 WebRTC 신호 중계)
+  // ───── 음성 (파티원끼리 또는 광장에서 WebRTC 신호 중계)
   sock.on('voice:signal', ({ to, data }) => {
     const t = players.get(to);
     if (!me || !t) return;
-    const sameParty = me.partyId && t.partyId === me.partyId, sameRoom = me.room && t.room === me.room; // '전체 듣기'는 같은 곳(로비·같은 게임)에 있는 사람끼리
-    if (!sameParty && !sameRoom) return;
+    const sameParty = me.partyId && t.partyId === me.partyId;
+    const bothInLobby = me.room === 'lobby' && t.room === 'lobby';
+    if (!sameParty && !bothInLobby) return;
     io.to(to).emit('voice:signal', { from: me.id, data });
   });
   sock.on('voice:mic', (on) => {

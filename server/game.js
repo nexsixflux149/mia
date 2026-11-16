@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { SCENARIOS, relicIcons } from './scenarios.js';
 import { ITEMS, RECIPES } from './items.js';
 
@@ -437,8 +438,9 @@ export class GameInstance {
     const all = relics >= this.sc.relics.length;
     const end = all ? this.sc.endings.true : this.sc.endings.normal;
     const ms = Date.now() - this.startedAt, full = this.startChapter === 0;
-    this.emit('game:ending', { ...end, relics, type: all ? 'true' : 'normal', total: this.sc.relics.length, icons: relicIcons(this.sc), cine: all ? this.sc.cine.true : this.sc.cine.normal, ms, full, hints: this.hintsUsed(), over: this.overtime() });
-    this.onEnd?.({ ms, full, type: all ? 'true' : 'normal', hints: this.hintsUsed(), over: this.overtime() });
+    const photoId = randomUUID();
+    this.emit('game:ending', { ...end, photoId, relics, type: all ? 'true' : 'normal', total: this.sc.relics.length, icons: relicIcons(this.sc), cine: all ? this.sc.cine.true : this.sc.cine.normal, ms, full, hints: this.hintsUsed(), over: this.overtime() });
+    this.onEnd?.({ photoId, ms, full, type: all ? 'true' : 'normal', hints: this.hintsUsed(), over: this.overtime() });
   }
 
   // 매 틱마다 호출 — 귀신 AI

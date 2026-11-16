@@ -17,7 +17,7 @@ const $ = (s) => document.querySelector(s);
 // 글꼴(이름표 · 쪽지 같은 캔버스 글씨)이 준비될 때까지 잠깐 기다린다. 느린 회선에서 화면이 멈추지 않게 최대 1.2초만 (글꼴 파일은 /fonts, 줄여 담아 약 160KB)
 await Promise.race([document.fonts.load('16px "Gowun Dodum"').catch(() => []), new Promise((r) => setTimeout(r, 1200))]);
 // 화면(클라이언트)과 서버가 주고받는 방식의 버전 — 서버(server/index.js 의 PROTO)와 맞춘다
-const PROTO = 2;
+const PROTO = 3;
 // 웹소켓으로 바로 붙는다 (막힌 곳에서는 예전 방식으로 자동 전환) — 처음 붙을 때 오가는 양이 줄어든다
 const socket = io({ transports: ['websocket', 'polling'], tryAllTransports: true });
 // 연결이 끊겼다 다시 붙으면(모바일 앱 전환 등) 같은 플레이어로 이어서 접속
@@ -77,7 +77,7 @@ const store = { get(k, d) { try { const v = localStorage.getItem(k); return v ==
 const S = {
   me: null, myName: '', items: {}, inv: [], light: false,
   room: 'lobby', world: null, chapter: null, objState: {}, dark: false,
-  party: null, roster: [], chatCh: 'all',
+  party: null, roster: [], chatCh: 'all', lobbyChatCh: 'all', themeComms: false,
   modalOpen: false, storyQueue: [], storyOpen: false, lockCtx: null,
   others: new Map(), looks: new Map(), lookReq: new Set(),
   ghost: null, ghostState: null,
@@ -366,8 +366,11 @@ function enterLobby(pos) {
   restoreFaded(); graphics.leave(); // 반투명해진 물체를 먼저 정리하고, 바꿔 둔 재질을 원래대로 돌린 뒤 세계를 지운다
   disposeWorld(scene, S.world);
   S.world = buildLobby(scene, { hidden: !!(S.hiddenOk || S.admin), champ: S.champ, floor: S.floor });
-  socket.emit('snap:list', (l) => { if (Array.isArray(l)) S.snaps = l; showSnaps(); });
+  showSnaps();
+  socket.emit('snap:list', mergeClearPhotos);
+  flushClearPhotos();
   S.room = 'lobby'; S.chapter = null; S.dark = false; S.objState = {}; S.mount = null; S.perch = null; me.y = 0;
+  setThemeComms(false);
   cam.dist = CAM_START; // 살짝 줌인된 상태로 시작
   me.x = pos.x; me.z = pos.z;
   removeGhost(); clearOthers(); clearPings();
@@ -388,6 +391,7 @@ function enterChapter(state, showIntro = true) {
   disposeWorld(scene, S.world);
   const ch = state.chapter;
   S.chapter = ch; S.room = 'game'; S.mount = null; S.perch = null; me.y = 0; closeThemePop(); noticeBox.classList.add('hidden');
+  setThemeComms(true);
   cam.dist = CAM_START; // 살짝 줌인된 상태로 시작
   if (S.snack) { const u = myAvatar?.userData; if (u?.gSnack) { u.gSnack.parent?.remove(u.gSnack); u.gSnack = null; u.gSnackCode = ''; } S.snack = ''; updateGearButtons(); } // 팝콘·커피·풍선은 테마에 가져가지 않는다
   S.world = buildChapter(scene, ch, S.scenario?.id);
@@ -457,7 +461,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'Escape') { if (S.modalOpen) closeModal(); hideMenus(); if (typing()) document.activeElement.blur(); S.combining = null; renderInv(); return; }
   if (S.modalOpen) { if (S.lockCtx) lockKey(e); return; }
   if (e.code === 'Enter') { if (typing()) return; e.preventDefault(); $('#chatInput').focus(); return; }
-  if (typing()) { if (e.code === 'Tab' && document.activeElement === $('#chatInput')) { e.preventDefault(); setChatCh(S.chatCh === 'all' ? 'party' : 'all'); } return; }
+  if (typing()) { if (e.code === 'Tab' && !S.themeComms && document.activeElement === $('#chatInput')) { e.preventDefault(); setChatCh(S.chatCh === 'all' ? 'party' : 'all'); } return; }
   keys[e.code] = true;
   if (e.repeat && ['Space', 'KeyE', 'KeyF', 'KeyX', 'KeyT', 'KeyQ', 'KeyG', 'KeyZ', 'KeyB', 'KeyI', 'KeyP'].includes(e.code)) { e.preventDefault(); return; } // 누르고 있어도 한 번만 (키 반복 입력 무시)
   if (e.code === 'KeyE') { e.preventDefault(); if (S.nearest) interact(S.nearest); }
@@ -1197,6 +1201,7 @@ socket.on('inv', (inv) => { const before = S.inv.length; S.inv = inv; if (!inv.i
 // 욕설 채팅 경고 · 채팅 금지
 socket.on('chat:blocked', (b) => { addChat({ channel: 'system', text: b.text }); toast(b.text); if (b.muted) { S.chatMutedUntil = Date.now() + b.left * 1000; } });
 socket.on('game:start', async (st) => {
+  setThemeComms(true);
   if (cinema.active) cinema.skip(); // 미리보기 영상을 보던 중이면 끝내고 게임으로
   closePhotoPop();
   closeModal(); S.fear = st.fear ?? 2;
@@ -1274,7 +1279,7 @@ socket.on('game:caught', ({ x, z, by, type }) => {
 socket.on('game:coopPulse', () => audio.play('clock_tick')); // 협동 장치 신호 (문 삐걱 소리는 껐다)
 socket.on('game:ending', (e) => {
   if (S.clock) S.clock.stop = e.ms ?? (performance.now() - S.clock.base);
-  rememberClear(e); // 기념 사진에 쓸 정보 (파티원 · 귀신 · 시간)를 지금 챙겨 둔다
+  const clear = rememberClear(e);
   closeModal(); S.storyQueue = []; closeStory(true);
   addJournal(e.title, e.text, 'story');
   setTimeout(async () => {
@@ -1285,6 +1290,7 @@ socket.on('game:ending', (e) => {
     let tm = $('#endTime'); if (!tm) { tm = el('div', 'end-time'); tm.id = 'endTime'; $('#endRelics').after(tm); }
     tm.textContent = e.ms ? `⏱ 클리어 시간 ${fmtMs(e.ms)} · 💡 힌트 ${e.hints ?? 0}개${e.over ? ' — ⏰ 제한 시간을 넘겨 순위표·경험치에서 빠졌어요 (코인은 받아요)' : e.full ? ' — 🏆 랭킹에 기록되었습니다' : ' (이어하기는 랭킹에 기록되지 않아요)'}` : '';
     showEndExtras();
+    if (clear?.photoId && !clear.queued) publishClearPhoto(clear).catch((err) => console.warn('클리어 사진 생성 실패:', err));
     $('#ending').classList.remove('hidden');
     audio.ambient(null); audio.play(e.type === 'true' || S.fear === 0 ? 'bell' : 'scream');
   }, 1200);
@@ -1307,7 +1313,70 @@ function rememberClear(e) {
   const sc = S.scenario; if (!sc) return;
   const members = [{ name: S.myName, look: { ...look }, gear: myGear() }];
   for (const m of S.party?.members || []) { if (m.id === S.me) continue; const lk = S.looks.get(m.id)?.look; if (lk) members.push({ name: m.name, look: lk, gear: S.net.get(m.id)?.gear || '' }); }
-  S.lastClear = { id: sc.id, title: sc.short || sc.title, icon: THEME_ICON[sc.id] || '', ending: e.type, timeText: e.ms && e.full ? fmtMs(e.ms) : '', hints: e.ms && e.full ? e.hints ?? 0 : null, members, ghostTypes: sc.ghostTypes || [], tint: themeColor(sc.id), date: new Date(), photo: null };
+  const frame = FRAMES[Math.floor(Math.random() * FRAMES.length)].id;
+  const clear = { photoId: e.photoId, frame, id: sc.id, title: sc.short || sc.title, icon: THEME_ICON[sc.id] || '', ending: e.type, timeText: e.ms && e.full ? fmtMs(e.ms) : '', hints: e.ms && e.full ? e.hints ?? 0 : null, members, ghostTypes: sc.ghostTypes || [], tint: themeColor(sc.id), date: new Date(), photo: null };
+  S.lastClear = clear;
+  if (clear.photoId) publishClearPhoto(clear).catch((err) => console.warn('클리어 사진 생성 실패:', err));
+  return clear;
+}
+
+function clearPhotoInfo(clear) {
+  const { list, hidden } = stampList(clear.id);
+  return {
+    icon: clear.icon, title: clear.title, ending: clear.ending, timeText: clear.timeText,
+    hints: clear.hints, names: clear.members.map((m) => m.name), date: clear.date, tint: clear.tint,
+    site: location.host.includes('localhost') || /^[\d.:]+$/.test(location.host) ? 'mia-escape.kr' : location.host,
+    stamps: list, hidden,
+  };
+}
+function prepareClearPhoto(clear) {
+  if (clear.photo) return Promise.resolve(clear.photo);
+  if (!clear.photoTask) {
+    clear.photoTask = Promise.all([
+      loadPhotoFonts(),
+      shootPhoto({ members: clear.members, ghostTypes: clear.ghostTypes, tint: clear.tint }),
+    ]).then(([, photo]) => (clear.photo = photo)).finally(() => { clear.photoTask = null; });
+  }
+  return clear.photoTask;
+}
+
+const clearPhotoQueueKey = 'mia-clear-photo-uploads';
+const clearPhotoQueue = new Map(store.get(clearPhotoQueueKey, []).map((photo) => [photo.id, photo]));
+let uploadingClearPhotos = false;
+async function flushClearPhotos() {
+  if (uploadingClearPhotos || !socket.connected || !S.me || !clearPhotoQueue.size) return;
+  uploadingClearPhotos = true;
+  try {
+    for (const [id, photo] of clearPhotoQueue) {
+      if (!socket.connected) break;
+      const response = await socket.timeout(5000).emitWithAck('clear-photo:post', photo);
+      if (!response?.ok && !response?.rejected) break;
+      clearPhotoQueue.delete(id);
+      store.set(clearPhotoQueueKey, [...clearPhotoQueue.values()]);
+    }
+  } catch {
+    // 연결이 돌아오면 같은 사진 ID로 다시 보낸다.
+  } finally {
+    uploadingClearPhotos = false;
+  }
+}
+setInterval(flushClearPhotos, 5000);
+
+async function publishClearPhoto(clear) {
+  if (clear.queued && clearPhotoQueue.has(clear.photoId)) { flushClearPhotos(); return; }
+  if (clear.queued) return;
+  const photo = await prepareClearPhoto(clear);
+  if (clear.queued) return;
+  const print = composePhoto(photo, clearPhotoInfo(clear), clear.frame);
+  const tile = document.createElement('canvas');
+  tile.width = 288; tile.height = 360;
+  tile.getContext('2d').drawImage(print, 0, 0, tile.width, tile.height);
+  let img = tile.toDataURL('image/jpeg', 0.78);
+  if (img.length > 90000) img = tile.toDataURL('image/jpeg', 0.52);
+  clear.queued = true;
+  clearPhotoQueue.set(clear.photoId, { id: clear.photoId, img });
+  store.set(clearPhotoQueueKey, [...clearPhotoQueue.values()]);
+  flushClearPhotos();
 }
 // 엔딩 창 아래: 도장이 찍힌 도장표 + 기념 사진 버튼
 function showEndExtras() {
@@ -1343,9 +1412,9 @@ async function openClearPhoto() {
   const tip = el('div', 'ppop-tip', document.body.classList.contains('mobile') ? '사진을 길게 눌러도 저장할 수 있어요' : '테두리를 바꾼 뒤 저장하거나 친구에게 공유해 보세요');
   card.append(frameBtn, closeBtn, chooser, stage, btns, tip); photoPop.appendChild(card);
   save.disabled = share.disabled = true;
-  let frame = store.get('mia-frame', 'polaroid'); if (!FRAMES.some((f) => f.id === frame)) frame = 'polaroid';
+  let frame = lc.frame || 'polaroid';
   let final = null;
-  const info = () => { const { list, hidden } = stampList(lc.id); return { icon: lc.icon, title: lc.title, ending: lc.ending, timeText: lc.timeText, hints: lc.hints, names: lc.members.map((m) => m.name), date: lc.date, tint: lc.tint, site: location.host.includes('localhost') || /^[\d.:]+$/.test(location.host) ? 'mia-escape.kr' : location.host, stamps: list, hidden }; };
+  const info = () => clearPhotoInfo(lc);
   const paint = () => {
     if (!lc.photo) return;
     final = composePhoto(lc.photo, info(), frame);
@@ -1353,7 +1422,7 @@ async function openClearPhoto() {
     chooser.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.id === frame));
     frameBtn.textContent = `🖼️ 테두리: ${FRAMES.find((f) => f.id === frame)?.name || ''}`;
   };
-  FRAMES.forEach((f) => { const b = el('button', 'btn small', `${f.icon} ${f.name}`); b.dataset.id = f.id; b.onclick = () => { frame = f.id; store.set('mia-frame', frame); audio.play('click'); paint(); }; chooser.appendChild(b); });
+  FRAMES.forEach((f) => { const b = el('button', 'btn small', `${f.icon} ${f.name}`); b.dataset.id = f.id; b.onclick = () => { frame = f.id; audio.play('click'); paint(); }; chooser.appendChild(b); });
   frameBtn.onclick = () => chooser.classList.toggle('hidden');
   const fileName = () => `mia-clear-${lc.id}-${lc.date.getFullYear()}${String(lc.date.getMonth() + 1).padStart(2, '0')}${String(lc.date.getDate()).padStart(2, '0')}.jpg`;
   const toBlob = () => new Promise((res) => final.toBlob(res, 'image/jpeg', 0.92));
@@ -1375,9 +1444,9 @@ async function openClearPhoto() {
     try { await navigator.clipboard.writeText(text); toast('📋 자랑 글과 게임 주소를 복사했어요! 사진은 💾 저장으로 받아 함께 올려 주세요.'); } catch { toast('이 브라우저에서는 바로 공유할 수 없어요. 💾 저장을 눌러 사진을 받아 주세요.'); }
   };
   try {
-    await loadPhotoFonts();
-    if (!lc.photo) lc.photo = await shootPhoto({ members: lc.members, ghostTypes: lc.ghostTypes, tint: lc.tint });
-    if (photoPop.classList.contains('hidden')) return;
+    await prepareClearPhoto(lc);
+    if (lc.photoId && !lc.queued) publishClearPhoto(lc).catch((err) => console.warn('클리어 사진 생성 실패:', err));
+    if (!card.isConnected) return;
     paint(); audio.play('pickup');
   } catch (err) { console.error(err); wait.textContent = '사진을 만들지 못했어요. 😢 닫고 다시 눌러 주세요.'; }
 }
@@ -1939,31 +2008,57 @@ function itemMenu(it, idx, anchor) {
 addEventListener('pointerdown', (e) => { if (!e.target.closest('#itemMenu') && !e.target.closest('.slot') && !e.target.closest('#playerMenu')) hideMenus(); });
 
 // ─────────────────────────── 채팅
+function setThemeComms(inTheme) {
+  if (S.themeComms === inTheme) return;
+  S.themeComms = inTheme;
+  if (inTheme) {
+    S.lobbyChatCh = S.chatCh;
+    if (S.chatCh === 'all') $('#chatInput').value = '';
+    $('#playerMenu').classList.add('hidden');
+    for (const avatar of [myAvatar, ...S.others.values()]) {
+      const bubble = avatar?.userData.bubble;
+      if (bubble?.userData.chatChannel !== 'all') continue;
+      removeLabel(bubble);
+      avatar.userData.bubble = null;
+    }
+  }
+  $('#chat [data-ch="all"]').classList.toggle('hidden', inTheme);
+  setChatCh(inTheme ? 'party' : S.lobbyChatCh);
+  updateVoiceTargets();
+  renderVoiceUI();
+}
 function setChatCh(ch) {
+  if (S.themeComms) ch = 'party';
   S.chatCh = ch;
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.ch === ch));
   $('#chatInput').classList.toggle('party', ch === 'party');
-  $('#chatInput').placeholder = ch === 'party' ? '[파티] 메시지 (Tab: 전환)' : '[전체] 메시지 (Tab: 전환)';
+  $('#chatInput').placeholder = S.themeComms ? '[파티] 메시지' : ch === 'party' ? '[파티] 메시지 (Tab: 전환)' : '[전체] 메시지 (Tab: 전환)';
   if (ch === 'party') $('#partyUnread').classList.add('hidden');
   renderChatFilter();
 }
 document.querySelectorAll('.tab').forEach((t) => (t.onclick = () => setChatCh(t.dataset.ch)));
 $('#chatInput').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') { const text = e.target.value.trim(); if (text) socket.emit('chat', { channel: S.chatCh, text }); e.target.value = ''; e.target.blur(); }
+  if (e.key === 'Enter') { const text = e.target.value.trim(); if (text) socket.emit('chat', { channel: S.themeComms ? 'party' : S.chatCh, text }); e.target.value = ''; e.target.blur(); }
   if (e.key === 'Escape') e.target.blur();
 });
 const chatLog = [];
 function addChat(m) {
+  if (S.themeComms && m.channel === 'all') return;
   chatLog.push(m); if (chatLog.length > 200) chatLog.shift();
   if (m.channel === 'party' && S.chatCh !== 'party') $('#partyUnread').classList.remove('hidden');
   renderChatFilter();
-  if (m.fromId && m.fromId !== S.me) { const g = S.others.get(m.fromId); if (g) setBubble(g, m.text); }
-  if (m.fromId === S.me && myAvatar) setBubble(myAvatar, m.text);
+  if (m.fromId) {
+    const avatar = m.fromId === S.me ? myAvatar : S.others.get(m.fromId);
+    if (avatar) {
+      setBubble(avatar, m.text);
+      avatar.userData.bubble.userData.chatChannel = m.channel;
+    }
+  }
 }
 function renderChatFilter() {
   const box = $('#chatLog'); box.innerHTML = '';
   for (const m of chatLog) {
-    if (S.chatCh === 'party' && m.channel === 'all') continue;
+    if (m.channel === 'all' && (S.themeComms || S.chatCh === 'party')) continue;
     const d = el('div', 'm ' + m.channel);
     if (m.channel === 'system') d.textContent = m.text;
     else { if (m.admin) d.classList.add('admin'); d.appendChild(el('span', 'ch', m.channel === 'party' ? '[파티]' : '[전체]')); d.appendChild(el('b', null, (m.admin ? '🛡️ ' : '') + m.from + ': ')); d.appendChild(document.createTextNode(m.text)); }
@@ -2008,33 +2103,33 @@ function openAdmin() {
 }
 // ─────────────────────────── 고객소리함 (버그 · 건의사항)
 const FB_KIND = { bug: '🐞 버그', idea: '💡 건의', etc: '💬 기타', wish: '🌠 별점 · 소원' };
-// 🖼 갤러리: 사람들이 📸캡처로 찍은 최근 사진(전광판과 같은 24장)을 모아 본다. 열려 있는 동안 새 사진이 오면 바로 추가된다
+// 🖼 갤러리: 전광판에 걸린 최근 클리어 기념 사진을 모아 본다.
 function openGallery() {
   const w = el('div', 'gal');
   const ago = (t) => { const m = Math.floor((Date.now() - t) / 60000); return m < 1 ? '방금' : m < 60 ? `${m}분 전` : m < 1440 ? `${Math.floor(m / 60)}시간 전` : `${Math.floor(m / 1440)}일 전`; };
   const grid = () => {
     w.innerHTML = '';
-    if (!S.snaps.length) { w.appendChild(el('div', 'muted gal-empty', '아직 찍은 사진이 없어요.\n화면 위 📸 캡처 를 눌러 첫 사진을 올려 보세요!')); return; }
+    if (!S.snaps.length) { w.appendChild(el('div', 'muted gal-empty', '아직 클리어 기념 사진이 없어요.\n테마를 클리어하면 전광판에 자동으로 올라와요.')); return; }
     const g = el('div', 'gal-grid');
     for (const sn of S.snaps) {
-      const card = el('button', 'gal-card'); const im = el('img'); im.src = sn.img; im.alt = `${sn.name} 님의 캡처`; im.loading = 'lazy';
-      card.append(im, el('div', 'gal-cap', `📸 ${sn.name} · ${ago(sn.at)}`));
+      const card = el('button', 'gal-card'); const im = el('img'); im.src = sn.img; im.alt = `${sn.name} 님 파티의 클리어 기념 사진`; im.loading = 'lazy';
+      card.append(im, el('div', 'gal-cap', `📸 ${sn.theme} · ${ago(sn.at)}`));
       card.onclick = () => big(sn); g.appendChild(card);
     }
     w.appendChild(g);
   };
   const big = (sn) => {
     w.innerHTML = ''; S.galleryBig = true;
-    const im = el('img', 'gal-big'); im.src = sn.img; im.alt = `${sn.name} 님의 캡처`;
+    const im = el('img', 'gal-big'); im.src = sn.img; im.alt = `${sn.name} 님 파티의 클리어 기념 사진`;
     const row = el('div', 'row gal-row');
     const back = el('button', 'btn', '← 목록'); back.onclick = () => { S.galleryBig = false; grid(); };
     const save = el('button', 'btn primary', '💾 저장'); save.onclick = () => { const a = el('a'); a.href = sn.img; a.download = `mia-gallery-${sn.name}-${sn.id}.jpg`; document.body.appendChild(a); a.click(); a.remove(); };
-    row.append(back, save); w.append(im, el('div', 'gal-cap big', `📸 ${sn.name} · ${ago(sn.at)}`), row);
+    row.append(back, save); w.append(im, el('div', 'gal-cap big', `📸 ${sn.theme} · ${sn.name} · ${ago(sn.at)}`), row);
   };
   S.galleryRefresh = () => { if (!S.galleryBig && w.isConnected) grid(); };
   S.galleryBig = false; grid();
-  openModal('🖼 갤러리', `모두가 📸 캡처로 찍은 최근 사진 ${S.snaps.length ? S.snaps.length + '장' : ''} (로비 전광판과 같아요)`, w);
-  socket.emit('snap:list', (l) => { if (Array.isArray(l)) { S.snaps = l; S.galleryRefresh?.(); } });
+  openModal('🖼 클리어 갤러리', '광장 전광판에 걸린 최근 클리어 기념 사진 30장', w);
+  socket.emit('snap:list', mergeClearPhotos);
 }
 function openFeedback() {
   const w = el('div', 'fb');
@@ -2529,7 +2624,9 @@ function openPlayerMenu(id, name, x, y) {
   else m.appendChild(el('div', 'muted', r?.partyId && r.partyId === S.party?.id ? '같은 파티원' : '초대할 수 없음'));
   const h = el('button', 'btn small', '💖 하트 보내기'); h.onclick = () => { socket.emit('heart', id); m.classList.add('hidden'); }; m.appendChild(h);
   const gf = el('button', 'btn small', '🎁 선물하기'); gf.onclick = () => { m.classList.add('hidden'); openGift(id, name); }; m.appendChild(gf);
-  const w = el('button', 'btn small', '👋 인사하기'); w.onclick = () => { socket.emit('chat', { channel: 'all', text: `${name} 님 안녕하세요! 👋` }); m.classList.add('hidden'); }; m.appendChild(w);
+  if (!S.themeComms) {
+    const w = el('button', 'btn small', '👋 인사하기'); w.onclick = () => { socket.emit('chat', { channel: 'all', text: `${name} 님 안녕하세요! 👋` }); m.classList.add('hidden'); }; m.appendChild(w);
+  }
   m.style.left = Math.min(x, innerWidth - 160) + 'px'; m.style.top = Math.min(y, innerHeight - 170) + 'px';
   m.classList.remove('hidden');
 }
@@ -2540,26 +2637,34 @@ const voice = new Voice(socket, {
   onError: (msg) => toast('🎙️ ' + msg),
   onChange: () => renderVoiceUI(), // 마이크가 스스로 꺼졌을 때(끊겨서 다시 열지 못함) 버튼 모양을 맞춘다
 });
-// 듣기 범위: 'party' 파티원만 · 'all' 같은 곳(로비 · 같은 게임)의 모두
+// 듣기 범위: 테마는 파티원만, 광장에서는 전체 듣기를 선택할 수 있다
 S.voiceMode = store.get('gwimun-voice', 'party');
 function updateVoiceTargets() {
   const ids = new Set((S.party?.members || []).map((m) => m.id));
-  if (S.voiceMode === 'all') {
-    const mine = S.roster?.find((r) => r.id === S.me)?.room;
-    if (mine) (S.roster || []).filter((r) => r.room === mine && r.id !== S.me).slice(0, 10).forEach((r) => ids.add(r.id));
+  if (effectiveVoiceMode() === 'all') {
+    (S.roster || []).filter((r) => r.room === 'lobby' && r.id !== S.me).slice(0, 10).forEach((r) => ids.add(r.id));
   }
   voice.setTargets([...ids]);
 }
-function setVoiceMode(m) { S.voiceMode = m; store.set('gwimun-voice', m); updateVoiceTargets(); renderVoiceUI(); toast(m === 'all' ? '🔊 이제 같은 곳에 있는 모두의 목소리가 들려요' : '🔊 이제 파티원 목소리만 들려요'); }
+function effectiveVoiceMode() { return S.themeComms ? 'party' : S.voiceMode; }
+function setVoiceMode(m) { if (S.themeComms) return; S.voiceMode = m; store.set('gwimun-voice', m); updateVoiceTargets(); renderVoiceUI(); toast(m === 'all' ? '🔊 이제 같은 곳에 있는 모두의 목소리가 들려요' : '🔊 이제 파티원 목소리만 들려요'); }
 function renderVoiceUI() {
   const on = voice.micOn;
   $('#micBtn').textContent = on ? '🎙️ 마이크 켜짐' : '🎙️ 마이크 꺼짐'; $('#micBtn').classList.toggle('primary', on);
-  const vm = $('#voiceModeBtn'); if (vm) vm.textContent = S.voiceMode === 'all' ? '🔊 듣기: 전체' : '🔊 듣기: 파티';
-  const mb = document.querySelector('.abtn.mic'); if (mb) { mb.classList.toggle('on', on); mb.title = S.voiceMode === 'all' ? '마이크 · 듣기: 전체' : '마이크 · 듣기: 파티'; }
-  const vp = $('#voicePanel'); if (vp) { vp.querySelector('.vp-mic').textContent = on ? '🎙️ 마이크 끄기' : '🎙️ 마이크 켜기'; vp.querySelector('.vp-mic').classList.toggle('primary', on); vp.querySelectorAll('.vp-mode').forEach((b) => b.classList.toggle('primary', b.dataset.m === S.voiceMode)); }
+  const mode = effectiveVoiceMode();
+  const vm = $('#voiceModeBtn'); if (vm) { vm.classList.toggle('hidden', S.themeComms); vm.textContent = mode === 'all' ? '🔊 듣기: 전체' : '🔊 듣기: 파티'; }
+  const mb = document.querySelector('.abtn.mic'); if (mb) { mb.classList.toggle('on', on); mb.title = mode === 'all' ? '마이크 · 듣기: 전체' : '마이크 · 듣기: 파티'; }
+  const vp = $('#voicePanel');
+  if (vp) {
+    vp.querySelector('.vp-mic').textContent = on ? '🎙️ 마이크 끄기' : '🎙️ 마이크 켜기';
+    vp.querySelector('.vp-mic').classList.toggle('primary', on);
+    vp.querySelector('.vp-modes').classList.toggle('hidden', S.themeComms);
+    vp.querySelectorAll('.vp-mode').forEach((b) => b.classList.toggle('primary', b.dataset.m === mode));
+    vp.querySelector('.vp-tip').textContent = S.themeComms ? '테마 안에서는 파티원끼리 대화할 수 있어요.' : '전체: 광장에 있는 모두와 대화 · 파티: 파티원끼리만';
+  }
 }
 async function toggleMicUI() {
-  if (S.voiceMode === 'party' && (!S.party || S.party.members.length < 2)) toast('지금은 파티원 목소리만 들리는 설정이에요. 로비의 모두와 말하려면 듣기를 "전체"로 바꾸세요.');
+  if (effectiveVoiceMode() === 'party' && (!S.party || S.party.members.length < 2)) toast(S.themeComms ? '테마 안에서는 파티원끼리 대화할 수 있어요.' : '광장의 모두와 말하려면 듣기를 "전체"로 바꾸세요.');
   await voice.toggleMic();
   renderVoiceUI();
 }
@@ -2769,21 +2874,25 @@ const myGear = () => { const e = S.profile?.equip || {}; return `${e.wings || ''
 const xpBar = el('div'); xpBar.id = 'xpBar'; xpBar.innerHTML = '<div id="xpFill"></div><div id="xpLabel"></div>'; $('#hud').appendChild(xpBar);
 const lvChip = el('div'); lvChip.id = 'lvChip'; $('#onlineChip').after(lvChip);
 lvChip.onclick = () => openBag();
-// 📸 캡처: 지금 화면을 찍어 내 폰(PC는 다운로드)에 저장하고, 작은 사진은 로비 전광판에 실시간으로 올린다
-const snapChip = el('div', null, '📸 캡처'); snapChip.id = 'snapChip'; snapChip.hidden = true; snapChip.title = '화면 캡처 → 내 폰에 저장 + 로비 전광판에 올리기'; lvChip.after(snapChip);
+// 📸 캡처: 지금 화면을 찍어 내 기기에 저장한다
+const snapChip = el('div', null, '📸 캡처'); snapChip.id = 'snapChip'; snapChip.hidden = true; snapChip.title = '화면 캡처 → 내 기기에 저장'; lvChip.after(snapChip);
 snapChip.onclick = (e) => { e.stopPropagation(); takeSnap(); };
 S.snaps = [];
 const showSnaps = () => S.world?.snapBoard?.set(S.snaps);
-socket.on('snap:new', (sn) => { S.snaps = [sn, ...S.snaps.filter((x) => x.id !== sn.id)].slice(0, 24); showSnaps(); S.galleryRefresh?.(); });
+function mergeClearPhotos(list) {
+  if (!Array.isArray(list)) return;
+  const latest = new Map([...S.snaps, ...list].map((photo) => [photo.id, photo]));
+  S.snaps = [...latest.values()].sort((a, b) => b.at - a.at || b.id.localeCompare(a.id)).slice(0, 30);
+  showSnaps();
+  S.galleryRefresh?.();
+}
+socket.on('snap:new', (photo) => mergeClearPhotos([photo]));
 function takeSnap() {
   if (!S.room || S._snapAt > performance.now() - 1500) return; S._snapAt = performance.now();
   // 같은 순간에 한 번 더 그려서 바로 읽는다 (화면 버퍼가 지워지기 전에)
   fx.render(performance.now(), { danger: S.danger, mode: S.room === 'lobby' ? 'lobby' : 'game' });
   renderer.autoClear = false; renderer.clearDepth(); renderer.render(overlay, camera); renderer.autoClear = true;
   const full = canvas.toDataURL('image/jpeg', 0.92);
-  const tc = document.createElement('canvas'); tc.width = 384; tc.height = 216; const tx = tc.getContext('2d');
-  { const k = Math.max(384 / canvas.width, 216 / canvas.height), w = canvas.width * k, h = canvas.height * k; tx.drawImage(canvas, (384 - w) / 2, (216 - h) / 2, w, h); }
-  let thumb = tc.toDataURL('image/jpeg', 0.72); if (thumb.length > 88000) thumb = tc.toDataURL('image/jpeg', 0.45);
   // 찰칵 효과
   const fl = el('div', 'snap-flash'); document.body.appendChild(fl); setTimeout(() => fl.remove(), 600); audio.play('pickup');
   // 내 폰에 저장: 폰은 공유 창(→ '이미지 저장'), PC는 다운로드
@@ -2795,7 +2904,7 @@ function takeSnap() {
   const file = new File([blob], name, { type: 'image/jpeg' });
   if (isMobileView() && navigator.canShare?.({ files: [file] })) navigator.share({ files: [file], title: '미아 캡처' }).catch((err) => { if (err?.name !== 'AbortError') download(); });
   else download();
-  socket.emit('snap:post', thumb, (r) => toast(r?.error ? `💾 내 기기에 저장했어요. ${r.error}` : '📸 캡처! 내 기기에 저장하고 로비 전광판에도 올렸어요.'));
+  toast('📸 화면을 캡처했어요.');
 }
 function renderXp() {
   const pf = S.profile; if (!pf) return;
@@ -3154,7 +3263,7 @@ applyMobile(); addEventListener('resize', applyMobile);
   abtn('emote', '😀', () => { $('#voicePanel')?.classList.add('hidden'); toggleEmotePanel(); });
   abtn('mic', '🎙️', () => { $('#emotePanel').classList.add('hidden'); $('#voicePanel').classList.toggle('hidden'); renderVoiceUI(); });
   const vp = el('div', 'hidden'); vp.id = 'voicePanel';
-  vp.innerHTML = `<button class="btn vp-mic">🎙️ 마이크 켜기</button><div class="vp-label">듣기</div><div class="vp-modes"><button class="btn vp-mode" data-m="all">🔊 전체</button><button class="btn vp-mode" data-m="party">👥 파티</button></div><div class="vp-tip">전체: 같은 곳에 있는 모두와 대화 · 파티: 파티원끼리만</div>`;
+  vp.innerHTML = `<button class="btn vp-mic">🎙️ 마이크 켜기</button><div class="vp-label">듣기</div><div class="vp-modes"><button class="btn vp-mode" data-m="all">🔊 전체</button><button class="btn vp-mode" data-m="party">👥 파티</button></div><div class="vp-tip">전체: 광장에 있는 모두와 대화 · 파티: 파티원끼리만</div>`;
   vp.querySelector('.vp-mic').onclick = (e) => { e.stopPropagation(); toggleMicUI(); };
   vp.querySelectorAll('.vp-mode').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); setVoiceMode(b.dataset.m); }));
   hud.appendChild(vp);
