@@ -278,6 +278,9 @@ const scene = new THREE.Scene();
 initFx(scene);
 const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 220);
 const fx = new FX(renderer, scene, camera);
+// 크롬 '그래픽 가속'이 꺼져 있으면 CPU 로 그려서(SwiftShader 등) 크게 끊긴다 → 가볍게 그리고 켜는 방법을 알려 준다
+const GPU_INFO = (() => { try { const gl = renderer.getContext(), e = gl.getExtension('WEBGL_debug_renderer_info'); return String(e ? gl.getParameter(e.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER) || ''); } catch { return ''; } })();
+fx.soft = /swiftshader|llvmpipe|software|basic render/i.test(GPU_INFO);
 fx.setQuality(SET.quality); fx.brightness = SET.brightness;
 const fitCamera = () => { camera.aspect = innerWidth / innerHeight; camera.fov = camera.aspect < 0.8 ? 72 : 55; camera.updateProjectionMatrix(); };
 fitCamera();
@@ -357,6 +360,7 @@ function setBubble(g, text) {
 // 화면이 바뀔 때(로비 · 챕터 · 영상 · 창) 눌려 있던 이동 입력을 모두 푼다 — 조이스틱이 숨겨지면 '손 뗌' 신호가 오지 않아 혼자 걷던 문제 방지
 function resetInput() { S.joy = null; S.moveTarget = null; S.pendingInteract = null; for (const k in keys) keys[k] = false; const kb = document.getElementById('joyKnob'); if (kb) kb.style.transform = ''; document.getElementById('joy')?.classList.remove('act'); }
 function enterLobby(pos) {
+  if (fx.soft && !S.softWarned) { S.softWarned = true; setTimeout(() => toast(/chrome|crios/i.test(navigator.userAgent) && !/edg\//i.test(navigator.userAgent) ? '🐢 크롬 그래픽 가속이 꺼져 있어 화면이 끊길 수 있어요. 크롬 설정 → 시스템 → 「가능한 경우 그래픽 가속 사용」을 켜고 크롬을 다시 시작해 주세요.' : '🐢 브라우저 그래픽 가속이 꺼져 있어 화면이 끊길 수 있어요. 브라우저 설정에서 그래픽(하드웨어) 가속을 켜 주세요.'), 2500); }
   resetInput();
   restoreFaded(); graphics.leave(); // 반투명해진 물체를 먼저 정리하고, 바꿔 둔 재질을 원래대로 돌린 뒤 세계를 지운다
   disposeWorld(scene, S.world);
@@ -1080,6 +1084,7 @@ function loop() {
   const inLobby = S.room === 'lobby';
   if (inLobby !== S._lobbyCls) { S._lobbyCls = inLobby; document.body.classList.toggle('in-lobby', inLobby); }
   updateGameTimer();
+  fx.adapt(performance.now()); // 끊기면 해상도를 조금씩 낮춘다
   fx.render(t, { danger: S.danger, mode: inLobby ? 'lobby' : 'game' });
   renderer.autoClear = false; renderer.clearDepth(); renderer.render(overlay, camera); renderer.autoClear = true;
 }
@@ -3024,4 +3029,4 @@ applyMobile(); addEventListener('resize', applyMobile);
   });
   $('#inventory').addEventListener('click', (e) => { const s = e.target.closest('.slot'); if (s?.dataset.lp) { e.stopImmediatePropagation(); e.preventDefault(); delete s.dataset.lp; } }, true);
 }
-if (window.__dbg) Object.assign(window.__dbg, { openGallery, takeSnap, graphics, gfx, PERF, applyGfx, restoreFaded, SET, S, me, cam, openShop, openBag, toggleRide, swingSword, doEmote, interact, lobbyAct, scene, camera, cinema, openRank, openFeedback, openStamps, openClearPhoto, rememberClear, showEndExtras, playHiddenPreview, openJournal });
+if (window.__dbg) Object.assign(window.__dbg, { fx, GPU_INFO, openGallery, takeSnap, graphics, gfx, PERF, applyGfx, restoreFaded, SET, S, me, cam, openShop, openBag, toggleRide, swingSword, doEmote, interact, lobbyAct, scene, camera, cinema, openRank, openFeedback, openStamps, openClearPhoto, rememberClear, showEndExtras, playHiddenPreview, openJournal });

@@ -81,10 +81,28 @@ export class FX {
     if (q === 'low') q = this.quality = 'medium';
     const pr = Math.min(mobile ? (q === 'high' ? 2 : 1.5) : 2, Math.max(1, devicePixelRatio));
     this.bloom.enabled = false;
-    this.r.setPixelRatio(pr);
-    this.composer.setPixelRatio(pr);
     this.r.shadowMap.enabled = false;
-    this.resize();
+    // 자동 해상도: 가장 선명한 값(maxPr)에서 시작하고, 끊기면 조금씩 낮춘다. 그래픽 가속이 꺼진 크롬(soft)은 처음부터 가볍게
+    this.maxPr = this.soft ? Math.min(1, pr) : pr; this.minPr = this.soft ? 0.6 : Math.min(1, pr) * 0.7;
+    this.curPr = this.maxPr; this.lockDown = false; this.ad = { t0: 0, n: 0, good: 0, before: 0 };
+    this.applyPr(this.curPr);
+  }
+  applyPr(pr) { this.r.setPixelRatio(pr); this.composer.setPixelRatio(pr); this.resize(); }
+  /** 매 프레임 부른다: 2초마다 FPS 를 재서 45 미만이면 해상도를 15% 낮추고, 10초 동안 58 이상이면 다시 올린다.
+   *  낮춰도 빨라지지 않으면(크롬 절전 모드처럼 30 FPS 로 묶인 경우) 되돌리고 더는 낮추지 않는다 */
+  adapt(now) {
+    const a = this.ad; if (!a || document.hidden) { if (a) a.t0 = 0; return; }
+    if (!a.t0) { a.t0 = now; a.n = 0; return; }
+    a.n++; const el = now - a.t0; if (el < 2000) return;
+    const fps = (a.n * 1000) / el; a.t0 = now; a.n = 0;
+    if (fps < 15) { a.before = 0; a.good = 0; return; } // 브라우저가 일부러 늦춘 경우(가려진 창 등) — 해상도와 상관없으니 건드리지 않는다
+    if (a.before) { // 방금 낮춘 효과가 있었나?
+      if (fps < a.before * 1.05) { this.lockDown = true; this.curPr = Math.min(this.maxPr, this.curPr / 0.85); this.applyPr(this.curPr); }
+      a.before = 0; return;
+    }
+    if (fps < 45 && !this.lockDown && this.curPr > this.minPr + 0.01) { a.before = fps; a.good = 0; this.curPr = Math.max(this.minPr, this.curPr * 0.85); this.applyPr(this.curPr); }
+    else if (fps >= 58) { if (++a.good >= 5 && this.curPr < this.maxPr - 0.01) { a.good = 0; this.curPr = Math.min(this.maxPr, this.curPr / 0.85); this.applyPr(this.curPr); } }
+    else a.good = 0;
   }
   resize() { this.r.setSize(innerWidth, innerHeight); this.composer.setSize(innerWidth, innerHeight); this.bloom.resolution.set(innerWidth / 2, innerHeight / 2); }
   render(t, { danger = 0, mode = 'game' } = {}) {
