@@ -507,7 +507,19 @@ function snackTex(kind) {
   else { x.fillStyle = '#fbf8f2'; x.fillRect(0, 0, 128, 64); x.fillStyle = '#c99a62'; x.fillRect(0, 20, 128, 26); x.fillStyle = '#0f7a4a'; x.beginPath(); x.arc(64, 33, 15, 0, Math.PI * 2); x.fill(); x.fillStyle = '#fff'; x.font = '900 16px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('★', 64, 34); }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; return (_snackTex[kind] = t);
 }
+export const BALLOON_COLORS = ['#ff4f6a', '#ffd23a', '#5ad1ff', '#9a7bff', '#7ee0a8', '#ff8fd0', '#ff9a3c', '#3c7bff', '#ffffff', '#c8ff4a'];
+/** 풍선 하나: 바닥(0,0,0)이 손 · 줄이 위로 1.1 · 그 위에 풍선 (up 그룹은 매 프레임 하늘을 향하게 돌린다) */
+export function buildBalloon(color, len = 1.1) {
+  const g = new THREE.Group(), up = new THREE.Group(); g.add(up);
+  up.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.03, len * 0.5, 0.02), new THREE.Vector3(0, len, 0)]), new THREE.LineBasicMaterial({ color: '#f4f0ea' })));
+  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.25, metalness: 0.05, emissive: color, emissiveIntensity: 0.18 });
+  const b = new THREE.Mesh(new THREE.SphereGeometry(0.21, 20, 16), mat); b.scale.set(1, 1.18, 1); b.position.y = len + 0.24; up.add(b);
+  const knot = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.06, 8), mat); knot.position.y = len + 0.005; up.add(knot);
+  const shine = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.55 })); shine.position.set(-0.08, len + 0.33, 0.15); up.add(shine);
+  g.userData.up = up; g.userData.ball = b; return g;
+}
 export function buildSnack(code) {
+  if (code[0] === 'b') { const g = buildBalloon(BALLOON_COLORS[Number(code[1]) || 0], 1.75); /* 큰 머리 위로 떠 있게 줄을 길게 */ g.userData.code = code; g.userData.balloon = true; return g; }
   const kind = code[0], n = Number(code[1]) || 1, g = new THREE.Group();
   if (kind === 'p') {
     const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.08, 0.2, 18, 1, true), new THREE.MeshStandardMaterial({ map: snackTex('p'), roughness: 0.6, side: THREE.DoubleSide })); cup.position.y = 0.1; g.add(cup);
@@ -529,8 +541,8 @@ export function applyGear(g, gear = '') {
   const u = g.userData; if (!u.rig) return;
   if (u.gearStr === gear) return; u.gearStr = gear;
   const [w = '', m = '', riding = '0', sword = '0', costume = '', gold = '', snack = ''] = gear.split('|');
-  const sn = /^[pc][123]$/.test(snack) ? snack : '';
-  if ((u.gSnackCode || '') !== sn) { u.gSnack?.parent?.remove(u.gSnack); u.gSnack = null; u.gSnackCode = sn; const arm = u.arms?.[1]; if (sn && arm) { const it = buildSnack(sn); it.scale.setScalar(1.35); it.position.set(0.02 * Math.sign(arm.position.x || 1), -0.36, 0.09); u.gSnack = it; arm.add(it); } }
+  const sn = /^([pc][123]|b[0-9])$/.test(snack) ? snack : '';
+  if ((u.gSnackCode || '') !== sn) { if (u.gSnack?.userData.balloon && !sn.startsWith('b')) releaseBalloon(u.gSnack); u.gSnack?.parent?.remove(u.gSnack); u.gSnack = null; u.gSnackCode = sn; const arm = u.arms?.[1]; if (sn && arm) { const it = buildSnack(sn); if (!it.userData.balloon) it.scale.setScalar(1.35); it.position.set(0.02 * Math.sign(arm.position.x || 1), -0.36, 0.09); u.gSnack = it; arm.add(it); } }
   if (u.gWingsId !== w) { if (u.gWings) u.rig.remove(u.gWings); u.gWings = w ? buildWings(w) : null; if (u.gWings) u.rig.add(u.gWings); u.gWingsId = w; }
   const mid = riding === '1' ? m : '';
   if (u.gMountId !== mid) { if (u.gMount) g.remove(u.gMount); u.gMount = mid ? buildMount(mid) : null; if (u.gMount) g.add(u.gMount); u.gMountId = mid; }
@@ -571,10 +583,21 @@ export function animateGear(g, t, dt, moving) {
 }
 
 /** 간식을 든 팔: 앞으로 들고 다니고(걷거나 앉아도 그대로), 먹을 때(eatT) 입으로 가져간다. 다른 동작이 정한 팔 자세를 덮어쓴다 */
-const _rest = new THREE.Vector3(), _mouth = new THREE.Vector3(), _up = new THREE.Vector3();
+const _rest = new THREE.Vector3(), _mouth = new THREE.Vector3(), _up = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion(), _e = new THREE.Euler();
 function animateSnack(u, t, dt, moving) {
   if (!u.gSnack || !u.arms?.[1]) { u.eatT = 0; return; }
   const arm = u.arms[1], s = Math.sign(arm.position.x || 1);
+  if (u.gSnack.userData.balloon) { // 풍선: 줄을 쥔 손은 살짝 들고, 풍선은 늘 하늘을 향해 둥실둥실
+    u.eatT = 0;
+    arm.rotation.set(-1.05 + (moving ? Math.sin(t * 9) * 0.05 : 0), 0, -s * 0.1); // 손을 앞으로 내밀어
+    u.gSnack.position.set(0.02 * s, -0.42, 0.06); u.gSnack.rotation.set(0, 0, 0);
+    u.gSnack.updateWorldMatrix(true, false); u.gSnack.getWorldQuaternion(_q).invert();
+    // 풍선은 캐릭터가 바라보는 쪽으로 기울여 머리 앞에 뜨게 (걸으면 조금 덜 기울어 뒤로 끌린다)
+    u.rig.getWorldQuaternion(_q3);
+    _e.set(0.42 + Math.sin(t * 1.3) * 0.08 + (moving ? -0.14 : 0), 0, Math.sin(t * 1.7 + 1) * 0.08);
+    u.gSnack.userData.up.quaternion.copy(_q).multiply(_q3).multiply(_q2.setFromEuler(_e));
+    return;
+  }
   let k = 0; if (u.eatT > 0) { u.eatT = Math.max(0, u.eatT - dt); k = Math.sin(Math.PI * (1 - u.eatT / 0.9)); }
   arm.rotation.set(-0.85 - k * 0.45 + (moving && !k ? Math.sin(t * 9) * 0.05 : 0), 0, -s * (0.18 + k * 0.45)); // 먹을 때 팔은 살짝만
   // 손에 든 컵은 세운 채로 (먹을 때만 입 쪽으로 기울인다)
@@ -606,6 +629,15 @@ function particles(n, colors, size, additive = true) {
   const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; return pts;
 }
 function addFx(obj, life, step) { fxScene.add(obj); FX.push({ obj, life, t: 0, step }); }
+/** 손에서 놓친 풍선: 그 자리에서 흔들흔들 하늘로 올라가며 작아져 사라진다 */
+export function releaseBalloon(held) {
+  if (!fxScene || !held?.userData.ball) return;
+  const p = new THREE.Vector3(); held.userData.ball.getWorldPosition(p);
+  const col = held.userData.ball.material.color.getStyle();
+  const b = buildBalloon(col, 0.7); b.position.set(p.x, p.y - 0.9, p.z);
+  const x0 = b.position.x, z0 = b.position.z, y0 = b.position.y, ph = Math.random() * 6;
+  addFx(b, 5, (o, t) => { o.position.set(x0 + Math.sin(t * 2 + ph) * 0.35 + t * 0.3, y0 + t * 1.6 + t * t * 0.35, z0 + Math.cos(t * 1.6 + ph) * 0.25); o.rotation.z = Math.sin(t * 2.5 + ph) * 0.25; o.scale.setScalar(Math.max(0.01, 1 - Math.max(0, t - 3) / 2)); });
+}
 /** 앞쪽으로 색종이가 쏟아지는 꼬깔 폭죽 */
 export function popperFx(x, y, z, ry) {
   const n = 160; const pts = particles(n, ['#ff6f91', '#ffe066', '#7ee0a8', '#6fd6ff', '#b39dff', '#ffffff', '#ff9671'], 0.16, false);

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { buildProp, FOOT, setPropTheme } from './props.js';
 import { textSprite, createAvatar, animateAvatar } from './avatar.js';
-import { buildWings, buildMount, buildSword } from './gear.js';
+import { buildWings, buildMount, buildSword, buildBalloon, BALLOON_COLORS } from './gear.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const DEG = Math.PI / 180;
@@ -748,6 +748,49 @@ function buildLobbyDeco(root, colliders, themes) {
     // 충돌: 가게 몸통 (돌려 놓은 상자를 대충 덮는 정사각형)
     colliders.push({ x, z, hw: 1.6, hd: 1.6, noSpread: true });
     inter.push({ id: 'coffee', kind: 'snack', x: x + Math.sin(g.rotation.y) * 2.0, z: z + Math.cos(g.rotation.y) * 2.0, r: 2.4, label: 'STARMIA 커피', verb: '받기', noSpread: true });
+  }
+
+  // 🎈 풍선 삐에로: 제자리에서 뒤뚱뒤뚱 → 풍선 하나를 건네는 몸짓 → 잠깐 가만히 (9초마다 반복). 다른 손엔 풍선 뭉치
+  {
+    const x = 6.5, z = 14.5, g = add(new THREE.Group()); g.position.set(x, 0, z); face(g, x, z);
+    const clown = createAvatar({ body: '#fff6f0', accent: '#ff3a5a', ears: 'none', hat: 'none', eyes: 'star', brows: 'soft', mouth: 'grin', cheeks: 'hearts', extra: 'clown', acc: 'bowtie', hair: 'spiky', hairColor: '#ff6a2a', outfit: 'clown' });
+    clown.scale.setScalar(1.15); g.add(clown);
+    const cu = clown.userData;
+    // 삐에로 고깔모자 (줄무늬 + 방울)
+    if (cu.head) {
+      const hat = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.5, 20), new THREE.MeshStandardMaterial({ map: stripeTex('#ff3a5a', '#ffe9a8', 8), roughness: 0.6 }));
+      hat.position.set(0.06, 0.52, 0); hat.rotation.z = -0.25; cu.head.add(hat);
+      const pom = new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 10), new THREE.MeshStandardMaterial({ color: '#5ad1ff', roughness: 0.8 })); pom.position.set(0.12, 0.79, 0); cu.head.add(pom);
+    }
+    // 풍선 뭉치 (한 손) · 건넬 풍선 (다른 손)
+    const bunch = new THREE.Group(), bunchUp = new THREE.Group(); bunch.add(bunchUp);
+    BALLOON_COLORS.concat(['#ffb36a']).forEach((c, i) => { const b = buildBalloon(c, 1.55 + (i % 3) * 0.28); b.rotation.set((i % 2 ? 0.16 : -0.12) * (1 + (i % 3) * 0.3), 0, (i - 3) * 0.13); bunchUp.add(b); });
+    const giveB = buildBalloon(BALLOON_COLORS[1], 1.3);
+    const holdArm = cu.arms?.[1], giveArm = cu.arms?.[0];
+    if (holdArm) { bunch.position.set(0, -0.4, 0.05); holdArm.add(bunch); }
+    if (giveArm) { giveB.position.set(0, -0.4, 0.05); giveArm.add(giveB); }
+    const q = new THREE.Quaternion(), CYC = 9;
+    let lastT = 0;
+    anim.push((t) => {
+      const dt = Math.min(0.05, Math.max(0, t - lastT)); lastT = t;
+      const tc = t % CYC;
+      const waddle = tc < 4, give = tc >= 4 && tc < 6.6;
+      animateAvatar(clown, dt, waddle, t, false, null, 0);
+      // 뒤뚱뒤뚱: 제자리에서 좌우로 기우뚱 + 통통
+      clown.rotation.z = waddle ? Math.sin(t * 7) * 0.12 : 0; clown.position.y = waddle ? Math.abs(Math.sin(t * 7)) * 0.05 : 0;
+      clown.position.x = 0; clown.position.z = 0;
+      // 건네기: 풍선 든 팔을 앞으로 쭉 내밀고 살짝 인사, 돌아오면 손에 새 풍선
+      let k = 0; if (give) { const f = (tc - 4) / 2.6; k = Math.sin(Math.PI * Math.min(1, f * 1.25)); }
+      if (giveArm) { giveArm.rotation.set(-0.4 - k * 1.25, 0, -0.1); }
+      clown.rotation.x = k * 0.12;
+      giveB.visible = !(tc > 5.6 && tc < 6.9); // 건넨 뒤 잠깐 빈손
+      if (holdArm) holdArm.rotation.set(-0.5 + (waddle ? Math.sin(t * 7) * 0.08 : 0), 0, Math.sign(holdArm.position.x || 1) * -0.1);
+      // 줄은 늘 하늘로
+      for (const [h, up, sw] of [[bunch, bunchUp, 0.08], [giveB, giveB.userData.up, 0.1]]) { h.updateWorldMatrix(true, false); h.getWorldQuaternion(q).invert(); up.quaternion.copy(q); up.rotation.x += Math.sin(t * 1.4) * sw; up.rotation.z += Math.sin(t * 1.9 + 1) * sw; }
+    });
+    const sign = textSprite('🎈 풍선 삐에로 · E 로 받기', { size: 26, bg: 'rgba(120,10,40,.88)', color: '#ffe9a8', border: '#ff8fd0' }); sign.position.set(x, 4.2, z); add(sign);
+    colliders.push({ x, z, hw: 0.45, hd: 0.45, noSpread: true });
+    inter.push({ id: 'balloon', kind: 'snack', x, z, r: 2.6, label: '풍선 삐에로', verb: '풍선 받기', noSpread: true });
   }
 
   // 🎢 자이로 드롭: 바깥을 보는 10자리 고리가 천천히 돌며 15m 까지 올라갔다가 한순간에 떨어진다 (실제 시계로 돌려서 모두에게 같게 보인다)

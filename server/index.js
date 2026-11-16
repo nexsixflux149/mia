@@ -360,7 +360,7 @@ io.on('connection', (sock) => {
     me.em = typeof m.em === 'string' ? m.em.slice(0, 10) : ''; me.eid = Number(m.eid) | 0;
     me.ride = typeof m.ride === 'string' && /^[a-z0-9]{1,12}:\d{1,2}$/.test(m.ride) ? m.ride : '';
     me.riding = !!m.mount && !!prof(me.name).equip.mount;
-    me.snack = typeof m.snack === 'string' && /^[pc][123]$/.test(m.snack) ? m.snack : ''; me.eat = Number(m.eat) | 0; // 손에 든 간식(팝콘·커피 · 남은 횟수)과 먹은 횟수
+    me.snack = typeof m.snack === 'string' && /^([pc][123]|b[0-9])$/.test(m.snack) ? m.snack : ''; me.eat = Number(m.eat) | 0; // 손에 든 간식(팝콘·커피 · 남은 횟수)과 먹은 횟수
     { const its = prof(me.name).items; me.sword = m.sword === 2 ? (its[GOLD_STAFF] ? 2 : 0) : m.sword ? (its.sword ? 1 : 0) : 0; } // 손에 든 것: 1 전설의 검 · 2 황금 고양이 지팡이
   });
 

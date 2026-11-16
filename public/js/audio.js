@@ -397,6 +397,9 @@ export class AudioFX {
       case 'pickup': this.tone(660, 0.12, { gain: 0.12 }); this.tone(990, 0.2, { gain: 0.1, at: 0.08 }); break;
       // ── 자이로 드롭: 떨어지는 바람 소리 + 꺄아아 비명
       case 'drop': this.noise(1.6, { freq: 700, q: 0.7, gain: 0.5, attack: 0.05, release: 0.6 }); this.noise(1.2, { freq: 2600, q: 0.8, gain: 0.18, attack: 0.1, release: 0.5 }); [880, 1040, 760].forEach((f, i) => this.tone(f, 1.2, { type: 'sawtooth', gain: 0.035, at: 0.05 + i * 0.07, slide: f * 0.62, attack: 0.04, release: 0.5, detune: 20 })); break;
+      // ── 풍선: 받을 때 고무 뽀드득 · 날아갈 때 휘이~
+      case 'balloon_get': this.tone(520, 0.16, { type: 'triangle', gain: 0.12, slide: 880 }); this.tone(700, 0.14, { type: 'triangle', gain: 0.09, at: 0.12, slide: 1050 }); this.tone(1320, 0.2, { gain: 0.06, at: 0.28 }); break;
+      case 'balloon_fly': this.tone(600, 1.1, { type: 'sine', gain: 0.07, slide: 1500, attack: 0.1, release: 0.5 }); this.noise(0.9, { freq: 1800, q: 1, gain: 0.08, attack: 0.2, release: 0.5 }); break;
       // ── 간식: 팝콘 바삭바삭 · 커피 호로록
       case 'crunch': for (let i = 0; i < 6; i++) { const at = 0.05 + i * 0.11 + Math.random() * 0.03; this.noise(0.05, { freq: 2600 + Math.random() * 1800, q: 0.9, gain: 0.42, at, release: 0.04 }); this.noise(0.04, { freq: 700, q: 1.2, gain: 0.2, at: at + 0.01, release: 0.03 }); } break;
       case 'slurp': this.noise(0.55, { freq: 1500, q: 3, gain: 0.32, attack: 0.04, release: 0.2 }); this.tone(520, 0.5, { type: 'sine', gain: 0.05, slide: 900, attack: 0.05 }); this.tone(190, 0.12, { type: 'sine', gain: 0.18, at: 0.62, slide: 120 }); break;

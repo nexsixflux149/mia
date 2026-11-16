@@ -388,7 +388,7 @@ function enterChapter(state, showIntro = true) {
   const ch = state.chapter;
   S.chapter = ch; S.room = 'game'; S.mount = null; S.perch = null; me.y = 0; closeThemePop(); noticeBox.classList.add('hidden');
   cam.dist = CAM_START; // 살짝 줌인된 상태로 시작
-  if (S.snack) { S.snack = ''; updateGearButtons(); }
+  if (S.snack) { const u = myAvatar?.userData; if (u?.gSnack) { u.gSnack.parent?.remove(u.gSnack); u.gSnack = null; u.gSnackCode = ''; } S.snack = ''; updateGearButtons(); } // 팝콘·커피·풍선은 테마에 가져가지 않는다
   S.world = buildChapter(scene, ch, S.scenario?.id);
   S.objState = state.objects; S.dark = state.dark;
   me.x = ch.spawn[0] + (Math.random() - 0.5); me.z = ch.spawn[1];
@@ -1088,6 +1088,7 @@ function loop() {
   if (inLobby !== S._lobbyCls) { S._lobbyCls = inLobby; document.body.classList.toggle('in-lobby', inLobby); }
   updateGameTimer();
   fx.adapt(performance.now()); // 끊기면 해상도를 조금씩 낮춘다
+  if (S.snack?.[0] === 'b' && performance.now() - (S.balloonAt || 0) > 30000) { S.snack = ''; audio.play('balloon_fly'); updateGearButtons(); toast('🎈 풍선이 하늘로 날아갔어요~'); } // 30초가 지나면 손에서 놓친다
   { const gp = S.room === 'lobby' && S.mount?.ride === 'gyro' ? S.world?.rides?.gyro?.phase?.() || '' : ''; if (gp === 'drop' && S.gyroPh !== 'drop') audio.play('drop'); S.gyroPh = gp; } // 자이로 드롭이 떨어지는 순간
   fx.render(t, { danger: S.danger, mode: inLobby ? 'lobby' : 'game' });
   renderer.autoClear = false; renderer.clearDepth(); renderer.render(overlay, camera); renderer.autoClear = true;
@@ -2202,6 +2203,10 @@ function lobbyAct(id) {
       if (!seat) { toast(`${it.label} 자리가 꽉 찼어요.`); return; }
     }
     S.mount = { kind: 'sit', seat: { ...seat } }; S.perch = null; S.em = 'sit'; S.emT = 0; S.eid++;
+  } else if (it.kind === 'snack' && it.id === 'balloon') {
+    // 🎈 삐에로 풍선: 열 가지 색 중 하나 · 30초 뒤 하늘로 날아간다 (팝콘·커피를 들고 있었다면 풍선으로 바꿔 든다)
+    { let c; do { c = Math.floor(Math.random() * 10); } while (c === S.lastBalloon); S.lastBalloon = c; S.snack = 'b' + c; } S.balloonAt = performance.now(); // 열 가지 색 중 무작위 (바로 전 색은 피한다) audio.play('balloon_get'); updateGearButtons();
+    toast('🎈 삐에로가 풍선을 줬어요! 30초 뒤엔 하늘로 날아가요~');
   } else if (it.kind === 'snack') {
     const kind = it.id === 'coffee' ? 'c' : 'p';
     if (S.snack && S.snack[0] === kind && S.snack[1] === '3') { toast(kind === 'c' ? '☕ 이미 가득 찬 커피를 들고 있어요!' : '🍿 이미 가득 찬 팝콘을 들고 있어요!'); return; }
@@ -2523,7 +2528,7 @@ function flashRed() { const v = $('#vignette'); v.classList.add('danger'); setTi
 // ─────────────────────────── 감정표현
 // ───── 간식 먹기 · 마시기: 손을 입으로 가져가며 소리 → 한 번 먹을 때마다 줄고, 3번 먹으면 사라진다 (앉아서도 먹을 수 있다)
 function eatSnack() {
-  if (!S.snack || !myAvatar || S.eatBusy) return;
+  if (!S.snack || S.snack[0] === 'b' || !myAvatar || S.eatBusy) return;
   S.eatBusy = true; S.eatId = (S.eatId || 0) + 1; myAvatar.userData.eatT = 0.9;
   const kind = S.snack[0];
   setTimeout(() => audio.play(kind === 'c' ? 'slurp' : 'crunch'), 320);
@@ -2917,7 +2922,7 @@ $('#sideBtns').insertBefore(Object.assign(el('button', 'btn small', '🛒 상점
 $('#sideBtns').insertBefore(Object.assign(el('button', 'btn small', '🎒 내 물건'), { id: 'bagBtn', onclick: () => openBag() }), $('#rankBtn'));
 function updateGearButtons() {
   const rb = $('.abtn.ride'), sb = $('.abtn.sword'), nb = $('.abtn.snack');
-  if (nb) { nb.classList.toggle('hidden', !S.snack); if (S.snack) { nb.firstChild.textContent = S.snack[0] === 'c' ? '☕' : '🍿'; nb.querySelector('small').textContent = `${S.snack[0] === 'c' ? '마시기' : '먹기'} ${S.snack[1]}`; } }
+  if (nb) { nb.classList.toggle('hidden', !S.snack || S.snack[0] === 'b'); if (S.snack) { nb.firstChild.textContent = S.snack[0] === 'c' ? '☕' : '🍿'; nb.querySelector('small').textContent = `${S.snack[0] === 'c' ? '마시기' : '먹기'} ${S.snack[1]}`; } }
   if (rb) { rb.classList.toggle('hidden', !S.profile?.equip?.mount); rb.classList.toggle('on', !!S.riding); rb.firstChild.textContent = S.shop[S.profile?.equip?.mount]?.icon || '🐴'; }
   if (sb) { const it = S.profile?.items; const staff = holdCode() === 2 || (!holdCode() && it?.gold_staff); sb.classList.toggle('hidden', !(it?.sword || it?.gold_staff)); sb.classList.toggle('on', !!holdCode()); sb.firstChild.textContent = staff ? '🪄' : '🗡️'; const sm = sb.querySelector('small'); if (sm) sm.textContent = staff ? '지팡이' : '검'; }
 }
