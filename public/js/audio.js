@@ -91,7 +91,8 @@ export class AudioFX {
   loadSamples() {
     if (this.samplesReady) return this.samplesReady;
     this.buf = {};
-    const names = ['scream', 'scream_child', 'scream_wet', 'whisper', 'creak', 'door', 'growl', 'zombie', 'giggle', 'breath', 'knock', 'bang', 'sting_low', 'static_hiss', 'chain', 'drip', 'amb_dark'];
+    // 속삭임(영어 말소리) · 으르렁(사람 말소리처럼 들림) · 좀비(트림 소리) 녹음은 거슬려서 뺐다 → 예전 합성음
+    const names = ['scream', 'scream_child', 'scream_wet', 'giggle', 'breath', 'knock', 'bang', 'sting_low', 'static_hiss', 'chain', 'drip', 'amb_dark'];
     this.samplesReady = Promise.all(names.map((n) => fetch(`/sfx/${n}.mp3`).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject())).then((ab) => this.ctx.decodeAudioData(ab)).then((b) => { this.buf[n] = b; }).catch(() => {})));
     return this.samplesReady;
   }
@@ -105,8 +106,7 @@ export class AudioFX {
   playSample(name) {
     const v = (a) => 1 + (Math.random() * 2 - 1) * a;
     // 크기 맞춤: 주변에 가끔 깔리는 소리(속삭임 · 삐걱 · 킥킥 …)는 예전 합성음보다 조금만 크게(-30 LUFS 쯤), 비명은 예전보다 2~3dB 크게
-    const LV = { whisper: 0.38, creak: 0.4, giggle: 0.38, breath: 0.41, knock: 0.52, bang: 0.62, chain: 0.39, drip: 0.31, static_hiss: 0.79, sting_low: 0.72 };
-    if (name === 'door') return this.buf?.door && this.buf?.creak ? (this.sample('creak', { gain: 0.4, rate: v(0.04) }), this.sample('door', { gain: 0.56, at: 1.2, rate: v(0.03) }), true) : false;
+    const LV = { giggle: 0.38, breath: 0.41, knock: 0.52, bang: 0.62, chain: 0.39, drip: 0.31, static_hiss: 0.79, sting_low: 0.72 };
     const scream = name.startsWith('scream');
     return this.sample(name, { gain: (LV[name] ?? 1) * v(scream ? 0.05 : 0.15), rate: v(scream ? 0.025 : 0.06) });
   }
@@ -412,6 +412,7 @@ export class AudioFX {
 
   play(name) {
     if (!this.ctx) return;
+    if (name === 'door' || name === 'creak') return; // 문 여닫는 소리는 게임에 거슬려서 끈다 (녹음 · 합성음 모두)
     if (this.buf && this.playSample(name)) return;
     switch (name) {
       // 🌠 소원의 별: 반짝이는 글로켄 아르페지오 + 부드럽게 부푸는 화음 / 별똥별마다 작은 반짝

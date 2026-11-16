@@ -5,16 +5,11 @@ amb_dark.mp3: "ambience06.wav" by yewbic (https://freesound.org/people/yewbic/so
 bang.mp3: "Knocking and banging on my apartment door (No Reverb)" by robotortoise (https://freesound.org/people/robotortoise/sounds/587930) — CC CC0 1.0 https://creativecommons.org/publicdomain/zero/1.0/
 breath.mp3: "Heavy Breathing" by Under7dude (https://freesound.org/people/Under7dude/sounds/163383) — CC CC0 1.0 https://creativecommons.org/publicdomain/zero/1.0/
 chain.mp3: "Chain rattling" by georgesavic (https://freesound.org/people/georgesavic/sounds/593458) — CC CC0 1.0 https://creativecommons.org/publicdomain/zero/1.0/
-creak.mp3: "DOOR CREAKS CLOSES 2.wav" by HowardV (https://freesound.org/people/HowardV/sounds/393798) — CC CC0 1.0 https://creativecommons.org/publicdomain/zero/1.0/
-door.mp3: "Wooden Door Slamming Close.wav" by krnash (https://freesound.org/people/krnash/sounds/389810) — CC CC0 1.0 https://creativecommons.org/publicdomain/zero/1.0/
 drip.mp3: "Water drop / Splash" by bxyorna (https://freesound.org/people/bxyorna/sounds/410335) — CC CC0 1.0 https://creativecommons.org/publicdomain/zero/1.0/
 giggle.mp3: "Boy or Young Child Laughing" by OBXJohn (https://freesound.org/people/OBXJohn/sounds/365632) — CC CC0 1.0 https://creativecommons.org/publicdomain/zero/1.0/
-growl.mp3: "Monster Growl 01" by Ezcah (https://freesound.org/people/Ezcah/sounds/188026) — CC CC0 1.0 https://creativecommons.org/publicdomain/zero/1.0/
 knock.mp3: "knocking on door" by RobSp1derp1g (https://freesound.org/people/RobSp1derp1g/sounds/615427) — CC CC0 1.0 https://creativecommons.org/publicdomain/zero/1.0/
 scream.mp3: "Female scream 02" by missozzy (https://freesound.org/people/missozzy/sounds/169811) — CC CC0 1.0 https://creativecommons.org/publicdomain/zero/1.0/
 scream_child.mp3: "girl scream" by bevibeldesign (https://freesound.org/people/bevibeldesign/sounds/315827) — CC CC0 1.0 https://creativecommons.org/publicdomain/zero/1.0/
 scream_wet.mp3: "Monster scream 1" by giddster (https://freesound.org/people/giddster/sounds/416049) — CC CC0 1.0 https://creativecommons.org/publicdomain/zero/1.0/
 static_hiss.mp3: "Radio Static" by stondi (https://freesound.org/people/stondi/sounds/235431) — CC CC0 1.0 https://creativecommons.org/publicdomain/zero/1.0/
 sting_low.mp3: "[Ambient Hits] Ambient Hit" by waveplaySFX (https://freesound.org/people/waveplaySFX/sounds/529139) — CC CC0 1.0 https://creativecommons.org/publicdomain/zero/1.0/
-whisper.mp3: "Honey lets go to sleep now - Whispering voice" by Duisterwho (https://freesound.org/people/Duisterwho/sounds/643029) — CC CC0 1.0 https://creativecommons.org/publicdomain/zero/1.0/
-zombie.mp3: "Burp Monster Zombie groan moan" by EricsSoundschmiede (https://freesound.org/people/EricsSoundschmiede/sounds/463721) — CC CC0 1.0 https://creativecommons.org/publicdomain/zero/1.0/

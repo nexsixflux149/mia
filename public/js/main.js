@@ -1243,7 +1243,7 @@ function openSignal(sg) {
       lamp.classList.add('ouija');
       for (let rep = 0; rep < 2 && alive(); rep++) {
         out.textContent = '';
-        for (const ch of sg.letters) { if (!alive()) return; lamp.textContent = ch; audio.play('creak'); out.textContent += ch + ' '; await wait(1100); }
+        for (const ch of sg.letters) { if (!alive()) return; lamp.textContent = ch; audio.play('porcelain'); /* 글자가 켜질 때 작은 '딩' (문 삐걱 소리는 껐다) */ out.textContent += ch + ' '; await wait(1100); }
         lamp.textContent = '…'; await wait(1500);
       }
     }
@@ -1270,7 +1270,7 @@ socket.on('game:caught', ({ x, z, by, type }) => {
   setTimeout(() => f.classList.add('hidden'), 2000);
   toast(`${by}에게 붙잡혔다… 처음 위치로 끌려왔다.`);
 });
-socket.on('game:coopPulse', () => audio.play('creak'));
+socket.on('game:coopPulse', () => audio.play('clock_tick')); // 협동 장치 신호 (문 삐걱 소리는 껐다)
 socket.on('game:ending', (e) => {
   if (S.clock) S.clock.stop = e.ms ?? (performance.now() - S.clock.base);
   rememberClear(e); // 기념 사진에 쓸 정보 (파티원 · 귀신 · 시간)를 지금 챙겨 둔다
