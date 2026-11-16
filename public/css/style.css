@@ -660,6 +660,9 @@ body.mobile #xpLabel { left: auto; right: 8px; }
 .abtn.ride.on { background: rgba(255,211,106,.45); border-color: #ffe9a8; }
 .abtn.sword.on { background: rgba(111,214,255,.4); border-color: #9ae8ff; box-shadow: 0 0 14px rgba(111,214,255,.6); }
 body:not(.mobile) .abtn.ride, body:not(.mobile) .abtn.sword { display: none; }
+.abtn.snack { position: fixed; bottom: calc(250px + env(safe-area-inset-bottom)); left: 134px; width: 56px; height: 56px; font-size: 22px; background: rgba(255,210,120,.35); border-color: #ffe9a8; box-shadow: 0 0 14px rgba(255,210,120,.45); }
+.abtn.snack small { font-size: 9px; font-weight: 800; color: #fff3d0; }
+body:not(.mobile) .abtn.snack { left: 18px; } /* PC: 탈것·검 버튼이 없으니 맨 왼쪽 (V 키로도 먹을 수 있다) */
 /* 가운데 조사 버튼: 조금 작게 */
 .abtn.use { width: 62px; height: 62px; font-size: 22px; }
 .abtn.use small { font-size: 11px; }

@@ -3,7 +3,7 @@ import { createAvatar, animateAvatar, textSprite, OPTIONS, SKIN, ACCENT, HAIRC, 
 import { Cinema } from './cinema.js';
 import { createGhost, animateGhost } from './ghosts.js';
 import { renderDoc } from './paper.js';
-import { buildLobby, buildChapter, disposeWorld } from './world.js';
+import { buildLobby, buildChapter, disposeWorld, LS } from './world.js';
 import { AudioFX } from './audio.js';
 import { jumpscare, pickScare } from './scare.js';
 import { Voice } from './voice.js';
@@ -388,6 +388,7 @@ function enterChapter(state, showIntro = true) {
   const ch = state.chapter;
   S.chapter = ch; S.room = 'game'; S.mount = null; S.perch = null; me.y = 0; closeThemePop(); noticeBox.classList.add('hidden');
   cam.dist = CAM_START; // 살짝 줌인된 상태로 시작
+  if (S.snack) { S.snack = ''; updateGearButtons(); }
   S.world = buildChapter(scene, ch, S.scenario?.id);
   S.objState = state.objects; S.dark = state.dark;
   me.x = ch.spawn[0] + (Math.random() - 0.5); me.z = ch.spawn[1];
@@ -471,6 +472,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyQ') sendCallout();
   if (e.code === 'KeyR') cam.yaw = me.ry + Math.PI;
   if (e.code === 'KeyZ') toggleRide();
+  if (e.code === 'KeyN' && !e.repeat) eatSnack(); // N = 냠냠 (V 는 조심조심 걷기)
   if (e.code === 'KeyB') swingSword();
   if (e.code === 'KeyI') openBag();
   if (e.code === 'KeyP') openShop();
@@ -699,10 +701,10 @@ function netSend(dt) {
   sendT += dt; if (sendT < 0.1 || !S.me) return; sendT = 0; // 1초에 10번, 바뀌었을 때만
   // 놀이기구에 탄 동안에는 위치를 보내지 않는다 (다른 사람 화면은 놀이기구 자리로 직접 계산한다 — 빙글빙글 도는 내내 보낼 필요가 없다)
   const rd = rideTag();
-  const k = rd ? `ride,${rd},${S.em},${S.eid},${S.riding},${holdCode()}` : `${(me.y || 0).toFixed(2)},${me.x.toFixed(2)},${me.z.toFixed(2)},${me.ry.toFixed(2)},${me.moving},${S.run},${S.crouch},${!!S.sneak},${S.em},${S.eid},${rd},${S.riding},${holdCode()}`;
+  const k = rd ? `ride,${rd},${S.em},${S.eid},${S.riding},${holdCode()},${S.snack || ''},${S.eatId || 0}` : `${(me.y || 0).toFixed(2)},${me.x.toFixed(2)},${me.z.toFixed(2)},${me.ry.toFixed(2)},${me.moving},${S.run},${S.crouch},${!!S.sneak},${S.em},${S.eid},${rd},${S.riding},${holdCode()},${S.snack || ''},${S.eatId || 0}`;
   if (k === lastSent) return; lastSent = k;
   const n2 = (v) => Math.round(v * 100) / 100;
-  socket.emit('move', { x: n2(me.x), z: n2(me.z), y: n2(me.y || 0), ry: n2(me.ry), anim: me.moving, run: S.run && me.moving, crouch: S.crouch || S.sneak, sneak: !!S.sneak, em: S.em, eid: S.eid, ride: rideTag(), mount: !!S.riding, sword: holdCode() });
+  socket.emit('move', { x: n2(me.x), z: n2(me.z), y: n2(me.y || 0), ry: n2(me.ry), anim: me.moving, run: S.run && me.moving, crouch: S.crouch || S.sneak, sneak: !!S.sneak, em: S.em, eid: S.eid, ride: rideTag(), mount: !!S.riding, sword: holdCode(), snack: S.snack || '', eat: S.eatId || 0 });
 }
 function rideTag() { return S.mount?.kind === 'ride' && S.room === 'lobby' ? `${S.mount.ride}:${S.mount.seat}` : ''; }
 function updateStatus() {
@@ -900,7 +902,7 @@ S.net = new Map();
 function applyPlayer(e) {
   let p = S.net.get(e[0]); if (!p) { p = { id: e[0] }; S.net.set(e[0], p); }
   p.x = e[1]; p.z = e[2]; p.y = e[3]; p.ry = e[4]; p.anim = e[5] & 1; p.crouch = e[5] & 2 ? 1 : 0; p.light = !!(e[5] & 4);
-  const x = e[6]; if (x) { p.name = x.n; p.lv = x.lv; p.partyId = x.pt || null; p.gear = x.g; p.em = x.em; p.eid = x.eid; p.ride = x.rd; }
+  const x = e[6]; if (x) { p.name = x.n; p.lv = x.lv; p.partyId = x.pt || null; p.gear = x.g; p.em = x.em; p.eid = x.eid; p.ride = x.rd; p.et = x.et || 0; }
   return p;
 }
 /** 다른 사람 한 명을 화면에 맞춘다 (캐릭터 만들기 · 외형 받기 · 감정표현 · 손전등 · 파티 표시) */
@@ -917,6 +919,7 @@ function syncOther(p) {
     S.others.set(p.id, g);
   }
   if (g.userData.eid !== p.eid || g.userData.em !== p.em) { const fresh = g.userData.eid != null; g.userData.eid = p.eid; g.userData.em = p.em; g.userData.emT = 0; if (p.em === 'jump' && fresh) audio.play('pickup'); if (p.em === 'fart' && fresh) doFart(g, p.x, p.y || 0, p.z, p.ry); }
+  if (g.userData.et !== p.et) { const fresh = g.userData.et != null; g.userData.et = p.et; if (fresh && p.et) { g.userData.eatT = 0.9; const sn = (p.gear || '').split('|')[6] || ''; if (myAvatar && Math.hypot(p.x - me.x, p.z - me.z) < 9) setTimeout(() => audio.play(sn[0] === 'c' ? 'slurp' : 'crunch'), 320); } }
   g.userData.target = p;
   setLight(g, p.light);
   const inParty = !!S.party?.members.some((m) => m.id === p.id);
@@ -1021,11 +1024,11 @@ function drawMinimap(dt, t) {
   mm.classList.toggle('hidden', !SET.minimap || !S.world);
   mmT += dt; if (mmT < 0.15 || !SET.minimap || !S.world) return; mmT = 0;
   const W = mm.width, H = mm.height; mmx.clearRect(0, 0, W, H);
-  const size = S.room === 'lobby' ? [60, 60] : S.world.size || [26, 22];
+  const size = S.room === 'lobby' ? [60 * LS, 60 * LS] : S.world.size || [26, 22];
   const sc = (Math.min(W, H) - 16) / Math.max(size[0], size[1]);
   const P = (x, z) => [W / 2 + x * sc, H / 2 + z * sc];
   mmx.strokeStyle = 'rgba(255,255,255,.25)'; mmx.lineWidth = 1;
-  if (S.room === 'lobby') { mmx.beginPath(); mmx.arc(W / 2, H / 2, 28.5 * sc, 0, Math.PI * 2); mmx.stroke(); mmx.fillStyle = 'rgba(63,143,200,.8)'; { const [px2, pz2] = P(0, -25.6); mmx.beginPath(); mmx.arc(px2, pz2, 4.6 * sc, 0, Math.PI * 2); mmx.fill(); } mmx.strokeStyle = 'rgba(255,63,108,.55)'; mmx.lineWidth = 2; mmx.beginPath(); mmx.arc(W / 2, H / 2, 22 * sc, 0, Math.PI * 2); mmx.stroke(); const fp = S.world.rides?.coaster?.front(); if (fp) { const [cx2, cz2] = P(fp.x, fp.z); mmx.fillStyle = '#ff3f6c'; mmx.beginPath(); mmx.arc(cx2, cz2, 4, 0, Math.PI * 2); mmx.fill(); } }
+  if (S.room === 'lobby') { mmx.beginPath(); mmx.arc(W / 2, H / 2, 28.5 * LS * sc, 0, Math.PI * 2); mmx.stroke(); mmx.fillStyle = 'rgba(63,143,200,.8)'; { const [px2, pz2] = P(0, -25.6 * LS); mmx.beginPath(); mmx.arc(px2, pz2, 4.6 * sc, 0, Math.PI * 2); mmx.fill(); } mmx.strokeStyle = 'rgba(255,63,108,.55)'; mmx.lineWidth = 2; mmx.beginPath(); mmx.arc(W / 2, H / 2, 22 * LS * sc, 0, Math.PI * 2); mmx.stroke(); const fp = S.world.rides?.coaster?.front(); if (fp) { const [cx2, cz2] = P(fp.x, fp.z); mmx.fillStyle = '#ff3f6c'; mmx.beginPath(); mmx.arc(cx2, cz2, 4, 0, Math.PI * 2); mmx.fill(); } }
   else {
     mmx.strokeRect(W / 2 - size[0] / 2 * sc, H / 2 - size[1] / 2 * sc, size[0] * sc, size[1] * sc);
     mmx.fillStyle = 'rgba(200,190,170,.35)';
@@ -1085,6 +1088,7 @@ function loop() {
   if (inLobby !== S._lobbyCls) { S._lobbyCls = inLobby; document.body.classList.toggle('in-lobby', inLobby); }
   updateGameTimer();
   fx.adapt(performance.now()); // 끊기면 해상도를 조금씩 낮춘다
+  { const gp = S.room === 'lobby' && S.mount?.ride === 'gyro' ? S.world?.rides?.gyro?.phase?.() || '' : ''; if (gp === 'drop' && S.gyroPh !== 'drop') audio.play('drop'); S.gyroPh = gp; } // 자이로 드롭이 떨어지는 순간
   fx.render(t, { danger: S.danger, mode: inLobby ? 'lobby' : 'game' });
   renderer.autoClear = false; renderer.clearDepth(); renderer.render(overlay, camera); renderer.autoClear = true;
 }
@@ -2198,6 +2202,11 @@ function lobbyAct(id) {
       if (!seat) { toast(`${it.label} 자리가 꽉 찼어요.`); return; }
     }
     S.mount = { kind: 'sit', seat: { ...seat } }; S.perch = null; S.em = 'sit'; S.emT = 0; S.eid++;
+  } else if (it.kind === 'snack') {
+    const kind = it.id === 'coffee' ? 'c' : 'p';
+    if (S.snack && S.snack[0] === kind && S.snack[1] === '3') { toast(kind === 'c' ? '☕ 이미 가득 찬 커피를 들고 있어요!' : '🍿 이미 가득 찬 팝콘을 들고 있어요!'); return; }
+    S.snack = kind + '3'; audio.play(kind === 'c' ? 'coffee_get' : 'popcorn_get'); updateGearButtons();
+    toast(kind === 'c' ? '☕ STARMIA 커피를 받았어요! N 키(또는 ☕ 버튼)로 3번 마실 수 있어요.' : '🍿 팝콘을 받았어요! N 키(또는 🍿 버튼)로 3번 먹을 수 있어요.');
   } else if (it.kind === 'climb') {
     S.perch = it.perch; me.x = it.perch.x; me.z = it.perch.z; me.y = it.perch.y; S.mount = null;
     toast(`${it.label} 위에 올라갔어요! (가장자리로 걸어가면 내려와요)`);
@@ -2491,7 +2500,7 @@ $('#helpBtn').onclick = () => {
     return;
   }
   const k = el('div', 'keys');
-  [['W A S D / 방향키', '이동'], ['Shift', '달리기 (발소리 때문에 귀신이 멀리서도 알아챈다)'], ['C (누르고 있기)', '웅크리기 — 그 자리에서 방향만 돌리며 귀신에게 덜 들킨다. 떼면 일어선다'], ['V (누르고 있기)', '조심조심 걷기 — 아주 느리지만 귀신이 절대 눈치채지 못한다'], ['마우스 드래그 · 휠', '시점 회전 · 확대/축소'], ['R', '카메라를 캐릭터 뒤로'], ['클릭 / E', '조사 · 줍기 · 풀기 (멀리 있으면 자동으로 다가감)'], ['Space', '점프'], ['X', '감정표현 (춤·인사·엎드리기·놀래키기 등)'], ['F', '손전등 켜기/끄기'], ['T', '부적 태우기 (귀신 20초 퇴치)'], ['1 ~ 9', '아이템 바로 사용 (자물쇠 창에서는 버튼 입력)'], ['아이템 우클릭', '조합 · 파티원에게 건네기'], ['J', '수첩 — 본 단서가 자동 기록됨'], ['H', '힌트'], ['G / 휠 클릭', '마우스 위치를 파티원에게 찍어 주기'], ['Q', '외치기 — "어이!" "여기야!" 하며 내 위치를 바닥 파형과 지도로 알리기'], ['M', '미니맵 켜기/끄기'], ['💖 (접속자 목록·캐릭터 클릭)', '친구에게 하트 보내기'], ['Enter · Tab', '채팅 · 전체/파티 전환']].forEach(([a, b]) => { k.append(el('kbd', null, a), el('span', null, b)); });
+  [['W A S D / 방향키', '이동'], ['Shift', '달리기 (발소리 때문에 귀신이 멀리서도 알아챈다)'], ['C (누르고 있기)', '웅크리기 — 그 자리에서 방향만 돌리며 귀신에게 덜 들킨다. 떼면 일어선다'], ['V (누르고 있기)', '조심조심 걷기 — 아주 느리지만 귀신이 절대 눈치채지 못한다'], ['마우스 드래그 · 휠', '시점 회전 · 확대/축소'], ['R', '카메라를 캐릭터 뒤로'], ['클릭 / E', '조사 · 줍기 · 풀기 (멀리 있으면 자동으로 다가감)'], ['Space', '점프'], ['X', '감정표현 (춤·인사·엎드리기·놀래키기 등)'], ['F', '손전등 켜기/끄기'], ['T', '부적 태우기 (귀신 20초 퇴치)'], ['1 ~ 9', '아이템 바로 사용 (자물쇠 창에서는 버튼 입력)'], ['아이템 우클릭', '조합 · 파티원에게 건네기'], ['J', '수첩 — 본 단서가 자동 기록됨'], ['H', '힌트'], ['G / 휠 클릭', '마우스 위치를 파티원에게 찍어 주기'], ['Q', '외치기 — "어이!" "여기야!" 하며 내 위치를 바닥 파형과 지도로 알리기'], ['N', '들고 있는 팝콘·커피 먹기·마시기 (로비의 🍿 팝콘 카트 · ☕ STARMIA 에서 E 로 받기 · 3번이면 끝)'], ['M', '미니맵 켜기/끄기'], ['💖 (접속자 목록·캐릭터 클릭)', '친구에게 하트 보내기'], ['Enter · Tab', '채팅 · 전체/파티 전환']].forEach(([a, b]) => { k.append(el('kbd', null, a), el('span', null, b)); });
   const tip = el('p', 'muted', '귀신 공략: 소사는 소리에 민감하고, 하얀 여자는 손전등을 비추는 동안 움직이지 못합니다. 이장과 무당은 등 뒤로 나타납니다. 협동 장치는 서로 다른 두 사람이 8초 안에 눌러야 하며, 혼자일 땐 한쪽만 눌러도 됩니다.');
   const w = el('div'); w.append(k, tip);
   openModal('조작법', '', w);
@@ -2512,6 +2521,20 @@ function scare(type, src) {
 function flashRed() { const v = $('#vignette'); v.classList.add('danger'); setTimeout(() => { if (S.danger < 0.45) v.classList.remove('danger'); }, 700); }
 
 // ─────────────────────────── 감정표현
+// ───── 간식 먹기 · 마시기: 손을 입으로 가져가며 소리 → 한 번 먹을 때마다 줄고, 3번 먹으면 사라진다 (앉아서도 먹을 수 있다)
+function eatSnack() {
+  if (!S.snack || !myAvatar || S.eatBusy) return;
+  S.eatBusy = true; S.eatId = (S.eatId || 0) + 1; myAvatar.userData.eatT = 0.9;
+  const kind = S.snack[0];
+  setTimeout(() => audio.play(kind === 'c' ? 'slurp' : 'crunch'), 320);
+  setTimeout(() => {
+    S.eatBusy = false; if (!S.snack) return;
+    const left = Number(S.snack[1]) - 1;
+    S.snack = left > 0 ? kind + left : '';
+    if (!left) toast(kind === 'c' ? '☕ 커피를 다 마셨어요. 호로록~ 맛있다!' : '🍿 팝콘을 다 먹었어요. 냠냠!');
+    updateGearButtons();
+  }, 900);
+}
 function doEmote(id) {
   if (!myAvatar) return;
   if (id === 'jump' && S.em === 'jump' && S.emT < 0.7) return; // 공중에 떠 있는 동안(발이 땅에 닿기 전)에는 다시 뛸 수 없다
@@ -2601,7 +2624,7 @@ const coinsText = () => (S.profile?.coins === -1 ? '∞' : String(S.profile?.coi
 function holdCode() { const it = S.profile?.items; return S.holdStaff && it?.gold_staff ? 2 : S.holdSword && it?.sword ? 1 : 0; }
 /** 착용 중인 황금 고양이 부위 글자 (가진 것만) */
 const goldWorn = () => { const on = S.profile?.equip?.gold || '', it = S.profile?.items || {}; let out = ''; for (const id of GOLD_ORDER) { const c = S.shop[id]?.part; if (c && it[id] && on.includes(c)) out += c; } return out; };
-const myGear = () => { const e = S.profile?.equip || {}; return `${e.wings || ''}|${e.mount || ''}|${S.riding && e.mount ? 1 : 0}|${holdCode()}|${e.costume || ''}|${goldWorn()}`; };
+const myGear = () => { const e = S.profile?.equip || {}; return `${e.wings || ''}|${e.mount || ''}|${S.riding && e.mount ? 1 : 0}|${holdCode()}|${e.costume || ''}|${goldWorn()}|${S.snack || ''}`; };
 // 맨 아래 얇은 경험치 바 + 왼쪽 위 레벨·코인
 const xpBar = el('div'); xpBar.id = 'xpBar'; xpBar.innerHTML = '<div id="xpFill"></div><div id="xpLabel"></div>'; $('#hud').appendChild(xpBar);
 const lvChip = el('div'); lvChip.id = 'lvChip'; $('#onlineChip').after(lvChip);
@@ -2893,7 +2916,8 @@ function openGift(toId, name) {
 $('#sideBtns').insertBefore(Object.assign(el('button', 'btn small', '🛒 상점'), { id: 'shopBtn', onclick: () => openShop() }), $('#rankBtn'));
 $('#sideBtns').insertBefore(Object.assign(el('button', 'btn small', '🎒 내 물건'), { id: 'bagBtn', onclick: () => openBag() }), $('#rankBtn'));
 function updateGearButtons() {
-  const rb = $('.abtn.ride'), sb = $('.abtn.sword');
+  const rb = $('.abtn.ride'), sb = $('.abtn.sword'), nb = $('.abtn.snack');
+  if (nb) { nb.classList.toggle('hidden', !S.snack); if (S.snack) { nb.firstChild.textContent = S.snack[0] === 'c' ? '☕' : '🍿'; nb.querySelector('small').textContent = `${S.snack[0] === 'c' ? '마시기' : '먹기'} ${S.snack[1]}`; } }
   if (rb) { rb.classList.toggle('hidden', !S.profile?.equip?.mount); rb.classList.toggle('on', !!S.riding); rb.firstChild.textContent = S.shop[S.profile?.equip?.mount]?.icon || '🐴'; }
   if (sb) { const it = S.profile?.items; const staff = holdCode() === 2 || (!holdCode() && it?.gold_staff); sb.classList.toggle('hidden', !(it?.sword || it?.gold_staff)); sb.classList.toggle('on', !!holdCode()); sb.firstChild.textContent = staff ? '🪄' : '🗡️'; const sm = sb.querySelector('small'); if (sm) sm.textContent = staff ? '지팡이' : '검'; }
 }
@@ -3002,6 +3026,7 @@ applyMobile(); addEventListener('resize', applyMobile);
   abtn('shout', '📢<small>외치기</small>', () => sendCallout());
   abtn('ride hidden', '🐴<small>타기</small>', () => toggleRide());
   abtn('sword hidden', '🗡️<small>검</small>', () => swingSword());
+  abtn('snack hidden', '🍿<small>먹기</small>', () => eatSnack());
   updateGearButtons();
   hud.appendChild(act);
   renderVoiceUI();
@@ -3029,4 +3054,4 @@ applyMobile(); addEventListener('resize', applyMobile);
   });
   $('#inventory').addEventListener('click', (e) => { const s = e.target.closest('.slot'); if (s?.dataset.lp) { e.stopImmediatePropagation(); e.preventDefault(); delete s.dataset.lp; } }, true);
 }
-if (window.__dbg) Object.assign(window.__dbg, { fx, GPU_INFO, openGallery, takeSnap, graphics, gfx, PERF, applyGfx, restoreFaded, SET, S, me, cam, openShop, openBag, toggleRide, swingSword, doEmote, interact, lobbyAct, scene, camera, cinema, openRank, openFeedback, openStamps, openClearPhoto, rememberClear, showEndExtras, playHiddenPreview, openJournal });
+if (window.__dbg) Object.assign(window.__dbg, { eatSnack, fx, GPU_INFO, openGallery, takeSnap, graphics, gfx, PERF, applyGfx, restoreFaded, SET, S, me, cam, openShop, openBag, toggleRide, swingSword, doEmote, interact, lobbyAct, scene, camera, cinema, openRank, openFeedback, openStamps, openClearPhoto, rememberClear, showEndExtras, playHiddenPreview, openJournal });

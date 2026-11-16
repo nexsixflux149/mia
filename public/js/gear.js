@@ -498,10 +498,39 @@ function setCostume(g, id) {
   u.gCostumeId = id;
 }
 /** gear = "날개|탈것|타는중(1/0)|손에 든 것(0 없음 · 1 전설의 검 · 2 황금 고양이 지팡이)|코스튬|황금 고양이 부위 글자(hmgtbsl)" */
+// ───── 손에 드는 간식: 팝콘(p) · STARMIA 커피(c). 뒤의 숫자는 남은 횟수(3·2·1) — 줄어들수록 덜 차 보인다
+const _snackTex = {};
+function snackTex(kind) {
+  if (_snackTex[kind]) return _snackTex[kind];
+  const c = document.createElement('canvas'); c.width = 128; c.height = 64; const x = c.getContext('2d');
+  if (kind === 'p') { for (let i = 0; i < 8; i++) { x.fillStyle = i % 2 ? '#ffffff' : '#e8202a'; x.fillRect(i * 16, 0, 16, 64); } x.fillStyle = '#ffd23a'; x.font = '900 22px sans-serif'; x.textAlign = 'center'; x.fillText('POP', 64, 40); }
+  else { x.fillStyle = '#fbf8f2'; x.fillRect(0, 0, 128, 64); x.fillStyle = '#c99a62'; x.fillRect(0, 20, 128, 26); x.fillStyle = '#0f7a4a'; x.beginPath(); x.arc(64, 33, 15, 0, Math.PI * 2); x.fill(); x.fillStyle = '#fff'; x.font = '900 16px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('★', 64, 34); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; return (_snackTex[kind] = t);
+}
+export function buildSnack(code) {
+  const kind = code[0], n = Number(code[1]) || 1, g = new THREE.Group();
+  if (kind === 'p') {
+    const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.08, 0.2, 18, 1, true), new THREE.MeshStandardMaterial({ map: snackTex('p'), roughness: 0.6, side: THREE.DoubleSide })); cup.position.y = 0.1; g.add(cup);
+    const bottom = new THREE.Mesh(new THREE.CircleGeometry(0.08, 16), new THREE.MeshStandardMaterial({ color: '#e8202a' })); bottom.rotation.x = Math.PI / 2; g.add(bottom);
+    const pm = [new THREE.MeshStandardMaterial({ color: '#fff6dc', roughness: 0.8 }), new THREE.MeshStandardMaterial({ color: '#ffe28a', roughness: 0.7 })];
+    const geo = new THREE.IcosahedronGeometry(0.032, 0);
+    const cnt = [0, 9, 17, 26][n], top = [0, 0.17, 0.2, 0.23][n];
+    for (let i = 0; i < cnt; i++) { const a = i * 2.4, r = 0.075 * Math.sqrt((i % 9) / 9 + 0.1); const k = new THREE.Mesh(geo, pm[i % 2]); k.position.set(Math.cos(a) * r, top - (i % 9) * 0.004 + Math.floor(i / 9) * 0.02, Math.sin(a) * r); k.rotation.set(i, i * 2, 0); k.scale.setScalar(0.8 + (i % 3) * 0.2); g.add(k); }
+  } else {
+    const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.047, 0.17, 18), [new THREE.MeshStandardMaterial({ map: snackTex('c'), roughness: 0.5 }), new THREE.MeshStandardMaterial({ color: '#fbf8f2' }), new THREE.MeshStandardMaterial({ color: '#fbf8f2' })]); cup.position.y = 0.085; g.add(cup);
+    const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.064, 0.064, 0.022, 18), new THREE.MeshStandardMaterial({ color: '#f2efe8', roughness: 0.4 })); lid.position.y = 0.18; g.add(lid);
+    const sip = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.026, 0.02, 10), new THREE.MeshStandardMaterial({ color: '#f2efe8' })); sip.position.set(0.025, 0.198, 0); g.add(sip);
+    // 김: 남은 양이 많을수록 진하게
+    const steam = new THREE.Mesh(new THREE.PlaneGeometry(0.08, 0.16), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.1 * n, depthWrite: false })); steam.position.set(0.02, 0.29, 0); g.add(steam); g.userData.steam = steam;
+  }
+  g.userData.code = code; return g;
+}
 export function applyGear(g, gear = '') {
   const u = g.userData; if (!u.rig) return;
   if (u.gearStr === gear) return; u.gearStr = gear;
-  const [w = '', m = '', riding = '0', sword = '0', costume = '', gold = ''] = gear.split('|');
+  const [w = '', m = '', riding = '0', sword = '0', costume = '', gold = '', snack = ''] = gear.split('|');
+  const sn = /^[pc][123]$/.test(snack) ? snack : '';
+  if ((u.gSnackCode || '') !== sn) { u.gSnack?.parent?.remove(u.gSnack); u.gSnack = null; u.gSnackCode = sn; const arm = u.arms?.[1]; if (sn && arm) { const it = buildSnack(sn); it.scale.setScalar(1.35); it.position.set(0.02 * Math.sign(arm.position.x || 1), -0.36, 0.09); u.gSnack = it; arm.add(it); } }
   if (u.gWingsId !== w) { if (u.gWings) u.rig.remove(u.gWings); u.gWings = w ? buildWings(w) : null; if (u.gWings) u.rig.add(u.gWings); u.gWingsId = w; }
   const mid = riding === '1' ? m : '';
   if (u.gMountId !== mid) { if (u.gMount) g.remove(u.gMount); u.gMount = mid ? buildMount(mid) : null; if (u.gMount) g.add(u.gMount); u.gMountId = mid; }
@@ -517,9 +546,10 @@ export function applyGear(g, gear = '') {
   if ((u.gCostumeId || '') !== costume) { if (u.gGold) setGold(g, ''); setCostume(g, costume); }
   if ((u.gGoldSet || '') !== gset) setGold(g, gset);
 }
-/** animateAvatar 다음에 부른다: 날개·탈것 움직임 + 탄 자세 + 검 휘두르기 */
+/** animateAvatar 다음에 부른다: 날개·탈것 움직임 + 탄 자세 + 검 휘두르기 + 간식 들기·먹기 */
 export function animateGear(g, t, dt, moving) {
   const u = g.userData;
+  try { animateSnack(u, t, dt, moving); } catch {}
   u.gWings?.userData.anim(t);
   u.gCostume?.anim(t);
   u.gGold?.anim(t, moving);
@@ -538,6 +568,26 @@ export function animateGear(g, t, dt, moving) {
     else if (u.gSwordKind === '2' && !u.gMount) { u.arms[0].rotation.x = -0.5 + (moving ? Math.sin(t * 9) * 0.07 : 0); } // 지팡이: 걸을 때도 세워서 든다 (긴 지팡이가 땅을 휘젓지 않게)
     else if (!moving) { u.arms[0].rotation.x = -0.5; }
   }
+}
+
+/** 간식을 든 팔: 앞으로 들고 다니고(걷거나 앉아도 그대로), 먹을 때(eatT) 입으로 가져간다. 다른 동작이 정한 팔 자세를 덮어쓴다 */
+const _rest = new THREE.Vector3(), _mouth = new THREE.Vector3(), _up = new THREE.Vector3();
+function animateSnack(u, t, dt, moving) {
+  if (!u.gSnack || !u.arms?.[1]) { u.eatT = 0; return; }
+  const arm = u.arms[1], s = Math.sign(arm.position.x || 1);
+  let k = 0; if (u.eatT > 0) { u.eatT = Math.max(0, u.eatT - dt); k = Math.sin(Math.PI * (1 - u.eatT / 0.9)); }
+  arm.rotation.set(-0.85 - k * 0.9 + (moving && !k ? Math.sin(t * 9) * 0.05 : 0), 0, -s * (0.18 + k * 0.85));
+  // 손에 든 컵은 세운 채로 (먹을 때만 입 쪽으로 기울인다)
+  // 팔이 앞으로 들리면 손 앞(-y 쪽)으로 더 내밀어 큰 머리에 묻히지 않게 하고, 컵 윗부분만 입 쪽으로 살짝 기울인다
+  u.gSnack.rotation.set(0.85 + k * 1.15, 0, s * (0.18 + k * 0.85)); // 팔이 안쪽으로 기운 만큼 되돌려 정면에서 똑바로 보이게
+  _rest.set(0.02 * s, -0.36, 0.09);
+  if (k > 0 && u.head && u.rig) {
+    // 먹는 동안: 손에서 '입 바로 앞'(얼굴 가운데 아래쪽)으로 끌어온다 — 팔이 옆에 달려 있어서 팔만 돌리면 볼 쪽으로 가기 때문
+    u.rig.updateMatrixWorld(true);
+    u.head.localToWorld(_mouth.set(0, -0.2, 0.52)); arm.worldToLocal(_mouth);
+    u.gSnack.position.lerpVectors(_rest, _mouth.addScaledVector(_up.set(0, 0, -1), 0.12), k);
+  } else u.gSnack.position.copy(_rest);
+  if (u.gSnack.userData.steam) { u.gSnack.userData.steam.position.y = 0.29 + Math.sin(t * 2) * 0.01; u.gSnack.userData.steam.rotation.y = t; }
 }
 
 // ───────────── 사용 효과 (폭죽 · 검 · 방귀)

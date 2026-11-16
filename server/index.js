@@ -122,7 +122,7 @@ const prof = (name) => {
 const findByName = (name) => [...players.values()].find((p) => p.name === name && !p.offline);
 const sendProfile = (p) => { if (p) io.to(p.id).emit('profile', { ...profileView(prof(p.name), p.admin), hiddenOk: hiddenOk(p.name) }); };
 // 장비 문자열: 날개|탈것|타는 중|손에 든 것(0 없음 · 1 전설의 검 · 2 황금 고양이 지팡이)|코스튬|황금 고양이 부위 글자
-const gearOf = (p) => { const pf = prof(p.name), e = pf.equip; return `${e.wings || ''}|${e.mount || ''}|${p.riding && e.mount ? 1 : 0}|${Number(p.sword) || 0}|${e.costume || ''}|${goldWorn(pf)}`; };
+const gearOf = (p) => { const pf = prof(p.name), e = pf.equip; return `${e.wings || ''}|${e.mount || ''}|${p.riding && e.mount ? 1 : 0}|${Number(p.sword) || 0}|${e.costume || ''}|${goldWorn(pf)}|${p.snack || ''}`; };
 /** 모든 테마를 한 번씩 깼거나 만렙이면 히든 테마가 열린다 */
 function hiddenOk(name) {
   const p = findByName(name); if (p?.admin) return true;
@@ -163,7 +163,7 @@ let seq = 1;
 const TICK_MS = 100;
 const r2 = (v) => Math.round(v * 100) / 100;
 const dynOf = (p) => [r2(p.x), r2(p.z), r2(p.y || 0), r2(p.ry), (p.anim ? 1 : 0) | (p.crouch ? 2 : 0) | (p.light ? 4 : 0)];
-const extOf = (p) => ({ n: p.name, lv: p.lv, pt: p.partyId || '', g: gearOf(p), em: p.em || '', eid: p.eid || 0, rd: p.room === 'lobby' ? p.ride || '' : '' });
+const extOf = (p) => ({ n: p.name, lv: p.lv, pt: p.partyId || '', g: gearOf(p), em: p.em || '', eid: p.eid || 0, rd: p.room === 'lobby' ? p.ride || '' : '', et: p.eat || 0 });
 const roomMeta = new Map(); // room -> { gk: 마지막으로 보낸 귀신 상태, ghosts, full: 다음 번에 전체를 보낼지, fullAt }
 const metaOf = (room) => { let m = roomMeta.get(room); if (!m) { m = { gk: 'null', ghosts: null, full: true, fullAt: 0 }; roomMeta.set(room, m); } return m; };
 const needFull = (room) => { if (room) metaOf(room).full = true; };
@@ -360,6 +360,7 @@ io.on('connection', (sock) => {
     me.em = typeof m.em === 'string' ? m.em.slice(0, 10) : ''; me.eid = Number(m.eid) | 0;
     me.ride = typeof m.ride === 'string' && /^[a-z0-9]{1,12}:\d{1,2}$/.test(m.ride) ? m.ride : '';
     me.riding = !!m.mount && !!prof(me.name).equip.mount;
+    me.snack = typeof m.snack === 'string' && /^[pc][123]$/.test(m.snack) ? m.snack : ''; me.eat = Number(m.eat) | 0; // 손에 든 간식(팝콘·커피 · 남은 횟수)과 먹은 횟수
     { const its = prof(me.name).items; me.sword = m.sword === 2 ? (its[GOLD_STAFF] ? 2 : 0) : m.sword ? (its.sword ? 1 : 0) : 0; } // 손에 든 것: 1 전설의 검 · 2 황금 고양이 지팡이
   });
 
@@ -938,7 +939,7 @@ setInterval(() => {
     const full = meta.full || now - meta.fullAt > 10000; // 가끔은 전체를 보내 혹시 어긋난 화면을 바로잡는다
     const out = [];
     for (const p of list) {
-      const d = dynOf(p), dk = d.join(), e = extOf(p), ek = `${e.n}|${e.lv}|${e.pt}|${e.g}|${e.em}|${e.eid}|${e.rd}`;
+      const d = dynOf(p), dk = d.join(), e = extOf(p), ek = `${e.n}|${e.lv}|${e.pt}|${e.g}|${e.em}|${e.eid}|${e.rd}|${e.et}`;
       if (full || p._sr !== room || ek !== p._ek) out.push([p.id, ...d, e]);
       else if (dk !== p._dk) out.push([p.id, ...d]);
       p._dk = dk; p._ek = ek; p._sr = room;

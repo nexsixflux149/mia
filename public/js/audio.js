@@ -395,6 +395,13 @@ export class AudioFX {
       case 'zombie': this.tone(85 + Math.random() * 30, 1.2, { type: 'sawtooth', gain: 0.18, slide: 60, attack: 0.1, release: 0.6, detune: 40 }); this.noise(1.1, { freq: 420, q: 2, gain: 0.25, attack: 0.15, release: 0.6 }); break;
       case 'heli': for (let i = 0; i < 16; i++) this.noise(0.07, { freq: 200, type: 'lowpass', gain: 0.6, at: i * 0.11 }); break;
       case 'pickup': this.tone(660, 0.12, { gain: 0.12 }); this.tone(990, 0.2, { gain: 0.1, at: 0.08 }); break;
+      // ── 자이로 드롭: 떨어지는 바람 소리 + 꺄아아 비명
+      case 'drop': this.noise(1.6, { freq: 700, q: 0.7, gain: 0.5, attack: 0.05, release: 0.6 }); this.noise(1.2, { freq: 2600, q: 0.8, gain: 0.18, attack: 0.1, release: 0.5 }); [880, 1040, 760].forEach((f, i) => this.tone(f, 1.2, { type: 'sawtooth', gain: 0.035, at: 0.05 + i * 0.07, slide: f * 0.62, attack: 0.04, release: 0.5, detune: 20 })); break;
+      // ── 간식: 팝콘 바삭바삭 · 커피 호로록
+      case 'crunch': for (let i = 0; i < 6; i++) { const at = 0.05 + i * 0.11 + Math.random() * 0.03; this.noise(0.05, { freq: 2600 + Math.random() * 1800, q: 0.9, gain: 0.42, at, release: 0.04 }); this.noise(0.04, { freq: 700, q: 1.2, gain: 0.2, at: at + 0.01, release: 0.03 }); } break;
+      case 'slurp': this.noise(0.55, { freq: 1500, q: 3, gain: 0.32, attack: 0.04, release: 0.2 }); this.tone(520, 0.5, { type: 'sine', gain: 0.05, slide: 900, attack: 0.05 }); this.tone(190, 0.12, { type: 'sine', gain: 0.18, at: 0.62, slide: 120 }); break;
+      case 'popcorn_get': for (let i = 0; i < 7; i++) this.noise(0.03, { freq: 1800 + Math.random() * 2000, q: 1, gain: 0.35, at: i * 0.07 + Math.random() * 0.03 }); this.tone(880, 0.12, { gain: 0.08, at: 0.5 }); this.tone(1320, 0.18, { gain: 0.07, at: 0.58 }); break;
+      case 'coffee_get': this.noise(0.7, { freq: 900, q: 2, gain: 0.22, attack: 0.08, release: 0.25 }); this.tone(330, 0.6, { type: 'sine', gain: 0.04, slide: 520 }); this.tone(1046, 0.25, { gain: 0.07, at: 0.75 }); break;
       case 'wrong': this.tone(140, 0.35, { type: 'sawtooth', gain: 0.15, slide: 90 }); break;
       case 'unlock': this.noise(0.1, { freq: 2500, gain: 0.25 }); this.tone(1200, 0.08, { type: 'square', gain: 0.06, at: 0.1 }); break;
       case 'creak': { const o = this.tone(180, 1.4, { type: 'sawtooth', gain: 0.05, slide: 120, attack: 0.3, release: 0.5 }); break; }
