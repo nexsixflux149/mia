@@ -536,7 +536,7 @@ function hoverCheck(e) {
   let label = null;
   const th = S.room === 'lobby' ? pickTheme(e.clientX, e.clientY) : null;
   if (th) label = `${THEME_INFO[th]?.title || ''} — 클릭해서 시작`;
-  else if (S.room === 'lobby' && pickClickable(e.clientX, e.clientY) === 'mailbox') label = '📮 고객소리함 — 버그 · 건의사항 보내기';
+  else if (S.room === 'lobby') { const ck = pickClickable(e.clientX, e.clientY); if (ck) label = { mailbox: '📮 고객소리함 — 버그 · 건의사항 보내기', wishstar: '🌠 소원의 별 — 소원빌기' }[ck] || null; }
   if (id) { const ent = S.world.objects[id]; label = (ent.done ? '✓ ' : '') + (ent.data.label || '') + (distTo(ent) > reach(ent) ? '  (클릭하면 다가감)' : ''); }
   else if (!th) { const av = pickAvatar(e.clientX, e.clientY); if (av) label = `${av.userData.name} (클릭: 메뉴)`; }
   canvas.style.cursor = label ? 'pointer' : 'default';
@@ -2006,7 +2006,7 @@ function openAdmin() {
   openModal('🛡️ 운영자', '공지 · 방문 통계 · 랭킹 관리 · 고객소리함 · 채팅 금지 · 내보내기 · 머니 무한', w);
 }
 // ─────────────────────────── 고객소리함 (버그 · 건의사항)
-const FB_KIND = { bug: '🐞 버그', idea: '💡 건의', etc: '💬 기타' };
+const FB_KIND = { bug: '🐞 버그', idea: '💡 건의', etc: '💬 기타', wish: '🌠 별점 · 소원' };
 // 🖼 갤러리: 사람들이 📸캡처로 찍은 최근 사진(전광판과 같은 24장)을 모아 본다. 열려 있는 동안 새 사진이 오면 바로 추가된다
 function openGallery() {
   const w = el('div', 'gal');
@@ -2062,6 +2062,94 @@ function openFeedback() {
   paint();
   openModal('📮 고객소리함', '버그를 발견했거나 바라는 점이 있다면 알려 주세요. 하나하나 읽고 고칩니다!', w);
   if (!document.body.classList.contains('mobile')) setTimeout(() => ta.focus(), 60);
+}
+// ─────────────────────────── 🌠 소원의 별: 별점 + 소원 → 10초 별똥별 → 소원 전달 + 커피 후원
+const WISH_WORD = ['', '아쉬워요', '그저 그래요', '괜찮아요', '좋아요!', '최고예요! 🥰'];
+function openWish() {
+  const w = el('div', 'wish');
+  let stars = 0;
+  const lab1 = el('div', 'wish-lab', '⭐ 게임 별점');
+  const row = el('div', 'wish-stars'); const word = el('div', 'wish-word', '별을 눌러 점수를 주세요');
+  const btns = [1, 2, 3, 4, 5].map((n) => { const b = el('button', 'wish-star', '★'); b.type = 'button'; b.setAttribute('aria-label', `${n}점`);
+    b.onpointerenter = () => paint(n); b.onpointerleave = () => paint(stars); b.onclick = () => { stars = n; paint(n); audio.play('pickup'); check(); }; row.appendChild(b); return b; });
+  const paint = (n) => { btns.forEach((b, i) => b.classList.toggle('on', i < n)); word.textContent = n ? `${n}점 · ${WISH_WORD[n]}` : '별을 눌러 점수를 주세요'; };
+  const lab2 = el('div', 'wish-lab', '🌠 소원 빌기');
+  const ta = el('textarea', 'wish-text'); ta.maxLength = 200; ta.rows = 3; ta.placeholder = '이루고 싶은 소원을 적어 주세요 ✨'; ta.onkeydown = (e) => e.stopPropagation();
+  const cnt = el('div', 'muted wish-count', '0 / 200'); ta.oninput = () => { cnt.textContent = `${ta.value.length} / 200`; check(); };
+  const note = el('div', 'wish-note', '*게임 별점과 소원 빌기를 작성하면 하늘에서 별똥별이 떨어져요');
+  const send = el('button', 'btn primary wish-send', '🌠 작성'); send.disabled = true;
+  const check = () => { send.disabled = !(stars && ta.value.trim()); };
+  send.onclick = () => {
+    if (send.disabled) return; send.disabled = true;
+    const back = setTimeout(() => { check(); toast('보내지 못했어요. 잠시 후 다시 눌러 주세요.'); }, 6000);
+    socket.emit('wish:send', { stars, text: ta.value.trim() }, (r) => {
+      clearTimeout(back);
+      if (r?.error) { toast(r.error); check(); return; }
+      closeModal(); meteorShower(10, () => openWishDone());
+    });
+  };
+  w.append(lab1, row, word, lab2, ta, cnt, send, note);
+  openModal('🌠 소원의 별', '별에게 이 게임의 별점을 주고, 소원을 하나 빌어 보세요.', w);
+}
+function openWishDone() {
+  const w = el('div', 'wish wish-done');
+  w.append(el('div', 'wish-done-icon', '🌠'), el('div', 'wish-done-msg', '별똥별이 소원을 하늘로 데려갔어요.\n꼭 이루어지길 바랄게요 ✨'));
+  const coffee = el('button', 'btn primary wish-coffee', '☕ 커피 한 잔 후원하기');
+  coffee.onclick = () => $('#coffeeBtn').onclick(); // 오른쪽 ☕ 버튼과 똑같이 (폰: 카카오페이 바로 열기 · PC: QR 창)
+  const close = el('button', 'btn wish-close', '닫기'); close.onclick = closeModal;
+  w.append(coffee, close);
+  openModal('소원이 전달 되었어요', '', w);
+}
+// 10초 동안 하늘 가득 별똥별 (화면 위 2D 캔버스 · 'lighter' 로 겹칠수록 밝게). 소원의 별도 함께 반짝인다
+let showerOn = false;
+function meteorShower(sec, done) {
+  if (showerOn) return; showerOn = true;
+  S.world?.wishStar?.boost(sec);
+  audio.play('wish_start');
+  const cv = el('canvas', 'meteor-cv'); document.body.appendChild(cv);
+  const ctx = cv.getContext('2d'); const dpr = Math.min(2, devicePixelRatio || 1);
+  let W = 0, H = 0; const fit = () => { W = innerWidth; H = innerHeight; cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }; fit(); addEventListener('resize', fit);
+  const TINT = [[255, 255, 255], [255, 236, 170], [190, 225, 255], [255, 200, 235], [215, 200, 255]];
+  const sky = Array.from({ length: 160 }, () => ({ x: Math.random(), y: Math.random() * 0.75, r: 0.5 + Math.random() * 1.3, p: Math.random() * 6 }));
+  const M = [], dust = [];
+  const S0 = Math.min(W, H) / 800; // 화면 크기에 맞춘 비율
+  const spawn = (big) => {
+    const ang = (Math.PI * (0.70 + Math.random() * 0.08)); // 오른쪽 위에서 왼쪽 아래로
+    const sp = (big ? 900 : 700 + Math.random() * 900) * Math.max(0.7, S0);
+    const c = TINT[big ? 1 : Math.floor(Math.random() * TINT.length)];
+    M.push({ x: Math.random() * W * 1.3, y: -40 - Math.random() * H * 0.35, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, len: (big ? 420 : 140 + Math.random() * 260) * Math.max(0.7, S0), w: big ? 3.2 : 1 + Math.random() * 1.8, c, life: 0, max: 0.9 + Math.random() * 0.9 + (big ? 0.6 : 0), big });
+  };
+  const t0 = performance.now(); let last = t0, acc = 0, nextBig = 0.6, twk = 0;
+  const frame = (now) => {
+    const t = (now - t0) / 1000, dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const env = Math.min(1, t / 0.8) * Math.min(1, Math.max(0, (sec - t) / 1.2)); // 서서히 시작 · 서서히 끝
+    ctx.clearRect(0, 0, W, H);
+    // 하늘을 살짝 깊은 남색으로 · 잔별이 반짝
+    const bg = ctx.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, `rgba(10,14,48,${0.55 * env})`); bg.addColorStop(0.6, `rgba(20,16,60,${0.22 * env})`); bg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'lighter';
+    for (const s of sky) { const a = env * (0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 2.4 + s.p))); ctx.fillStyle = `rgba(255,250,235,${a})`; ctx.beginPath(); ctx.arc(s.x * W, s.y * H, s.r, 0, 6.283); ctx.fill(); }
+    // 새 별똥별: 한가운데(1~8초)에 초당 ~40개
+    if (t < sec - 0.6) { acc += dt * (8 + 34 * Math.min(1, t / 1.5) * Math.min(1, (sec - 1.5 - t) / 1.5 + 0.3)); while (acc >= 1) { acc -= 1; spawn(false); } if (t > nextBig) { spawn(true); nextBig = t + 0.5 + Math.random() * 0.7; } }
+    if (t > twk && t < sec - 0.5) { audio.play('twinkle'); twk = t + 0.18 + Math.random() * 0.35; }
+    for (let i = M.length - 1; i >= 0; i--) {
+      const m = M[i]; m.life += dt; m.x += m.vx * dt; m.y += m.vy * dt;
+      const f = Math.min(1, m.life / 0.12) * Math.max(0, 1 - Math.max(0, m.life - m.max * 0.6) / (m.max * 0.4));
+      if (f <= 0 || m.y > H + 80 || m.x < -m.len - 80) { M.splice(i, 1); continue; }
+      const k = Math.hypot(m.vx, m.vy), ux = m.vx / k, uy = m.vy / k, tx = m.x - ux * m.len, ty = m.y - uy * m.len;
+      const gr = ctx.createLinearGradient(m.x, m.y, tx, ty); const [r, g, b] = m.c;
+      gr.addColorStop(0, `rgba(255,255,255,${0.95 * f})`); gr.addColorStop(0.08, `rgba(${r},${g},${b},${0.8 * f})`); gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      ctx.strokeStyle = gr; ctx.lineWidth = m.w; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(m.x, m.y); ctx.lineTo(tx, ty); ctx.stroke();
+      const hg = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, m.w * (m.big ? 7 : 4.5)); hg.addColorStop(0, `rgba(255,255,255,${f})`); hg.addColorStop(0.4, `rgba(${r},${g},${b},${0.45 * f})`); hg.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(m.x, m.y, m.w * (m.big ? 7 : 4.5), 0, 6.283); ctx.fill();
+      if (m.big || Math.random() < dt * 6) dust.push({ x: m.x - ux * 6, y: m.y - uy * 6, vx: ux * 30 + (Math.random() - 0.5) * 40, vy: uy * 30 + (Math.random() - 0.5) * 40 + 10, life: 0, max: 0.6 + Math.random() * 0.9, r: 0.8 + Math.random() * (m.big ? 1.8 : 1), c: m.c });
+    }
+    // 큰 별똥별이 흘리는 반짝 가루
+    for (let i = dust.length - 1; i >= 0; i--) { const d = dust[i]; d.life += dt; if (d.life > d.max) { dust.splice(i, 1); continue; } d.x += d.vx * dt; d.y += d.vy * dt; d.vy += 30 * dt; const a = (1 - d.life / d.max) * (0.6 + 0.4 * Math.sin(d.life * 40)); const [r, g, b] = d.c; ctx.fillStyle = `rgba(${r},${g},${b},${a})`; ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, 6.283); ctx.fill(); }
+    if (t < sec || M.length) requestAnimationFrame(frame);
+    else { cv.remove(); removeEventListener('resize', fit); showerOn = false; done?.(); }
+  };
+  requestAnimationFrame(frame);
 }
 function openFeedbackAdmin() {
   const w = el('div', 'fb-admin'); w.appendChild(el('div', 'muted', '불러오는 중…'));
@@ -2180,6 +2268,7 @@ function lobbyAct(id) {
   if (S.mount) { dismount(); toast('내렸어요.'); return; }
   if (id === 'shop') { setTimeout(openShop, 160); return; }
   if (id === 'mailbox') { setTimeout(openFeedback, 160); return; }
+  if (id === 'wishstar') { setTimeout(openWish, 160); return; }
   if (S.riding) { S.riding = false; S.wasRiding = true; } // 벤치·놀이기구에서 내리면 다시 탈것에 탄다
   if (S.perch && id === 'off') { S.perch = null; me.y = 0; [me.x, me.z] = collide(me.x + Math.sin(me.ry) * 1.2, me.z + Math.cos(me.ry) * 1.2); return; }
   const it = S.world?.interactives?.find((i) => i.id === id); if (!it) return;

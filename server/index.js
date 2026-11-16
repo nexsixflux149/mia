@@ -678,6 +678,21 @@ io.on('connection', (sock) => {
     saveFeedback(); ack({ ok: true });
     for (const p of players.values()) if (p.admin && !p.offline) io.to(p.id).emit('toast', { text: `📮 고객소리함에 새 글이 도착했어요 (${me.name})` });
   });
+  // ───── 🌠 소원의 별: 게임 별점(1~5) + 소원 한 줄. 고객소리함 목록에 함께 쌓여 운영자가 본다
+  sock.on('wish:send', ({ stars, text } = {}, ack) => {
+    if (!me || typeof ack !== 'function') return;
+    stars = Math.round(Number(stars)); text = String(text || '').trim().slice(0, 200);
+    if (!(stars >= 1 && stars <= 5)) return ack({ error: '별점을 골라 주세요. (1~5점)' });
+    if (!text) return ack({ error: '소원을 적어 주세요.' });
+    const now = Date.now();
+    if (!me.admin && now - (me.lastWish || 0) < 20000) return ack({ error: '별똥별이 아직 떨어지는 중이에요. 잠시 뒤에 다시 빌어 주세요.' });
+    if (!me.admin && feedback.list.filter((f) => f.kind === 'wish' && f.name === me.name && now - f.at < 86400000).length >= 5) return ack({ error: '소원은 하루에 5번까지 빌 수 있어요. 내일 또 빌어 주세요!' });
+    me.lastWish = now;
+    feedback.list.push({ id: 'w' + now.toString(36) + randomBytes(2).toString('hex'), at: now, name: me.name, lv: levelOf(prof(me.name).xp), kind: 'wish', stars,
+      text: `${'★'.repeat(stars)}${'☆'.repeat(5 - stars)} (${stars}점)\n소원: ${text}`, where: '로비 · 소원의 별', ua: String(sock.handshake.headers['user-agent'] || '').slice(0, 160) });
+    if (feedback.list.length > 500) feedback.list.splice(0, feedback.list.length - 500);
+    saveFeedback(); ack({ ok: true });
+  });
   sock.on('admin:feedback', adminOnly((ack) => { if (typeof ack === 'function') ack(feedback.list.slice(-200).reverse()); }));
   sock.on('admin:feedbackDone', adminOnly((id) => { const f = feedback.list.find((x) => x.id === id); if (f) { f.done = !f.done; saveFeedback(); } }));
   sock.on('admin:feedbackDel', adminOnly((id) => { const i = feedback.list.findIndex((x) => x.id === id); if (i >= 0) { feedback.list.splice(i, 1); saveFeedback(); } }));

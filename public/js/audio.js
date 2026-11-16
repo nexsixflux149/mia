@@ -84,6 +84,31 @@ export class AudioFX {
     const len = this.ctx.sampleRate * 2;
     this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
     const d = this.noiseBuf.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    this.loadSamples();
+  }
+  // ── 실제 녹음 효과음 (Openverse CC0 · public/sfx/CREDITS.txt). 합성음이 '그 소리처럼 들리지 않던' 공포 효과음을 바꾼다.
+  // 다 받기 전이거나 받지 못하면 예전 합성음이 그대로 난다.
+  loadSamples() {
+    if (this.samplesReady) return this.samplesReady;
+    this.buf = {};
+    const names = ['scream', 'scream_child', 'scream_wet', 'whisper', 'creak', 'door', 'growl', 'zombie', 'giggle', 'breath', 'knock', 'bang', 'sting_low', 'static_hiss', 'chain', 'drip', 'amb_dark'];
+    this.samplesReady = Promise.all(names.map((n) => fetch(`/sfx/${n}.mp3`).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject())).then((ab) => this.ctx.decodeAudioData(ab)).then((b) => { this.buf[n] = b; }).catch(() => {})));
+    return this.samplesReady;
+  }
+  sample(name, { gain = 1, at = 0, rate = 1 } = {}) {
+    const b = this.buf?.[name]; if (!b) return false;
+    const s = this.ctx.createBufferSource(); s.buffer = b; s.playbackRate.value = rate;
+    const g = this.ctx.createGain(); g.gain.value = gain; s.connect(g).connect(this.master); s.start(this.t + at);
+    return true;
+  }
+  // 같은 녹음이 반복돼도 티가 덜 나게: 재생할 때마다 음 높이 · 크기를 조금씩 바꾼다 (비명은 아주 조금만)
+  playSample(name) {
+    const v = (a) => 1 + (Math.random() * 2 - 1) * a;
+    // 크기 맞춤: 주변에 가끔 깔리는 소리(속삭임 · 삐걱 · 킥킥 …)는 예전 합성음보다 조금만 크게(-30 LUFS 쯤), 비명은 예전보다 2~3dB 크게
+    const LV = { whisper: 0.38, creak: 0.4, giggle: 0.38, breath: 0.41, knock: 0.52, bang: 0.62, chain: 0.39, drip: 0.31, static_hiss: 0.79, sting_low: 0.72 };
+    if (name === 'door') return this.buf?.door && this.buf?.creak ? (this.sample('creak', { gain: 0.4, rate: v(0.04) }), this.sample('door', { gain: 0.56, at: 1.2, rate: v(0.03) }), true) : false;
+    const scream = name.startsWith('scream');
+    return this.sample(name, { gain: (LV[name] ?? 1) * v(scream ? 0.05 : 0.15), rate: v(scream ? 0.025 : 0.06) });
   }
   get t() { return this.ctx.currentTime; }
   noise(dur, { freq = 1000, q = 1, type = 'bandpass', gain = 0.3, attack = 0.01, release = 0.3, at = 0 } = {}) {
@@ -159,6 +184,12 @@ export class AudioFX {
       }
     }
     this.amb = { g, nodes };
+    // 테마 안: 실제 녹음한 어두운 드론을 합성 드론 밑에 은은하게 깐다 (36초 이음새 없는 반복). 아직 못 받았으면 받는 대로 붙인다
+    if (mode !== 'lobby') {
+      const amb = this.amb;
+      const bed = () => { if (this.amb !== amb || !this.buf?.amb_dark) return; const s = c.createBufferSource(); s.buffer = this.buf.amb_dark; s.loop = true; const bg = c.createGain(); bg.gain.value = 0; bg.gain.linearRampToValueAtTime(0.3, this.t + 4); s.connect(bg).connect(g); s.start(this.t, Math.random() * 30); nodes.push(s); };
+      if (this.buf?.amb_dark) bed(); else this.loadSamples().then(bed);
+    }
   }
 
   // 삐에로 배경음악 (자작곡): 바람 빠진 증기 오르간이 연주하는 느리고 비뚤어진 왈츠.
@@ -381,7 +412,11 @@ export class AudioFX {
 
   play(name) {
     if (!this.ctx) return;
+    if (this.buf && this.playSample(name)) return;
     switch (name) {
+      // 🌠 소원의 별: 반짝이는 글로켄 아르페지오 + 부드럽게 부푸는 화음 / 별똥별마다 작은 반짝
+      case 'wish_start': [1046.5, 1318.5, 1568, 2093, 2637, 3136].forEach((f, i) => this.tone(f, 1.6, { type: 'sine', gain: 0.05, at: i * 0.09, attack: 0.005, release: 1.5 })); [523.3, 659.3, 784, 987.8].forEach((f) => this.tone(f, 9.5, { type: 'sine', gain: 0.022, attack: 2.2, release: 3.5, detune: (Math.random() - 0.5) * 12 })); break;
+      case 'twinkle': { const f = [2093, 2349, 2637, 3136, 3520][Math.floor(Math.random() * 5)]; this.tone(f, 0.7, { type: 'sine', gain: 0.018 + Math.random() * 0.015, attack: 0.004, release: 0.65 }); break; }
       case 'click': this.tone(880, 0.06, { type: 'square', gain: 0.04 }); break;
       // ── 상점 물건 · 장난 소리
       case 'party_pop': this.noise(0.14, { freq: 1400, q: 0.5, gain: 1.4 }); this.noise(0.5, { freq: 5200, q: 0.6, gain: 0.35, at: 0.04, release: 0.45 }); this.tone(95, 0.2, { type: 'square', gain: 0.55, slide: 40 }); for (let i = 0; i < 10; i++) this.tone(1800 + Math.random() * 2600, 0.12, { type: 'triangle', gain: 0.05, at: 0.06 + i * 0.03 }); break;

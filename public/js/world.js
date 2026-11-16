@@ -870,7 +870,63 @@ function buildLobbyDeco(root, colliders, themes) {
     colliders.push({ x, z, hw: 3.3, hd: 3.3, noSpread: true });
     inter.push({ id: 'gyro', kind: 'ride', x: x - Math.cos(ga) * 4.2, z: z - Math.sin(ga) * 4.2, r: 4.6, label: '자이로 드롭', verb: '타기', noSpread: true });
   }
-  return { interactives: inter, rides, update: (t) => anim.forEach((f) => f(t)) };
+  // 🌠 소원의 별: 광장 북동쪽(분수대와 테마 문 사이)에 떠 있는 커다란 금빛 별.
+  // 천천히 둥실둥실 → 9초마다 한 번 5바퀴를 자연스럽게 빠르게 돌며 반짝이를 흩뿌린다 (무한 반복). 다가가면 '별똥별 보기'
+  const clickables = []; let wishStar = null;
+  {
+    const x = 8, z = -6.5, BASE = 5.0, CYC = 9, SPIN0 = 6.0, SPIN = 2.2;
+    const g = add(new THREE.Group()); g.position.set(x, 0, z); g.rotation.y = Math.atan2(6.2 - x, 5.6 - z); // 고객소리함 쪽(광장 입구)을 바라본다
+    const sh = new THREE.Shape(); const RO = 1.9, RI = 0.8;
+    for (let i = 0; i < 10; i++) { const a = Math.PI / 2 + (i / 10) * Math.PI * 2, r = i % 2 ? RI : RO; i ? sh.lineTo(Math.cos(a) * r, Math.sin(a) * r) : sh.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
+    const sg = new THREE.ExtrudeGeometry(sh, { depth: 0.5, bevelEnabled: true, bevelThickness: 0.22, bevelSize: 0.16, bevelSegments: 5, curveSegments: 4 }); sg.center(); sg.computeVertexNormals();
+    const starM = new THREE.MeshStandardMaterial({ color: '#ffbf2e', emissive: '#ff9a10', emissiveIntensity: 0.4, metalness: 0.7, roughness: 0.28 });
+    const spin = new THREE.Group(); spin.position.y = BASE; g.add(spin);
+    const star = new THREE.Mesh(sg, starM); star.castShadow = true; spin.add(star);
+    // 별 속에서 번지는 빛 · 바닥까지 내려오는 은은한 빛기둥 · 바닥 빛 웅덩이
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: '#ffd890', transparent: true, opacity: 0.75, depthWrite: false, blending: THREE.AdditiveBlending })); glow.scale.setScalar(9); spin.add(glow);
+    const beamTex = (() => { const c = document.createElement('canvas'); c.width = 4; c.height = 128; const q = c.getContext('2d'); const gr = q.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, 'rgba(255,225,150,0.32)'); gr.addColorStop(0.6, 'rgba(255,200,120,0.06)'); gr.addColorStop(1, 'rgba(255,200,120,0)'); q.fillStyle = gr; q.fillRect(0, 0, 4, 128); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 2.6, BASE, 32, 1, true), new THREE.MeshBasicMaterial({ map: beamTex, transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending })); beam.position.y = BASE / 2; beam.rotation.x = Math.PI; g.add(beam);
+    const pool = new THREE.Mesh(new THREE.CircleGeometry(3.4, 48), new THREE.MeshBasicMaterial({ map: glowTex, color: '#ffd890', transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending })); pool.rotation.x = -Math.PI / 2; pool.position.y = 0.04; g.add(pool);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(3.1, 0.035, 6, 96), new THREE.MeshBasicMaterial({ color: '#ffe7a8', transparent: true, opacity: 0.7 })); ring.rotation.x = Math.PI / 2; ring.position.y = 0.06; g.add(ring);
+    const light = new THREE.PointLight('#ffcf7a', matchMedia('(pointer: coarse)').matches ? 0 : 9, 13, 1.6); light.position.y = BASE; if (light.intensity) g.add(light);
+    // 별 둘레를 천천히 도는 작은 반짝이
+    const ON = 70, og = new THREE.BufferGeometry(), op = new Float32Array(ON * 3), oseed = [];
+    for (let i = 0; i < ON; i++) oseed.push([Math.random() * 6.283, 2.3 + Math.random() * 1.6, (Math.random() - 0.5) * 3.2, 0.15 + Math.random() * 0.35]);
+    og.setAttribute('position', new THREE.BufferAttribute(op, 3));
+    const orbit = new THREE.Points(og, new THREE.PointsMaterial({ map: glowTex, color: '#fff2c4', size: 0.32, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); orbit.frustumCulled = false; g.add(orbit);
+    // 회전할 때 흩뿌리는 반짝이 (재활용하는 스프라이트 묶음)
+    const SPK = [], sparkM = ['#fff6d0', '#ffd34a', '#ffe6f6', '#cfe8ff'].map((c) => new THREE.SpriteMaterial({ map: glowTex, color: c, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    for (let i = 0; i < 90; i++) { const s = new THREE.Sprite(sparkM[i % 4].clone()); s.visible = false; s.userData = { v: new THREE.Vector3(), life: 0 }; g.add(s); SPK.push(s); }
+    let nextSpk = 0;
+    const emit = (n) => { for (let k = 0; k < n; k++) { const s = SPK[nextSpk++ % SPK.length], a = Math.random() * 6.283, e = (Math.random() - 0.3) * 1.4, sp = 2.2 + Math.random() * 3.4; s.position.set(Math.cos(a) * 1.4, spin.position.y + Math.sin(a * 2) * 0.9, Math.sin(a) * 1.4); s.userData.v.set(Math.cos(a) * sp, e * sp * 0.6 + 1.2, Math.sin(a) * sp); s.userData.life = 1.3 + Math.random() * 0.9; s.userData.max = s.userData.life; s.userData.sz = 0.25 + Math.random() * 0.4; s.visible = true; } };
+    let lastT = 0, boostUntil = 0, boostT = 0;
+    const easeIO = (k) => (k < 0.5 ? 4 * k * k * k : 1 - (-2 * k + 2) ** 3 / 2);
+    anim.push((t) => {
+      const dt = Math.min(0.05, Math.max(0, t - lastT)); lastT = t; boostT = t;
+      const boost = t < boostUntil ? Math.min(1, (boostUntil - t) / 1.5, 1) : 0;
+      const tc = t % CYC, inSpin = tc >= SPIN0 && tc < SPIN0 + SPIN, k = inSpin ? (tc - SPIN0) / SPIN : 0;
+      spin.position.y = BASE + Math.sin(t * 1.25) * 0.28 + (inSpin ? Math.sin(Math.PI * k) * 0.35 : 0);
+      spin.rotation.y = easeIO(k) * Math.PI * 2 * 5 + Math.sin(t * 0.6) * 0.18;
+      spin.rotation.z = Math.sin(t * 0.9) * 0.06;
+      const sc = 1 + (inSpin ? Math.sin(Math.PI * k) * 0.07 : 0) + boost * 0.08; spin.scale.setScalar(sc);
+      if (inSpin) emit((Math.random() < dt * 55 ? 2 : 0) + (Math.random() < dt * 40 ? 1 : 0));
+      if (boost && Math.random() < dt * 20) emit(1);
+      starM.emissiveIntensity = 0.4 + Math.sin(t * 2.2) * 0.08 + (inSpin ? Math.sin(Math.PI * k) * 0.45 : 0) + boost * 0.7;
+      glow.material.opacity = 0.38 + Math.sin(t * 2.2) * 0.08 + (inSpin ? Math.sin(Math.PI * k) * 0.25 : 0) + boost * 0.35;
+      if (light.intensity) light.intensity = 8 + Math.sin(t * 2.2) * 1.2 + boost * 8; light.position.y = spin.position.y;
+      beam.material.opacity = 0.6 + Math.sin(t * 1.3) * 0.15; pool.material.opacity = 0.45 + Math.sin(t * 1.3) * 0.1 + boost * 0.3;
+      for (let i = 0; i < ON; i++) { const [a0, r, h, s] = oseed[i], a = a0 + t * s; op[i * 3] = Math.cos(a) * r; op[i * 3 + 1] = spin.position.y + h + Math.sin(t * 1.7 + a0) * 0.15; op[i * 3 + 2] = Math.sin(a) * r; }
+      og.attributes.position.needsUpdate = true; orbit.material.opacity = 0.55 + Math.sin(t * 3) * 0.2;
+      for (const s of SPK) { if (!s.visible) continue; const u = s.userData; u.life -= dt; if (u.life <= 0) { s.visible = false; continue; } u.v.y -= 2.4 * dt; u.v.multiplyScalar(1 - dt * 0.9); s.position.addScaledVector(u.v, dt); const f = u.life / u.max; s.material.opacity = Math.min(1, f * 1.6) * (0.7 + 0.3 * Math.sin(t * 30 + u.sz * 50)); s.scale.setScalar(u.sz * (0.6 + f)); }
+    });
+    const sign = textSprite('🌠 소원의 별 · 다가가서 소원빌기', { size: 26, bg: 'rgba(30,20,60,.85)', color: '#ffe9a8', border: '#ffd34a', maxW: 600 }); sign.position.set(x, BASE + 3.1, z); add(sign);
+    anim.push((t) => { sign.position.y = spin.position.y + 3.1; });
+    inter.push({ id: 'wishstar', kind: 'wish', x, z, r: 4.2, label: '소원의 별', verb: '소원빌기', noSpread: true });
+    clickables.push({ id: 'wishstar', group: spin });
+    // 별똥별이 떨어지는 동안 별이 더 밝게 빛나고 반짝이를 뿌린다
+    wishStar = { x, z, y: () => spin.position.y, boost: (sec) => { boostUntil = boostT + sec; } };
+  }
+  return { interactives: inter, rides, clickables, wishStar, update: (t) => anim.forEach((f) => f(t)) };
 }
 
 export function buildLobby(scene, opts = {}) {
@@ -1081,7 +1137,7 @@ export function buildLobby(scene, opts = {}) {
       e.spin.forEach((s) => (s.rotation.z = Math.sin(t * 1.2 + i) * 0.15));
     });
   };
-  return { root, colliders, walls: [], objects: {}, flickers: [], ceiling: [], update, bounds: 28.5 * LS, outdoor: true, themes, exhibits, hiddenGate: !!opts.hidden, setChamp: (c) => champSign.set(c), snapBoard, shopFace: extra.shopFace, clickables: extra.clickables, interactives: [...park.interactives, ...outer.interactives, ...extra.interactives, ...deco.interactives], rides: { ...park.rides, ...extra.rides, ...deco.rides } };
+  return { root, colliders, walls: [], objects: {}, flickers: [], ceiling: [], update, bounds: 28.5 * LS, outdoor: true, themes, exhibits, hiddenGate: !!opts.hidden, setChamp: (c) => champSign.set(c), snapBoard, shopFace: extra.shopFace, clickables: [...extra.clickables, ...deco.clickables], wishStar: deco.wishStar, interactives: [...park.interactives, ...outer.interactives, ...extra.interactives, ...deco.interactives], rides: { ...park.rides, ...extra.rides, ...deco.rides } };
 }
 
 // ───── 로비 쉼터: 불멍 캠프파이어 + 통나무 벤치 · 타면 움직이는 그네 · 코인 상점
@@ -1131,9 +1187,12 @@ function buildLobbyExtras(root, colliders, add) {
       const top = mesh(new THREE.BoxGeometry(0.3, 0.04, 1.6), pm('#7a4a28'), 0, 0.47, 0, lg); top.castShadow = false;
       colliders.push({ x: lx, z: lz, hw: 0.55, hd: 0.55 });
       const face = Math.atan2(cx - lx, cz - lz); // 불 쪽을 바라보기
+      // 로비를 넓히면(spreadLobby) 통나무 가운데만 LS 배로 옮겨지고 통나무 크기는 그대로다.
+      // 그래서 자리는 넓힌 뒤의 통나무 가운데에서 통나무 길이 방향으로 ±0.45m 에 직접 놓는다 (같이 넓히면 두 자리가 통나무 양 끝으로 벌어진다)
+      const fx = lx * LS, fz = lz * LS;
       for (const s of [-1, 1]) {
         const ox = -Math.sin(a) * 0.45 * s, oz = Math.cos(a) * 0.45 * s; // 통나무 길이 방향
-        interactives.push({ id: `log${k}${s > 0 ? 'b' : 'a'}`, kind: 'sit', x: lx + ox, z: lz + oz, r: 1.1, label: '통나무 벤치', verb: '앉아서 불멍', seat: { x: lx + ox, z: lz + oz, y: 0.43, ry: face } });
+        interactives.push({ id: `log${k}${s > 0 ? 'b' : 'a'}`, kind: 'sit', x: fx + ox, z: fz + oz, r: 1.1, label: '통나무 벤치', verb: '앉아서 불멍', noSpread: true, seat: { x: fx + ox, z: fz + oz, y: 0.43, ry: face } });
       }
     }
   }

@@ -260,6 +260,7 @@ function carriage() {
   const sparks = []; for (let i = 0; i < 10; i++) { const sp = glowSprite('#ffe9a8', 0.1, 0.9); g.add(sp); sparks.push(sp); }
   g.userData.seat = 0.72;
   g.userData.anim = (t, moving) => {
+    g.position.y = 0; // 점프 높이가 매 프레임 쌓이지 않게 바닥으로 되돌린다
     wheels.forEach((w) => (w.rotation.x = moving ? -t * 6 : w.rotation.x));
     box.position.y = 0.75 + (moving ? Math.abs(Math.sin(t * 10)) * 0.03 : 0); box.rotation.z = Math.sin(t * 1.2) * 0.02;
     crown.rotation.y = t * 0.8; glow.material.opacity = 0.3 + Math.sin(t * 2.5) * 0.12;
@@ -566,13 +567,16 @@ export function animateGear(g, t, dt, moving) {
   u.gCostume?.anim(t);
   u.gGold?.anim(t, moving);
   if (u.gMount) {
+    // 점프: animateAvatar 가 먼저 올려 둔 몸 높이를 기억해 두었다가 탈것과 함께 폴짝 띄운다
+    const jy = u.expr === 'jump' ? Math.max(0, u.rig.position.y) : 0;
     u.gMount.userData.anim(t, moving);
     const seat = u.gMount.userData.seat + (u.gMount.userData.float ? u.gMount.position.y : u.gMount.position.y * 0.6);
-    u.rig.position.y = seat + Math.sin(t * 2) * 0.005;
+    u.gMount.position.y += jy;
+    u.rig.position.y = seat + jy + Math.sin(t * 2) * 0.005;
     u.rig.rotation.x = 0;
     if (u.legs) { u.legs[0].rotation.set(-1.25, 0, -0.45); u.legs[1].rotation.set(-1.25, 0, 0.45); }
-    // 운전 자세: 두 팔을 앞으로 뻗어 핸들(고삐·빗자루 자루)을 잡는다 — 걸을 때처럼 흔들지 않는다
-    if (u.arms) { const sway = Math.sin(t * 1.8) * 0.04; u.arms[0].rotation.set(-1.15 + sway, 0, 0.32); u.arms[1].rotation.set(-1.15 - sway, 0, -0.32); }
+    // 운전 자세: 두 팔을 앞으로 뻗어 핸들(고삐·빗자루 자루)을 잡는다 — 걸을 때처럼 흔들지 않는다. 점프 중에는 만세 (점프 동작이 든 팔 그대로)
+    if (u.arms && !jy) { const sway = Math.sin(t * 1.8) * 0.04; u.arms[0].rotation.set(-1.15 + sway, 0, 0.32); u.arms[1].rotation.set(-1.15 - sway, 0, -0.32); }
   }
   if (u.gSword) {
     u.gSword.userData.anim(t);

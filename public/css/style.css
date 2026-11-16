@@ -851,3 +851,25 @@ body.mobile #login.tiny .logo, body.mobile #login.tiny .pv-wrap, body.mobile #lo
 .gal-big { display: block; width: 100%; max-height: 55vh; object-fit: contain; border-radius: 10px; background: #000; }
 .gal-row { justify-content: center; gap: 8px; margin-top: 8px; }
 .gal-empty { white-space: pre-line; text-align: center; padding: 24px 8px; }
+
+/* 🌠 소원의 별 팝업 · 별똥별 */
+.wish { display: flex; flex-direction: column; gap: 8px; }
+.wish-lab { font-weight: 800; font-size: 15px; margin-top: 4px; }
+.wish-stars { display: flex; justify-content: center; gap: 6px; }
+.wish-star { font-size: 40px; line-height: 1; width: 52px; height: 52px; border: 0; border-radius: 12px; background: rgba(255,255,255,.06); color: rgba(255,255,255,.25); cursor: pointer; transition: transform .12s, color .12s, text-shadow .12s; }
+.wish-star:hover { transform: scale(1.12); }
+.wish-star.on { color: #ffd34a; text-shadow: 0 0 14px rgba(255,200,60,.75); }
+.wish-word { text-align: center; font-size: 13px; opacity: .85; min-height: 18px; }
+.wish-text { width: 100%; box-sizing: border-box; resize: vertical; border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 15px; background: rgba(0,0,0,.35); color: #fff; border: 1px solid rgba(255,211,106,.35); }
+.wish-text:focus { outline: none; border-color: #ffd34a; box-shadow: 0 0 0 3px rgba(255,211,74,.18); }
+.wish-count { text-align: right; font-size: 12px; margin-top: -4px; }
+.wish-send { font-size: 16px; padding: 10px; }
+.wish-send:disabled { opacity: .45; cursor: not-allowed; }
+.wish-note { font-size: 12px; opacity: .7; text-align: center; }
+.wish-done { align-items: center; text-align: center; padding: 4px 0; }
+.wish-done-icon { font-size: 54px; filter: drop-shadow(0 0 16px rgba(255,210,90,.7)); animation: wishFloat 2.4s ease-in-out infinite; }
+.wish-done-msg { white-space: pre-line; line-height: 1.7; font-size: 15px; margin-bottom: 6px; }
+.wish-coffee { width: 100%; font-size: 16px; padding: 11px; }
+.wish-close { width: 100%; }
+@keyframes wishFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+.meteor-cv { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 8; } /* 게임 화면 위 · 버튼(HUD) 아래 */
