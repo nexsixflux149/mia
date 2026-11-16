@@ -371,6 +371,7 @@ function enterLobby(pos) {
   flushClearPhotos();
   S.room = 'lobby'; S.chapter = null; S.dark = false; S.objState = {}; S.mount = null; S.perch = null; me.y = 0;
   setThemeComms(false);
+  audio.classicEffects = false;
   cam.dist = CAM_START; // 살짝 줌인된 상태로 시작
   me.x = pos.x; me.z = pos.z;
   removeGhost(); clearOthers(); clearPings();
@@ -392,6 +393,7 @@ function enterChapter(state, showIntro = true) {
   const ch = state.chapter;
   S.chapter = ch; S.room = 'game'; S.mount = null; S.perch = null; me.y = 0; closeThemePop(); noticeBox.classList.add('hidden');
   setThemeComms(true);
+  audio.classicEffects = true;
   cam.dist = CAM_START; // 살짝 줌인된 상태로 시작
   if (S.snack) { const u = myAvatar?.userData; if (u?.gSnack) { u.gSnack.parent?.remove(u.gSnack); u.gSnack = null; u.gSnackCode = ''; } S.snack = ''; updateGearButtons(); } // 팝콘·커피·풍선은 테마에 가져가지 않는다
   S.world = buildChapter(scene, ch, S.scenario?.id);
@@ -1202,6 +1204,7 @@ socket.on('inv', (inv) => { const before = S.inv.length; S.inv = inv; if (!inv.i
 socket.on('chat:blocked', (b) => { addChat({ channel: 'system', text: b.text }); toast(b.text); if (b.muted) { S.chatMutedUntil = Date.now() + b.left * 1000; } });
 socket.on('game:start', async (st) => {
   setThemeComms(true);
+  audio.classicEffects = true;
   if (cinema.active) cinema.skip(); // 미리보기 영상을 보던 중이면 끝내고 게임으로
   closePhotoPop();
   closeModal(); S.fear = st.fear ?? 2;

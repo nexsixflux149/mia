@@ -76,7 +76,7 @@ function parseAbc(abc, key) {
 }
 
 export class AudioFX {
-  constructor() { this.ctx = null; this.amb = null; this.mode = null; }
+  constructor() { this.ctx = null; this.amb = null; this.mode = null; this.classicEffects = false; }
   init() {
     if (this.ctx) { this.ctx.resume(); return; }
     this.ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -186,7 +186,7 @@ export class AudioFX {
     }
     this.amb = { g, nodes };
     // 테마 안: 실제 녹음한 어두운 드론을 합성 드론 밑에 은은하게 깐다 (36초 이음새 없는 반복). 아직 못 받았으면 받는 대로 붙인다
-    if (mode !== 'lobby') {
+    if (mode !== 'lobby' && !this.classicEffects) {
       const amb = this.amb;
       const bed = () => { if (this.amb !== amb || !this.buf?.amb_dark) return; const s = c.createBufferSource(); s.buffer = this.buf.amb_dark; s.loop = true; const bg = c.createGain(); bg.gain.value = 0; bg.gain.linearRampToValueAtTime(0.3, this.t + 4); s.connect(bg).connect(g); s.start(this.t, Math.random() * 30); nodes.push(s); };
       if (this.buf?.amb_dark) bed(); else this.loadSamples().then(bed);
@@ -413,8 +413,8 @@ export class AudioFX {
 
   play(name) {
     if (!this.ctx) return;
-    if (name === 'door' || name === 'creak') return; // 문 여닫는 소리는 게임에 거슬려서 끈다 (녹음 · 합성음 모두)
-    if (this.buf && this.playSample(name)) return;
+    if (!this.classicEffects && (name === 'door' || name === 'creak')) return;
+    if (this.buf && (!this.classicEffects || name === 'thunder') && this.playSample(name)) return;
     switch (name) {
       // 🌠 소원의 별: 반짝이는 글로켄 아르페지오 + 부드럽게 부푸는 화음 / 별똥별마다 작은 반짝
       case 'wish_start': [1046.5, 1318.5, 1568, 2093, 2637, 3136].forEach((f, i) => this.tone(f, 1.6, { type: 'sine', gain: 0.05, at: i * 0.09, attack: 0.005, release: 1.5 })); [523.3, 659.3, 784, 987.8].forEach((f) => this.tone(f, 9.5, { type: 'sine', gain: 0.022, attack: 2.2, release: 3.5, detune: (Math.random() - 0.5) * 12 })); break;
@@ -472,8 +472,14 @@ export class AudioFX {
       case 'morse_long': this.tone(700, 0.36, { type: 'sine', gain: 0.12 }); break;
       case 'growl': this.tone(70, 1.1, { type: 'sawtooth', gain: 0.35, slide: 45 }); this.noise(1.0, { freq: 220, q: 1.5, gain: 0.4 }); this.tone(140, 0.9, { type: 'square', gain: 0.08, slide: 90, detune: 30 }); break;
       case 'glitch': for (let i = 0; i < 10; i++) this.noise(0.05, { freq: 300 + Math.random() * 6000, q: 4, gain: 0.35, at: i * 0.07 }); this.tone(60, 0.8, { type: 'square', gain: 0.15 }); break;
-      case 'scream_wet': this.play('sting'); break; // (비명 소리는 뺐다 → 낮은 효과음만)
-      case 'scream_child': this.play('sting'); break; // (비명 소리는 뺐다 → 낮은 효과음만)
+      case 'scream_wet': {
+        if (!this.classicEffects) { this.play('sting'); break; }
+        this.noise(1.2, { freq: 1200, q: 1.2, gain: 0.45 }); [480, 720].forEach((f) => this.tone(f, 1.1, { type: 'sawtooth', gain: 0.1, slide: f * 0.4 })); this.noise(0.8, { freq: 300, type: 'lowpass', gain: 0.3, at: 0.2 }); break;
+      }
+      case 'scream_child': {
+        if (!this.classicEffects) { this.play('sting'); break; }
+        [1300, 1650, 2100].forEach((f, i) => this.tone(f, 0.9, { type: 'triangle', gain: 0.1, slide: f * 1.3, at: i * 0.05 })); this.noise(0.9, { freq: 3000, q: 2, gain: 0.35 }); break;
+      }
       case 'glass': for (let i = 0; i < 14; i++) this.tone(2500 + Math.random() * 3500, 0.25, { type: 'triangle', gain: 0.05, at: i * 0.025 }); this.noise(0.4, { freq: 6000, q: 0.7, gain: 0.35 }); break;
       case 'bang': [0, 0.18, 0.32, 0.43].forEach((a) => this.noise(0.12, { freq: 150, type: 'lowpass', gain: 0.9, at: a })); break;
       case 'sting_low': this.tone(55, 1.8, { type: 'sawtooth', gain: 0.18, slide: 50 }); this.tone(58.3, 1.8, { type: 'sawtooth', gain: 0.15 }); break;
@@ -502,7 +508,13 @@ export class AudioFX {
       case 'power': this.tone(60, 1.5, { type: 'sawtooth', gain: 0.08, slide: 120 }); this.noise(0.2, { freq: 4000, gain: 0.1 }); break;
       case 'water': this.noise(3, { freq: 500, q: 0.6, gain: 0.25, attack: 0.5, release: 1.5 }); break;
       case 'talisman': this.noise(0.8, { freq: 3000, q: 0.5, gain: 0.2, release: 0.6 }); this.tone(1400, 0.8, { gain: 0.08, slide: 300 }); break;
-      case 'scream': this.play('sting'); break; // (여자 비명 소리는 뺐다 → 낮은 효과음만)
+      case 'scream': {
+        if (!this.classicEffects) { this.play('sting'); break; }
+        this.noise(1.3, { freq: 2200, q: 2, gain: 0.55, attack: 0.01, release: 0.8 });
+        [740, 1110, 1480].forEach((f, i) => this.tone(f, 1.2, { type: 'sawtooth', gain: 0.13, slide: f * 0.6, detune: i * 23 }));
+        this.tone(55, 0.6, { type: 'square', gain: 0.4, slide: 30 });
+        break;
+      }
       case 'sting': this.tone(98, 1.5, { type: 'sawtooth', gain: 0.18, slide: 92 }); this.tone(104, 1.5, { type: 'sawtooth', gain: 0.18, slide: 97 }); this.noise(0.5, { freq: 6000, q: 3, gain: 0.2 }); break;
       case 'story': this.tone(110, 3, { type: 'sine', gain: 0.15, attack: 0.5, release: 2 }); this.tone(116.5, 3, { type: 'sine', gain: 0.1, attack: 0.5, release: 2 }); break;
     }
