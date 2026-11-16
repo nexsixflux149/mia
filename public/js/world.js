@@ -30,6 +30,25 @@ function groundTex(color, noise = 0.12) {
   for (let i = 0; i < 2500; i++) { x.fillStyle = `rgba(${Math.random() > 0.5 ? '255,255,255' : '0,0,0'},${Math.random() * noise})`; x.fillRect(Math.random() * 256, Math.random() * 256, 2 + Math.random() * 4, 2 + Math.random() * 4); }
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t;
 }
+/** 로비 바닥 재질 고르기. style: '' 지금(돌길) · '1' 단색 · '2' 큰 타일 · '3' 동심원 광장 · '4' 가운데가 밝은 번짐 */
+function lobbyFloor(style) {
+  const tex = (size, draw, rep = 1) => { const c = document.createElement('canvas'); c.width = c.height = size; draw(c.getContext('2d'), size); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; if (rep > 1) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep, rep); } return t; };
+  const simple = { ground: { color: '#34422f' }, path: { color: '#bfb193' } }; // 단순한 바닥들은 풀밭 · 산책로도 무늬 없이
+  switch (String(style || '')) {
+    case '1': return { ...simple, plaza: { color: '#5e5967' } };
+    case '2': return { ...simple, plaza: { map: tex(256, (x, n) => { x.fillStyle = '#625c6a'; x.fillRect(0, 0, n, n); x.strokeStyle = 'rgba(20,16,26,.5)'; x.lineWidth = 7; x.strokeRect(0, 0, n, n); x.strokeStyle = 'rgba(255,255,255,.05)'; x.lineWidth = 2; x.strokeRect(6, 6, n - 12, n - 12); }, 20) } };
+    case '3': return { ...simple, plaza: { map: tex(1024, (x, n) => {
+      const R = n / 2, N = 8;
+      for (let i = N; i >= 1; i--) { x.fillStyle = i % 2 ? '#665f6f' : '#575160'; x.beginPath(); x.arc(R, R, (i / N) * R, 0, Math.PI * 2); x.fill(); }
+      x.strokeStyle = 'rgba(18,14,24,.45)'; x.lineWidth = 3; for (let i = 1; i <= N; i++) { x.beginPath(); x.arc(R, R, (i / N) * R - 1.5, 0, Math.PI * 2); x.stroke(); }
+    }) } };
+    case '4': return { ...simple, plaza: { map: tex(512, (x, n) => {
+      const R = n / 2, g = x.createRadialGradient(R, R, R * 0.12, R, R, R); g.addColorStop(0, '#7d7587'); g.addColorStop(0.55, '#645d6d'); g.addColorStop(1, '#4a4553');
+      x.fillStyle = g; x.fillRect(0, 0, n, n); x.strokeStyle = 'rgba(255,255,255,.10)'; x.lineWidth = 4; x.beginPath(); x.arc(R, R, R * 0.965, 0, Math.PI * 2); x.stroke();
+    }) } };
+    default: return { ground: { map: (() => { const t = groundTex('#3a4a32', 0.12); t.repeat.set(18, 18); return t; })() }, plaza: { map: cobbleTex(), roughness: 0.95 }, path: null }; // 지금 바닥: 돌길 광장
+  }
+}
 function floorTex(color) {
   const c = document.createElement('canvas'); c.width = c.height = 256;
   const x = c.getContext('2d');
@@ -361,7 +380,7 @@ function buildExhibit(root, colliders, th) {
 
 // ───────────────── 놀이공원 (로비) — 회전목마 · 관람차 · 벤치 · 피크닉 테이블
 // 놀이기구는 실제 시계(Date.now)로 돌려서 모든 접속자 화면에서 같은 위치에 보인다
-const PARK = { carousel: { x: -10.5, z: 9.5 }, wheel: { x: 11, z: 10.5 } };
+const PARK = { carousel: { x: -10.5, z: 9.5 }, wheel: { x: -2.3, z: -18.9 } }; // 관람차는 광장 북쪽, 츠바키야 · 삐에로 관문 사이 뒤에 선다 (관문 너머 하늘에 보인다)
 const parkNow = () => Date.now() / 1000;
 function stripeTex(a, b, n = 12) {
   const c = document.createElement('canvas'); c.width = 256; c.height = 32; const x = c.getContext('2d');
@@ -430,7 +449,7 @@ function buildPark(root, colliders, add) {
     const cpos = (i) => { const th = ang() + (i / N) * Math.PI * 2; return { x: Math.cos(th) * RAD, y: AX + Math.sin(th) * RAD - 0.4 }; };
     anim.push(() => { wheel.rotation.z = ang(); cabins.forEach((c, i) => { const p = cpos(i); c.position.set(p.x, p.y, 0); }); });
     rides.wheel = { center: PARK.wheel, seats: N, pick: (busy) => { let best = -1, by = 1e9; for (let i = 0; i < N; i++) { if (busy.has(i)) continue; const y = cpos(i).y; if (y < by) { by = y; best = i; } } return best; },
-      pos: (i) => { const p = cpos(i); return { x: cx + p.x, z: cz, y: p.y - 0.62, ry: Math.PI }; } };
+      pos: (i) => { const p = cpos(i); return { x: cx + p.x, z: cz, y: p.y - 0.62, ry: cz < 0 ? 0 : Math.PI }; } }; // 탄 사람은 광장 쪽을 본다
     interactives.push({ id: 'wheel', kind: 'ride', x: cx, z: cz + 1.8, r: 5.5, label: '관람차', verb: '타기' }); // 관람차가 커서 옆에서도 탈 수 있게 넓게
     const sign = textSprite('🎡 관람차', { size: 30, bg: 'rgba(40,10,40,.75)', color: '#ffd0f0' }); sign.position.set(cx, 1.6, cz + 1.7); root.add(sign);
   }
@@ -952,15 +971,19 @@ export function buildLobby(scene, opts = {}) {
   const sun = new THREE.DirectionalLight('#d0a8b4', 1.45); sun.position.set(-30, 42, -60); // 붉은 달빛
   root.add(sun);
 
-  const gt = groundTex('#3a4a32', 0.12); gt.repeat.set(18, 18);
-  const ground = new THREE.Mesh(new THREE.CircleGeometry(46, 72), new THREE.MeshStandardMaterial({ map: gt, roughness: 1 }));
+  const FL = lobbyFloor(opts.floor); // 바닥 모양 (기본은 지금의 돌길 · 주소 끝 ?floor=1~4 로 단순한 바닥 미리보기)
+  const ground = new THREE.Mesh(new THREE.CircleGeometry(46, 72), new THREE.MeshStandardMaterial({ roughness: 1, ...FL.ground }));
   ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; ground.userData.spreadScale = true; root.add(ground);
-  const plaza = new THREE.Mesh(new THREE.CircleGeometry(16.5, 56), new THREE.MeshStandardMaterial({ map: cobbleTex(), roughness: 0.95 })); // 돌길 광장
+  const plaza = new THREE.Mesh(new THREE.CircleGeometry(16.5, 56), new THREE.MeshStandardMaterial({ roughness: 1, ...FL.plaza }));
   plaza.rotation.x = -Math.PI / 2; plaza.position.y = 0.01; plaza.receiveShadow = true; plaza.userData.spreadScale = true; root.add(plaza);
 
   const add = (p) => { const g = place(root, p); const f = footOf(p, g); if (f) colliders.push(f); return g; };
-  for (let i = 0; i < 18; i++) { const a = (i / 18) * Math.PI * 2 + 0.09; add({ t: i % 3 ? 'pine' : 'tree', x: Math.cos(a) * 19.5, z: Math.sin(a) * 19.5, color: ['#c9a8ff', '#ffb7c9', '#9ad0ff'][i % 3] }); }
-  const outer = buildOuterPark(root, colliders, add);
+  for (let i = 0; i < 18; i++) {
+    const a = (i / 18) * Math.PI * 2 + 0.09, tx = Math.cos(a) * 19.5, tz = Math.sin(a) * 19.5;
+    if (Math.hypot(tx - PARK.wheel.x, tz - PARK.wheel.z) < 3.4) continue; // 관람차 자리의 나무는 심지 않는다
+    add({ t: i % 3 ? 'pine' : 'tree', x: tx, z: tz, color: ['#c9a8ff', '#ffb7c9', '#9ad0ff'][i % 3] });
+  }
+  const outer = buildOuterPark(root, colliders, add, FL.path);
   buildLobbyHorror(root, colliders);
   add({ t: 'bench', x: -6, z: 7, r: 30 }); add({ t: 'bench', x: 6, z: 7, r: -30 });
   for (const s of [-1, 1]) { add({ t: 'lamp', x: 13 * s, z: 4.5, noLight: true }); add({ t: 'lamp', x: 6.5 * s, z: 16, noLight: true }); }
@@ -1426,14 +1449,14 @@ function ringColliders(r) {
 }
 
 // ───────────────── 넓어진 바깥 공원: 산책로 · 연못과 분수 · 꽃밭 · 먹자골목 · 야외 무대 · 바깥 숲
-function buildOuterPark(root, colliders, add) {
+function buildOuterPark(root, colliders, add, pathMat = null) {
   const anim = []; const inter = [];
   // 둘레 산책로 (반지름 27)
-  const ring = new THREE.Mesh(new THREE.RingGeometry(24.6, 27, 96), new THREE.MeshStandardMaterial({ map: (() => { const t = groundTex('#d8c8a8', 0.12); t.repeat.set(30, 2); return t; })(), roughness: 1 }));
+  const ring = new THREE.Mesh(new THREE.RingGeometry(24.6, 27, 96), new THREE.MeshStandardMaterial(pathMat ? { ...pathMat, roughness: 1 } : { map: (() => { const t = groundTex('#d8c8a8', 0.12); t.repeat.set(30, 2); return t; })(), roughness: 1 }));
   ring.rotation.x = -Math.PI / 2; ring.position.y = 0.012; ring.receiveShadow = true; ring.userData.spreadScale = true; root.add(ring);
   // 광장에서 산책로로 이어지는 네 갈래 길
   for (const a of [Math.PI / 4, (3 * Math.PI) / 4, (5 * Math.PI) / 4, (7 * Math.PI) / 4]) {
-    const p = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 10), new THREE.MeshStandardMaterial({ color: '#cdbf9f', roughness: 1 }));
+    const p = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 10), new THREE.MeshStandardMaterial({ color: pathMat?.color || '#cdbf9f', roughness: 1 }));
     p.rotation.x = -Math.PI / 2; p.rotation.z = -a + Math.PI / 2; p.position.set(Math.cos(a) * 21, 0.011, Math.sin(a) * 21); p.scale.y = LS; root.add(p);
   }
   // 북쪽: 연못 + 분수

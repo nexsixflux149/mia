@@ -86,6 +86,7 @@ const S = {
   mouse: { x: 0, y: 0 }, danger: 0, ghosts: new Map(),
   fear: 2, em: '', emT: 0, eid: 0, labels: [], hearts: 0, flyHearts: [],
   profile: null, shop: {}, riding: false, holdSword: false, holdStaff: false, champ: null, hiddenOk: false, vlv: new Map(), vrings: [],
+  floor: new URLSearchParams(location.search).get('floor') || '', // 로비 바닥 미리보기: 주소 끝 ?floor=1~4 (없으면 지금 바닥)
 };
 const SET = Object.assign({ volume: 0.8, voice: 1, sens: 1, quality: (matchMedia('(pointer: coarse)').matches || innerWidth < 760) ? 'medium' : 'high', brightness: 1, minimap: true, gfx: true }, store.get('gwimun-settings', {}));
 if (SET.quality === 'low') SET.quality = 'medium'; // '낮음'은 없어졌다 → 보통
@@ -364,7 +365,7 @@ function enterLobby(pos) {
   resetInput();
   restoreFaded(); graphics.leave(); // 반투명해진 물체를 먼저 정리하고, 바꿔 둔 재질을 원래대로 돌린 뒤 세계를 지운다
   disposeWorld(scene, S.world);
-  S.world = buildLobby(scene, { hidden: !!(S.hiddenOk || S.admin), champ: S.champ });
+  S.world = buildLobby(scene, { hidden: !!(S.hiddenOk || S.admin), champ: S.champ, floor: S.floor });
   socket.emit('snap:list', (l) => { if (Array.isArray(l)) S.snaps = l; showSnaps(); });
   S.room = 'lobby'; S.chapter = null; S.dark = false; S.objState = {}; S.mount = null; S.perch = null; me.y = 0;
   cam.dist = CAM_START; // 살짝 줌인된 상태로 시작
@@ -1008,11 +1009,11 @@ function updateOthers(dt, t) {
     if (myAvatar && S.light && lvl > 0.5) setLight(myAvatar, Math.random() > 0.25);
     e.soundT -= dt;
     if (gs.v && d < 13 && e.soundT < 0) {
-      const sounds = { zombie: ['zombie', 1.7], janitor: ['stomp', 0.55], elder: ['pipe', 2.2], woman: ['whisper', 2.4], mudang: ['crawl', 0.45], child: ['giggle', 3], sailor: ['water_step', 0.6], doll: ['porcelain', 0.4], father: ['snip', 1.1], dalgyal: ['hum', 2.6], slender: ['static_hiss', 1.8], nurse: ['cart', 0.9], headless: ['drag', 0.8], shadow: ['whisper', 3] };
+      const sounds = { zombie: ['zombie', 1.7], janitor: ['stomp', 0.55], elder: ['pipe', 2.2], woman: ['whisper', 2.4], mudang: ['crawl', 0.45], child: ['giggle', 3], sailor: ['water_step', 0.6], doll: ['clock_tick', 0.4], father: ['snip', 1.1], dalgyal: ['hum', 2.6], slender: ['static_hiss', 1.8], nurse: ['cart', 0.9], headless: ['drag', 0.8], shadow: ['whisper', 3] };
       const [snd, gap] = sounds[gs.type] || ['whisper', 2];
       e.soundT = gap * (gs.mode === 'hunt' ? 1 : 1.8) * (0.6 + d / 13);
       if (Math.random() < 1 - d / 15) audio.play(snd);
-      if (gs.type === 'mudang' && Math.random() < 0.2) audio.play('jingle');
+      // (귀신 가까이에서 나던 종소리 — 무당 방울 · 인형의 '띵' — 는 뺐다)
     }
   }
 }
@@ -1176,7 +1177,7 @@ function randomHorror(dt) {
   let r = Math.random();
   if (S.fear === 1 && r >= 0.3 && r < 0.82) r = 0.9; // 순한맛: 귀신 등장 없이 소리만
   if (S.fear === 2 && r >= 0.72 && r < 0.8) r = 0.9; // 보통: 갑툭튀 없음
-  if (r < 0.3 && S.world.ceiling.length && !S.dark) { S.world.ceiling.forEach((c) => (c.light.intensity = 0)); audio.play('knock'); setTimeout(() => applyDark(), 1200 + Math.random() * 1500); }
+  if (r < 0.3 && S.world.ceiling.length && !S.dark) { S.world.ceiling.forEach((c) => (c.light.intensity = 0)); setTimeout(() => applyDark(), 1200 + Math.random() * 1500); }
   else if (r < 0.55) { const g = createGhost('woman'); g.position.set(me.x - Math.sin(me.ry) * 3.5, 0, me.z - Math.cos(me.ry) * 3.5); g.lookAt(me.x, 0, me.z); scene.add(g); audio.play('breath'); setTimeout(() => scene.remove(g), 900); }
   else if (r < 0.72) {
     // 아이 귀신이 옆을 스쳐 달려간다
@@ -3193,4 +3194,4 @@ applyMobile(); addEventListener('resize', applyMobile);
   });
   $('#inventory').addEventListener('click', (e) => { const s = e.target.closest('.slot'); if (s?.dataset.lp) { e.stopImmediatePropagation(); e.preventDefault(); delete s.dataset.lp; } }, true);
 }
-if (window.__dbg) Object.assign(window.__dbg, { eatSnack, fx, GPU_INFO, openGallery, takeSnap, graphics, gfx, PERF, applyGfx, restoreFaded, SET, S, me, cam, openShop, openBag, toggleRide, swingSword, doEmote, interact, lobbyAct, scene, camera, cinema, openRank, openFeedback, openStamps, openClearPhoto, rememberClear, showEndExtras, playHiddenPreview, openJournal });
+if (window.__dbg) Object.assign(window.__dbg, { setFloor: (f) => { S.floor = String(f || ''); enterLobby({ x: me.x, z: me.z }); }, eatSnack, fx, GPU_INFO, openGallery, takeSnap, graphics, gfx, PERF, applyGfx, restoreFaded, SET, S, me, cam, openShop, openBag, toggleRide, swingSword, doEmote, interact, lobbyAct, scene, camera, cinema, openRank, openFeedback, openStamps, openClearPhoto, rememberClear, showEndExtras, playHiddenPreview, openJournal });

@@ -289,7 +289,7 @@ export class Cinema {
   dollShots(kind, looks) {
     const A = () => this.audio;
     this.buildMansion(looks);
-    const flash = (c, t) => { const on = (t % 3.3 < 0.12) || (t % 3.3 > 0.25 && t % 3.3 < 0.32); c.lightning.intensity = on ? 6 : 0; if (on && !c._lt) { c._lt = 1; A()?.play('knock'); } if (!on) c._lt = 0; };
+    const flash = (c, t) => { const on = (t % 3.3 < 0.12) || (t % 3.3 > 0.25 && t % 3.3 < 0.32); c.lightning.intensity = on ? 6 : 0; if (on && !c._lt) { c._lt = 1; A()?.play('thunder'); } if (!on) c._lt = 0; };
     const rain = (c, dt) => { const a = c.mRain.geometry.attributes.position; for (let i = 0; i < a.count; i++) { let y = a.getY(i) - dt * 16; if (y < 0) y = 20; a.setY(i, y); } a.needsUpdate = true; };
     const storm = (c) => { c.scene.background = new THREE.Color('#06070c'); c.scene.fog = new THREE.FogExp2('#06070c', 0.025); };
     if (kind === 'doll_intro') {

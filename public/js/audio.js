@@ -92,7 +92,8 @@ export class AudioFX {
     if (this.samplesReady) return this.samplesReady;
     this.buf = {};
     // 속삭임(영어 말소리) · 으르렁(사람 말소리처럼 들림) · 좀비(트림 소리) 녹음은 거슬려서 뺐다 → 예전 합성음
-    const names = ['scream', 'scream_child', 'scream_wet', 'giggle', 'knock', 'bang', 'sting_low', 'static_hiss', 'chain', 'drip', 'amb_dark'];
+    // 비명(여자 · 아이 · 젖은 비명) · 문 두드림 · 물방울 '뽀옥' 녹음도 뺐다 (아래 play 에서도 소리를 내지 않는다)
+    const names = ['giggle', 'bang', 'sting_low', 'static_hiss', 'chain', 'amb_dark'];
     this.samplesReady = Promise.all(names.map((n) => fetch(`/sfx/${n}.mp3`).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject())).then((ab) => this.ctx.decodeAudioData(ab)).then((b) => { this.buf[n] = b; }).catch(() => {})));
     return this.samplesReady;
   }
@@ -156,18 +157,18 @@ export class AudioFX {
       const EV = {
         gwimun: ['gong', 'gayageum', 'gayageum', 'whisper', 'creak', 'janggu', 'wind', 'giggle'],
         rain: ['thunder', 'gayageum', 'whisper', 'creak', 'wind', 'gong'],
-        ship: ['foghorn', 'hull', 'hull', 'wave', 'shipbell', 'chain', 'whisper', 'drip'],
+        ship: ['foghorn', 'hull', 'hull', 'wave', 'shipbell', 'chain', 'whisper'],
         doll: ['musicbox_far', 'clock_tick', 'porcelain', 'giggle', 'creak', 'whisper', 'musicbox_far', 'cuckoo'],
-        horror: ['creak', 'whisper', 'knock', 'giggle', 'wind'],
-        hospital: ['hum', 'cart', 'drip', 'whisper', 'knock', 'breath', 'creak', 'cart'],
-        camp: ['wind', 'giggle', 'crawl', 'whisper', 'wave', 'creak', 'giggle', 'drip'],
-        west: ['wind', 'wind', 'creak', 'bell', 'whisper', 'knock', 'chain'],
-        kimono: ['gayageum', 'gong', 'whisper', 'wind', 'giggle', 'creak', 'drip'],
-        mia: ['whisper', 'giggle', 'creak', 'wind', 'knock', 'giggle', 'drip', 'whisper'],
-        zombie: ['zombie', 'wind', 'glass', 'zombie', 'bang', 'drip', 'zombie', 'creak'],
+        horror: ['creak', 'whisper', 'giggle', 'wind'],
+        hospital: ['hum', 'cart', 'whisper', 'breath', 'creak', 'cart'],
+        camp: ['wind', 'giggle', 'crawl', 'whisper', 'wave', 'creak', 'giggle'],
+        west: ['wind', 'wind', 'creak', 'bell', 'whisper', 'chain'],
+        kimono: ['gayageum', 'gong', 'whisper', 'wind', 'giggle', 'creak'],
+        mia: ['whisper', 'giggle', 'creak', 'wind', 'giggle', 'whisper'],
+        zombie: ['zombie', 'wind', 'glass', 'zombie', 'zombie', 'creak'],
         park: ['calliope_far', 'giggle', 'whisper', 'creak', 'pop', 'musicbox_far', 'giggle', 'wind'],
         clown: ['honk', 'clown_laugh', 'giggle', 'creak', 'pop', 'whisper', 'jackbox', 'calliope_far'],
-      }[mode] || ['creak', 'whisper', 'knock'];
+      }[mode] || ['creak', 'whisper'];
       this.horrorTimer = setInterval(() => { if (!this.mode || this.mode === 'lobby') return clearInterval(this.horrorTimer); if (Math.random() < 0.75) this.play(EV[Math.floor(Math.random() * EV.length)]); }, mode === 'doll' || mode === 'gwimun' ? 6000 : 7500);
       // 시나리오 고유의 배경 레이어
       if (mode === 'ship') { // 파도
@@ -447,7 +448,7 @@ export class AudioFX {
       case 'door': this.play('creak'); this.noise(0.4, { freq: 120, type: 'lowpass', gain: 0.5, at: 1.2 }); break;
       case 'gate': this.noise(1.2, { freq: 3500, q: 6, gain: 0.08 }); this.noise(0.3, { freq: 200, type: 'lowpass', gain: 0.5, at: 1 }); break;
       case 'drawer': this.noise(0.5, { freq: 600, q: 2, gain: 0.15 }); break;
-      case 'knock': [0, 0.35, 0.7].forEach((a) => this.noise(0.08, { freq: 180, type: 'lowpass', gain: 0.6, at: a })); break;
+      case 'knock': break; // (문 두드리는 소리 — 뺐다)
       case 'whisper': for (let i = 0; i < 6; i++) this.noise(0.25 + Math.random() * 0.3, { freq: 2500 + Math.random() * 2500, q: 8, gain: 0.05, at: i * 0.22, attack: 0.08 }); break;
       case 'breath': this.noise(1.2, { freq: 800, q: 1, gain: 0.12, attack: 0.5, release: 0.6 }); this.noise(1.0, { freq: 600, q: 1, gain: 0.1, attack: 0.3, release: 0.6, at: 1.4 }); break;
       case 'giggle': for (let i = 0; i < 5; i++) this.tone(900 + Math.random() * 200, 0.09, { type: 'triangle', gain: 0.06, at: i * 0.12, slide: 700 }); break;
@@ -471,8 +472,8 @@ export class AudioFX {
       case 'morse_long': this.tone(700, 0.36, { type: 'sine', gain: 0.12 }); break;
       case 'growl': this.tone(70, 1.1, { type: 'sawtooth', gain: 0.35, slide: 45 }); this.noise(1.0, { freq: 220, q: 1.5, gain: 0.4 }); this.tone(140, 0.9, { type: 'square', gain: 0.08, slide: 90, detune: 30 }); break;
       case 'glitch': for (let i = 0; i < 10; i++) this.noise(0.05, { freq: 300 + Math.random() * 6000, q: 4, gain: 0.35, at: i * 0.07 }); this.tone(60, 0.8, { type: 'square', gain: 0.15 }); break;
-      case 'scream_wet': this.noise(1.2, { freq: 1200, q: 1.2, gain: 0.45 }); [480, 720].forEach((f) => this.tone(f, 1.1, { type: 'sawtooth', gain: 0.1, slide: f * 0.4 })); this.noise(0.8, { freq: 300, type: 'lowpass', gain: 0.3, at: 0.2 }); break;
-      case 'scream_child': [1300, 1650, 2100].forEach((f, i) => this.tone(f, 0.9, { type: 'triangle', gain: 0.1, slide: f * 1.3, at: i * 0.05 })); this.noise(0.9, { freq: 3000, q: 2, gain: 0.35 }); break;
+      case 'scream_wet': this.play('sting'); break; // (비명 소리는 뺐다 → 낮은 효과음만)
+      case 'scream_child': this.play('sting'); break; // (비명 소리는 뺐다 → 낮은 효과음만)
       case 'glass': for (let i = 0; i < 14; i++) this.tone(2500 + Math.random() * 3500, 0.25, { type: 'triangle', gain: 0.05, at: i * 0.025 }); this.noise(0.4, { freq: 6000, q: 0.7, gain: 0.35 }); break;
       case 'bang': [0, 0.18, 0.32, 0.43].forEach((a) => this.noise(0.12, { freq: 150, type: 'lowpass', gain: 0.9, at: a })); break;
       case 'sting_low': this.tone(55, 1.8, { type: 'sawtooth', gain: 0.18, slide: 50 }); this.tone(58.3, 1.8, { type: 'sawtooth', gain: 0.15 }); break;
@@ -493,7 +494,7 @@ export class AudioFX {
       case 'wave': this.noise(3.5, { freq: 700, q: 0.5, gain: 0.15, attack: 1.4, release: 1.8 }); break;
       case 'shipbell': [1, 2.4].forEach((m) => this.tone(880 * m, 2.5, { gain: 0.04 / m, release: 2.3 })); this.tone(880, 2.5, { gain: 0.03, at: 0.6, release: 2.3 }); break;
       case 'chain': for (let i = 0; i < 8; i++) this.tone(1800 + Math.random() * 1500, 0.08, { type: 'triangle', gain: 0.04, at: i * 0.06 }); break;
-      case 'drip': this.tone(1400, 0.08, { gain: 0.08, slide: 700 }); break;
+      case 'drip': break; // (물방울 '뽀옥' 소리 — 뺐다)
       case 'musicbox_far': [1046, 988, 880, 784, 880].forEach((fq, i) => this.tone(fq * (1 + (Math.random() - 0.5) * 0.02), 0.6, { type: 'triangle', gain: 0.025, at: i * 0.45, release: 0.55 })); break;
       case 'cuckoo': [0, 0.35].forEach((a, i) => this.tone(i ? 587 : 740, 0.25, { type: 'sine', gain: 0.06, at: a })); break;
       case 'teleport': this.play('sting'); this.noise(0.6, { freq: 300, q: 0.4, gain: 0.3, release: 0.5 }); break;
@@ -501,12 +502,7 @@ export class AudioFX {
       case 'power': this.tone(60, 1.5, { type: 'sawtooth', gain: 0.08, slide: 120 }); this.noise(0.2, { freq: 4000, gain: 0.1 }); break;
       case 'water': this.noise(3, { freq: 500, q: 0.6, gain: 0.25, attack: 0.5, release: 1.5 }); break;
       case 'talisman': this.noise(0.8, { freq: 3000, q: 0.5, gain: 0.2, release: 0.6 }); this.tone(1400, 0.8, { gain: 0.08, slide: 300 }); break;
-      case 'scream': {
-        this.noise(1.3, { freq: 2200, q: 2, gain: 0.55, attack: 0.01, release: 0.8 });
-        [740, 1110, 1480].forEach((f, i) => this.tone(f, 1.2, { type: 'sawtooth', gain: 0.13, slide: f * 0.6, detune: i * 23 }));
-        this.tone(55, 0.6, { type: 'square', gain: 0.4, slide: 30 });
-        break;
-      }
+      case 'scream': this.play('sting'); break; // (여자 비명 소리는 뺐다 → 낮은 효과음만)
       case 'sting': this.tone(98, 1.5, { type: 'sawtooth', gain: 0.18, slide: 92 }); this.tone(104, 1.5, { type: 'sawtooth', gain: 0.18, slide: 97 }); this.noise(0.5, { freq: 6000, q: 3, gain: 0.2 }); break;
       case 'story': this.tone(110, 3, { type: 'sine', gain: 0.15, attack: 0.5, release: 2 }); this.tone(116.5, 3, { type: 'sine', gain: 0.1, attack: 0.5, release: 2 }); break;
     }
