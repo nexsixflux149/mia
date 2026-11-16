@@ -608,7 +608,12 @@ function spreadLobby(root, colliders, interactives, rides) {
     o.position.x *= k; o.position.z *= k;
   }
   for (const c of colliders) if (!c.noSpread) sxz(c);
-  for (const it of interactives) { if (it.noSpread) continue; sxz(it); sxz(it.seat); sxz(it.perch); (it.seats || []).forEach(sxz); }
+  // 앉는 자리 · 올라가는 자리: 물건 중심이 옮겨간 만큼만 같이 옮긴다 (중심→자리 거리는 그대로 — 테이블 의자 밖으로 엉덩이가 나가지 않게)
+  for (const it of interactives) {
+    if (it.noSpread) continue;
+    const dx = it.x * (k - 1), dz = it.z * (k - 1), sh = (o) => { if (o && typeof o.x === 'number') { o.x += dx; o.z += dz; } };
+    sh(it.seat); sh(it.perch); (it.seats || []).forEach(sh); sxz(it);
+  }
   for (const r of Object.values(rides)) {
     sxz(r.exit);
     // 기구 중심(center)이 있으면 중심만 옮기고 중심→자리 거리는 그대로 (관람차 칸 · 회전목마 말 안에 정확히 앉게)

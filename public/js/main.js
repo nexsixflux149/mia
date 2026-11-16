@@ -2551,6 +2551,12 @@ function doEmote(id) {
   $('#emotePanel').classList.add('hidden');
 }
 function toggleEmotePanel() { $('#emotePanel').classList.toggle('hidden'); }
+// 감정표현 창이 열려 있을 때 창 바깥(화면 · 조이스틱 · 다른 버튼)을 누르면 닫는다. 😀 버튼은 원래대로 열고 닫기
+document.addEventListener('pointerdown', (e) => {
+  const p = $('#emotePanel'); if (!p || p.classList.contains('hidden')) return;
+  if (p.contains(e.target) || e.target.closest?.('.abtn.emote')) return;
+  p.classList.add('hidden');
+}, true);
 (function buildEmotes() {
   const p = $('#emotePanel');
   EMOTES.forEach(([id, name, icon], i) => { const b = el('button', 'btn small', `${icon} ${name}`); b.onclick = () => doEmote(id); p.appendChild(b); });
