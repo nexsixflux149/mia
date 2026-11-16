@@ -30,11 +30,41 @@ function groundTex(color, noise = 0.12) {
   for (let i = 0; i < 2500; i++) { x.fillStyle = `rgba(${Math.random() > 0.5 ? '255,255,255' : '0,0,0'},${Math.random() * noise})`; x.fillRect(Math.random() * 256, Math.random() * 256, 2 + Math.random() * 4, 2 + Math.random() * 4); }
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t;
 }
-/** 로비 바닥 재질 고르기. style: '' 지금(돌길) · '1' 단색 · '2' 큰 타일 · '3' 동심원 광장 · '4' 가운데가 밝은 번짐 */
+/** 로비 바닥 재질 고르기. 기본은 적색 부채꼴 타일, 0~4는 기존 스타일 미리보기. */
 function lobbyFloor(style) {
   const tex = (size, draw, rep = 1) => { const c = document.createElement('canvas'); c.width = c.height = size; draw(c.getContext('2d'), size); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; if (rep > 1) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep, rep); } return t; };
   const simple = { ground: { color: '#34422f' }, path: { color: '#bfb193' } }; // 단순한 바닥들은 풀밭 · 산책로도 무늬 없이
   switch (String(style || '')) {
+    case 'burgundy': return { ...simple, plaza: { map: tex(1024, (x, n) => {
+      const center = n / 2;
+      const radius = center * 0.96;
+      const rings = 9;
+      const colors = ['#522b36', '#59303c', '#603542', '#653845', '#6a3c49'];
+      const random = rng('burgundy-plaza');
+      x.fillStyle = '#32303b';
+      x.fillRect(0, 0, n, n);
+      x.strokeStyle = '#382631';
+      x.lineWidth = 2.4;
+      for (let ring = 0; ring < rings; ring++) {
+        const inner = radius * ring / rings;
+        const outer = radius * (ring + 1) / rings;
+        const count = 8 + ring * 4;
+        const step = Math.PI * 2 / count;
+        const offset = ring % 2 ? step / 2 : 0;
+        for (let tile = 0; tile < count; tile++) {
+          const start = tile * step + offset;
+          const end = start + step;
+          x.beginPath();
+          x.arc(center, center, outer, start, end);
+          if (inner > 0) x.arc(center, center, inner, end, start, true);
+          else x.lineTo(center, center);
+          x.closePath();
+          x.fillStyle = colors[Math.floor(random() * colors.length)];
+          x.fill();
+          x.stroke();
+        }
+      }
+    }), roughness: 0.95 } };
     case '1': return { ...simple, plaza: { color: '#5e5967' } };
     case '2': return { ...simple, plaza: { map: tex(256, (x, n) => { x.fillStyle = '#625c6a'; x.fillRect(0, 0, n, n); x.strokeStyle = 'rgba(20,16,26,.5)'; x.lineWidth = 7; x.strokeRect(0, 0, n, n); x.strokeStyle = 'rgba(255,255,255,.05)'; x.lineWidth = 2; x.strokeRect(6, 6, n - 12, n - 12); }, 20) } };
     case '3': return { ...simple, plaza: { map: tex(1024, (x, n) => {
@@ -971,7 +1001,7 @@ export function buildLobby(scene, opts = {}) {
   const sun = new THREE.DirectionalLight('#d0a8b4', 1.45); sun.position.set(-30, 42, -60); // 붉은 달빛
   root.add(sun);
 
-  const FL = lobbyFloor(opts.floor); // 바닥 모양 (기본은 지금의 돌길 · 주소 끝 ?floor=1~4 로 단순한 바닥 미리보기)
+  const FL = lobbyFloor(opts.floor);
   const ground = new THREE.Mesh(new THREE.CircleGeometry(46, 72), new THREE.MeshStandardMaterial({ roughness: 1, ...FL.ground }));
   ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; ground.userData.spreadScale = true; root.add(ground);
   const plaza = new THREE.Mesh(new THREE.CircleGeometry(16.5, 56), new THREE.MeshStandardMaterial({ roughness: 1, ...FL.plaza }));

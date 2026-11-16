@@ -86,7 +86,7 @@ const S = {
   mouse: { x: 0, y: 0 }, danger: 0, ghosts: new Map(),
   fear: 2, em: '', emT: 0, eid: 0, labels: [], hearts: 0, flyHearts: [],
   profile: null, shop: {}, riding: false, holdSword: false, holdStaff: false, champ: null, hiddenOk: false, vlv: new Map(), vrings: [],
-  floor: new URLSearchParams(location.search).get('floor') || '4', // 로비 바닥: 기본 4(가운데가 밝은 번짐). 주소 끝 ?floor=0(예전 돌길) · 1~3 으로 다른 바닥을 볼 수 있다
+  floor: new URLSearchParams(location.search).get('floor') || 'burgundy', // 주소 끝 ?floor=0~4로 기존 바닥 미리보기
 };
 const SET = Object.assign({ volume: 0.8, voice: 1, sens: 1, quality: (matchMedia('(pointer: coarse)').matches || innerWidth < 760) ? 'medium' : 'high', brightness: 1, minimap: true, gfx: true }, store.get('gwimun-settings', {}));
 if (SET.quality === 'low') SET.quality = 'medium'; // '낮음'은 없어졌다 → 보통
@@ -2895,8 +2895,8 @@ function useShopItem(id) {
 // ───── 방귀 뿡 (먼지 + 낄낄)
 function doFart(g, x, y, z, ry) {
   const d = Math.hypot(x - me.x, z - me.z);
-  setTimeout(() => { fartFx(x, y, z, ry); if (d < 16) audio.play('fart'); }, 380);
-  if (d < 16) setTimeout(() => audio.play('laugh'), 820);
+  setTimeout(() => fartFx(x, y, z, ry), 380);
+  if (d < 16) setTimeout(() => audio.play('emote_chuckle'), 450);
   if (g) setTimeout(() => { const b = textSprite('뿌우웅~ 💨 낄낄', { size: 26, bg: 'rgba(60,50,20,.8)', color: '#ffe9a8' }); addLabel(g, b, 2.05); setTimeout(() => removeLabel(b), 1800); }, 400);
 }
 // ───── 마이크로 말하면 발밑에 초록 링이 목소리 크기에 맞춰 퍼진다
