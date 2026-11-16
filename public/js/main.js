@@ -2085,7 +2085,7 @@ function openWish() {
     socket.emit('wish:send', { stars, text: ta.value.trim() }, (r) => {
       clearTimeout(back);
       if (r?.error) { toast(r.error); check(); return; }
-      closeModal(); meteorShower(10, () => openWishDone());
+      closeModal(); setTimeout(openWishDone, 10500); // 별똥별은 서버가 로비 모두에게 'wish:shower' 로 보낸다
     });
   };
   w.append(lab1, row, word, lab2, ta, cnt, send, note);
@@ -2100,57 +2100,96 @@ function openWishDone() {
   w.append(coffee, close);
   openModal('소원이 전달 되었어요', '', w);
 }
-// 10초 동안 하늘 가득 별똥별 (화면 위 2D 캔버스 · 'lighter' 로 겹칠수록 밝게). 소원의 별도 함께 반짝인다
-let showerOn = false;
-function meteorShower(sec, done) {
-  if (showerOn) return; showerOn = true;
-  S.world?.wishStar?.boost(sec);
-  audio.play('wish_start');
-  const cv = el('canvas', 'meteor-cv'); document.body.appendChild(cv);
-  const ctx = cv.getContext('2d'); const dpr = Math.min(2, devicePixelRatio || 1);
-  let W = 0, H = 0; const fit = () => { W = innerWidth; H = innerHeight; cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }; fit(); addEventListener('resize', fit);
-  const TINT = [[255, 255, 255], [255, 236, 170], [190, 225, 255], [255, 200, 235], [215, 200, 255]];
-  const sky = Array.from({ length: 160 }, () => ({ x: Math.random(), y: Math.random() * 0.75, r: 0.5 + Math.random() * 1.3, p: Math.random() * 6 }));
-  const M = [], dust = [];
-  const S0 = Math.min(W, H) / 800; // 화면 크기에 맞춘 비율
-  const spawn = (big) => {
-    const ang = (Math.PI * (0.70 + Math.random() * 0.08)); // 오른쪽 위에서 왼쪽 아래로
-    const sp = (big ? 900 : 700 + Math.random() * 900) * Math.max(0.7, S0);
-    const c = TINT[big ? 1 : Math.floor(Math.random() * TINT.length)];
-    M.push({ x: Math.random() * W * 1.3, y: -40 - Math.random() * H * 0.35, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, len: (big ? 420 : 140 + Math.random() * 260) * Math.max(0.7, S0), w: big ? 3.2 : 1 + Math.random() * 1.8, c, life: 0, max: 0.9 + Math.random() * 0.9 + (big ? 0.6 : 0), big });
-  };
-  const t0 = performance.now(); let last = t0, acc = 0, nextBig = 0.6, twk = 0;
-  const frame = (now) => {
-    const t = (now - t0) / 1000, dt = Math.min(0.05, (now - last) / 1000); last = now;
-    const env = Math.min(1, t / 0.8) * Math.min(1, Math.max(0, (sec - t) / 1.2)); // 서서히 시작 · 서서히 끝
-    ctx.clearRect(0, 0, W, H);
-    // 하늘을 살짝 깊은 남색으로 · 잔별이 반짝
-    const bg = ctx.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, `rgba(10,14,48,${0.55 * env})`); bg.addColorStop(0.6, `rgba(20,16,60,${0.22 * env})`); bg.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
-    ctx.globalCompositeOperation = 'lighter';
-    for (const s of sky) { const a = env * (0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 2.4 + s.p))); ctx.fillStyle = `rgba(255,250,235,${a})`; ctx.beginPath(); ctx.arc(s.x * W, s.y * H, s.r, 0, 6.283); ctx.fill(); }
-    // 새 별똥별: 한가운데(1~8초)에 초당 ~40개
-    if (t < sec - 0.6) { acc += dt * (8 + 34 * Math.min(1, t / 1.5) * Math.min(1, (sec - 1.5 - t) / 1.5 + 0.3)); while (acc >= 1) { acc -= 1; spawn(false); } if (t > nextBig) { spawn(true); nextBig = t + 0.5 + Math.random() * 0.7; } }
-    if (t > twk && t < sec - 0.5) { audio.play('twinkle'); twk = t + 0.18 + Math.random() * 0.35; }
-    for (let i = M.length - 1; i >= 0; i--) {
-      const m = M[i]; m.life += dt; m.x += m.vx * dt; m.y += m.vy * dt;
-      const f = Math.min(1, m.life / 0.12) * Math.max(0, 1 - Math.max(0, m.life - m.max * 0.6) / (m.max * 0.4));
-      if (f <= 0 || m.y > H + 80 || m.x < -m.len - 80) { M.splice(i, 1); continue; }
-      const k = Math.hypot(m.vx, m.vy), ux = m.vx / k, uy = m.vy / k, tx = m.x - ux * m.len, ty = m.y - uy * m.len;
-      const gr = ctx.createLinearGradient(m.x, m.y, tx, ty); const [r, g, b] = m.c;
-      gr.addColorStop(0, `rgba(255,255,255,${0.95 * f})`); gr.addColorStop(0.08, `rgba(${r},${g},${b},${0.8 * f})`); gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
-      ctx.strokeStyle = gr; ctx.lineWidth = m.w; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(m.x, m.y); ctx.lineTo(tx, ty); ctx.stroke();
-      const hg = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, m.w * (m.big ? 7 : 4.5)); hg.addColorStop(0, `rgba(255,255,255,${f})`); hg.addColorStop(0.4, `rgba(${r},${g},${b},${0.45 * f})`); hg.addColorStop(1, `rgba(${r},${g},${b},0)`);
-      ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(m.x, m.y, m.w * (m.big ? 7 : 4.5), 0, 6.283); ctx.fill();
-      if (m.big || Math.random() < dt * 6) dust.push({ x: m.x - ux * 6, y: m.y - uy * 6, vx: ux * 30 + (Math.random() - 0.5) * 40, vy: uy * 30 + (Math.random() - 0.5) * 40 + 10, life: 0, max: 0.6 + Math.random() * 0.9, r: 0.8 + Math.random() * (m.big ? 1.8 : 1), c: m.c });
-    }
-    // 큰 별똥별이 흘리는 반짝 가루
-    for (let i = dust.length - 1; i >= 0; i--) { const d = dust[i]; d.life += dt; if (d.life > d.max) { dust.splice(i, 1); continue; } d.x += d.vx * dt; d.y += d.vy * dt; d.vy += 30 * dt; const a = (1 - d.life / d.max) * (0.6 + 0.4 * Math.sin(d.life * 40)); const [r, g, b] = d.c; ctx.fillStyle = `rgba(${r},${g},${b},${a})`; ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, 6.283); ctx.fill(); }
-    if (t < sec || M.length) requestAnimationFrame(frame);
-    else { cv.remove(); removeEventListener('resize', fit); showerOn = false; done?.(); }
-  };
-  requestAnimationFrame(frame);
+// 10초 동안 로비 하늘에서 진짜로 별똥별이 쏟아진다 (3D · 로비에 있는 모두에게 · 'wish:shower' 를 받으면 시작)
+// 별똥별은 하늘 높이(30~60m)에서 카메라 앞쪽 하늘을 가로질러 오른쪽 위 → 왼쪽 아래로. 꼬리는 카메라를 향하게 세운 빛 띠, 머리는 빛 덩이, 큰 별똥별은 반짝 가루를 흘린다
+const shower = { on: false, end: 0, meshes: [], heads: [], live: [], dust: null };
+function showerTex() {
+  if (shower.tex) return shower.tex;
+  const c = document.createElement('canvas'); c.width = 256; c.height = 16; const x = c.getContext('2d');
+  const g = x.createLinearGradient(0, 0, 256, 0); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.75, 'rgba(255,255,255,.45)'); g.addColorStop(0.97, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,255,255,1)');
+  x.fillStyle = g; x.fillRect(0, 0, 256, 16);
+  const v = x.createLinearGradient(0, 0, 0, 16); v.addColorStop(0, 'rgba(0,0,0,1)'); v.addColorStop(0.5, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,1)');
+  x.globalCompositeOperation = 'destination-out'; x.fillStyle = v; x.fillRect(0, 0, 256, 16);
+  const h = document.createElement('canvas'); h.width = h.height = 64; const y = h.getContext('2d'); const rg = y.createRadialGradient(32, 32, 0, 32, 32, 32); rg.addColorStop(0, 'rgba(255,255,255,1)'); rg.addColorStop(0.25, 'rgba(255,255,255,.55)'); rg.addColorStop(1, 'rgba(255,255,255,0)'); y.fillStyle = rg; y.fillRect(0, 0, 64, 64);
+  shower.tex = { tail: new THREE.CanvasTexture(c), head: new THREE.CanvasTexture(h) };
+  return shower.tex;
 }
+const SHOWER_TINT = ['#ffffff', '#ffe9a8', '#bfe2ff', '#ffc6ea', '#d8c8ff'];
+function meteorShower(sec) {
+  if (S.room !== 'lobby' || !S.world) return;
+  const now = performance.now() / 1000;
+  S.world.wishStar?.boost(sec);
+  if (shower.on) { shower.end = Math.max(shower.end, now + sec); return; } // 이미 쏟아지는 중이면 더 길게
+  shower.on = true; shower.t0 = now; shower.end = now + sec;
+  audio.play('wish_start');
+  const tx = showerTex();
+  if (!shower.meshes.length) { const geo = new THREE.PlaneGeometry(1, 1); geo.translate(-0.5, 0, 0); /* 머리(x=0)에서 꼬리(x=-1)로 */ for (let i = 0; i < 220; i++) {
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tx.tail, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, side: THREE.DoubleSide }));
+    const h = new THREE.Sprite(new THREE.SpriteMaterial({ map: tx.head, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+    m.visible = h.visible = false; m.frustumCulled = h.frustumCulled = false; m.renderOrder = h.renderOrder = 5; shower.meshes.push(m); shower.heads.push(h);
+  } }
+  shower.meshes.forEach((m) => scene.add(m)); shower.heads.forEach((h) => scene.add(h));
+  // 반짝 가루 (점 600개, 색이 어두워지며 사라진다)
+  const DN = 600, dg = new THREE.BufferGeometry(), dp = new Float32Array(DN * 3), dc = new Float32Array(DN * 3);
+  dg.setAttribute('position', new THREE.BufferAttribute(dp, 3)); dg.setAttribute('color', new THREE.BufferAttribute(dc, 3));
+  const dust = new THREE.Points(dg, new THREE.PointsMaterial({ map: tx.head, size: 0.9, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+  dust.frustumCulled = false; scene.add(dust);
+  const D = Array.from({ length: DN }, () => ({ life: 0, max: 1, v: new THREE.Vector3(), c: new THREE.Color() })); let dn = 0;
+  // 이번 비의 방향: 카메라 기준 오른쪽 위 → 왼쪽 아래 (모두 같은 쪽으로 흐르면 더 비처럼 보인다)
+  const fwd = new THREE.Vector3(), right = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+  camera.getWorldDirection(fwd); fwd.y = 0; if (fwd.lengthSq() < 1e-4) fwd.set(0, 0, -1); fwd.normalize(); right.crossVectors(fwd, up).normalize();
+  const dir = new THREE.Vector3().addScaledVector(right, -0.78).addScaledVector(up, -0.55).addScaledVector(fwd, 0.12).normalize();
+  const live = shower.live = [];
+  const spawn = (big) => {
+    const i = shower.meshes.findIndex((m) => !m.visible); if (i < 0) return;
+    const m = shower.meshes[i], h = shower.heads[i], cp = camera.position;
+    // 지금 카메라에 보이는 화면 위쪽 어딘가(오른쪽으로 조금 치우쳐)에서 생겨나 화면을 가로질러 떨어진다 → 카메라가 땅을 내려다봐도 보인다
+    const dist = 14 + Math.random() * 46;
+    const ray = new THREE.Vector3(-0.6 + Math.random() * 2.0, 0.15 + Math.random() * 1.0, 0.5).unproject(camera).sub(cp).normalize();
+    const p = cp.clone().addScaledVector(ray, dist); p.y = Math.max(p.y, 3 + Math.random() * 4);
+    const camUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion), camRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+    dir.copy(camRight).multiplyScalar(-0.62).addScaledVector(camUp, -0.62).add(new THREE.Vector3(0, -0.35, 0)).normalize();
+    const sp = (big ? 30 : 22 + Math.random() * 22) * (0.55 + dist / 60);
+    const col = new THREE.Color(SHOWER_TINT[big ? 1 : Math.floor(Math.random() * SHOWER_TINT.length)]);
+    const len = (big ? 16 : 5 + Math.random() * 8) * (0.5 + dist / 60), wid = (big ? 0.65 : 0.18 + Math.random() * 0.2) * (0.5 + dist / 60);
+    m.material.color.copy(col); h.material.color.copy(col).lerp(new THREE.Color('#fff'), 0.6);
+    m.visible = h.visible = true;
+    live.push({ m, h, p, v: dir.clone().multiplyScalar(sp).add(new THREE.Vector3((Math.random() - 0.5) * 3, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 3)), len, wid, life: 0, max: 0.8 + Math.random() * 0.8 + (big ? 0.7 : 0), big, col });
+  };
+  const X = new THREE.Vector3(), Y = new THREE.Vector3(), Z = new THREE.Vector3(), M4 = new THREE.Matrix4();
+  let last = now, acc = 0, nextBig = 0.5, twk = 0;
+  const step = () => {
+    const tnow = performance.now() / 1000, dt = Math.min(0.05, tnow - last), t = tnow - shower.t0, left = shower.end - tnow; last = tnow;
+    const gone = S.room !== 'lobby';
+    if (!gone && left > 0.5) {
+      const rate = 10 + 46 * Math.min(1, t / 1.5) * Math.min(1, left / 2 + 0.2);
+      acc += dt * rate; while (acc >= 1) { acc -= 1; spawn(false); }
+      if (t > nextBig) { spawn(true); nextBig = t + 0.45 + Math.random() * 0.7; }
+      if (t > twk) { audio.play('twinkle'); twk = t + 0.18 + Math.random() * 0.35; }
+    }
+    for (let k = live.length - 1; k >= 0; k--) {
+      const o = live[k]; o.life += dt; o.p.addScaledVector(o.v, dt);
+      const f = Math.min(1, o.life / 0.15) * Math.max(0, 1 - Math.max(0, o.life - o.max * 0.55) / (o.max * 0.45));
+      if (f <= 0 || gone) { o.m.visible = o.h.visible = false; live.splice(k, 1); continue; }
+      // 꼬리 띠: x축은 날아가는 방향, 띠의 면은 카메라를 향하게
+      X.copy(o.v).normalize(); Z.subVectors(camera.position, o.p); Z.addScaledVector(X, -Z.dot(X)).normalize(); Y.crossVectors(Z, X).normalize();
+      M4.makeBasis(X, Y, Z); o.m.quaternion.setFromRotationMatrix(M4); o.m.position.copy(o.p); o.m.scale.set(o.len * (0.4 + 0.6 * Math.min(1, o.life / 0.3)), o.wid, 1);
+      o.m.material.opacity = f; o.h.position.copy(o.p); o.h.scale.setScalar(o.wid * (o.big ? 9 : 6)); o.h.material.opacity = f;
+      if (o.big ? Math.random() < dt * 60 : Math.random() < dt * 5) { const d = D[dn++ % DN]; d.life = 0; d.max = 0.7 + Math.random() * 1.1; d.p = o.p.clone().addScaledVector(X, -0.6); d.v.set((Math.random() - 0.5) * 3, -0.5 - Math.random() * 1.5, (Math.random() - 0.5) * 3).addScaledVector(o.v, 0.08); d.c.copy(o.col); }
+    }
+    for (let i = 0; i < DN; i++) { const d = D[i]; if (!d.p || d.life >= d.max) { dc[i * 3] = dc[i * 3 + 1] = dc[i * 3 + 2] = 0; continue; } d.life += dt; d.p.addScaledVector(d.v, dt); d.v.y -= 1.5 * dt; dp[i * 3] = d.p.x; dp[i * 3 + 1] = d.p.y; dp[i * 3 + 2] = d.p.z; const a = (1 - d.life / d.max) * (0.6 + 0.4 * Math.sin(d.life * 35)); dc[i * 3] = d.c.r * a; dc[i * 3 + 1] = d.c.g * a; dc[i * 3 + 2] = d.c.b * a; }
+    dg.attributes.position.needsUpdate = true; dg.attributes.color.needsUpdate = true;
+    if (!gone && (left > 0 || live.length)) requestAnimationFrame(step);
+    else { shower.meshes.forEach((m) => { m.visible = false; scene.remove(m); }); shower.heads.forEach((h) => { h.visible = false; scene.remove(h); }); scene.remove(dust); dg.dispose(); shower.on = false; }
+  };
+  requestAnimationFrame(step);
+}
+// 로비의 누군가가 소원을 빌면 로비에 있는 모두의 하늘에 별똥별이 쏟아진다
+socket.on('wish:shower', ({ name, sec } = {}) => {
+  if (S.room !== 'lobby') return;
+  meteorShower(Math.min(15, Number(sec) || 10));
+  if (name && name !== S.me) toast(`🌠 ${name} 님이 소원을 빌었어요! 하늘을 올려다보세요 ✨`);
+});
 function openFeedbackAdmin() {
   const w = el('div', 'fb-admin'); w.appendChild(el('div', 'muted', '불러오는 중…'));
   const fmtAt = (t) => { const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };

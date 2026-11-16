@@ -692,6 +692,8 @@ io.on('connection', (sock) => {
       text: `${'★'.repeat(stars)}${'☆'.repeat(5 - stars)} (${stars}점)\n소원: ${text}`, where: '로비 · 소원의 별', ua: String(sock.handshake.headers['user-agent'] || '').slice(0, 160) });
     if (feedback.list.length > 500) feedback.list.splice(0, feedback.list.length - 500);
     saveFeedback(); ack({ ok: true });
+    // 로비에 있는 모두의 하늘에 10초 동안 별똥별이 쏟아진다
+    for (const p of players.values()) if (p.room === 'lobby' && !p.offline) io.to(p.id).emit('wish:shower', { name: me.name, sec: 10 });
   });
   sock.on('admin:feedback', adminOnly((ack) => { if (typeof ack === 'function') ack(feedback.list.slice(-200).reverse()); }));
   sock.on('admin:feedbackDone', adminOnly((id) => { const f = feedback.list.find((x) => x.id === id); if (f) { f.done = !f.done; saveFeedback(); } }));

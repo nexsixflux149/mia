@@ -872,4 +872,3 @@ body.mobile #login.tiny .logo, body.mobile #login.tiny .pv-wrap, body.mobile #lo
 .wish-coffee { width: 100%; font-size: 16px; padding: 11px; }
 .wish-close { width: 100%; }
 @keyframes wishFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-.meteor-cv { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 8; } /* 게임 화면 위 · 버튼(HUD) 아래 */
