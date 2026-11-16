@@ -402,7 +402,7 @@ function buildPark(root, colliders, add) {
     colliders.push({ x: cx, z: cz, hw: 3.0, hd: 3.0 });
     const ang = () => parkNow() * 0.55;
     anim.push(() => { const a = ang(); spin.rotation.y = -a; horses.forEach((b, i) => (b.position.y = 1.15 + Math.sin(a * 3 + i * 1.7) * 0.22)); });
-    rides.carousel = { seats: 6, pos: (i) => { const a = ang(); const th = (i / 6) * Math.PI * 2 + a; return { x: cx + Math.cos(th) * 2.4, z: cz + Math.sin(th) * 2.4, y: 0.35 + 1.15 + Math.sin(a * 3 + i * 1.7) * 0.22 - 0.35, ry: (-th) % (Math.PI * 2) }; } };
+    rides.carousel = { center: PARK.carousel, seats: 6, pos: (i) => { const a = ang(); const th = (i / 6) * Math.PI * 2 + a; return { x: cx + Math.cos(th) * 2.4, z: cz + Math.sin(th) * 2.4, y: 0.35 + 1.15 + Math.sin(a * 3 + i * 1.7) * 0.22 - 0.35, ry: (-th) % (Math.PI * 2) }; } };
     interactives.push({ id: 'carousel', kind: 'ride', x: cx, z: cz, r: 4.4, label: '회전목마', verb: '타기' });
   }
   // 관람차
@@ -429,7 +429,7 @@ function buildPark(root, colliders, add) {
     const ang = () => parkNow() * 0.13;
     const cpos = (i) => { const th = ang() + (i / N) * Math.PI * 2; return { x: Math.cos(th) * RAD, y: AX + Math.sin(th) * RAD - 0.4 }; };
     anim.push(() => { wheel.rotation.z = ang(); cabins.forEach((c, i) => { const p = cpos(i); c.position.set(p.x, p.y, 0); }); });
-    rides.wheel = { seats: N, pick: (busy) => { let best = -1, by = 1e9; for (let i = 0; i < N; i++) { if (busy.has(i)) continue; const y = cpos(i).y; if (y < by) { by = y; best = i; } } return best; },
+    rides.wheel = { center: PARK.wheel, seats: N, pick: (busy) => { let best = -1, by = 1e9; for (let i = 0; i < N; i++) { if (busy.has(i)) continue; const y = cpos(i).y; if (y < by) { by = y; best = i; } } return best; },
       pos: (i) => { const p = cpos(i); return { x: cx + p.x, z: cz, y: p.y - 0.62, ry: Math.PI }; } };
     interactives.push({ id: 'wheel', kind: 'ride', x: cx, z: cz + 1.8, r: 5.5, label: '관람차', verb: '타기' }); // 관람차가 커서 옆에서도 탈 수 있게 넓게
     const sign = textSprite('🎡 관람차', { size: 30, bg: 'rgba(40,10,40,.75)', color: '#ffd0f0' }); sign.position.set(cx, 1.6, cz + 1.7); root.add(sign);
@@ -611,7 +611,8 @@ function spreadLobby(root, colliders, interactives, rides) {
   for (const it of interactives) { if (it.noSpread) continue; sxz(it); sxz(it.seat); sxz(it.perch); (it.seats || []).forEach(sxz); }
   for (const r of Object.values(rides)) {
     sxz(r.exit);
-    if (!r.posFinal && r.pos) { const p0 = r.pos; r.pos = (i) => { const p = p0(i); return p && { ...p, x: p.x * k, z: p.z * k }; }; }
+    // 기구 중심(center)이 있으면 중심만 옮기고 중심→자리 거리는 그대로 (관람차 칸 · 회전목마 말 안에 정확히 앉게)
+    if (!r.posFinal && r.pos) { const p0 = r.pos, c = r.center; r.pos = (i) => { const p = p0(i); if (!p) return p; return c ? { ...p, x: p.x + c.x * (k - 1), z: p.z + c.z * (k - 1) } : { ...p, x: p.x * k, z: p.z * k }; }; }
   }
 }
 

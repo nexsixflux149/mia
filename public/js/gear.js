@@ -576,16 +576,17 @@ function animateSnack(u, t, dt, moving) {
   if (!u.gSnack || !u.arms?.[1]) { u.eatT = 0; return; }
   const arm = u.arms[1], s = Math.sign(arm.position.x || 1);
   let k = 0; if (u.eatT > 0) { u.eatT = Math.max(0, u.eatT - dt); k = Math.sin(Math.PI * (1 - u.eatT / 0.9)); }
-  arm.rotation.set(-0.85 - k * 0.9 + (moving && !k ? Math.sin(t * 9) * 0.05 : 0), 0, -s * (0.18 + k * 0.85));
+  arm.rotation.set(-0.85 - k * 0.45 + (moving && !k ? Math.sin(t * 9) * 0.05 : 0), 0, -s * (0.18 + k * 0.45)); // 먹을 때 팔은 살짝만
   // 손에 든 컵은 세운 채로 (먹을 때만 입 쪽으로 기울인다)
   // 팔이 앞으로 들리면 손 앞(-y 쪽)으로 더 내밀어 큰 머리에 묻히지 않게 하고, 컵 윗부분만 입 쪽으로 살짝 기울인다
-  u.gSnack.rotation.set(0.85 + k * 1.15, 0, s * (0.18 + k * 0.85)); // 팔이 안쪽으로 기운 만큼 되돌려 정면에서 똑바로 보이게
+  u.gSnack.rotation.set(0.85 + k * 0.45, 0, s * (0.18 + k * 0.62)); // 팔이 기운 만큼 되돌려 컵은 똑바로 선 채로
   _rest.set(0.02 * s, -0.36, 0.09);
   if (k > 0 && u.head && u.rig) {
     // 먹는 동안: 손에서 '입 바로 앞'(얼굴 가운데 아래쪽)으로 끌어온다 — 팔이 옆에 달려 있어서 팔만 돌리면 볼 쪽으로 가기 때문
     u.rig.updateMatrixWorld(true);
-    u.head.localToWorld(_mouth.set(0, -0.2, 0.52)); arm.worldToLocal(_mouth);
-    u.gSnack.position.lerpVectors(_rest, _mouth.addScaledVector(_up.set(0, 0, -1), 0.12), k);
+    // 머리 아래쪽 한가운데(입 · 턱 바로 앞)까지: 컵·통 바닥이 턱보다 조금 아래, 윗부분이 입에 닿는 높이
+    u.head.localToWorld(_mouth.set(s * 0.08, -0.41, 0.4)); arm.worldToLocal(_mouth); // 든 손 쪽으로 쏠려 보이지 않게 입 한가운데로
+    u.gSnack.position.lerpVectors(_rest, _mouth, k);
   } else u.gSnack.position.copy(_rest);
   if (u.gSnack.userData.steam) { u.gSnack.userData.steam.position.y = 0.29 + Math.sin(t * 2) * 0.01; u.gSnack.userData.steam.rotation.y = t; }
 }
