@@ -86,7 +86,7 @@ const S = {
   mouse: { x: 0, y: 0 }, danger: 0, ghosts: new Map(),
   fear: 2, em: '', emT: 0, eid: 0, labels: [], hearts: 0, flyHearts: [],
   profile: null, shop: {}, riding: false, holdSword: false, holdStaff: false, champ: null, hiddenOk: false, vlv: new Map(), vrings: [],
-  floor: new URLSearchParams(location.search).get('floor') || '', // 로비 바닥 미리보기: 주소 끝 ?floor=1~4 (없으면 지금 바닥)
+  floor: new URLSearchParams(location.search).get('floor') || '4', // 로비 바닥: 기본 4(가운데가 밝은 번짐). 주소 끝 ?floor=0(예전 돌길) · 1~3 으로 다른 바닥을 볼 수 있다
 };
 const SET = Object.assign({ volume: 0.8, voice: 1, sens: 1, quality: (matchMedia('(pointer: coarse)').matches || innerWidth < 760) ? 'medium' : 'high', brightness: 1, minimap: true, gfx: true }, store.get('gwimun-settings', {}));
 if (SET.quality === 'low') SET.quality = 'medium'; // '낮음'은 없어졌다 → 보통
