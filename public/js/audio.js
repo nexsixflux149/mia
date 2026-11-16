@@ -92,7 +92,7 @@ export class AudioFX {
     if (this.samplesReady) return this.samplesReady;
     this.buf = {};
     // 속삭임(영어 말소리) · 으르렁(사람 말소리처럼 들림) · 좀비(트림 소리) 녹음은 거슬려서 뺐다 → 예전 합성음
-    const names = ['scream', 'scream_child', 'scream_wet', 'giggle', 'breath', 'knock', 'bang', 'sting_low', 'static_hiss', 'chain', 'drip', 'amb_dark'];
+    const names = ['scream', 'scream_child', 'scream_wet', 'giggle', 'knock', 'bang', 'sting_low', 'static_hiss', 'chain', 'drip', 'amb_dark'];
     this.samplesReady = Promise.all(names.map((n) => fetch(`/sfx/${n}.mp3`).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject())).then((ab) => this.ctx.decodeAudioData(ab)).then((b) => { this.buf[n] = b; }).catch(() => {})));
     return this.samplesReady;
   }
@@ -106,7 +106,7 @@ export class AudioFX {
   playSample(name) {
     const v = (a) => 1 + (Math.random() * 2 - 1) * a;
     // 크기 맞춤: 주변에 가끔 깔리는 소리(속삭임 · 삐걱 · 킥킥 …)는 예전 합성음보다 조금만 크게(-30 LUFS 쯤), 비명은 예전보다 2~3dB 크게
-    const LV = { giggle: 0.38, breath: 0.41, knock: 0.52, bang: 0.62, chain: 0.39, drip: 0.31, static_hiss: 0.79, sting_low: 0.72 };
+    const LV = { giggle: 0.38, knock: 0.52, bang: 0.62, chain: 0.39, drip: 0.31, static_hiss: 0.79, sting_low: 0.72 };
     const scream = name.startsWith('scream');
     return this.sample(name, { gain: (LV[name] ?? 1) * v(scream ? 0.05 : 0.15), rate: v(scream ? 0.025 : 0.06) });
   }
