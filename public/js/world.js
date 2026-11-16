@@ -943,11 +943,11 @@ function buildLobbyDeco(root, colliders, themes) {
     inter.push({ id: 'gyro', kind: 'ride', x: x - Math.cos(ga) * 4.2, z: z - Math.sin(ga) * 4.2, r: 4.6, label: '자이로 드롭', verb: '타기', noSpread: true });
   }
   // 🌠 소원의 별: 광장 한가운데 떠 있는 커다란 금빛 별.
-  // 천천히 떠 있다가 9초마다 정면에서 한 바퀴 돌며 반짝이를 흩뿌린다.
+  // 광장 입구를 향해 떠 있다가 9초마다 수직축을 중심으로 한 바퀴 돌며 반짝이를 흩뿌린다.
   const clickables = []; let wishStar = null;
   {
     const x = 0, z = 0, BASE = 3.5, CYC = 9, SPIN0 = 6.0, SPIN = 2.2; // 별 가운데 높이 (아래 끝이 머리 위 2m 쯤)
-    const g = add(new THREE.Group()); g.position.set(x, 0, z); g.rotation.y = 0; // 카메라 방향을 받기 전에는 광장 입구 쪽을 본다
+    const g = add(new THREE.Group()); g.position.set(x, 0, z); // 앞면(+Z)이 광장 입구를 향한다
     const sh = new THREE.Shape(); const RO = 1.5, RI = 0.63;
     for (let i = 0; i < 10; i++) { const a = Math.PI / 2 + (i / 10) * Math.PI * 2, r = i % 2 ? RI : RO; i ? sh.lineTo(Math.cos(a) * r, Math.sin(a) * r) : sh.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
     const sg = new THREE.ExtrudeGeometry(sh, { depth: 0.4, bevelEnabled: true, bevelThickness: 0.18, bevelSize: 0.13, bevelSegments: 5, curveSegments: 4 }); sg.center(); sg.computeVertexNormals();
@@ -977,7 +977,7 @@ function buildLobbyDeco(root, colliders, themes) {
       const boost = t < boostUntil ? Math.min(1, (boostUntil - t) / 1.5, 1) : 0;
       const tc = t % CYC, inSpin = tc >= SPIN0 && tc < SPIN0 + SPIN, k = inSpin ? (tc - SPIN0) / SPIN : 0;
       spin.position.y = BASE + Math.sin(t * 1.25) * 0.28 + (inSpin ? Math.sin(Math.PI * k) * 0.35 : 0);
-      spin.rotation.z = -easeIO(k) * Math.PI * 2 + Math.sin(t * 0.9) * 0.06;
+      spin.rotation.y = easeIO(k) * Math.PI * 2;
       const sc = 1 + (inSpin ? Math.sin(Math.PI * k) * 0.07 : 0) + boost * 0.08; spin.scale.setScalar(sc);
       if (inSpin) emit((Math.random() < dt * 55 ? 2 : 0) + (Math.random() < dt * 40 ? 1 : 0));
       if (boost && Math.random() < dt * 20) emit(1);
@@ -994,10 +994,6 @@ function buildLobbyDeco(root, colliders, themes) {
     // 별똥별이 떨어지는 동안 별이 더 밝게 빛나고 반짝이를 뿌린다
     wishStar = {
       x, z, y: () => spin.position.y,
-      face(view) {
-        if (!view || Math.hypot(view.x - x, view.z - z) < 0.01) return;
-        g.rotation.y = Math.atan2(view.x - x, view.z - z);
-      },
       boost: (sec) => { boostUntil = boostT + sec; },
     };
   }
@@ -1165,8 +1161,7 @@ export function buildLobby(scene, opts = {}) {
   const deco = buildLobbyDeco(root, colliders, themes);
   scene.add(root);
   let lastT = 0;
-  const update = (t, _dt, view) => {
-    deco.wishStar.face(view);
+  const update = (t) => {
     snapBoard.update(Math.min(0.1, Math.max(0, t - lastT))); lastT = t;
     park.update(t); outer.update(t); deco.update(t); champSign.update(t, deco.wishStar.y()); fireflies.update(t); extra.update(t);
     clouds.rotation.y = t * 0.006; clouds.children.forEach((c) => (c.position.y += Math.sin(t * 0.3 + c.userData.ph) * 0.004));

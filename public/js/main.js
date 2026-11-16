@@ -1074,7 +1074,7 @@ function loop() {
     netSend(dt);
     if (S.room === 'lobby' && S.world.rides?.swing) { const b = new Set(); if (S.mount?.ride === 'swing') b.add(S.mount.seat); for (const g of S.others.values()) { const rd = g.userData.target?.ride; if (rd?.startsWith('swing:')) b.add(Number(rd.split(':')[1])); } S.world.rides.swing.setBusy(b); }
     S.world.shopFace?.(me.x, me.z);
-    S.world.update?.(t, dt, camera.position);
+    S.world.update?.(t, dt);
     graphics.update(camera.position, me); watchPerf(performance.now());
     updateThemeBubble();
     // 보조광: 머리 위가 아니라 카메라 쪽에서 넓게 비춰 캐릭터 머리가 하얗게 빛나지 않게 한다
