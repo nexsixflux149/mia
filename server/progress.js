@@ -15,8 +15,8 @@ export const clearXp = (difficulty, fear, full) => Math.round((300 + difficulty 
 /** 제한 시간: 쉬운 테마(난이도 2 이하) 60분, 어려운 테마 120분 */
 export const timeLimitMs = (difficulty) => (difficulty <= 2 ? 60 : 120) * 60 * 1000;
 
-/** 주간랭킹 1위 보상(비매품)의 설명 */
-export const GOLD_NOTE = '비매품 - 매주 주간랭킹 1위에게 랜덤 지급되는 아이템';
+/** 주간랭킹 1~3위 보상(비매품)의 설명 */
+export const GOLD_NOTE = '비매품 - 매주 주간랭킹 1~3위에게 아직 없는 부위 하나를 무작위 지급';
 // 상점 물건. kind: wings(등에 다는 날개) · mount(타는 것, 탄 동안 이동 속도 1.5배) · pop(파티 꼬깔 폭죽) · rocket(쏘아 올리는 폭죽) · sword(전설의 검)
 export const SHOP = {
   popper: { name: '파티 꼬깔 폭죽', icon: '🎉', kind: 'pop', price: 3, lv: 1, max: 10, desc: '앞에 있는 친구를 향해 펑! 색종이가 쏟아지고 아주 큰 소리가 나요.' },
@@ -35,7 +35,7 @@ export const SHOP = {
   costume_robot: { name: '로봇 코스튬', icon: '🤖', kind: 'costume', price: 400, lv: 50, max: 1, desc: '머리부터 발끝까지 반짝이는 로봇으로 변신! 눈과 가슴 불빛이 깜빡여요.' },
   mount_carriage: { name: '황금 마차', icon: '👑', kind: 'mount', price: 2000, lv: 100, max: 1, desc: '번쩍이는 황금 마차. 최고 레벨만 탈 수 있는 전설의 탈것. 탄 동안 이동 속도 1.5배!' },
   sword: { name: '전설의 검', icon: '🗡️', kind: 'sword', price: 1000, lv: 30, max: 1, uses: 30, desc: '푸른 빛을 내뿜는 크리스탈 검. 가까운 귀신을 베어 없앨 수 있어요. 귀신을 30번 없애면 깨져 버려요.' },
-  // ── 황금 고양이 세트 (비매품 · kind: gold): 매주 주간랭킹 1위에게 아직 없는 것 하나를 랜덤으로 준다. part = 몸의 어느 부위인지 (착용 글자)
+  // ── 황금 고양이 세트 (비매품 · kind: gold): 매주 주간랭킹 1~3위에게 아직 없는 것 하나를 랜덤으로 준다. part = 몸의 어느 부위인지 (착용 글자)
   gold_hat: { name: '황금 고양이 모자', icon: '🎩', kind: 'gold', part: 'h', price: 0, lv: 1, max: 1, nosale: true, desc: GOLD_NOTE, tip: '큼직한 귀가 쫑긋한 황금 고양이 모자.' },
   gold_mask: { name: '황금 고양이 가면', icon: '🎭', kind: 'gold', part: 'm', price: 0, lv: 1, max: 1, nosale: true, desc: GOLD_NOTE, tip: '하얀 바탕에 붉은 무늬와 황금 눈꼬리를 그린, 귀가 큰 고양이 탈.' },
   gold_gloves: { name: '황금 고양이 장갑', icon: '🧤', kind: 'gold', part: 'g', price: 0, lv: 1, max: 1, nosale: true, desc: GOLD_NOTE, tip: '분홍 발바닥 젤리가 달린 황금 고양이 장갑.' },
@@ -80,21 +80,20 @@ export const monthKey = (t = Date.now()) => dayKey(t).slice(0, 7);
 /** 경험치를 얻을 때마다: 이번 주 · 이번 달 몫에 더한다 (주·달이 바뀌었으면 0부터) */
 export function addPeriodXp(pf, amt, t = Date.now()) {
   const wk = weekKey(t), mo = monthKey(t);
-  if (pf.wk?.k !== wk) { if (pf.wk?.xp > 0) pf.pwk = pf.wk; pf.wk = { k: wk, xp: 0 }; } // 지난주 몫(pwk)은 남겨 둔다 → 주간 1위를 확정할 때 쓴다
+  if (pf.wk?.k !== wk) { if (pf.wk?.xp > 0) pf.pwk = pf.wk; pf.wk = { k: wk, xp: 0 }; } // 지난주 몫(pwk)은 남겨 둔다 → 주간 1~3위를 확정할 때 쓴다
   if (pf.mo?.k !== mo) pf.mo = { k: mo, xp: 0 };
   pf.wk.xp += amt; pf.mo.xp += amt;
 }
-/** wk 주(그 주 월요일 날짜)에 경험치를 가장 많이 얻은 사람 (없으면 null). 순서는 주간 랭킹 표와 같다: 얻은 경험치 → 총 경험치 → 이름 */
-export function weekWinner(profiles, wk, skip = () => false) {
-  let best = null;
+const rankOrder = (a, b) => b.gain - a.gain || b.xp - a.xp || (a.name < b.name ? -1 : 1);
+/** 지난주 지급 대상. 주간 랭킹과 같은 순서로 양의 경험치가 있는 상위 3명. */
+export function weeklyPodium(profiles, wk, skip = () => false) {
+  const rows = [];
   for (const [name, pf] of Object.entries(profiles)) {
     if (!pf || skip(name)) continue;
     const gain = pf.wk?.k === wk ? pf.wk.xp : pf.pwk?.k === wk ? pf.pwk.xp : 0;
-    if (!(gain > 0)) continue;
-    const xp = pf.xp || 0;
-    if (!best || gain > best.gain || (gain === best.gain && (xp > best.xp || (xp === best.xp && name < best.name)))) best = { name, gain, xp, lv: levelOf(xp) };
+    if (gain > 0) rows.push({ name, gain, xp: pf.xp || 0, lv: levelOf(pf.xp || 0) });
   }
-  return best;
+  return rows.sort(rankOrder).slice(0, 3);
 }
 /** 레벨 랭킹 표: kind = 'week' | 'month' | 'total'. 상위 n명 + 내 순위 */
 export function levelBoard(profiles, kind, n = 20, skip = () => false) {
@@ -106,7 +105,7 @@ export function levelBoard(profiles, kind, n = 20, skip = () => false) {
     if (!(gain > 0)) continue;
     rows.push({ name, lv: levelOf(xp), xp, gain });
   }
-  rows.sort((a, b) => b.gain - a.gain || b.xp - a.xp || (a.name < b.name ? -1 : 1));
+  rows.sort(rankOrder);
   return { rows: rows.slice(0, n), total: rows.length, rankOf: (name) => { const i = rows.findIndex((r) => r.name === name); return i < 0 ? null : { no: i + 1, ...rows[i] }; } };
 }
 /** stats.days[날짜] = { v: 방문 수, u: { 닉네임: 머문 시간(ms) } } */

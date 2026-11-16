@@ -293,7 +293,7 @@ export function buildSword() {
   return g;
 }
 
-// ───────────── 황금 고양이 세트 (비매품 · 주간랭킹 1위 보상)
+// ───────────── 황금 고양이 세트 (비매품 · 주간랭킹 1~3위 보상)
 //  부위마다 따로 입는다 — h 모자 · m 가면 · g 장갑 · t 상의 · b 하의 · s 신발 · l 꼬리. 원래 옷 위에 덧입는 모양이라 몸을 숨기지 않는다.
 const goldM = () => M('#ffd04a', { metalness: 0.32, roughness: 0.27, emissive: '#c79a00', emissiveIntensity: 0.5 });
 const goldD = () => M('#e5a520', { metalness: 0.36, roughness: 0.36, emissive: '#946400', emissiveIntensity: 0.46 });

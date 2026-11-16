@@ -622,7 +622,31 @@ function buildSnapBoard(root, colliders) {
   const foot = 1.35, cy = foot + H / 2;
   const metal = new THREE.MeshStandardMaterial({ color: '#2a2530', metalness: 0.6, roughness: 0.45 });
   const back = new THREE.Mesh(new THREE.BoxGeometry(W + 0.7, H + 0.7, 0.3), metal); back.position.set(0, cy, -0.18); g.add(back);
-  const rim = new THREE.Mesh(new THREE.BoxGeometry(W + 0.9, H + 0.9, 0.12), new THREE.MeshStandardMaterial({ color: '#ffd390', emissive: '#ff8c52', emissiveIntensity: 0.9 })); rim.position.set(0, cy, -0.3); g.add(rim);
+  // 겹을 나눈 금박 몰딩과 마름모 코너 장식.
+  const agedGold = new THREE.MeshStandardMaterial({ color: '#98601f', metalness: 0.52, roughness: 0.42 });
+  const gold = new THREE.MeshStandardMaterial({ color: '#d5a443', metalness: 0.48, roughness: 0.28 });
+  const highlight = new THREE.MeshStandardMaterial({ color: '#ffe2a1', metalness: 0.32, roughness: 0.24, emissive: '#a76522', emissiveIntensity: 0.18 });
+  const frame = (inset, width, depth, z, material) => {
+    const outerW = W + (inset + width) * 2;
+    const innerH = H + inset * 2;
+    const outerH = innerH + width * 2;
+    for (const side of [-1, 1]) {
+      const horizontal = new THREE.Mesh(new THREE.BoxGeometry(outerW, width, depth), material);
+      horizontal.position.set(0, cy + side * (outerH - width) / 2, z); g.add(horizontal);
+      const vertical = new THREE.Mesh(new THREE.BoxGeometry(width, innerH, depth), material);
+      vertical.position.set(side * (outerW - width) / 2, cy, z); g.add(vertical);
+    }
+  };
+  frame(0.09, 0.48, 0.36, -0.06, agedGold);
+  frame(0.15, 0.34, 0.24, 0.11, gold);
+  frame(0.10, 0.055, 0.14, 0.16, highlight);
+  frame(0.44, 0.055, 0.10, 0.22, highlight);
+  const cornerGeo = new THREE.BoxGeometry(0.28, 0.28, 0.10);
+  for (const x of [-1, 1]) for (const y of [-1, 1]) {
+    const corner = new THREE.Mesh(cornerGeo, highlight);
+    corner.rotation.z = Math.PI / 4;
+    corner.position.set(x * (W / 2 + 0.32), cy + y * (H / 2 + 0.32), 0.28); g.add(corner);
+  }
   for (const s of [-1, 1]) {
     const x = s * (W / 2 - 0.55);
     const leg = new THREE.Mesh(new THREE.BoxGeometry(0.45, foot, 0.45), metal);
@@ -661,7 +685,7 @@ function buildSnapBoard(root, colliders) {
       });
       flash = 1;
     },
-    update(dt) { if (flash > 0) { flash = Math.max(0, flash - dt * 1.5); rim.material.emissiveIntensity = 0.9 + flash * 2; } },
+    update(dt) { if (flash > 0) { flash = Math.max(0, flash - dt * 1.5); highlight.emissiveIntensity = 0.18 + flash * 0.52; } },
   };
 }
 
@@ -1051,7 +1075,7 @@ export function buildLobby(scene, opts = {}) {
   const tip = textSprite('🚪 테마 관문을 클릭하면 바로 시작! · 🎠 놀이기구도 탈 수 있어요', { size: 26, bg: 'rgba(0,0,0,.55)', maxW: 700 });
   tip.position.set(0, 7.9, 9); root.add(tip);
 
-  // ── 소원의 별 위에 주간랭킹 1위를 표시한다
+  // ── 소원의 별 위에 주간랭킹 상위 3명을 표시한다
   const champSign = (() => {
     const cv = document.createElement('canvas'); cv.width = 2048; cv.height = 256;
     const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
@@ -1062,9 +1086,13 @@ export function buildLobby(scene, opts = {}) {
     const draw = () => {
       const x = cv.getContext('2d'), W = cv.width, H = cv.height; x.clearRect(0, 0, W, H);
       if (!cur?.name) { tex.needsUpdate = true; return; }
-      const parts = [['🏆 ', FIX, '#fff4d6'], ['주간랭킹 1위는 ', FIX, '#fff4d6'], [`"${cur.name}"`, NAME, '#ffd24a'], ['님 입니다', FIX, '#fff4d6']];
+      const colors = ['#ffd24a', '#e6e8f3', '#efbe91'];
+      const parts = [[cur.last ? '🏆 지난주 ' : '🏆 이번 주 ', FIX, '#fff4d6']];
+      cur.names.forEach((name, i) => {
+        parts.push([`${i ? '   ·   ' : ''}${i + 1}위 `, FIX, '#fff4d6'], [name, NAME, colors[i]]);
+      });
       let size = 132; const widthAt = (px) => parts.reduce((a, [t, f]) => { x.font = `${px}px ${f}`; return a + x.measureText(t).width; }, 0);
-      let tw = widthAt(size); if (tw > W - 150) { size = Math.max(60, Math.floor(size * (W - 150) / tw)); tw = widthAt(size); }
+      let tw = widthAt(size); if (tw > W - 150) { size = Math.floor(size * (W - 150) / tw); tw = widthAt(size); }
       // 어두운 반투명 띠 + 황금 테두리
       const pw = Math.min(W - 8, tw + 130), ph = Math.min(H - 12, size + 78), px0 = (W - pw) / 2, py0 = (H - ph) / 2, r = ph / 2;
       x.beginPath(); x.moveTo(px0 + r, py0); x.arcTo(px0 + pw, py0, px0 + pw, py0 + ph, r); x.arcTo(px0 + pw, py0 + ph, px0, py0 + ph, r); x.arcTo(px0, py0 + ph, px0, py0, r); x.arcTo(px0, py0, px0 + pw, py0, r); x.closePath();
@@ -1081,12 +1109,13 @@ export function buildLobby(scene, opts = {}) {
       tex.needsUpdate = true;
     };
     return {
-      /** c = { name, week, last } | null */
       set(c) {
-        const key = c?.name ? `${c.name}|${c.week}` : ''; if (key === (cur?.key || '') && sp.visible === !!key) return;
-        cur = c?.name ? { ...c, key } : null; sp.visible = !!cur; draw();
-        // 글꼴이 늦게 오면 다시 그린다 (처음엔 기기 글꼴로 보일 수 있다)
-        if (cur && document.fonts?.load) Promise.all([document.fonts.load(`100px ${FIX.split(',')[0]}`, '주간랭킹 1위는 님 입니다'), document.fonts.load(`100px ${NAME.split(',')[0]}`, cur.name)]).then(() => { if (sp.parent) draw(); }).catch(() => {});
+        const names = c?.names?.length ? c.names.slice(0, 3) : c?.name ? [c.name] : [];
+        const key = names.length ? JSON.stringify([c.week, c.last, names]) : '';
+        if (key === (cur?.key || '') && sp.visible === !!key) return;
+        cur = names.length ? { ...c, name: names[0], names, key } : null;
+        sp.visible = !!cur; draw();
+        if (cur && document.fonts?.load) Promise.all([document.fonts.load(`100px ${FIX.split(',')[0]}`, '지난주 이번 주 1위 2위 3위'), document.fonts.load(`100px ${NAME.split(',')[0]}`, names.join(' '))]).then(() => { if (sp.parent) draw(); }).catch(() => {});
       },
       update(t, starY) { if (!sp.visible) return; sp.position.y = starY + 2.8; const k = 1 + Math.sin(t * 2.3) * 0.012; sp.scale.set(W0 * k, (W0 / 8) * k, 1); },
     };

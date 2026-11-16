@@ -2542,7 +2542,7 @@ function openRank(opt = {}) {
     S.rankTab = () => ({ main, theme: cur });
     const md = (k) => `${Number(k.slice(5, 7))}월 ${Number(k.slice(8, 10))}일`;
     const SUB = {
-      week: () => `이번 주(${md(data.week)} 월요일부터)에 얻은 경험치 순위예요. 매주 월요일 0시에 새로 시작해요.`,
+      week: () => `이번 주(${md(data.week)} 월요일부터)에 얻은 경험치 순위예요. 월요일 0시(한국 시간)에 마감하며, 1~3위는 아직 없는 황금 고양이 부위 1개를 무작위로 받아요.`,
       month: () => `이번 달(${Number(data.month.slice(5, 7))}월)에 얻은 경험치 순위예요. 매달 1일에 새로 시작해요.`,
       total: () => '지금까지 쌓은 레벨 순위예요. (같은 레벨이면 경험치가 많은 순)',
       theme: () => '테마를 1장부터 끝까지 클리어한 시간 순위예요. (테마마다 상위 10팀)',
@@ -2865,7 +2865,7 @@ async function loadShareInfo() {
 }
 
 // ─────────────────────────── 레벨 · 코인 · 상점 · 내 물건 · 선물
-const GOLD_ORDER = ['gold_hat', 'gold_mask', 'gold_gloves', 'gold_top', 'gold_bottom', 'gold_shoes', 'gold_tail']; // 황금 고양이 세트 (비매품 · 주간랭킹 1위 보상)
+const GOLD_ORDER = ['gold_hat', 'gold_mask', 'gold_gloves', 'gold_top', 'gold_bottom', 'gold_shoes', 'gold_tail']; // 황금 고양이 세트 (비매품 · 주간랭킹 1~3위 보상)
 const SHOP_ORDER = ['popper', 'rocket', 'wings_fairy', 'mount_pony', 'wings_angel', 'mount_broom', 'mount_cat', 'mount_dog', 'mount_unicorn', 'wings_devil', 'mount_trex', 'wings_dragon', 'sword', 'mount_ufo', 'costume_robot', 'mount_carriage', ...GOLD_ORDER, 'gold_staff'];
 const coinsText = () => (S.profile?.coins === -1 ? '∞' : String(S.profile?.coins ?? 0));
 // 손에 든 것: 0 없음 · 1 전설의 검 · 2 황금 고양이 지팡이
@@ -2936,15 +2936,15 @@ socket.on('xp', ({ add, why, lv, up }) => {
   if (up) { audio.play('bell'); if (myAvatar) burstHearts(myAvatar, 10); }
 });
 socket.on('gift', ({ from, icon, name }) => { toast(`🎁 ${from} 님이 ${icon} ${name}을(를) 선물했어요! (🎒 내 물건)`); audio.play('pickup'); if (myAvatar) burstHearts(myAvatar, 8); });
-// 우편: 주간랭킹 1위 보상처럼 꼭 알려야 하는 소식 (접속해 있지 않았다면 다음에 들어올 때 온다)
+// 우편: 주간랭킹 1~3위 보상처럼 꼭 알려야 하는 소식 (접속해 있지 않았다면 다음에 들어올 때 온다)
 socket.on('mail', ({ text }) => {
   const w = el('div', 'bag'); w.appendChild(el('div', 'mail-text', text));
   const b = el('button', 'btn primary', '🎒 내 물건 보기'); b.onclick = () => openBag(); w.appendChild(b);
-  openModal('🏆 축하합니다!', '주간랭킹 1위 보상', w);
+  openModal('🏆 축하합니다!', '주간랭킹 보상', w);
   audio.play('bell'); if (myAvatar) burstHearts(myAvatar, 12);
   addChat({ channel: 'system', text: '🎁 ' + text });
 });
-// 분수대 위 큰 글씨: 주간랭킹 1위
+// 소원의 별 위에 주간랭킹 상위 3명을 표시한다
 function setChamp(c) { S.champ = c || null; if (S.room === 'lobby') S.world?.setChamp?.(S.champ); }
 socket.on('champ', (c) => setChamp(c));
 socket.on('rank:changed', () => openRank(S.rankTab?.() || { main: 'theme' }));
@@ -3075,7 +3075,7 @@ function openShop() {
     const it = S.shop[sel]; const have = pf.items?.[sel] || 0; const locked = !it.nosale && !pf.admin && pf.lv < it.lv;
     if (it.nosale) { // 비매품: 전시만 한다 (살 수 없다)
       const goldHave = GOLD_ORDER.filter((id) => pf.items?.[id]).length;
-      info.innerHTML = `<div class="sh-t">${it.icon} ${it.name}</div><div class="sh-d">${it.desc}</div><div class="sh-d muted">${it.tip || ''}</div><div class="sh-lv">${have ? '✅ 가지고 있어요' : it.kind === 'staff' ? `황금 고양이 세트 ${goldHave}/7 모음` : '🏆 주간랭킹 1위가 되면 받을 수 있어요'}</div><div class="muted">아이템별 1개만 가질 수 있어요 · 황금 고양이 세트 ${goldHave}/7${it.kind === 'staff' ? '' : ' · 7종을 다 모으면 🪄 황금 고양이 지팡이(귀신 퇴치 무제한)'}</div>`;
+      info.innerHTML = `<div class="sh-t">${it.icon} ${it.name}</div><div class="sh-d">${it.desc}</div><div class="sh-d muted">${it.tip || ''}</div><div class="sh-lv">${have ? '✅ 가지고 있어요' : it.kind === 'staff' ? `황금 고양이 세트 ${goldHave}/7 모음` : '🏆 주간랭킹 1~3위에게 미보유 부위 1개를 무작위로 지급해요'}</div><div class="muted">아이템별 1개만 가질 수 있어요 · 황금 고양이 세트 ${goldHave}/7${it.kind === 'staff' ? '' : ' · 7종을 다 모으면 🪄 황금 고양이 지팡이(귀신 퇴치 무제한)'}</div>`;
       const nb = el('button', 'btn primary', '비매품 (살 수 없어요)'); nb.disabled = true;
       const bag2 = el('button', 'btn', '🎒 내 물건'); bag2.onclick = () => openBag();
       const row2 = el('div', 'row'); row2.append(nb, bag2); info.appendChild(row2);
@@ -3092,7 +3092,7 @@ function openShop() {
   w.append(head, top, grid);
   previewItem(sel); draw();
   S.shopRefresh = () => { if ($('#modalBody').firstChild === w) draw(); else S.shopRefresh = null; };
-  openModal('🛒 코인 상점', '날개 · 탈것 · 코스튬 · 폭죽 · 전설의 검 · 🏆 주간랭킹 1위 보상(비매품)', w);
+  openModal('🛒 코인 상점', '날개 · 탈것 · 코스튬 · 폭죽 · 전설의 검 · 🏆 주간랭킹 1~3위 보상(비매품)', w);
   $('#modal .modal-card').classList.add('shop-mode'); // 위는 고정, 아래 물건 목록만 스크롤
   const stop = () => { if ($('#modalBody').firstChild !== w || $('#modal').classList.contains('hidden')) { pv.on = false; S.shopRefresh = null; } else setTimeout(stop, 500); }; setTimeout(stop, 500);
 }

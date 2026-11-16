@@ -14,7 +14,7 @@ import { hasBadWord } from './filter.js';
 import { isAdminPassword, looksLikeAdmin, ADMIN_NAME } from './admin.js';
 import { ITEMS, START_ITEMS } from './items.js';
 import { openStore, persist, flushAll, storeKind, loadClearPhotos, saveClearPhoto } from './store.js';
-import { MAX_LV, HIDDEN_LV, ADMIN_LV, levelOf, xpAt, CLEAR_COINS, CHAPTER_XP, clearXp, timeLimitMs, SHOP, isWear, blankProfile, profileView, dayKey, statRange, pruneStats, addPeriodXp, levelBoard, weekKey, monthKey, GOLD_IDS, GOLD_STAFF, isGold, giveGold, randomGold, goldWorn, weekWinner } from './progress.js';
+import { MAX_LV, HIDDEN_LV, ADMIN_LV, levelOf, xpAt, CLEAR_COINS, CHAPTER_XP, clearXp, timeLimitMs, SHOP, isWear, blankProfile, profileView, dayKey, statRange, pruneStats, addPeriodXp, levelBoard, weekKey, monthKey, GOLD_IDS, GOLD_STAFF, isGold, giveGold, randomGold, goldWorn, weeklyPodium } from './progress.js';
 import { Accounts, clientIp } from './accounts.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -142,7 +142,7 @@ function addXp(name, amt, why) {
   if (!name || !(amt > 0)) return;
   const pf = prof(name); const before = levelOf(pf.xp);
   pf.xp += Math.round(amt); addPeriodXp(pf, Math.round(amt)); saveProfiles();
-  if (!stats.weekly?.champ?.name) { boardCache = null; pushChamp(); } // 아직 확정된 주간 1위가 없을 때는 '이번 주 지금 1위'를 분수대에 띄운다
+  if (!stats.weekly?.champ?.name) { boardCache = null; pushChamp(); } // 확정 순위가 없으면 이번 주의 현재 순위를 별 위에 표시한다
   const after = levelOf(pf.xp); const p = findByName(name);
   if (p) { io.to(p.id).emit('xp', { add: Math.round(amt), why, lv: after, up: after > before }); sendProfile(p); }
   if (after > before) {
@@ -508,7 +508,7 @@ io.on('connection', (sock) => {
   sock.on('shop:buy', (id) => {
     if (!me) return; const it = SHOP[id]; if (!it) return;
     const pf = prof(me.name); const lv = levelOf(pf.xp); const have = pf.items[id] || 0;
-    if (it.nosale) return sock.emit('toast', { text: it.kind === 'staff' ? `${it.icon} ${it.name}은(는) 비매품이에요. 황금 고양이 세트 7종을 모두 모으면 받아요.` : `${it.icon} ${it.name}은(는) 비매품이에요. 매주 주간랭킹 1위에게 랜덤으로 주어져요.` });
+    if (it.nosale) return sock.emit('toast', { text: it.kind === 'staff' ? `${it.icon} ${it.name}은(는) 비매품이에요. 황금 고양이 세트 7종을 모두 모으면 받아요.` : `${it.icon} ${it.name}은(는) 비매품이에요. 매주 주간랭킹 1~3위에게 아직 없는 부위 하나가 무작위로 주어져요.` });
     if (!me.admin && lv < it.lv) return sock.emit('toast', { text: `🔒 Lv.${it.lv} 부터 살 수 있어요. (지금 Lv.${lv})` });
     if (have >= it.max) return sock.emit('toast', { text: it.max > 1 ? `${it.icon} ${it.name}은(는) ${it.max}개까지만 가질 수 있어요.` : `${it.icon} ${it.name}은(는) 이미 가지고 있어요.` });
     if (!me.admin && (pf.coins || 0) < it.price) return sock.emit('toast', { text: `🪙 코인이 모자라요. (${it.price}코인 필요 · 지금 ${pf.coins || 0}코인)` });
@@ -881,42 +881,62 @@ function levelBoards() {
   boardAt = Date.now(); return boardCache;
 }
 
-// ───── 주간랭킹 1위: 주(월요일 0시, 한국 시간)가 바뀌면 지난주 1위를 확정한다
-//  → 분수대 위 큰 글씨 '주간랭킹 1위는 "○○"님 입니다' + 황금 고양이 세트 중 아직 없는 것 하나를 랜덤으로 지급 (7종을 다 모으면 지팡이)
-//  서버가 그 시각에 꺼져 있었어도, 다시 켜졌을 때 지난주 것을 한 번 확정한다 (stats.weekly.done = 마지막으로 확정한 주)
+// 매주 월요일 0시(한국 시간)에 지난주 상위 3명의 보상을 확정한다.
 stats.weekly ||= { done: '', champ: null, log: [] };
 const goldSetText = () => `황금 고양이 세트 7종을 모두 모았어요! ${SHOP[GOLD_STAFF].icon} ${SHOP[GOLD_STAFF].name}을(를) 받았습니다. (귀신 퇴치 무제한 · 🎒 내 물건에서 들기)`;
 const adminKit = (pf) => { let ch = false; for (const id of [...GOLD_IDS, GOLD_STAFF]) if (!pf.items[id]) { pf.items[id] = 1; ch = true; } if (ch) saveProfiles(); };
-/** 분수대에 띄울 이름: 지난주에 확정된 1위. 아직 없으면(기능이 켜진 첫 주 · 지난주에 아무도 안 했을 때) 이번 주 지금 1위 */
 function champView() {
-  const c = stats.weekly?.champ;
-  if (c?.name) return { name: c.name, week: c.k, last: true };
-  const top = levelBoards().week.rows[0];
-  return top ? { name: top.name, week: weekKey(), last: false } : null;
+  const { champ, podium } = stats.weekly;
+  // 기존 1위 기록도 새 서버에서 표시할 수 있다.
+  const previous = podium ?? (champ ? [champ] : []);
+  const rows = previous.length ? previous : levelBoards().week.rows.slice(0, 3);
+  return rows.length ? { name: rows[0].name, names: rows.map((r) => r.name), week: previous[0]?.k || weekKey(), last: !!previous.length } : null;
 }
 let champSent = null;
-function pushChamp(force) { const v = champView(); const key = v ? `${v.name}|${v.week}|${v.last}` : ''; if (!force && key === champSent) return; champSent = key; io.emit('champ', v); }
-/** 우편: 접속해 있으면 바로, 아니면 다음에 들어올 때 보여 준다 (보상 알림) */
-function mail(name, text) { const pf = prof(name); (pf.mail ||= []).push({ text, at: Date.now() }); if (pf.mail.length > 10) pf.mail.splice(0, pf.mail.length - 10); saveProfiles(); flushMail(findByName(name)); }
+function pushChamp(force) { const v = champView(); const key = JSON.stringify(v); if (!force && key === champSent) return; champSent = key; io.emit('champ', v); }
+/** 우편: 접속해 있지 않으면 다음에 들어올 때 보상 알림을 보여 준다. */
 function flushMail(p) { if (!p || p.offline) return; const pf = prof(p.name); if (!pf.mail?.length) return; const list = pf.mail; pf.mail = []; saveProfiles(); for (const m of list) io.to(p.id).emit('mail', m); }
+function awardWeeklyRank(row) {
+  const pf = prof(row.name);
+  if (pf.weeklyGold?.k === row.k) return;
+  const item = row.item ? SHOP[row.item] : null;
+  const reward = row.item ? giveGold(pf, row.item) : { staff: false };
+  pf.weeklyGold = { k: row.k, item: row.item };
+  const text = item
+    ? `🏆 지난주 주간랭킹 ${row.rank}위! ${item.icon} ${item.name}을(를) 받았어요. (🎒 내 물건)`
+    : `🏆 지난주 주간랭킹 ${row.rank}위! 황금 고양이 세트 7종을 이미 모두 가지고 있어요.`;
+  (pf.mail ||= []).push({ text, at: row.at });
+  if (reward.staff) pf.mail.push({ text: goldSetText(), at: row.at });
+  if (pf.mail.length > 10) pf.mail.splice(0, pf.mail.length - 10);
+  saveProfiles();
+  const player = findByName(row.name);
+  flushMail(player);
+  sendProfile(player);
+}
 function checkWeek(now = Date.now()) {
   const w = stats.weekly, prev = weekKey(now - 7 * 86400000);
-  if (w.done === prev) return null;
-  const first = !w.done; w.done = prev;
-  if (first) { saveStats(); return null; } // 이 기능이 처음 켜진 주: 지난주 기록이 온전하지 않으므로 지급 없이 넘어간다 (다음 월요일부터 시작)
-  const top = weekWinner(profiles, prev, (n) => n === ADMIN_NAME || n.startsWith(ADMIN_NAME + '#'));
+  if (w.done === prev) {
+    for (const row of w.podium || []) awardWeeklyRank(row);
+    return null;
+  }
+  const first = !w.done;
+  w.done = prev;
+  if (first) { saveStats(); return null; }
+  const winners = weeklyPodium(profiles, prev, (n) => n === ADMIN_NAME || n.startsWith(ADMIN_NAME + '#'));
+  w.podium = winners.map((winner, i) => {
+    const pf = prof(winner.name);
+    const item = pf.weeklyGold?.k === prev ? pf.weeklyGold.item : randomGold(pf) || '';
+    return { ...winner, k: prev, rank: i + 1, item, at: now };
+  });
+  w.champ = w.podium[0] || null;
+  if (w.podium.length) { (w.log ||= []).push(...w.podium); w.log = w.log.slice(-180); }
   boardCache = null;
-  if (!top) { w.champ = null; saveStats(); pushChamp(); return null; } // 지난주에 아무도 경험치를 얻지 못했다
-  const pf = prof(top.name);
-  const id = randomGold(pf); const r = id ? giveGold(pf, id) : { added: false, staff: false };
-  w.champ = { k: prev, name: top.name, gain: top.gain, lv: top.lv, item: id || '', at: now };
-  (w.log ||= []).push(w.champ); if (w.log.length > 60) w.log.shift();
-  saveStats(); saveProfiles();
-  const it = id ? SHOP[id] : null;
-  io.emit('celebrate', { name: top.name, kind: 'weekly', text: it ? `🏆 지난주 주간랭킹 1위는 ${top.name} 님! ${it.icon} ${it.name}을(를) 받았습니다!` : `🏆 지난주 주간랭킹 1위는 ${top.name} 님!` });
-  mail(top.name, it ? `🏆 지난주 주간랭킹 1위! 보상으로 ${it.icon} ${it.name}을(를) 받았어요. (🎒 내 물건에서 입고 벗을 수 있어요)` : '🏆 지난주 주간랭킹 1위! 황금 고양이 세트는 이미 모두 가지고 있어요.');
-  if (r.staff) mail(top.name, goldSetText());
-  sendProfile(findByName(top.name));
+  saveStats();
+  for (const row of w.podium) awardWeeklyRank(row);
+  if (w.podium.length) {
+    const placements = w.podium.map(({ name, rank }) => `${rank}위 ${name}`).join(' · ');
+    io.emit('celebrate', { name: w.champ.name, kind: 'weekly', text: `🏆 지난주 주간랭킹 ${placements} · 황금 고양이 보상을 확인하세요!` });
+  }
   pushChamp(true);
   return w.champ;
 }
