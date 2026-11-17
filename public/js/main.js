@@ -351,9 +351,12 @@ function rebuildMyAvatar() {
   myAvatar = makeAvatar(S.me, S.myName, look, true);
   myAvatar.position.set(me.x, 0, me.z); setLight(myAvatar, S.light);
 }
-function setBubble(g, text) {
+function setBubble(g, text, channel = 'all') {
   if (g.userData.bubble) removeLabel(g.userData.bubble);
-  const b = textSprite(text, { size: 30, bg: '#f6efe2', color: '#140c10', maxW: 380, border: '#3a2a30', tail: true });
+  // 전체 채팅은 크림색, 파티 채팅은 하늘색 말풍선
+  const b = channel === 'party'
+    ? textSprite(text, { size: 30, bg: '#b9dcff', color: '#0b1d2e', maxW: 380, border: '#1f6fb5', tail: true })
+    : textSprite(text, { size: 30, bg: '#ffe6a3', color: '#140c10', maxW: 380, border: '#b8830f', tail: true });
   addLabel(g, b, 2.0 + b.scale.y / 2); g.userData.bubble = b;
   clearTimeout(g.userData.bt); g.userData.bt = setTimeout(() => { if (g.userData.bubble === b) { removeLabel(b); g.userData.bubble = null; } }, 6000);
 }
@@ -1076,7 +1079,23 @@ function drawMinimap(dt, t) {
       mmx.beginPath(); mmx.arc(x, z, ent.data.kind === 'door' ? 3.5 : 2.2, 0, Math.PI * 2); mmx.fill();
     }
   }
-  for (const g of S.others.values()) { const [x, z] = P(g.position.x, g.position.z); mmx.fillStyle = g.userData.inParty ? '#8fd3ff' : '#ddd'; mmx.beginPath(); mmx.arc(x, z, 3.5, 0, Math.PI * 2); mmx.fill(); }
+  // 다른 사람: 회색 점 · 파티 친구: 하늘색 큰 점 + 흰 테두리 + 이름 (지도 밖이면 가장자리에 붙여서)
+  const clampP = (x, z) => [Math.max(6, Math.min(W - 6, x)), Math.max(6, Math.min(H - 6, z))];
+  const others = [...S.others.values()].filter((g) => g.visible !== false);
+  for (const g of others) {
+    if (g.userData.inParty) continue;
+    const [x, z] = clampP(...P(g.position.x, g.position.z));
+    mmx.fillStyle = 'rgba(225,220,230,.85)'; mmx.strokeStyle = 'rgba(0,0,0,.6)'; mmx.lineWidth = 1;
+    mmx.beginPath(); mmx.arc(x, z, 3, 0, Math.PI * 2); mmx.fill(); mmx.stroke();
+  }
+  for (const g of others) {
+    if (!g.userData.inParty) continue;
+    const [x, z] = clampP(...P(g.position.x, g.position.z));
+    const pulse = 1 + Math.sin(t * 4) * 0.25;
+    mmx.strokeStyle = 'rgba(95,184,255,.45)'; mmx.lineWidth = 2; mmx.beginPath(); mmx.arc(x, z, 8 * pulse, 0, Math.PI * 2); mmx.stroke();
+    mmx.fillStyle = '#4fb4ff'; mmx.strokeStyle = '#fff'; mmx.lineWidth = 1.5;
+    mmx.beginPath(); mmx.arc(x, z, 5, 0, Math.PI * 2); mmx.fill(); mmx.stroke();
+  }
   for (const p of S.pings) { const [x, z] = P(p.x, p.z); mmx.strokeStyle = '#ff5a4a'; mmx.lineWidth = 2; mmx.beginPath(); mmx.arc(x, z, 5 + Math.sin(t * 8) * 2, 0, Math.PI * 2); mmx.stroke(); }
   const nowMs = performance.now();
   for (const c of S.callouts) {
@@ -2094,7 +2113,7 @@ function addChat(m) {
   if (m.fromId) {
     const avatar = m.fromId === S.me ? myAvatar : S.others.get(m.fromId);
     if (avatar) {
-      setBubble(avatar, m.text);
+      setBubble(avatar, m.text, m.channel);
       avatar.userData.bubble.userData.chatChannel = m.channel;
     }
   }
@@ -2410,7 +2429,7 @@ function renderParty() {
       if (info) $('#scenarioDesc').textContent = diffText(info.difficulty || 3) + '\n' + info.desc;
       sel.innerHTML = ''; const t = info?.chapters?.[pk.chapter];
       if (t) { const o = el('option', null, (pk.chapter === 0 ? '처음부터: ' : '이어하기: ') + t); o.value = pk.chapter; sel.appendChild(o); }
-      $('#fearSel').value = String(pk.fear);
+      $('#fearSel').value = String(pk.fear); tintFear($('#fearSel'));
     }
   }
 }
@@ -2422,7 +2441,9 @@ function sendPick() {
 $('#nudgeBtn').onclick = () => socket.emit('party:nudge');
 $('#startBtn').onclick = () => { audio.init(); store.set('gwimun-fear', Number($('#fearSel').value)); store.set('gwimun-scenario', $('#scenarioSel').value); socket.emit('party:start', { scenario: $('#scenarioSel').value, chapter: Number($('#chapterSel').value || 0), fear: Number($('#fearSel').value) }); };
 $('#scenarioSel').onchange = () => { store.set('gwimun-scenario', $('#scenarioSel').value); $('#chapterSel').value = ''; renderParty(); sendPick(); };
-$('#fearSel').addEventListener('change', sendPick);
+// 공포도 선택창: 공포도에 따라 색이 달라진다 (0 초록 · 1 하늘 · 2 주황 · 3 빨강)
+function tintFear(sel) { if (sel) sel.dataset.fear = sel.value; }
+$('#fearSel').addEventListener('change', () => { tintFear($('#fearSel')); sendPick(); });
 $('#rankBtn').onclick = () => openRank();
 
 // ─────────────────────────── 로비 놀이공원: 앉기 · 올라가기 · 놀이기구 타기
@@ -2550,7 +2571,8 @@ function openThemePop(id) {
   const fear = el('select'); fear.innerHTML = $('#fearSel').innerHTML; fear.value = member && p.pick ? String(p.pick.fear) : $('#fearSel').value;
   const chap = el('select'); chap.innerHTML = $('#chapterSel').innerHTML; chap.value = $('#chapterSel').value;
   if (member) { fear.disabled = chap.disabled = true; }
-  fear.onchange = () => { $('#fearSel').value = fear.value; sendPick(); };
+  fear.classList.add('fear-sel'); tintFear(fear);
+  fear.onchange = () => { $('#fearSel').value = fear.value; tintFear(fear); tintFear($('#fearSel')); sendPick(); };
   chap.onchange = () => { $('#chapterSel').value = chap.value; sendPick(); };
   rows.append(el('label', null, '공포도'), fear, el('label', null, '챕터'), chap);
   card.appendChild(rows);
@@ -2648,7 +2670,7 @@ function openRank(opt = {}) {
   });
 }
  $('#chapterSel').addEventListener('change', sendPick);
-$('#fearSel').value = String(store.get('gwimun-fear', 2));
+$('#fearSel').value = String(store.get('gwimun-fear', 2)); tintFear($('#fearSel'));
 $('#leaveBtn').onclick = () => socket.emit('party:leave');
 $('#quitBtn').onclick = () => { S.mobileClose?.(); askConfirm('로비로 돌아가기', '정말 로비로 돌아갈까요? 도달한 챕터는 이어하기로 저장됩니다.', '로비로 돌아가기', () => socket.emit('party:quit')); };
 function renderRoster() {
@@ -2716,7 +2738,8 @@ function renderVoiceUI() {
   const on = voice.micOn;
   $('#micBtn').textContent = on ? '🎙️ 마이크 켜짐' : '🎙️ 마이크 꺼짐'; $('#micBtn').classList.toggle('primary', on);
   const mode = effectiveVoiceMode();
-  const vm = $('#voiceModeBtn'); if (vm) { vm.classList.toggle('hidden', S.themeComms); vm.textContent = mode === 'all' ? '🔊 듣기: 전체' : '🔊 듣기: 파티'; }
+  const vm = $('#voiceModeBtn'); if (vm) { vm.classList.toggle('hidden', S.themeComms); vm.textContent = mode === 'all' ? '🔊 듣기: 전체' : '🔊 듣기: 파티'; vm.classList.toggle('v-all', mode === 'all'); vm.classList.toggle('v-party', mode !== 'all'); }
+  $('#micBtn').classList.toggle('v-all', on && mode === 'all'); $('#micBtn').classList.toggle('v-party', on && mode !== 'all');
   const mb = document.querySelector('.abtn.mic'); if (mb) { mb.classList.toggle('on', on); mb.title = mode === 'all' ? '마이크 · 듣기: 전체' : '마이크 · 듣기: 파티'; }
   const vp = $('#voicePanel');
   if (vp) {

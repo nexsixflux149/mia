@@ -92,6 +92,15 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); c
 #chatLog .m.system { color: var(--muted); font-style: italic; }
 #chatInput { width: 100%; border: 0; border-top: 1px solid var(--line); background: #0f0c10; color: var(--text); padding: 9px 10px; font-family: var(--ui); font-size: 14px; outline: none; }
 #chatInput.party { box-shadow: inset 3px 0 0 #8fd3ff; }
+/* 전체 = 금색, 파티 = 하늘색 */
+.tab[data-ch="all"].active { color: #ffd36a; background: rgba(255,200,80,.10); box-shadow: inset 0 -2px 0 #ffc94a; }
+.tab[data-ch="party"].active { color: #8fd3ff; background: rgba(90,170,255,.12); box-shadow: inset 0 -2px 0 #5fb8ff; }
+#chatInput:not(.party) { box-shadow: inset 3px 0 0 #ffc94a; }
+#chatLog .m:not(.party):not(.system) .ch { color: #ffd36a; }
+#voiceModeBtn.v-all, #voicePanel .vp-mode[data-m="all"].primary { background: #3a2c08; color: #ffd36a; border-color: #c99a2e; }
+#voiceModeBtn.v-party, #voicePanel .vp-mode[data-m="party"].primary { background: #0c2740; color: #8fd3ff; border-color: #3f8fd0; }
+#micBtn.primary.v-all { background: #b8860b; border-color: #ffc94a; color: #fff; }
+#micBtn.primary.v-party { background: #2a6fb0; border-color: #5fb8ff; color: #fff; }
 
 #inventory { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 6px; max-width: calc(100vw - 420px); flex-wrap: wrap; justify-content: center; }
 .slot { position: relative; width: 50px; height: 50px; border-radius: 10px; background: #19141a; border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 26px; cursor: pointer; }
@@ -882,3 +891,13 @@ body.mobile #login.tiny .logo, body.mobile #login.tiny .pv-wrap, body.mobile #lo
 .xmas-pop .xp-t { font-size: 26px; font-weight: 900; margin-top: 8px; color: #ffe27a; text-shadow: 0 2px 0 #5a0008; }
 .xmas-pop .xp-s { font-size: 14px; margin-top: 6px; opacity: .9; }
 @keyframes xmasIn { to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+/* 공포도 선택창 색: 0 초록 · 1 하늘 · 2 주황 · 3 빨강 */
+#fearSel[data-fear="0"], .fear-sel[data-fear="0"] { background: #0f2a14 !important; color: #8dffa0 !important; border-color: #3fae55 !important; }
+#fearSel[data-fear="1"], .fear-sel[data-fear="1"] { background: #0d2333 !important; color: #8fd3ff !important; border-color: #3f8fd0 !important; }
+#fearSel[data-fear="2"], .fear-sel[data-fear="2"] { background: #33200a !important; color: #ffbf6a !important; border-color: #d0822a !important; }
+#fearSel[data-fear="3"], .fear-sel[data-fear="3"] { background: #3a0c10 !important; color: #ff8a8a !important; border-color: #e0313d !important; box-shadow: 0 0 8px rgba(224,49,61,.45); }
+#fearSel option, .fear-sel option { background: #141015; }
+#fearSel option[value="0"], .fear-sel option[value="0"] { color: #8dffa0; }
+#fearSel option[value="1"], .fear-sel option[value="1"] { color: #8fd3ff; }
+#fearSel option[value="2"], .fear-sel option[value="2"] { color: #ffbf6a; }
+#fearSel option[value="3"], .fear-sel option[value="3"] { color: #ff8a8a; }
