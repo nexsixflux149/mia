@@ -391,7 +391,7 @@ export class AudioFX {
     const now = performance.now();
     if (level <= 0) { this.chaseOn = false; return; }
     if (!this.chaseOn) { this.chaseOn = true; this.chaseStep = 0; this.play('sting_low'); }
-    if (this.score) return; // 테마 배경음악이 절정 구간으로 바뀌어 대신 긴장감을 올린다
+    if (this.xmasMechanical || this.score) return; // 전용 BGM 위에 기존 추격음을 겹치지 않는다
     const gap = 330 - level * 130;
     if (now - (this.lastChase || 0) < gap) return;
     this.lastChase = now;
@@ -403,13 +403,13 @@ export class AudioFX {
   }
 
   heartbeat(level) { // 0~1
-    if (this.ctx && this.xmasMechanical) return this.xmasEffect('heartbeat');
     if (!this.ctx) return;
     const now = performance.now();
     if (level <= 0) return;
     const gap = 1100 - level * 650;
     if (now - (this.lastBeat || 0) < gap) return;
     this.lastBeat = now;
+    if (this.xmasMechanical) return this.xmasEffect('heartbeat');
     this.tone(55, 0.14, { type: 'sine', gain: 0.35 * level + 0.1, release: 0.1, slide: 40 });
     this.tone(50, 0.12, { type: 'sine', gain: 0.25 * level + 0.08, release: 0.1, at: 0.18, slide: 38 });
   }
