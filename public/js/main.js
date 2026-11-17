@@ -1294,7 +1294,7 @@ function openSignal(sg) {
 }
 socket.on('lock:result', ({ ok }) => {
   const d = $('.lock-display');
-  if (ok) { audio.play('unlock'); if (d) d.classList.add('ok'); setTimeout(closeModal, 500); }
+  if (ok) { if (!audio.xmasMechanical) audio.play('unlock'); if (d) d.classList.add('ok'); setTimeout(closeModal, 500); }
   else { audio.play('wrong'); if (d) { d.classList.remove('shake'); void d.offsetWidth; d.classList.add('shake'); } if (S.lockCtx?.reset) setTimeout(S.lockCtx.reset, 400); if (S.lockCtx && ['buttons', 'digits', 'text'].includes(S.lockCtx.input)) { S.lockCtx.val = S.lockCtx.input === 'buttons' ? [] : ''; setTimeout(renderLockVal, 400); } }
 });
 socket.on('game:story', (s) => { queueStory(s); addJournal(s.title, s.text, 'story'); });

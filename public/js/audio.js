@@ -452,17 +452,17 @@ export class AudioFX {
     if (name === 'step') { pulse(105, 71, .06, 0, .032); this.noise(.027, { freq: 1450, q: 5, gain: .032 }); return; }
     if (name === 'heartbeat') { pulse(66, 48, .10, 0, .04); pulse(56, 43, .08, .14, .027); return; }
     if (/scream|sting|growl|glitch|bang|thunder|wrong/.test(name)) {
-      pulse(345, 68, .33, 0, .17); pulse(177, 46, .42, .11, .12);
-      this.noise(.28, { freq: 1680, q: 5, gain: .15, release: .21 });
+      this.tone(142, .22, { type: 'triangle', slide: 72, gain: .063, attack: .026, release: .12 });
+      this.tone(89, .14, { type: 'sine', slide: 57, at: .085, gain: .033, attack: .018, release: .085 });
       return;
     }
     if (/door|creak|gate|chain|whisper|breath|giggle|drag|laugh/.test(name)) {
-      pulse(310, 124, .14); pulse(184, 330, .12, .13, .048);
-      this.noise(.19, { freq: 920, q: 5, gain: .095, release: .13 });
+      this.tone(178, .16, { type: 'triangle', slide: 106, gain: .045, attack: .022, release: .085 });
+      this.noise(.10, { freq: 390, q: 1, gain: .024, attack: .02, release: .065 });
       return;
     }
     if (/unlock|pickup|bell|story|clear/.test(name)) {
-      [460, 635, 910].forEach((f, i) => pulse(f, f * .93, .108, i * .067));
+      [262, 330].forEach((f, i) => this.tone(f, .12, { type: 'triangle', slide: f * .96, at: i * .072, gain: .043, attack: .016, release: .065 }));
       return;
     }
     pulse(780, 435, .075, 0, .043);
