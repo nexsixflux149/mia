@@ -872,3 +872,11 @@ body.mobile #login.tiny .logo, body.mobile #login.tiny .pv-wrap, body.mobile #lo
 .wish-coffee { width: 100%; font-size: 16px; padding: 11px; }
 .wish-close { width: 100%; }
 @keyframes wishFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+
+/* 🎄 크리스마스 선물 팝업: 가운데에 떴다가 위로 사라진다 */
+.xmas-pop { position: fixed; left: 50%; top: 38%; transform: translate(-50%, -50%) scale(.6); z-index: 9000; pointer-events: none; text-align: center; padding: 22px 34px; border-radius: 22px; background: linear-gradient(160deg, rgba(170,18,30,.95), rgba(90,8,16,.95)); border: 3px solid #ffd23a; box-shadow: 0 0 40px rgba(255,210,58,.55), 0 10px 30px rgba(0,0,0,.5); color: #fff6dc; opacity: 0; animation: xmasIn .5s cubic-bezier(.2,1.6,.4,1) forwards; transition: opacity .8s, transform .8s; }
+.xmas-pop.out { opacity: 0 !important; transform: translate(-50%, -80%) scale(.95) !important; }
+.xmas-pop .xp-i { font-size: 54px; line-height: 1; }
+.xmas-pop .xp-t { font-size: 26px; font-weight: 900; margin-top: 8px; color: #ffe27a; text-shadow: 0 2px 0 #5a0008; }
+.xmas-pop .xp-s { font-size: 14px; margin-top: 6px; opacity: .9; }
+@keyframes xmasIn { to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }

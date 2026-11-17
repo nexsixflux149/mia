@@ -8,7 +8,7 @@ import { AudioFX } from './audio.js';
 import { jumpscare, pickScare } from './scare.js';
 import { Voice } from './voice.js';
 import { FX, makeBeam } from './fx.js';
-import { applyGear, animateGear, initFx, updateFx, popperFx, rocketFx, swordFx, shatterFx, fartFx } from './gear.js';
+import { applyGear, animateGear, initFx, updateFx, popperFx, rocketFx, swordFx, shatterFx, fartFx, giftPuffFx, buildCashStack } from './gear.js';
 import { FRAMES, shootPhoto, composePhoto, drawStampCard, loadPhotoFonts } from './photo.js';
 import { GraphicsUpgrade } from './graphics-upgrade.js';
 import { gfx } from './visual-upgrade.js';
@@ -85,7 +85,7 @@ const S = {
   crouch: false, run: false, pings: [], callouts: [], journal: store.get('gwimun-journal', []).filter((j) => j && j.sc),
   mouse: { x: 0, y: 0 }, danger: 0, ghosts: new Map(),
   fear: 2, em: '', emT: 0, eid: 0, labels: [], hearts: 0, flyHearts: [],
-  profile: null, shop: {}, riding: false, holdSword: false, holdStaff: false, champ: null, hiddenOk: false, vlv: new Map(), vrings: [],
+  profile: null, shop: {}, riding: false, holdSword: false, holdStaff: false, holdSaw: false, champ: null, hiddenOk: false, vlv: new Map(), vrings: [],
   floor: new URLSearchParams(location.search).get('floor') || 'burgundy', // 주소 끝 ?floor=0~4로 기존 바닥 미리보기
 };
 const SET = Object.assign({ volume: 0.8, voice: 1, sens: 1, quality: (matchMedia('(pointer: coarse)').matches || innerWidth < 760) ? 'medium' : 'high', brightness: 1, minimap: true, gfx: true }, store.get('gwimun-settings', {}));
@@ -362,10 +362,11 @@ function setBubble(g, text) {
 function resetInput() { S.joy = null; S.moveTarget = null; S.pendingInteract = null; for (const k in keys) keys[k] = false; const kb = document.getElementById('joyKnob'); if (kb) kb.style.transform = ''; document.getElementById('joy')?.classList.remove('act'); }
 function enterLobby(pos) {
   if (fx.soft && !S.softWarned) { S.softWarned = true; setTimeout(() => toast(/chrome|crios/i.test(navigator.userAgent) && !/edg\//i.test(navigator.userAgent) ? '🐢 크롬 그래픽 가속이 꺼져 있어 화면이 끊길 수 있어요. 크롬 설정 → 시스템 → 「가능한 경우 그래픽 가속 사용」을 켜고 크롬을 다시 시작해 주세요.' : '🐢 브라우저 그래픽 가속이 꺼져 있어 화면이 끊길 수 있어요. 브라우저 설정에서 그래픽(하드웨어) 가속을 켜 주세요.'), 2500); }
-  resetInput();
+  resetInput(); removeCash();
   restoreFaded(); graphics.leave(); // 반투명해진 물체를 먼저 정리하고, 바꿔 둔 재질을 원래대로 돌린 뒤 세계를 지운다
   disposeWorld(scene, S.world);
   S.world = buildLobby(scene, { hidden: !!(S.hiddenOk || S.admin), champ: S.champ, floor: S.floor });
+  if (S.profile?.items?.costume_xmas || S.xmasGot) S.world.xmasGift?.hide();
   showSnaps();
   socket.emit('snap:list', mergeClearPhotos);
   flushClearPhotos();
@@ -384,6 +385,30 @@ function enterLobby(pos) {
   renderer.toneMappingExposure = 1.5;
   renderParty();
 }
+// ───── 💵 돈다발: 서버가 3% 확률로 고른 챕터 하나에만 나타난다. 자리는 시드로 정해서 모두에게 같은 곳에 보인다
+let cashObj = null;
+function removeCash() { if (cashObj) { scene.remove(cashObj); cashObj = null; } }
+function placeCash(seed, ch) {
+  let a = seed >>> 0; const rnd = () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const [W, D] = ch.size || [12, 12], [sx, sz] = ch.spawn, cols = S.world?.colliders || [];
+  const hitCol = (x, z, m) => cols.some((c) => !(c.objId && S.world.objects?.[c.objId] && !S.world.objects[c.objId].visible) && Math.abs(c.x - x) < c.hw + m && Math.abs(c.z - z) < c.hd + m);
+  const ok = (x, z) => {
+    if (Math.abs(x) > W / 2 - 0.8 || Math.abs(z) > D / 2 - 0.8 || hitCol(x, z, 0.7)) return false;
+    if ((ch.objects || []).some((o) => Math.hypot(o.x - x, o.z - z) < 1.1)) return false; // 단서 · 물건 바로 옆은 피한다
+    const n = Math.ceil(Math.hypot(x - sx, z - sz) / 0.3); for (let i = 1; i < n; i++) if (hitCol(sx + ((x - sx) * i) / n, sz + ((z - sz) * i) / n, 0.25)) return false; // 시작 자리에서 걸어갈 수 있게
+    return true;
+  };
+  let px = null, pz = null;
+  for (let i = 0; i < 300 && px == null; i++) { const ang = rnd() * Math.PI * 2, r = 2 + rnd() * 6, x = sx + Math.cos(ang) * r, z = sz + Math.sin(ang) * r; if (ok(x, z)) { px = x; pz = z; } }
+  if (px == null) for (let i = 0; i < 16 && px == null; i++) { const ang = (i / 16) * Math.PI * 2, x = sx + Math.cos(ang) * 1.6, z = sz + Math.sin(ang) * 1.6; if (!hitCol(x, z, 0.4)) { px = x; pz = z; } }
+  if (px == null) { px = sx + 1.2; pz = sz; }
+  cashObj = buildCashStack(); cashObj.position.set(px, 0, pz); cashObj.userData.sent = false; scene.add(cashObj);
+}
+socket.on('cash:gone', ({ by }) => {
+  if (!cashObj) return;
+  const { x, z } = cashObj.position; giftPuffFx(x, 0.3, z); removeCash();
+  if (by === S.me) { audio.play('pickup'); audio.play('firework'); }
+});
 function enterChapter(state, showIntro = true) {
   resetInput();
   setGameClock(state.elapsed, state.timed); setHintsUsed(state.hintsUsed ?? 0); S.limitMs = state.limitMs || 0;
@@ -402,6 +427,7 @@ function enterChapter(state, showIntro = true) {
   me.ry = Math.PI; cam.yaw = bestOpenYaw(); // 시작 지점이 벽에 붙어 있으면 카메라가 머리 속으로 파고들지 않게 가장 트인 쪽에서 비춘다
   S.moveTarget = null; S.pendingInteract = null;
   removeGhost(); clearOthers(); clearPings();
+  removeCash(); if (state.cash != null) placeCash(state.cash, ch);
   $('#placeTitle').textContent = ch.title; $('#placeTitle').appendChild(Object.assign(el('span', 'limit-tag'), { id: 'limitTag' }));
   $('#placeSub').textContent = ch.place;
   $('#objective').classList.remove('hidden');
@@ -543,7 +569,7 @@ function hoverCheck(e) {
   let label = null;
   const th = S.room === 'lobby' ? pickTheme(e.clientX, e.clientY) : null;
   if (th) label = `${THEME_INFO[th]?.title || ''} — 클릭해서 시작`;
-  else if (S.room === 'lobby') { const ck = pickClickable(e.clientX, e.clientY); if (ck) label = { mailbox: '📮 고객소리함 — 버그 · 건의사항 보내기', wishstar: '🌠 소원의 별 — 소원빌기' }[ck] || null; }
+  else if (S.room === 'lobby') { const ck = pickClickable(e.clientX, e.clientY); if (ck) label = { mailbox: '📮 고객소리함 — 버그 · 건의사항 보내기', wishstar: '🌠 소원의 별 — 소원빌기', xmasgift: '🎁 크리스마스 선물상자 — 선물받기' }[ck] || null; }
   if (id) { const ent = S.world.objects[id]; label = (ent.done ? '✓ ' : '') + (ent.data.label || '') + (distTo(ent) > reach(ent) ? '  (클릭하면 다가감)' : ''); }
   else if (!th) { const av = pickAvatar(e.clientX, e.clientY); if (av) label = `${av.userData.name} (클릭: 메뉴)`; }
   canvas.style.cursor = label ? 'pointer' : 'default';
@@ -671,7 +697,7 @@ function updateMove(dt) {
   if (sneak !== !!S.sneak) { S.sneak = sneak; updateStatus(); }
   const run = !!(runKey || (S.mRun && S.joy)) && !S.crouch && !sneak;
   if (run !== S.run) { S.run = run; updateStatus(); }
-  const speed = (sneak ? 1.5 : S.crouch ? 2.0 : run ? 6.2 : 4.0) * (S.riding ? 1.5 : 1); // 탈것을 탄 동안 1.5배
+  const speed = (sneak ? 1.5 : S.crouch ? 2.0 : run ? 6.2 : 4.0) * (S.riding ? (S.profile?.equip?.mount === 'mount_turtle' ? 2 : 1.5) : 1); // 탈것을 탄 동안 1.5배 (거북이는 2배)
   if (ix || iz) {
     S.moveTarget = null; S.pendingInteract = null;
     const sin = Math.sin(cam.yaw), cos = Math.cos(cam.yaw);
@@ -1069,6 +1095,7 @@ function loop() {
     updateMove(dt);
     animateAvatar(myAvatar, dt, me.moving, t, S.crouch || S.sneak, S.em || null, S.emT);
     applyGear(myAvatar, myGear()); animateGear(myAvatar, t, dt, me.moving);
+    if (cashObj) { cashObj.userData.anim(t); if (!cashObj.userData.sent && S.room === 'game' && Math.hypot(me.x - cashObj.position.x, me.z - cashObj.position.z) < 0.9) { cashObj.userData.sent = true; socket.emit('cash:take'); setTimeout(() => { if (cashObj) cashObj.userData.sent = false; }, 3000); } }
     updateOthers(dt, t);
     updateVoiceRings(dt);
     updateCamera(dt);
@@ -2407,6 +2434,7 @@ function lobbyAct(id) {
   if (id === 'shop') { setTimeout(openShop, 160); return; }
   if (id === 'mailbox') { setTimeout(openFeedback, 160); return; }
   if (id === 'wishstar') { setTimeout(openWish, 160); return; }
+  if (id === 'xmasgift') { if (!xmasGiftLeft()) return; if (S.xmasBusy) return; S.xmasBusy = true; audio.play('click'); socket.emit('xmas:claim'); setTimeout(() => { S.xmasBusy = false; }, 3000); return; }
   if (S.riding) { S.riding = false; S.wasRiding = true; } // 벤치·놀이기구에서 내리면 다시 탈것에 탄다
   if (S.perch && id === 'off') { S.perch = null; me.y = 0; [me.x, me.z] = collide(me.x + Math.sin(me.ry) * 1.2, me.z + Math.cos(me.ry) * 1.2); return; }
   const it = S.world?.interactives?.find((i) => i.id === id); if (!it) return;
@@ -2435,15 +2463,34 @@ function lobbyAct(id) {
     { let c; do { c = Math.floor(Math.random() * 10); } while (c === S.lastBalloon); S.lastBalloon = c; S.snack = 'b' + c; } S.balloonAt = performance.now(); // 열 가지 색 중 무작위 (바로 전 색은 피한다) audio.play('balloon_get'); updateGearButtons();
     toast('🎈 삐에로가 풍선을 줬어요! 30초 뒤엔 하늘로 날아가요~');
   } else if (it.kind === 'snack') {
-    const kind = it.id === 'coffee' ? 'c' : 'p';
-    if (S.snack && S.snack[0] === kind && S.snack[1] === '3') { toast(kind === 'c' ? '☕ 이미 가득 찬 커피를 들고 있어요!' : '🍿 이미 가득 찬 팝콘을 들고 있어요!'); return; }
+    const kind = { coffee: 'c', hotdog: 'h', cottoncandy: 's' }[it.id] || 'p', sk = SNACK_INFO[kind];
+    if (S.snack && S.snack[0] === kind && S.snack[1] === '3') { toast(`${sk.icon} 이미 가득 찬 ${sk.name}${sk.ga} 들고 있어요!`); return; }
     S.snack = kind + '3'; audio.play(kind === 'c' ? 'coffee_get' : 'popcorn_get'); updateGearButtons();
-    toast(kind === 'c' ? '☕ STARMIA 커피를 받았어요! N 키(또는 ☕ 버튼)로 3번 마실 수 있어요.' : '🍿 팝콘을 받았어요! N 키(또는 🍿 버튼)로 3번 먹을 수 있어요.');
+    toast(kind === 'c' ? '☕ STARMIA 커피를 받았어요! N 키(또는 ☕ 버튼)로 3번 마실 수 있어요.' : `${sk.icon} ${sk.got} N 키(또는 ${sk.icon} 버튼)로 3번 먹을 수 있어요.`);
   } else if (it.kind === 'climb') {
     S.perch = it.perch; me.x = it.perch.x; me.z = it.perch.z; me.y = it.perch.y; S.mount = null;
     toast(`${it.label} 위에 올라갔어요! (가장자리로 걸어가면 내려와요)`);
   }
 }
+// 🍿 ☕ 🌭 🍭 간식 이름 · 다 먹었을 때 한마디
+const SNACK_INFO = {
+  p: { icon: '🍿', name: '팝콘', ga: '을', got: '팝콘을 받았어요!', done: '🍿 팝콘을 다 먹었어요. 냠냠!' },
+  c: { icon: '☕', name: '커피', ga: '를', got: 'STARMIA 커피를 받았어요!', done: '☕ 커피를 다 마셨어요. 호로록~ 맛있다!' },
+  h: { icon: '🌭', name: '핫도그', ga: '를', got: '바삭 핫도그를 받았어요!', done: '🌭 핫도그를 다 먹었어요. 바삭바삭 든든해!' },
+  s: { icon: '🍭', name: '솜사탕', ga: '을', got: '구름 솜사탕을 받았어요!', done: '🍭 솜사탕을 다 먹었어요. 입안에서 사르르~' },
+};
+// 🎁 크리스마스 선물상자: 아직 안 받았으면 보인다 (받으면 내 화면에서만 사라진다)
+const xmasGiftLeft = () => !S.xmasGot && !S.profile?.items?.costume_xmas;
+socket.on('xmas:done', ({ already } = {}) => {
+  S.xmasGot = true; S.xmasBusy = false;
+  const gb = S.world?.xmasGift;
+  if (gb && gb.group.visible) { giftPuffFx(gb.x, gb.y, gb.z); gb.hide(); }
+  if (already) { toast('🎄 크리스마스 선물은 이미 받았어요! 🎒 내 물건에서 입고 벗을 수 있어요.'); return; }
+  audio.play('pop'); audio.play('pickup'); for (let i = 0; i < 6; i++) setTimeout(() => audio.play('twinkle'), 200 + i * 140);
+  if (S.riding) { S.riding = false; updateGearButtons(); }
+  const pop = el('div', 'xmas-pop'); pop.innerHTML = '<div class="xp-i">🎄</div><div class="xp-t">크리스마스 선물입니다</div><div class="xp-s">트리 코스튬을 입었어요! 🎒 내 물건에서 벗을 수 있어요</div>';
+  document.body.appendChild(pop); setTimeout(() => pop.classList.add('out'), 2600); setTimeout(() => pop.remove(), 3400);
+});
 function lobbyNearest() {
   S.nearest = null; S.nearestVerb = null;
   const p = $('#prompt');
@@ -2451,7 +2498,7 @@ function lobbyNearest() {
   else if (S.perch) { S.nearest = 'L:off'; S.nearestVerb = '내려가기'; }
   else {
     let best = 1e9;
-    for (const it of S.world?.interactives || []) { const d = Math.hypot(it.x - me.x, it.z - me.z); if (d < it.r && d < best) { best = d; S.nearest = 'L:' + it.id; S.nearestVerb = it.verb; S.nearestLabel = it.label; } }
+    for (const it of S.world?.interactives || []) { if (it.id === 'xmasgift' && !xmasGiftLeft()) continue; const d = Math.hypot(it.x - me.x, it.z - me.z) - (it.id === 'xmasgift' ? 3 : 0); if (d < it.r && d < best) { best = d; S.nearest = 'L:' + it.id; S.nearestVerb = it.verb; S.nearestLabel = it.label; } }
   }
   if (S.nearest && !S.modalOpen) { p.innerHTML = `<kbd>E</kbd>${S.nearest === 'L:off' ? '' : (S.nearestLabel || '') + ' '}${S.nearestVerb}`; p.classList.remove('hidden'); }
   else p.classList.add('hidden');
@@ -2742,7 +2789,7 @@ $('#helpBtn').onclick = () => {
     return;
   }
   const k = el('div', 'keys');
-  [['W A S D / 방향키', '이동'], ['Shift', '달리기 (발소리 때문에 귀신이 멀리서도 알아챈다)'], ['C (누르고 있기)', '웅크리기 — 그 자리에서 방향만 돌리며 귀신에게 덜 들킨다. 떼면 일어선다'], ['V (누르고 있기)', '조심조심 걷기 — 아주 느리지만 귀신이 절대 눈치채지 못한다'], ['마우스 드래그 · 휠', '시점 회전 · 확대/축소'], ['R', '카메라를 캐릭터 뒤로'], ['클릭 / E', '조사 · 줍기 · 풀기 (멀리 있으면 자동으로 다가감)'], ['Space', '점프'], ['X', '감정표현 (춤·인사·엎드리기·놀래키기 등)'], ['F', '손전등 켜기/끄기'], ['T', '부적 태우기 (귀신 20초 퇴치)'], ['1 ~ 9', '아이템 바로 사용 (자물쇠 창에서는 버튼 입력)'], ['아이템 우클릭', '조합 · 파티원에게 건네기'], ['J', '수첩 — 본 단서가 자동 기록됨'], ['H', '힌트'], ['G / 휠 클릭', '마우스 위치를 파티원에게 찍어 주기'], ['Q', '외치기 — "어이!" "여기야!" 하며 내 위치를 바닥 파형과 지도로 알리기'], ['N', '들고 있는 팝콘·커피 먹기·마시기 (로비의 🍿 팝콘 카트 · ☕ STARMIA 에서 E 로 받기 · 3번이면 끝)'], ['M', '미니맵 켜기/끄기'], ['💖 (접속자 목록·캐릭터 클릭)', '친구에게 하트 보내기'], ['Enter · Tab', '채팅 · 전체/파티 전환']].forEach(([a, b]) => { k.append(el('kbd', null, a), el('span', null, b)); });
+  [['W A S D / 방향키', '이동'], ['Shift', '달리기 (발소리 때문에 귀신이 멀리서도 알아챈다)'], ['C (누르고 있기)', '웅크리기 — 그 자리에서 방향만 돌리며 귀신에게 덜 들킨다. 떼면 일어선다'], ['V (누르고 있기)', '조심조심 걷기 — 아주 느리지만 귀신이 절대 눈치채지 못한다'], ['마우스 드래그 · 휠', '시점 회전 · 확대/축소'], ['R', '카메라를 캐릭터 뒤로'], ['클릭 / E', '조사 · 줍기 · 풀기 (멀리 있으면 자동으로 다가감)'], ['Space', '점프'], ['X', '감정표현 (춤·인사·엎드리기·놀래키기 등)'], ['F', '손전등 켜기/끄기'], ['T', '부적 태우기 (귀신 20초 퇴치)'], ['1 ~ 9', '아이템 바로 사용 (자물쇠 창에서는 버튼 입력)'], ['아이템 우클릭', '조합 · 파티원에게 건네기'], ['J', '수첩 — 본 단서가 자동 기록됨'], ['H', '힌트'], ['G / 휠 클릭', '마우스 위치를 파티원에게 찍어 주기'], ['Q', '외치기 — "어이!" "여기야!" 하며 내 위치를 바닥 파형과 지도로 알리기'], ['N', '들고 있는 간식 먹기·마시기 (로비의 🍿 팝콘 · ☕ STARMIA · 🌭 핫도그 · 🍭 솜사탕 가게에서 E 로 받기 · 3번이면 끝)'], ['M', '미니맵 켜기/끄기'], ['💖 (접속자 목록·캐릭터 클릭)', '친구에게 하트 보내기'], ['Enter · Tab', '채팅 · 전체/파티 전환']].forEach(([a, b]) => { k.append(el('kbd', null, a), el('span', null, b)); });
   const tip = el('p', 'muted', '귀신 공략: 소사는 소리에 민감하고, 하얀 여자는 손전등을 비추는 동안 움직이지 못합니다. 이장과 무당은 등 뒤로 나타납니다. 협동 장치는 서로 다른 두 사람이 8초 안에 눌러야 하며, 혼자일 땐 한쪽만 눌러도 됩니다.');
   const w = el('div'); w.append(k, tip);
   openModal('조작법', '', w);
@@ -2768,12 +2815,12 @@ function eatSnack() {
   if (!S.snack || S.snack[0] === 'b' || !myAvatar || S.eatBusy) return;
   S.eatBusy = true; S.eatId = (S.eatId || 0) + 1; myAvatar.userData.eatT = 0.9;
   const kind = S.snack[0];
-  setTimeout(() => audio.play(kind === 'c' ? 'slurp' : 'crunch'), 320);
+  setTimeout(() => audio.play(kind === 'c' ? 'slurp' : kind === 's' ? 'pop' : 'crunch'), 320);
   setTimeout(() => {
     S.eatBusy = false; if (!S.snack) return;
     const left = Number(S.snack[1]) - 1;
     S.snack = left > 0 ? kind + left : '';
-    if (!left) toast(kind === 'c' ? '☕ 커피를 다 마셨어요. 호로록~ 맛있다!' : '🍿 팝콘을 다 먹었어요. 냠냠!');
+    if (!left) toast(SNACK_INFO[kind]?.done || '냠냠!');
     updateGearButtons();
   }, 900);
 }
@@ -2866,13 +2913,13 @@ async function loadShareInfo() {
 
 // ─────────────────────────── 레벨 · 코인 · 상점 · 내 물건 · 선물
 const GOLD_ORDER = ['gold_hat', 'gold_mask', 'gold_gloves', 'gold_top', 'gold_bottom', 'gold_shoes', 'gold_tail']; // 황금 고양이 세트 (비매품 · 주간랭킹 1~3위 보상)
-const SHOP_ORDER = ['popper', 'rocket', 'wings_fairy', 'mount_pony', 'wings_angel', 'mount_broom', 'mount_cat', 'mount_dog', 'mount_unicorn', 'wings_devil', 'mount_trex', 'wings_dragon', 'sword', 'mount_ufo', 'costume_robot', 'mount_carriage', ...GOLD_ORDER, 'gold_staff'];
+const SHOP_ORDER = ['popper', 'rocket', 'wings_fairy', 'mount_pony', 'wings_angel', 'mount_broom', 'mount_cat', 'mount_dog', 'mount_wolf', 'mount_unicorn', 'wings_devil', 'mount_trex', 'wings_dragon', 'sword', 'mount_ufo', 'mount_lion', 'mount_turtle', 'mount_human', 'costume_robot', 'mount_carriage', 'chainsaw', 'mask_paper', 'mask_rabbit', 'mask_fox', 'mask_bear', 'mask_hahoe', 'mask_wolf', 'mask_venice', 'mask_ghost', 'mask_oni', 'mount_sleigh', 'costume_xmas', ...GOLD_ORDER, 'gold_staff'];
 const coinsText = () => (S.profile?.coins === -1 ? '∞' : String(S.profile?.coins ?? 0));
 // 손에 든 것: 0 없음 · 1 전설의 검 · 2 황금 고양이 지팡이
-function holdCode() { const it = S.profile?.items; return S.holdStaff && it?.gold_staff ? 2 : S.holdSword && it?.sword ? 1 : 0; }
+function holdCode() { const it = S.profile?.items; return S.holdSaw && it?.chainsaw ? 3 : S.holdStaff && it?.gold_staff ? 2 : S.holdSword && it?.sword ? 1 : 0; }
 /** 착용 중인 황금 고양이 부위 글자 (가진 것만) */
 const goldWorn = () => { const on = S.profile?.equip?.gold || '', it = S.profile?.items || {}; let out = ''; for (const id of GOLD_ORDER) { const c = S.shop[id]?.part; if (c && it[id] && on.includes(c)) out += c; } return out; };
-const myGear = () => { const e = S.profile?.equip || {}; return `${e.wings || ''}|${e.mount || ''}|${S.riding && e.mount ? 1 : 0}|${holdCode()}|${e.costume || ''}|${goldWorn()}|${S.snack || ''}`; };
+const myGear = () => { const e = S.profile?.equip || {}; return `${e.wings || ''}|${e.mount || ''}|${S.riding && e.mount ? 1 : 0}|${holdCode()}|${e.costume || ''}|${goldWorn()}|${S.snack || ''}|${e.mask || ''}`; };
 // 맨 아래 얇은 경험치 바 + 왼쪽 위 레벨·코인
 const xpBar = el('div'); xpBar.id = 'xpBar'; xpBar.innerHTML = '<div id="xpFill"></div><div id="xpLabel"></div>'; $('#hud').appendChild(xpBar);
 const lvChip = el('div'); lvChip.id = 'lvChip'; $('#onlineChip').after(lvChip);
@@ -2920,10 +2967,12 @@ function renderXp() {
   if (!pf.equip?.mount) S.riding = false;
   if (!pf.items?.sword) S.holdSword = false;
   if (!pf.items?.gold_staff) S.holdStaff = false;
+  if (!pf.items?.chainsaw) S.holdSaw = false;
   updateGearButtons();
 }
 socket.on('profile', (pf) => {
   const was = S.profile; S.profile = pf;
+  if (pf.items?.costume_xmas) S.world?.xmasGift?.hide(); // 계정 정보가 로비보다 늦게 와도 이미 받은 선물상자는 숨긴다
   if (!was && pf.equip?.mount) S.riding = true; // 탈것을 착용해 두었다면 타고 시작
   if (was && pf.equip?.mount && pf.equip.mount !== was.equip?.mount) S.riding = true; // 새 탈것을 착용하면 바로 탄다
   renderXp();
@@ -2969,22 +3018,22 @@ function toggleRide() {
   if (!m) { toast('🐴 탈것이 없어요. 🛒 상점에서 사서 🎒 내 물건에서 착용하세요.'); return; }
   if (S.mount) dismount();
   S.riding = !S.riding; S.perch = null; me.y = 0;
-  toast(S.riding ? `${S.shop[m]?.icon || '🐴'} ${S.shop[m]?.name || '탈것'}에 탔어요! 이동 속도 1.5배 (Z: 내리기)` : '탈것에서 내렸어요.');
+  toast(S.riding ? `${S.shop[m]?.icon || '🐴'} ${S.shop[m]?.name || '탈것'}에 탔어요! 이동 속도 ${m === 'mount_turtle' ? 2 : 1.5}배 (Z: 내리기)` : '탈것에서 내렸어요.');
   updateGearButtons();
 }
 function swingSword() {
   const it = S.profile?.items || {};
-  if (!it.sword && !it.gold_staff) { toast('🗡️ 전설의 검이 없어요. (🛒 상점)'); return; }
-  if (!holdCode()) { // 아무것도 들고 있지 않으면 먼저 든다 (지팡이가 있으면 지팡이부터: 횟수 제한이 없다)
-    S.holdStaff = !!it.gold_staff; S.holdSword = !it.gold_staff;
-    toast(S.holdStaff ? '🪄 황금 고양이 지팡이를 들었다! B: 휘두르기 · 귀신 퇴치 무제한' : `🗡️ 전설의 검을 들었다! B: 휘두르기 · 남은 횟수 ${S.profile.swordUses}/30`);
+  if (!it.sword && !it.gold_staff && !it.chainsaw) { toast('🗡️ 전설의 검이 없어요. (🛒 상점)'); return; }
+  if (!holdCode()) { // 아무것도 들고 있지 않으면 먼저 든다 (지팡이 → 전기톱 → 검 순서: 앞의 둘은 횟수 제한이 없다)
+    S.holdStaff = !!it.gold_staff; S.holdSaw = !it.gold_staff && !!it.chainsaw; S.holdSword = !S.holdStaff && !S.holdSaw;
+    toast(S.holdStaff ? '🪄 황금 고양이 지팡이를 들었다! B: 휘두르기 · 귀신 퇴치 무제한' : S.holdSaw ? '🪚 전기톱을 들었다! 부르릉~ B: 갈기 · 귀신 퇴치 무제한' : `🗡️ 전설의 검을 들었다! B: 휘두르기 · 남은 횟수 ${S.profile.swordUses}/30`);
     updateGearButtons(); return;
   }
   if (myAvatar) myAvatar.userData.swingT = 0.45;
-  socket.emit('shop:use', holdCode() === 2 ? 'gold_staff' : 'sword');
+  socket.emit('shop:use', ['', 'sword', 'gold_staff', 'chainsaw'][holdCode()]);
 }
-/** 손에 드는 것 바꾸기: '' 넣기 · 'sword' · 'staff' (둘 중 하나만 든다) */
-function holdWeapon(kind) { S.holdSword = kind === 'sword'; S.holdStaff = kind === 'staff'; updateGearButtons(); }
+/** 손에 드는 것 바꾸기: '' 넣기 · 'sword' · 'staff' · 'saw' (하나만 든다) */
+function holdWeapon(kind) { S.holdSword = kind === 'sword'; S.holdStaff = kind === 'staff'; S.holdSaw = kind === 'saw'; updateGearButtons(); }
 socket.on('fx:item', (f) => {
   const d = Math.hypot(f.x - me.x, f.z - me.z); if (d > 40) return;
   const g = avatarById(f.id);
@@ -2997,10 +3046,13 @@ socket.on('fx:item', (f) => {
   } else if (f.type === 'staff') { // 황금 고양이 지팡이: 황금빛 궤적
     if (g && f.id !== S.me) g.userData.swingT = 0.45;
     swordFx(f.x, f.y, f.z, f.ry, f.hit, true); audio.play(f.hit ? 'slay' : 'sword');
+  } else if (f.type === 'saw') { // 전기톱: 부르릉 + 주황 불꽃
+    if (g && f.id !== S.me) g.userData.swingT = 0.45;
+    swordFx(f.x, f.y, f.z, f.ry, f.hit, 'saw'); audio.play('chainsaw'); if (f.hit) audio.play('slay'); if (d < 3) S.shake = 0.15;
   }
 });
 function useShopItem(id) {
-  if (id === 'sword' || id === 'gold_staff') { holdWeapon(id === 'sword' ? 'sword' : 'staff'); return swingSword(); }
+  if (id === 'sword' || id === 'gold_staff' || id === 'chainsaw') { holdWeapon(id === 'sword' ? 'sword' : id === 'chainsaw' ? 'saw' : 'staff'); return swingSword(); }
   if (!S.profile?.items?.[id]) { toast('남은 게 없어요. 🛒 상점에서 더 살 수 있어요.'); return; }
   socket.emit('shop:use', id);
 }
@@ -3050,8 +3102,8 @@ function previewItem(id) {
   const pv = shopPreview(); const it = S.shop[id] || {};
   if (!pv.av) { pv.av = createAvatar(look); pv.sc.add(pv.av); }
   pv.walk = it.kind === 'mount' || it.kind === 'costume';
-  pv.gear = it.kind === 'wings' ? `${id}||0|0|` : it.kind === 'mount' ? `|${id}|1|0|` : it.kind === 'sword' ? '|||1|' : it.kind === 'staff' ? '|||2||hmgtbsl' : it.kind === 'gold' ? `||0|0||${it.part}` : it.kind === 'costume' ? `||0|0|${id}` : '';
-  const big = ['mount_cat', 'mount_dog', 'mount_carriage', 'mount_trex'].includes(id); pv.cam.position.set(0, it.kind === 'mount' ? (big ? 2.2 : 1.6) : 1.3, it.kind === 'mount' ? (big ? 6.2 : 4.8) : 4.2); pv.cam.lookAt(0, it.kind === 'mount' ? (big ? 1.2 : 0.9) : 0.75, 0);
+  pv.gear = it.kind === 'wings' ? `${id}||0|0|` : it.kind === 'mount' ? `|${id}|1|0|` : it.kind === 'sword' ? '|||1|' : it.kind === 'staff' ? '|||2||hmgtbsl' : it.kind === 'saw' ? '|||3|' : it.kind === 'gold' ? `||0|0||${it.part}` : it.kind === 'costume' ? `||0|0|${id}` : it.kind === 'mask' ? `||0|0||||${id}` : '';
+  const big = ['mount_cat', 'mount_dog', 'mount_carriage', 'mount_trex', 'mount_wolf', 'mount_lion', 'mount_human'].includes(id), huge = id === 'mount_sleigh'; pv.cam.position.set(0, it.kind === 'mount' ? (huge ? 4.2 : big ? 2.2 : 1.6) : it.kind === 'mask' ? 1.15 : 1.3, it.kind === 'mount' ? (huge ? 11.5 : big ? 6.2 : 4.8) : it.kind === 'mask' ? 2.6 : 4.2); pv.cam.lookAt(0, it.kind === 'mount' ? (big ? 1.2 : 0.9) : it.kind === 'mask' ? 1.0 : 0.75, 0);
 }
 function openShop() {
   if (!S.profile) return;
@@ -3067,7 +3119,7 @@ function openShop() {
       const it = S.shop[id]; if (!it) continue;
       const have = pf.items?.[id] || 0, locked = !pf.admin && pf.lv < it.lv, full = have >= it.max;
       const c = el('div', 'shop-card' + (sel === id ? ' sel' : '') + (locked ? ' locked' : ''));
-      if (it.nosale) { c.classList.add('nosale'); c.innerHTML = `<div class="si">${it.icon}</div><div class="sn">${it.name}</div><div class="sp">비매품</div><div class="sl">${have ? '✅ 보유' : it.kind === 'staff' ? '세트 7종 보상' : '🏆 주간 1위 보상'}</div>`; }
+      if (it.nosale) { c.classList.add('nosale'); c.innerHTML = `<div class="si">${it.icon}</div><div class="sn">${it.name}</div><div class="sp">비매품</div><div class="sl">${have ? '✅ 보유' : it.gift === 'xmas' ? '🎄 크리스마스 선물' : it.kind === 'staff' ? '세트 7종 보상' : '🏆 주간 1위 보상'}</div>`; }
       else c.innerHTML = `<div class="si">${it.icon}</div><div class="sn">${it.name}</div><div class="sp">🪙 ${it.price.toLocaleString()}</div><div class="sl">${locked ? `🔒 Lv.${it.lv}` : it.max > 1 ? `${have}/${it.max}개` : have ? '✅ 보유' : `Lv.${it.lv}+`}</div>`;
       c.onclick = () => { sel = id; previewItem(id); draw(); };
       grid.appendChild(c);
@@ -3075,13 +3127,13 @@ function openShop() {
     const it = S.shop[sel]; const have = pf.items?.[sel] || 0; const locked = !it.nosale && !pf.admin && pf.lv < it.lv;
     if (it.nosale) { // 비매품: 전시만 한다 (살 수 없다)
       const goldHave = GOLD_ORDER.filter((id) => pf.items?.[id]).length;
-      info.innerHTML = `<div class="sh-t">${it.icon} ${it.name}</div><div class="sh-d">${it.desc}</div><div class="sh-d muted">${it.tip || ''}</div><div class="sh-lv">${have ? '✅ 가지고 있어요' : it.kind === 'staff' ? `황금 고양이 세트 ${goldHave}/7 모음` : '🏆 주간랭킹 1~3위에게 미보유 부위 1개를 무작위로 지급해요'}</div><div class="muted">아이템별 1개만 가질 수 있어요 · 황금 고양이 세트 ${goldHave}/7${it.kind === 'staff' ? '' : ' · 7종을 다 모으면 🪄 황금 고양이 지팡이(귀신 퇴치 무제한)'}</div>`;
+      info.innerHTML = `<div class="sh-t">${it.icon} ${it.name}</div><div class="sh-d">${it.desc}</div><div class="sh-d muted">${it.tip || ''}</div><div class="sh-lv">${have ? '✅ 가지고 있어요' : it.gift === 'xmas' ? '🎁 로비 소원의 별 앞 선물상자에서 E 키로 받아요 (한 사람에 한 번)' : it.kind === 'staff' ? `황금 고양이 세트 ${goldHave}/7 모음` : '🏆 주간랭킹 1~3위에게 미보유 부위 1개를 무작위로 지급해요'}</div>${it.gift === 'xmas' ? '' : `<div class="muted">아이템별 1개만 가질 수 있어요 · 황금 고양이 세트 ${goldHave}/7${it.kind === 'staff' ? '' : ' · 7종을 다 모으면 🪄 황금 고양이 지팡이(귀신 퇴치 무제한)'}</div>`}`;
       const nb = el('button', 'btn primary', '비매품 (살 수 없어요)'); nb.disabled = true;
       const bag2 = el('button', 'btn', '🎒 내 물건'); bag2.onclick = () => openBag();
       const row2 = el('div', 'row'); row2.append(nb, bag2); info.appendChild(row2);
       return;
     }
-    info.innerHTML = `<div class="sh-t">${it.icon} ${it.name}</div><div class="sh-d">${it.desc}</div><div class="sh-lv${locked ? ' locked' : ''}">${it.lv > 1 ? `🔒 Lv.${it.lv} 이상 구매 가능` : '🔓 누구나 구매 가능'}${locked ? ` · 현재 Lv.${pf.lv}` : ' ✓'}</div><div class="muted">${it.max > 1 ? `최대 ${it.max}개까지 가질 수 있어요 · 지금 ${have}개` : '아이템별 1개만 가질 수 있어요'}${it.kind === 'mount' ? ' · 탄 동안 이동 속도 1.5배 (Z)' : ''}${it.kind === 'sword' ? ' · 귀신 30번 베면 깨져요' : ''}</div>`;
+    info.innerHTML = `<div class="sh-t">${it.icon} ${it.name}</div><div class="sh-d">${it.desc}</div><div class="sh-lv${locked ? ' locked' : ''}">${it.lv > 1 ? `🔒 Lv.${it.lv} 이상 구매 가능` : '🔓 누구나 구매 가능'}${locked ? ` · 현재 Lv.${pf.lv}` : ' ✓'}</div><div class="muted">${it.max > 1 ? `최대 ${it.max}개까지 가질 수 있어요 · 지금 ${have}개` : '아이템별 1개만 가질 수 있어요'}${it.kind === 'mount' ? ` · 탄 동안 이동 속도 ${sel === 'mount_turtle' ? 2 : 1.5}배 (Z)` : ''}${it.kind === 'sword' ? ' · 귀신 30번 베면 깨져요' : ''}${it.kind === 'saw' ? ' · 귀신 퇴치 무제한 (B)' : ''}</div>`;
     const buy = el('button', 'btn primary', locked ? `🔒 Lv.${it.lv} 부터` : have >= it.max ? (it.max > 1 ? '가득 찼어요' : '이미 있어요') : `🪙 ${it.price.toLocaleString()} 코인에 사기`);
     buy.disabled = locked || have >= it.max;
     buy.onclick = () => { socket.emit('shop:buy', sel); audio.play('click'); };
@@ -3092,11 +3144,11 @@ function openShop() {
   w.append(head, top, grid);
   previewItem(sel); draw();
   S.shopRefresh = () => { if ($('#modalBody').firstChild === w) draw(); else S.shopRefresh = null; };
-  openModal('🛒 코인 상점', '날개 · 탈것 · 코스튬 · 폭죽 · 전설의 검 · 🏆 주간랭킹 1~3위 보상(비매품)', w);
+  openModal('🛒 코인 상점', '날개 · 탈것 · 코스튬 · 가면 · 폭죽 · 전설의 검 · 🏆 주간랭킹 1~3위 보상(비매품)', w);
   $('#modal .modal-card').classList.add('shop-mode'); // 위는 고정, 아래 물건 목록만 스크롤
   const stop = () => { if ($('#modalBody').firstChild !== w || $('#modal').classList.contains('hidden')) { pv.on = false; S.shopRefresh = null; } else setTimeout(stop, 500); }; setTimeout(stop, 500);
 }
-socket.on('shop:bought', ({ id }) => { audio.play('pickup'); const it = S.shop[id]; if (it?.kind === 'sword') S.holdSword = true; });
+socket.on('shop:bought', ({ id }) => { audio.play('pickup'); const it = S.shop[id]; if (it?.kind === 'sword') holdWeapon('sword'); if (it?.kind === 'saw') holdWeapon('saw'); });
 // ───── 내 물건 (착용 · 사용 · 선물)
 function openBag() {
   if (!S.profile) return;
@@ -3121,19 +3173,19 @@ function openBag() {
       const it = S.shop[id]; const n = pf.items[id];
       const row = el('div', 'bag-row');
       row.appendChild(el('span', 'bi', it.icon));
-      row.appendChild(el('span', 'bn', `${it.name}${it.max > 1 ? ` ×${n}` : ''}${it.kind === 'sword' ? ` (남은 ${pf.swordUses}/30)` : ''}${it.kind === 'staff' ? ' (무제한)' : ''}`));
+      row.appendChild(el('span', 'bn', `${it.name}${it.max > 1 ? ` ×${n}` : ''}${it.kind === 'sword' ? ` (남은 ${pf.swordUses}/30)` : ''}${it.kind === 'staff' || it.kind === 'saw' ? ' (무제한)' : ''}`));
       const acts = el('span', 'ba');
-      if (it.kind === 'wings' || it.kind === 'mount' || it.kind === 'costume') {
+      if (it.kind === 'wings' || it.kind === 'mount' || it.kind === 'costume' || it.kind === 'mask') {
         const on = pf.equip?.[it.kind] === id;
-        const b = el('button', 'btn tiny' + (on ? ' primary' : ''), on ? '착용 중 ✓' : '착용'); b.onclick = () => { socket.emit('shop:equip', { id, on: !on }); if (it.kind === 'mount') { S.riding = !on; if (!on) { if (S.mount) dismount(); S.perch = null; me.y = 0; toast(`${it.icon} ${it.name}에 탔어요! 이동 속도 1.5배 (Z: 내리기/타기)`); } updateGearButtons(); } };
+        const b = el('button', 'btn tiny' + (on ? ' primary' : ''), on ? '착용 중 ✓' : '착용'); b.onclick = () => { socket.emit('shop:equip', { id, on: !on }); if (it.kind === 'mount') { S.riding = !on; if (!on) { if (S.mount) dismount(); S.perch = null; me.y = 0; toast(`${it.icon} ${it.name}에 탔어요! 이동 속도 ${id === 'mount_turtle' ? 2 : 1.5}배 (Z: 내리기/타기)`); } updateGearButtons(); } };
         acts.appendChild(b);
         if (it.kind === 'mount' && on) { const r = el('button', 'btn tiny', S.riding ? '내리기 (Z)' : '타기 (Z)'); r.onclick = () => { toggleRide(); draw(); }; acts.appendChild(r); }
       } else if (it.kind === 'gold') { // 황금 고양이 부위: 부위마다 따로 입고 벗는다
         const on = (pf.equip?.gold || '').includes(it.part);
         const b = el('button', 'btn tiny' + (on ? ' primary' : ''), on ? '착용 중 ✓' : '착용'); b.onclick = () => socket.emit('shop:equip', { id, on: !on });
         acts.appendChild(b);
-      } else if (it.kind === 'sword' || it.kind === 'staff') {
-        const kind = it.kind, held = kind === 'sword' ? S.holdSword : S.holdStaff;
+      } else if (it.kind === 'sword' || it.kind === 'staff' || it.kind === 'saw') {
+        const kind = it.kind, held = kind === 'sword' ? S.holdSword : kind === 'saw' ? S.holdSaw : S.holdStaff;
         const b = el('button', 'btn tiny' + (held ? ' primary' : ''), held ? '넣기' : '들기'); b.onclick = () => { holdWeapon(held ? '' : kind); draw(); };
         const sw = el('button', 'btn tiny', '휘두르기 (B)'); sw.onclick = () => { holdWeapon(kind); closeModal(); swingSword(); };
         acts.append(b, sw);
@@ -3148,7 +3200,7 @@ function openBag() {
   };
   draw();
   S.bagRefresh = () => { if ($('#modalBody').firstChild === w) draw(); else S.bagRefresh = null; };
-  openModal('🎒 내 물건', '날개·탈것·코스튬은 착용하면 모두에게 보여요 · 아이템별 1개만 가질 수 있어요 (폭죽은 여러 개)', w);
+  openModal('🎒 내 물건', '날개·탈것·코스튬·가면은 착용하면 모두에게 보여요 · 아이템별 1개만 가질 수 있어요 (폭죽은 여러 개)', w);
   footBtn('🛒 상점', () => openShop());
   footBtn('🎫 도장표', () => openStamps());
 }
@@ -3171,9 +3223,9 @@ $('#sideBtns').insertBefore(Object.assign(el('button', 'btn small', '🛒 상점
 $('#sideBtns').insertBefore(Object.assign(el('button', 'btn small', '🎒 내 물건'), { id: 'bagBtn', onclick: () => openBag() }), $('#rankBtn'));
 function updateGearButtons() {
   const rb = $('.abtn.ride'), sb = $('.abtn.sword'), nb = $('.abtn.snack');
-  if (nb) { nb.classList.toggle('hidden', !S.snack || S.snack[0] === 'b'); if (S.snack) { nb.firstChild.textContent = S.snack[0] === 'c' ? '☕' : '🍿'; nb.querySelector('small').textContent = `${S.snack[0] === 'c' ? '마시기' : '먹기'} ${S.snack[1]}`; } }
+  if (nb) { nb.classList.toggle('hidden', !S.snack || S.snack[0] === 'b'); if (S.snack) { nb.firstChild.textContent = SNACK_INFO[S.snack[0]]?.icon || '🍿'; nb.querySelector('small').textContent = `${S.snack[0] === 'c' ? '마시기' : '먹기'} ${S.snack[1]}`; } }
   if (rb) { rb.classList.toggle('hidden', !S.profile?.equip?.mount); rb.classList.toggle('on', !!S.riding); rb.firstChild.textContent = S.shop[S.profile?.equip?.mount]?.icon || '🐴'; }
-  if (sb) { const it = S.profile?.items; const staff = holdCode() === 2 || (!holdCode() && it?.gold_staff); sb.classList.toggle('hidden', !(it?.sword || it?.gold_staff)); sb.classList.toggle('on', !!holdCode()); sb.firstChild.textContent = staff ? '🪄' : '🗡️'; const sm = sb.querySelector('small'); if (sm) sm.textContent = staff ? '지팡이' : '검'; }
+  if (sb) { const it = S.profile?.items; const hc = holdCode(), k = hc || (it?.gold_staff ? 2 : it?.chainsaw ? 3 : 1); sb.classList.toggle('hidden', !(it?.sword || it?.gold_staff || it?.chainsaw)); sb.classList.toggle('on', !!hc); sb.firstChild.textContent = ['', '🗡️', '🪄', '🪚'][k]; const sm = sb.querySelector('small'); if (sm) sm.textContent = ['', '검', '지팡이', '전기톱'][k]; }
 }
 // ───── 운영자: 방문 통계 (일간 · 주간 · 월간)
 const fmtDur = (ms) => { const m = Math.round(ms / 60000); return m >= 60 ? `${Math.floor(m / 60)}시간 ${m % 60}분` : `${m}분`; };

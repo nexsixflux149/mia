@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { buildProp, FOOT, setPropTheme } from './props.js';
 import { textSprite, createAvatar, animateAvatar } from './avatar.js';
-import { buildWings, buildMount, buildSword, buildBalloon, BALLOON_COLORS } from './gear.js';
+import { buildWings, buildMount, buildSword, buildBalloon, BALLOON_COLORS, buildSnack } from './gear.js';
+const HOTDOG_POS = [16, 18], CANDY_POS = [-10.9, 21.4]; // 핫도그는 팝콘 가게 옆, 솜사탕은 커피 가게 옆 같은 줄 (광장 가장자리 같은 반지름)
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const DEG = Math.PI / 180;
@@ -420,7 +421,7 @@ function buildExhibit(root, colliders, th) {
 
 // ───────────────── 놀이공원 (로비) — 회전목마 · 관람차 · 벤치 · 피크닉 테이블
 // 놀이기구는 실제 시계(Date.now)로 돌려서 모든 접속자 화면에서 같은 위치에 보인다
-const PARK = { carousel: { x: -10.5, z: 9.5 }, wheel: { x: -2.3, z: -18.9 } }; // 관람차는 광장 북쪽, 츠바키야 · 삐에로 관문 사이 뒤에 선다 (관문 너머 하늘에 보인다)
+const PARK = { carousel: { x: -13.45, z: 9.05 }, wheel: { x: -2.3, z: -18.9 } }; // 관람차는 광장 북쪽, 츠바키야 · 삐에로 관문 사이 뒤에 선다 (관문 너머 하늘에 보인다)
 const parkNow = () => Date.now() / 1000;
 function stripeTex(a, b, n = 12) {
   const c = document.createElement('canvas'); c.width = 256; c.height = 32; const x = c.getContext('2d');
@@ -819,7 +820,7 @@ function buildLobbyDeco(root, colliders, themes) {
   }
   // ☕ STARMIA 미니 커피숍 (광장 남서쪽)
   {
-    const x = -12.5, z = 20.5, g = add(new THREE.Group()); g.position.set(x, 0, z); face(g, x, z);
+    const x = -15.1, z = 18.7, g = add(new THREE.Group()); g.position.set(x, 0, z); face(g, x, z);
     const cream = pm('#f3ead8'), wood = pm('#5a3a24'), green = pm('#0f7a4a', { emissive: '#0a4a2a', emissiveIntensity: 0.4 });
     mesh(new THREE.BoxGeometry(3.4, 0.14, 2.4), pm('#3a2a22'), 0, 0.07, 0, g);
     mesh(new THREE.BoxGeometry(3.4, 2.6, 0.14), cream, 0, 1.37, -1.1, g);
@@ -1021,7 +1022,55 @@ function buildLobbyDeco(root, colliders, themes) {
       boost: (sec) => { boostUntil = boostT + sec; },
     };
   }
-  return { interactives: inter, rides, clickables, wishStar, update: (t) => anim.forEach((f) => f(t)) };
+  // 🌭 핫도그 가게 · 🍭 솜사탕 가게 (광장 양옆) — 팝콘 · 커피처럼 E 로 받아서 N 으로 먹는다
+  const snackStall = (x, z, o) => {
+    const g = add(new THREE.Group()); g.position.set(x, 0, z); face(g, x, z);
+    const base = pm(o.base), trim = pm(o.trim, { emissive: o.trim, emissiveIntensity: 0.25 });
+    mesh(new THREE.BoxGeometry(2.6, 1.05, 1.3), base, 0, 0.53, 0, g); // 판매대
+    mesh(new THREE.BoxGeometry(2.7, 0.08, 1.4), trim, 0, 1.09, 0, g);
+    for (const s of [-1, 1]) mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.6, 8), pm('#e8e0d0', { metalness: 0.4 }), s * 1.25, 1.9, -0.55, g);
+    for (const s of [-1, 1]) mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.6, 8), pm('#e8e0d0', { metalness: 0.4 }), s * 1.25, 1.9, 0.55, g);
+    const aw = mesh(new THREE.BoxGeometry(2.9, 0.07, 1.7), new THREE.MeshStandardMaterial({ map: stripeTex(o.stripe[0], o.stripe[1], 12), roughness: 0.7 }), 0, 2.75, 0, g); aw.rotation.x = 0.12;
+    for (let i = 0; i < 8; i++) { const fl = mesh(G('awF', () => new THREE.ConeGeometry(0.19, 0.22, 3)), G('awFm' + o.stripe[i % 2], () => pm(o.stripe[i % 2])), -1.26 + i * 0.36, 2.58, 0.86, g); fl.rotation.x = Math.PI; }
+    for (let i = 0; i < 10; i++) mesh(G('bulbH', () => new THREE.SphereGeometry(0.055, 8, 6)), G('bmH' + (i % 2), () => new THREE.MeshBasicMaterial({ color: i % 2 ? '#fff2a8' : o.bulb })), -1.3 + i * 0.29, 2.66, 0.9, g);
+    // 앞판 그림 (캔버스)
+    const c = document.createElement('canvas'); c.width = 512; c.height = 192; const q = c.getContext('2d');
+    q.fillStyle = o.panel; q.fillRect(0, 0, 512, 192); q.strokeStyle = o.trim; q.lineWidth = 12; q.strokeRect(8, 8, 496, 176);
+    q.font = '96px sans-serif'; q.textAlign = 'center'; q.textBaseline = 'middle'; q.fillText(o.emoji, 90, 100); q.fillText(o.emoji, 422, 100);
+    q.fillStyle = '#fff'; q.font = '900 56px sans-serif'; q.fillText(o.title, 256, 100);
+    const pt = new THREE.CanvasTexture(c); pt.colorSpace = THREE.SRGBColorSpace;
+    mesh(new THREE.PlaneGeometry(2.4, 0.9), new THREE.MeshBasicMaterial({ map: pt }), 0, 0.55, 0.66, g).castShadow = false;
+    // 판매대 위에 진열된 간식 · 지붕 위 커다란 간식 모형이 빙글빙글
+    for (let i = 0; i < 4; i++) { const it = buildSnack(o.code + '3'); it.position.set(-0.75 + i * 0.5, 1.13, 0.25); it.rotation.y = i; g.add(it); }
+    const big = buildSnack(o.code + '3'); big.scale.setScalar(o.bigScale); big.position.y = 2.85; g.add(big);
+    const seller = createAvatar(o.seller); seller.position.set(0, 0, -0.95); g.add(seller);
+    anim.push((t) => { big.rotation.y = t * 0.8; big.position.y = 2.85 + Math.sin(t * 2) * 0.08; animateAvatar(seller, 0.033, false, t, false, Math.sin(t * 0.55 + x) > 0.85 ? 'wave' : null, (t * 0.5) % 2); seller.rotation.y = Math.sin(t * 0.6 + x) * 0.25; });
+    const sign = textSprite(`${o.emoji} ${o.label} · E 로 받기`, { size: 26, bg: o.signBg, color: '#fff6e0', border: o.trim }); sign.position.set(x, 4.6, z); add(sign);
+    colliders.push({ x, z, hw: 1.4, hd: 1.4, noSpread: true });
+    inter.push({ id: o.id, kind: 'snack', x: x + Math.sin(g.rotation.y) * 1.8, z: z + Math.cos(g.rotation.y) * 1.8, r: 2.4, label: o.label, verb: '받기', noSpread: true });
+  };
+  snackStall(HOTDOG_POS[0], HOTDOG_POS[1], { id: 'hotdog', code: 'h', label: '바삭 핫도그', title: 'HOT DOG', emoji: '🌭', base: '#c8302a', trim: '#ffd23a', stripe: ['#e8202a', '#ffd23a'], bulb: '#ff8a3a', panel: '#9a1a16', signBg: 'rgba(140,20,16,.9)', bigScale: 5.5, seller: { body: '#ffe0c8', accent: '#e8202a', ears: 'bear', hat: 'none', eyes: 'smile', mouth: 'grin', hair: 'short', hairColor: '#3a2416', outfit: 'chef' } });
+  snackStall(CANDY_POS[0], CANDY_POS[1], { id: 'cottoncandy', code: 's', label: '구름 솜사탕', title: '솜사탕', emoji: '🍭', base: '#ff8fc8', trim: '#8fd4ff', stripe: ['#ffb3d6', '#ffffff'], bulb: '#8fd4ff', panel: '#d0508e', signBg: 'rgba(170,50,120,.9)', bigScale: 4.2, seller: { body: '#fff0e0', accent: '#ff8fc8', ears: 'bunny', hat: 'none', eyes: 'smile', mouth: 'smile', hair: 'twintail', hairColor: '#ff9ad0', outfit: 'princess' } });
+
+  // 🎁 크리스마스 선물상자: 소원의 별 바로 앞 · 한 번 받으면 그 사람 화면에서만 사라진다
+  let xmasGift = null;
+  {
+    const x = 0, z = 2.7, g = add(new THREE.Group()); g.position.set(x, 0, z);
+    const box = new THREE.Group(); g.add(box);
+    const red = pm('#d8202a', { emissive: '#5a0008', emissiveIntensity: 0.35, roughness: 0.55 }), gold = pm('#ffd23a', { metalness: 0.5, roughness: 0.3, emissive: '#a07000', emissiveIntensity: 0.5 });
+    mesh(new THREE.BoxGeometry(0.62, 0.5, 0.62), red, 0, 0.25, 0, box);
+    mesh(new THREE.BoxGeometry(0.7, 0.14, 0.7), red, 0, 0.55, 0, box); // 뚜껑
+    for (const r of [0, Math.PI / 2]) { const b1 = mesh(new THREE.BoxGeometry(0.12, 0.52, 0.64), gold, 0, 0.26, 0, box); b1.rotation.y = r; const b2 = mesh(new THREE.BoxGeometry(0.12, 0.15, 0.72), gold, 0, 0.55, 0, box); b2.rotation.y = r; }
+    for (const s of [-1, 1]) { const loop = mesh(new THREE.TorusGeometry(0.12, 0.04, 8, 16), gold, s * 0.11, 0.7, 0, box); loop.scale.set(1, 0.75, 0.55); loop.rotation.z = s * 0.5; }
+    mesh(new THREE.SphereGeometry(0.06, 10, 8), gold, 0, 0.66, 0, box);
+    const glowS = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: '#ffe08a', transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending })); glowS.scale.setScalar(1.8); glowS.position.y = 0.4; g.add(glowS);
+    const tag = textSprite('🎁 크리스마스 선물', { size: 22, bg: 'rgba(150,16,24,.9)', color: '#fff3c4', border: '#ffd23a' }); tag.position.set(0, 1.25, 0); tag.scale.multiplyScalar(0.7); g.add(tag);
+    anim.push((t) => { if (!g.visible) return; box.position.y = Math.abs(Math.sin(t * 2.4)) * 0.06; box.rotation.y = Math.sin(t * 0.9) * 0.3; glowS.material.opacity = 0.45 + Math.sin(t * 3) * 0.15; tag.position.y = 1.25 + Math.sin(t * 2) * 0.05; });
+    inter.push({ id: 'xmasgift', kind: 'gift', x, z, r: 1.5, label: '크리스마스 선물상자', verb: '선물받기', noSpread: true });
+    clickables.push({ id: 'xmasgift', group: box });
+    xmasGift = { x, y: 0.4, z, group: g, hide: () => { g.visible = false; }, show: () => { g.visible = true; } };
+  }
+  return { interactives: inter, rides, clickables, wishStar, xmasGift, update: (t) => anim.forEach((f) => f(t)) };
 }
 
 export function buildLobby(scene, opts = {}) {
@@ -1203,7 +1252,7 @@ export function buildLobby(scene, opts = {}) {
       e.spin.forEach((s) => (s.rotation.z = Math.sin(t * 1.2 + i) * 0.15));
     });
   };
-  return { root, colliders, walls: [], objects: {}, flickers: [], ceiling: [], update, bounds: 28.5 * LS, outdoor: true, themes, exhibits, hiddenGate: !!opts.hidden, setChamp: (c) => champSign.set(c), snapBoard, shopFace: extra.shopFace, clickables: [...extra.clickables, ...deco.clickables], wishStar: deco.wishStar, interactives: [...park.interactives, ...outer.interactives, ...extra.interactives, ...deco.interactives], rides: { ...park.rides, ...extra.rides, ...deco.rides } };
+  return { root, colliders, walls: [], objects: {}, flickers: [], ceiling: [], update, bounds: 28.5 * LS, outdoor: true, themes, exhibits, hiddenGate: !!opts.hidden, setChamp: (c) => champSign.set(c), snapBoard, shopFace: extra.shopFace, clickables: [...extra.clickables, ...deco.clickables], wishStar: deco.wishStar, xmasGift: deco.xmasGift, interactives: [...park.interactives, ...outer.interactives, ...extra.interactives, ...deco.interactives], rides: { ...park.rides, ...extra.rides, ...deco.rides } };
 }
 
 // ───── 로비 쉼터: 불멍 캠프파이어 + 통나무 벤치 · 타면 움직이는 그네 · 코인 상점

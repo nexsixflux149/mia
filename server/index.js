@@ -123,7 +123,7 @@ feedback.list ||= [];
 const saveFeedback = () => persist(DATA_DIR, 'feedback', feedback);
 const profChecked = new Set(); // 서버가 켜진 뒤 처음 볼 때 한 번씩만 정리한다
 const prof = (name) => {
-  const pf = (profiles[name] ||= blankProfile()); pf.items ||= {}; pf.equip ||= { wings: '', mount: '' }; pf.equip.costume ??= ''; pf.equip.gold ??= '';
+  const pf = (profiles[name] ||= blankProfile()); pf.items ||= {}; pf.equip ||= { wings: '', mount: '' }; pf.equip.costume ??= ''; pf.equip.gold ??= ''; pf.equip.mask ??= '';
   // 탈것 · 코스튬 · 날개 · 검 · 비매품은 아이템별 1개만 (폭죽은 max 개까지): 혹시 예전 기록에 더 들어 있으면 줄여 둔다
   if (!profChecked.has(name)) { profChecked.add(name); for (const [id, n] of Object.entries(pf.items)) { const it = SHOP[id]; if (it && n > it.max) pf.items[id] = it.max; } if (pf.equip.gold && pf.equip.costume) pf.equip.costume = ''; } // (고양이 세트와 로봇 코스튬은 함께 입지 않는다)
   return pf;
@@ -131,7 +131,7 @@ const prof = (name) => {
 const findByName = (name) => [...players.values()].find((p) => p.name === name && !p.offline);
 const sendProfile = (p) => { if (p) io.to(p.id).emit('profile', { ...profileView(prof(p.name), p.admin), hiddenOk: hiddenOk(p.name) }); };
 // 장비 문자열: 날개|탈것|타는 중|손에 든 것(0 없음 · 1 전설의 검 · 2 황금 고양이 지팡이)|코스튬|황금 고양이 부위 글자
-const gearOf = (p) => { const pf = prof(p.name), e = pf.equip; return `${e.wings || ''}|${e.mount || ''}|${p.riding && e.mount ? 1 : 0}|${Number(p.sword) || 0}|${e.costume || ''}|${goldWorn(pf)}|${p.snack || ''}`; };
+const gearOf = (p) => { const pf = prof(p.name), e = pf.equip; return `${e.wings || ''}|${e.mount || ''}|${p.riding && e.mount ? 1 : 0}|${Number(p.sword) || 0}|${e.costume || ''}|${goldWorn(pf)}|${p.snack || ''}|${e.mask || ''}`; };
 /** 모든 테마를 한 번씩 깼거나 만렙이면 히든 테마가 열린다 */
 function hiddenOk(name) {
   const p = findByName(name); if (p?.admin) return true;
@@ -369,8 +369,8 @@ io.on('connection', (sock) => {
     me.em = typeof m.em === 'string' ? m.em.slice(0, 10) : ''; me.eid = Number(m.eid) | 0;
     me.ride = typeof m.ride === 'string' && /^[a-z0-9]{1,12}:\d{1,2}$/.test(m.ride) ? m.ride : '';
     me.riding = !!m.mount && !!prof(me.name).equip.mount;
-    me.snack = typeof m.snack === 'string' && /^([pc][123]|b[0-9])$/.test(m.snack) ? m.snack : ''; me.eat = Number(m.eat) | 0; // 손에 든 간식(팝콘·커피 · 남은 횟수)과 먹은 횟수
-    { const its = prof(me.name).items; me.sword = m.sword === 2 ? (its[GOLD_STAFF] ? 2 : 0) : m.sword ? (its.sword ? 1 : 0) : 0; } // 손에 든 것: 1 전설의 검 · 2 황금 고양이 지팡이
+    me.snack = typeof m.snack === 'string' && /^([pchs][123]|b[0-9])$/.test(m.snack) ? m.snack : ''; me.eat = Number(m.eat) | 0; // 손에 든 간식(팝콘·커피 · 남은 횟수)과 먹은 횟수
+    { const its = prof(me.name).items; me.sword = m.sword === 3 ? (its.chainsaw ? 3 : 0) : m.sword === 2 ? (its[GOLD_STAFF] ? 2 : 0) : m.sword ? (its.sword ? 1 : 0) : 0; } // 손에 든 것: 1 전설의 검 · 2 황금 고양이 지팡이 · 3 전기톱
   });
 
   // 외형은 바뀔 때만 전송 (사진 얼굴은 용량이 크므로 매 틱 보내지 않는다)
@@ -508,7 +508,7 @@ io.on('connection', (sock) => {
   sock.on('shop:buy', (id) => {
     if (!me) return; const it = SHOP[id]; if (!it) return;
     const pf = prof(me.name); const lv = levelOf(pf.xp); const have = pf.items[id] || 0;
-    if (it.nosale) return sock.emit('toast', { text: it.kind === 'staff' ? `${it.icon} ${it.name}은(는) 비매품이에요. 황금 고양이 세트 7종을 모두 모으면 받아요.` : `${it.icon} ${it.name}은(는) 비매품이에요. 매주 주간랭킹 1~3위에게 아직 없는 부위 하나가 무작위로 주어져요.` });
+    if (it.nosale) return sock.emit('toast', { text: it.gift === 'xmas' ? `${it.icon} ${it.name}은(는) 비매품이에요. 로비 소원의 별 앞 🎁 선물상자에서 받을 수 있어요.` : it.kind === 'staff' ? `${it.icon} ${it.name}은(는) 비매품이에요. 황금 고양이 세트 7종을 모두 모으면 받아요.` : `${it.icon} ${it.name}은(는) 비매품이에요. 매주 주간랭킹 1~3위에게 아직 없는 부위 하나가 무작위로 주어져요.` });
     if (!me.admin && lv < it.lv) return sock.emit('toast', { text: `🔒 Lv.${it.lv} 부터 살 수 있어요. (지금 Lv.${lv})` });
     if (have >= it.max) return sock.emit('toast', { text: it.max > 1 ? `${it.icon} ${it.name}은(는) ${it.max}개까지만 가질 수 있어요.` : `${it.icon} ${it.name}은(는) 이미 가지고 있어요.` });
     if (!me.admin && (pf.coins || 0) < it.price) return sock.emit('toast', { text: `🪙 코인이 모자라요. (${it.price}코인 필요 · 지금 ${pf.coins || 0}코인)` });
@@ -528,6 +528,7 @@ io.on('connection', (sock) => {
       const pf = prof(me.name);
       pf.equip.gold = on ? GOLD_IDS.filter((g) => pf.items[g]).map((g) => SHOP[g].part).join('') : '';
       if (pf.equip.gold) dropCostume(pf);
+      if (pf.equip.gold.includes('m')) pf.equip.mask = ''; // 황금 고양이 가면을 쓰면 상점 가면은 벗는다
       saveProfiles(); sendProfile(me); return;
     }
     const it = SHOP[id]; if (!it || !(isWear(id) || isGold(id))) return;
@@ -536,15 +537,31 @@ io.on('connection', (sock) => {
       const cur = new Set(pf.equip.gold || ''); if (on) cur.add(it.part); else cur.delete(it.part);
       pf.equip.gold = GOLD_IDS.map((g) => SHOP[g].part).filter((c) => cur.has(c)).join('');
       if (on) dropCostume(pf);
+      if (on && it.part === 'm') pf.equip.mask = ''; // 가면은 하나만
       saveProfiles(); sendProfile(me); return;
     }
+    if (it.kind === 'mask' && on && (pf.equip.gold || '').includes('m')) pf.equip.gold = pf.equip.gold.replace('m', ''); // 상점 가면을 쓰면 황금 고양이 가면은 벗는다
     if (it.kind === 'costume' && on && pf.equip.gold) { pf.equip.gold = ''; sock.emit('toast', { text: `🏆 황금 고양이 세트를 벗었어요. (${it.icon} ${it.name}와(과)는 함께 입을 수 없어요)` }); } // 반대로 로봇 코스튬을 입으면 고양이 세트를 벗는다
     pf.equip[it.kind] = on ? id : (pf.equip[it.kind] === id ? '' : pf.equip[it.kind]);
     if (it.kind === 'mount' && !on) me.riding = false;
     saveProfiles(); sendProfile(me);
   });
+  // 🎄 크리스마스 선물상자: 한 사람에 한 번 · 받자마자 트리 코스튬을 입는다 (황금 고양이 세트는 벗는다)
+  sock.on('xmas:claim', () => {
+    if (!me) return;
+    const pf = prof(me.name);
+    if (pf.items.costume_xmas) return sock.emit('xmas:done', { already: true });
+    pf.items.costume_xmas = 1; pf.equip.costume = 'costume_xmas'; pf.equip.gold = '';
+    saveProfiles(); sendProfile(me);
+    sock.emit('xmas:done', { already: false });
+  });
+  sock.on('cash:take', () => { // 💵 테마 속 돈다발 (3% 확률로 한 챕터에만 나타난다)
+    if (!me || !inst()?.takeCash?.(me)) return;
+    addCoins(me.name, 1000);
+    io.to(inst().room).emit('toast', { text: `💵 ${me.name} 님이 숨겨진 돈다발을 주웠다! +1,000코인` });
+  });
   sock.on('shop:use', (id) => {
-    if (!me || !['popper', 'rocket', 'sword', GOLD_STAFF].includes(id)) return;
+    if (!me || !['popper', 'rocket', 'sword', 'chainsaw', GOLD_STAFF].includes(id)) return;
     const pf = prof(me.name); if (!pf.items[id]) return;
     const now = Date.now(); if (now - (me.lastFx || 0) < 900) return; me.lastFx = now;
     const room = me.room; if (!room) return;
@@ -555,6 +572,14 @@ io.on('connection', (sock) => {
       if (hit) sock.emit('toast', { text: `🪄 ${hit.name}을(를) 물리쳤다! (황금 고양이 지팡이 · 횟수 제한 없음)` });
       else if (!inst()) sock.emit('toast', { text: '🪄 휘익— (귀신은 방탈출 안에서만 물리칠 수 있어요)' });
       else sock.emit('toast', { text: '🪄 휘익— 가까이에 귀신이 없다. (귀신 가까이서 휘두르세요)' });
+      io.to(room).emit('fx:item', fx); return;
+    }
+    if (id === 'chainsaw') { // 전기톱: 가까운 귀신을 갈아 없앤다 · 횟수 제한 없음
+      const hit = inst()?.slay?.(me, 'saw');
+      fx.type = 'saw'; fx.hit = hit ? { x: hit.x, z: hit.z, name: hit.name } : null;
+      if (hit) sock.emit('toast', { text: `🪚 부르르릉! ${hit.name}을(를) 갈아 없앴다! (전기톱 · 횟수 제한 없음)` });
+      else if (!inst()) sock.emit('toast', { text: '🪚 부릉부릉— (귀신은 방탈출 안에서만 물리칠 수 있어요)' });
+      else sock.emit('toast', { text: '🪚 부릉부릉— 가까이에 귀신이 없다. (귀신 가까이서 켜세요)' });
       io.to(room).emit('fx:item', fx); return;
     }
     if (id === 'sword') {

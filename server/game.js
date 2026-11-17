@@ -32,6 +32,9 @@ export class GameInstance {
     this.ghost = null;
     this.ended = false;
     this.startedAt = Date.now(); this.startChapter = chapter; // 랭킹: 처음부터 시작한 판만 기록
+    // 💵 돈다발: 한 판에 3% 확률로, 남은 챕터 중 딱 한 곳에만 나타난다 (먼저 줍는 사람이 1,000코인)
+    const chance = Number(process.env.CASH_CHANCE ?? 0.03);
+    this.cash = Math.random() < chance ? { ch: chapter + Math.floor(Math.random() * (this.chapters.length - chapter)), seed: Math.floor(Math.random() * 1e9), taken: false } : null;
     this.loadChapter(chapter);
   }
 
@@ -121,7 +124,15 @@ export class GameInstance {
       ghostName: this.ghost?.name || null,
       fear: this.fear,
       scenario: this.scenarioInfo(),
+      cash: this.cash && !this.cash.taken && this.cash.ch === this.chapterIdx ? this.cash.seed : null,
     };
+  }
+  /** 돈다발 줍기: 이 챕터에 있고 아직 아무도 안 주웠으면 true */
+  takeCash(p) {
+    const c = this.cash;
+    if (!c || c.taken || c.ch !== this.chapterIdx || Date.now() - this.loadedAt < 1500) return false;
+    c.taken = true; this.emit('cash:gone', { by: p.id, name: p.name });
+    return true;
   }
 
   syncAll() {
@@ -413,7 +424,7 @@ export class GameInstance {
     best.repelUntil = Date.now() + 90000; best.mode = 'wander'; best.target = null;
     best.x = best.cfg.spawn[0]; best.z = best.cfg.spawn[1];
     this.emit('game:sound', 'talisman');
-    this.emit('toast', { text: by === 'staff' ? `🪄 ${p.name} 님이 황금 고양이 지팡이로 ${hit.name}을(를) 물리쳤다! (잠시 동안 나타나지 않는다)` : `🗡️ ${p.name} 님이 전설의 검으로 ${hit.name}을(를) 베었다! (잠시 동안 나타나지 않는다)` });
+    this.emit('toast', { text: by === 'saw' ? `🪚 ${p.name} 님이 전기톱으로 ${hit.name}을(를) 갈아버렸다! (잠시 동안 나타나지 않는다)` : by === 'staff' ? `🪄 ${p.name} 님이 황금 고양이 지팡이로 ${hit.name}을(를) 물리쳤다! (잠시 동안 나타나지 않는다)` : `🗡️ ${p.name} 님이 전설의 검으로 ${hit.name}을(를) 베었다! (잠시 동안 나타나지 않는다)` });
     return hit;
   }
 
