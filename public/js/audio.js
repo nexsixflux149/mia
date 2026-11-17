@@ -76,7 +76,7 @@ function parseAbc(abc, key) {
 }
 
 export class AudioFX {
-  constructor() { this.ctx = null; this.amb = null; this.mode = null; this.classicEffects = false; }
+  constructor() { this.ctx = null; this.amb = null; this.mode = null; this.classicEffects = false; this.xmasMechanical = false; }
   init() {
     if (this.ctx) { this.ctx.resume(); return; }
     this.ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -137,6 +137,10 @@ export class AudioFX {
     if (this.tuneBus) { const old = this.tuneBus; this.tuneBus = null; clearTimeout(this.tuneTimer); old.gain.linearRampToValueAtTime(0, this.t + 1.2); setTimeout(() => old.disconnect(), 1500); }
     if (this.amb) { const a = this.amb; a.g.gain.linearRampToValueAtTime(0, this.t + 1.5); setTimeout(() => a.nodes.forEach((n) => { try { n.stop(); } catch {} }), 1700); this.amb = null; }
     if (!mode) return;
+    if (['xmas', 'xmas_intro', 'xmas_normal', 'xmas_true'].includes(mode)) {
+      this.xmasScore(mode);
+      return;
+    }
     const c = this.ctx; const g = c.createGain(); g.gain.value = 0; g.connect(this.master);
     const nodes = [];
     if (mode === 'lobby') {
@@ -399,6 +403,7 @@ export class AudioFX {
   }
 
   heartbeat(level) { // 0~1
+    if (this.ctx && this.xmasMechanical) return this.xmasEffect('heartbeat');
     if (!this.ctx) return;
     const now = performance.now();
     if (level <= 0) return;
@@ -409,10 +414,63 @@ export class AudioFX {
     this.tone(50, 0.12, { type: 'sine', gain: 0.25 * level + 0.08, release: 0.1, at: 0.18, slide: 38 });
   }
 
-  step(outdoor) { if (this.ctx) this.noise(0.08, { freq: outdoor ? 700 : 300, q: 1.5, gain: 0.05, release: 0.06 }); }
+  step(outdoor) {
+    if (!this.ctx) return;
+    if (this.xmasMechanical) return this.xmasEffect('step');
+    this.noise(0.08, { freq: outdoor ? 700 : 300, q: 1.5, gain: 0.05, release: 0.06 });
+  }
+
+  xmasScore(mode) {
+    const g = this.ctx.createGain();
+    g.gain.value = 0;
+    g.connect(this.master);
+    const amb = { g, nodes: [] };
+    this.amb = amb;
+    clearInterval(this.horrorTimer);
+    this.xmasScores ||= new Map();
+    if (!this.xmasScores.has(mode)) {
+      this.xmasScores.set(mode, fetch('/sfx/' + mode + '.mp3')
+        .then(res => { if (!res.ok) throw new Error('Music unavailable'); return res.arrayBuffer(); })
+        .then(data => this.ctx.decodeAudioData(data))
+        .catch(() => { this.xmasScores.delete(mode); return null; }));
+    }
+    this.xmasScores.get(mode).then(buffer => {
+      if (this.amb !== amb) return;
+      if (!buffer) { this.horrorScore('doll'); return; }
+      const source = this.ctx.createBufferSource();
+      source.buffer = buffer;
+      source.loop = mode === 'xmas';
+      source.connect(g); amb.nodes.push(source);
+      g.gain.linearRampToValueAtTime(.62, this.t + 1.15);
+      source.start();
+    });
+  }
+
+  xmasEffect(name) {
+    const pulse = (f, end, time, at = 0, gain = .066) =>
+      this.tone(f, time, { type: 'square', slide: end, at, gain, attack: .006, release: .045 });
+    if (name === 'step') { pulse(105, 71, .06, 0, .032); this.noise(.027, { freq: 1450, q: 5, gain: .032 }); return; }
+    if (name === 'heartbeat') { pulse(66, 48, .10, 0, .04); pulse(56, 43, .08, .14, .027); return; }
+    if (/scream|sting|growl|glitch|bang|thunder|wrong/.test(name)) {
+      pulse(345, 68, .33, 0, .17); pulse(177, 46, .42, .11, .12);
+      this.noise(.28, { freq: 1680, q: 5, gain: .15, release: .21 });
+      return;
+    }
+    if (/door|creak|gate|chain|whisper|breath|giggle|drag|laugh/.test(name)) {
+      pulse(310, 124, .14); pulse(184, 330, .12, .13, .048);
+      this.noise(.19, { freq: 920, q: 5, gain: .095, release: .13 });
+      return;
+    }
+    if (/unlock|pickup|bell|story|clear/.test(name)) {
+      [460, 635, 910].forEach((f, i) => pulse(f, f * .93, .108, i * .067));
+      return;
+    }
+    pulse(780, 435, .075, 0, .043);
+  }
 
   play(name) {
     if (!this.ctx) return;
+    if (this.xmasMechanical) return this.xmasEffect(name);
     if (!this.classicEffects && (name === 'door' || name === 'creak')) return;
     if (this.buf && (!this.classicEffects || name === 'thunder') && this.playSample(name)) return;
     switch (name) {

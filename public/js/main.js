@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { createAvatar, animateAvatar, textSprite, OPTIONS, SKIN, ACCENT, HAIRC, EYEC, DEFAULT_LOOK, EMOTES, EMOTE_DUR } from './avatar.js';
 import { Cinema } from './cinema.js';
+import { xmasMirrorPanel } from './xmas-mirrors.js';
 import { createGhost, animateGhost } from './ghosts.js';
 import { renderDoc } from './paper.js';
 import { buildLobby, buildChapter, disposeWorld, LS } from './world.js';
@@ -373,6 +374,7 @@ function enterLobby(pos) {
   S.room = 'lobby'; S.chapter = null; S.dark = false; S.objState = {}; S.mount = null; S.perch = null; me.y = 0;
   setThemeComms(false);
   audio.classicEffects = false;
+  audio.xmasMechanical = false;
   cam.dist = CAM_START; // 살짝 줌인된 상태로 시작
   me.x = pos.x; me.z = pos.z;
   removeGhost(); clearOthers(); clearPings();
@@ -419,6 +421,7 @@ function enterChapter(state, showIntro = true) {
   S.chapter = ch; S.room = 'game'; S.mount = null; S.perch = null; me.y = 0; closeThemePop(); noticeBox.classList.add('hidden');
   setThemeComms(true);
   audio.classicEffects = true;
+  audio.xmasMechanical = S.scenario?.id === 'christmas';
   cam.dist = CAM_START; // 살짝 줌인된 상태로 시작
   if (S.snack) { const u = myAvatar?.userData; if (u?.gSnack) { u.gSnack.parent?.remove(u.gSnack); u.gSnack = null; u.gSnackCode = ''; } S.snack = ''; updateGearButtons(); } // 팝콘·커피·풍선은 테마에 가져가지 않는다
   S.world = buildChapter(scene, ch, S.scenario?.id);
@@ -444,7 +447,7 @@ function enterChapter(state, showIntro = true) {
 // 지금 있는 곳의 배경음 이름
 function roomAmbient() {
   if (S.room !== 'game' || !S.chapter) return 'lobby';
-  return { gwimun: S.chapter.rain ? 'rain' : 'gwimun', ophelia: 'ship', doll: 'doll', hospital: 'hospital', camp: 'camp', west: 'west', kimono: 'kimono', clown: 'clown', park: 'park', mia: 'mia', zombie: 'zombie' }[S.scenario?.id] || 'horror';
+  return { gwimun: S.chapter.rain ? 'rain' : 'gwimun', ophelia: 'ship', doll: 'doll', hospital: 'hospital', camp: 'camp', west: 'west', kimono: 'kimono', clown: 'clown', park: 'park', mia: 'mia', zombie: 'zombie', christmas: 'xmas' }[S.scenario?.id] || 'horror';
 }
 function clearOthers() { for (const [, g] of S.others) removeAvatar(g); S.others.clear(); S.net.clear(); if (S.me) socket.emit('state:full'); }
 function applyObjState() {
@@ -1131,6 +1134,8 @@ loop();
 
 // 로비 테마 관문: 가까이 가면 설명 말풍선
 const THEME_INFO = {
+  christmas: { title: '🎄 크리스마스 특별판 — 자정에 반송된 선물', tag: '특별판 · 광학 퍼즐 · 3챕터', color: '#ffe0a0',
+    story: '12월 24일 23:57. 당신 앞으로 도착한 소포의 발송일은 내일이다. 소포를 가져간 붉은 외투를 쫓아, 자정이 되기 전에 마지막 열차를 찾아라.' },
   zombie: { title: '🧟 데드 시티 — 마지막 헬기 (히든)', tag: '히든 테마 · 좀비 도시 → 백화점 5층 → 옥상 헬기 · 7챕터 · 역대급 퍼즐 · 약 4~5시간', color: '#8aff5a',
     story: '2026년 11월, R-9 감염 사태 사흘째. 무너진 한빛시에서 구조 헬기 매-7의 마지막 방송이 들린다. "05시 정각, 그랜드 한빛 백화점 옥상." 좀비로 가득한 백화점을 지하주차장부터 옥상까지 올라가 헬기에 오르자. 그리고 — 노란 풍선을 든 아이를 찾아서.' },
   gwimun: { title: '鬼門 귀문 — 서하리 분교 실종사건', tag: '한국 괴담 · 폐분교 · 7챕터 · 약 4~5시간', color: '#ff6a5a',
@@ -1329,15 +1334,17 @@ $('#endBtn').onclick = () => { $('#ending').classList.add('hidden'); socket.emit
 socket.on('clears', (ub) => { S.unlockedBy = ub || {}; if (!$('#ending').classList.contains('hidden')) showEndExtras(); });
 
 // ─────────────────────────── 클리어 기념 사진 · 클리어 도장표
-const THEME_ICON = { mia: '🔰', gwimun: '👻', ophelia: '⚓', doll: '🎎', hospital: '🏥', camp: '🏕️', west: '🤠', kimono: '🏮', clown: '🎪', park: '🎡', zombie: '🧟' };
+const THEME_ICON = { christmas: '🎄', mia: '🔰', gwimun: '👻', ophelia: '⚓', doll: '🎎', hospital: '🏥', camp: '🏕️', west: '🤠', kimono: '🏮', clown: '🎪', park: '🎡', zombie: '🧟' };
 const themeColor = (id) => THEME_INFO[id]?.color || '#ff3a2a';
 /** 도장표에 찍을 테마 목록 (히든 테마는 따로). nowId: 방금 깬 테마 */
 function stampList(nowId) {
   const ub = S.unlockedBy || {};
-  const list = (S.scenarios || []).filter((x) => !x.hidden).map((x) => ({ id: x.id, icon: THEME_ICON[x.id] || '★', short: x.short, cleared: !!ub[x.id]?.cleared || x.id === nowId, at: ub[x.id]?.at || 0, now: x.id === nowId }));
+  const card = x => ({ id: x.id, icon: THEME_ICON[x.id] || '★', short: x.short, cleared: !!ub[x.id]?.cleared || x.id === nowId, at: ub[x.id]?.at || 0, now: x.id === nowId });
+  const list = (S.scenarios || []).filter(x => !x.hidden && !x.special).map(card);
+  const special = (S.scenarios || []).filter(x => x.special).map(card);
   const h = (S.scenarios || []).find((x) => x.hidden);
   const hidden = h ? { id: h.id, icon: THEME_ICON[h.id] || '🧟', short: h.short, cleared: !!ub[h.id]?.cleared || h.id === nowId, at: ub[h.id]?.at || 0 } : null;
-  return { list, hidden };
+  return { list, hidden, special };
 }
 function rememberClear(e) {
   const sc = S.scenario; if (!sc) return;
@@ -1482,13 +1489,13 @@ async function openClearPhoto() {
 }
 /** 클리어 도장표 (설정 · 내 물건에서 언제든 볼 수 있다) */
 function openStamps() {
-  const { list, hidden } = stampList(null);
+  const { list, hidden, special } = stampList(null);
   const w = el('div', 'stamps');
   const done = list.filter((x) => x.cleared).length;
   w.appendChild(el('div', 'stamps-head', hidden?.cleared ? `🧟 히든 테마까지 모두 클리어! (${done}/${list.length} + 히든)` : done >= list.length ? `🎉 ${done}/${list.length} — 모든 테마 클리어! 히든 테마가 열렸어요.` : `도장 ${done} / ${list.length} — ${list.length - done}개 더 모으면 히든 테마 「데드 시티」가 열려요!`));
   const grid = el('div', 'stamps-grid');
   const fmtDay = (t) => { const d = new Date(t); return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`; };
-  for (const x of [...list, ...(hidden && (hidden.cleared || S.hiddenOk || S.admin) ? [{ ...hidden, hid: true }] : [])]) {
+  for (const x of [...list, ...special, ...(hidden && (hidden.cleared || S.hiddenOk || S.admin) ? [{ ...hidden, hid: true }] : [])]) {
     const c = el('div', 'stamp' + (x.cleared ? ' on' : '') + (x.hid ? ' hid' : ''));
     c.append(el('div', 'stamp-ring', x.icon), el('div', 'stamp-name', x.short), el('div', 'stamp-date', x.cleared ? (x.at ? fmtDay(x.at) : 'CLEAR') : '아직'));
     grid.appendChild(c);
@@ -1555,6 +1562,13 @@ function openLock(l) {
   if (l.input === 'grid') return openGrid(l);
   if (l.input === 'clock') return openClock(l);
   if (l.input === 'tune') return openTune(l);
+  if (l.input === 'xmas_mirror') {
+    const panel = xmasMirrorPanel(l.optics, {
+      click: () => audio.play('click'),
+      submit: (answer) => socket.emit('game:lock', { id: l.id, answer }),
+    });
+    return openModal(l.title, l.text, panel);
+  }
   if (l.input === 'wires') return openWires(l);
   if (l.input === 'simon') return openSimon(l);
   if (l.input === 'slide') return openSlide(l);
@@ -1731,7 +1745,7 @@ function openStars(l) {
     const i = pick(e); if (i < 0) return;
     if (ctx.val.length && ctx.val[ctx.val.length - 1] === i) return;
     if (ctx.val.includes(i) && !(l.close && i === ctx.val[0] && ctx.val.length === need - 1)) return;
-    ctx.val.push(i); audio.tone?.(520 + ctx.val.length * 60, 0.25); draw();
+    ctx.val.push(i); if (audio.xmasMechanical) audio.play('click'); else audio.tone?.(520 + ctx.val.length * 60, 0.25); draw();
     status.textContent = `${ctx.val.length} / ${need}`;
     if (ctx.val.length >= need) setTimeout(() => { socket.emit('game:lock', { id: l.id, answer: ctx.val.map(String) }); }, 350);
   });

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { SCENARIOS, relicIcons } from './scenarios.js';
 import { ITEMS, RECIPES } from './items.js';
+import { traceXmasMirrors } from '../public/js/xmas-mirrors.js';
 
 const COOP_WINDOW = 8000;
 const GHOST_SLOW = 0.5;
@@ -231,7 +232,7 @@ export class GameInstance {
         this.emitTo(p.id, 'ui:lock', { id: o.id, title, text: this.textFor(o), input: o.lock.input, buttons: o.lock.buttons, len: o.lock.len, notes: !!o.lock.notes, drum: !!o.lock.drum, morse: !!o.lock.morse, wheels: o.lock.wheels, size: o.lock.size, lightsOut: !!o.lock.lightsOut,
           min: o.lock.min, max: o.lock.max, step: o.lock.step, unit: o.lock.unit, left: o.lock.left, right: o.lock.right, colors: o.lock.colors,
           sequence: o.lock.input === 'simon' ? o.lock.answer : undefined, rings: o.lock.rings, positions: o.lock.positions, image: o.lock.image, labels: o.lock.labels,
-          points: o.lock.points, weights: o.lock.weights, target: o.lock.target, pick: o.lock.pick, cups: o.lock.cups, swaps: o.lock.input === 'cups' ? this.cupSwaps(o) : undefined, start: o.lock.start, close: o.lock.close });
+          points: o.lock.points, weights: o.lock.weights, target: o.lock.target, pick: o.lock.pick, optics: o.lock.optics, cups: o.lock.cups, swaps: o.lock.input === 'cups' ? this.cupSwaps(o) : undefined, start: o.lock.start, close: o.lock.close });
         break;
       }
       case 'use': {
@@ -292,6 +293,9 @@ export class GameInstance {
     const o = this.ch.objects.find((x) => x.id === objId);
     if (!o || o.kind !== 'lock' || this.flags.has('solved:' + o.id)) return;
     if (!(o.req || []).every((f) => this.flags.has(f))) return;
+    if (o.lock.input === 'xmas_mirror') {
+      return this.lockResult(p, o, traceXmasMirrors(o.lock.optics, answer).solved);
+    }
     const given = Array.isArray(answer) ? answer.join(',') : answer;
     if (o.lock.input === 'tune') {
       const ok = Math.abs(Number(answer) - o.lock.answer) <= (o.lock.tol ?? 0.3);

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { buildProp } from './props.js';
+import { makeXmasShots } from './xmas-cinema.js';
 import { createAvatar, animateAvatar } from './avatar.js';
 import { createGhost, animateGhost } from './ghosts.js';
 
@@ -790,6 +791,7 @@ export class Cinema {
   makeShots(kind, looks) {
     const A = () => this.audio;
     const walk = (a, dt, t) => animateAvatar(a, dt, true, t);
+    if (kind.startsWith('xmas_')) return makeXmasShots(this, kind, looks);
     if (kind.startsWith('ship')) return this.shipShots(kind, looks);
     if (kind.startsWith('doll')) return this.dollShots(kind, looks);
     if (kind.startsWith('hosp')) return this.hospShots(kind, looks);

@@ -136,7 +136,7 @@ const gearOf = (p) => { const pf = prof(p.name), e = pf.equip; return `${e.wings
 function hiddenOk(name) {
   const p = findByName(name); if (p?.admin) return true;
   if (levelOf(prof(name).xp) >= HIDDEN_LV) return true;
-  return Object.values(SCENARIOS).filter((s) => !s.hidden).every((s) => saves[s.saveKey(name) + ':clear']);
+  return Object.values(SCENARIOS).filter((s) => !s.hidden && !s.special).every((s) => saves[s.saveKey(name) + ':clear']);
 }
 function addXp(name, amt, why) {
   if (!name || !(amt > 0)) return;

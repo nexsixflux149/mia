@@ -1,5 +1,8 @@
 // 아이템 정의. use: 'flashlight' | 'talisman' | 'read' | null
 export const ITEMS = {
+  xmas_relic_post: { name: '첫 발신인 기록', icon: '✉️', desc: '아직 오지 않은 내일 날짜의 반송 기록.', relic: true },
+  xmas_relic_tape: { name: '구조 안내의 원본 테이프', icon: '📼', desc: '서윤이 무엇을 선택했는지 남아 있다.', relic: true },
+  xmas_relic_tag: { name: '서윤의 지워진 탑승표', icon: '🎫', desc: '비어 있던 자리에 이름이 다시 나타난다.', relic: true },
   flashlight: { name: '손전등', icon: '🔦', use: 'flashlight', desc: '심야방송 크루의 장비. 배터리는 충분하다... 아마도.' },
   jang_eye: { name: '나무 눈알', icon: '🌰', use: null, desc: '나무를 깎아 만든 장승의 눈알. 눈동자가 손때로 반들반들하다.' },
   tube: { name: '진공관', icon: '💡', use: null, desc: '구형 라디오용 진공관. 아직 쓸 만해 보인다.' },

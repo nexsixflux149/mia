@@ -11,6 +11,7 @@ import { PARK_CHAPTERS, PARK_ENDINGS } from './park.js';
 import { MIA_CHAPTERS, MIA_ENDINGS } from './mia.js';
 import { ZOMBIE_CHAPTERS, ZOMBIE_ENDINGS } from './zombie.js';
 import { ITEMS } from './items.js';
+import { XMAS_CHAPTERS, XMAS_ENDINGS, XMAS_RELICS } from './xmas.js';
 
 export const SCENARIOS = {
   // 처음 온 사람을 위한 짧은 입문 테마 — 목록 맨 앞, 기본 선택
@@ -113,6 +114,15 @@ export const SCENARIOS = {
     saveKey: (name) => 'park:' + name,
     carry: () => [],
     startItems: () => ['talisman', 'talisman', 'talisman'],
+  },
+  christmas: {
+    id: 'christmas', title: '크리스마스 특별판 — 자정에 반송된 선물', short: '크리스마스',
+    desc: '크리스마스 특별판 · 반송 우체국 → 달빛 온실 → 0번 신호탑 · 3챕터', difficulty: 3, special: true,
+    chapters: XMAS_CHAPTERS, endings: XMAS_ENDINGS, relics: XMAS_RELICS, relicName: '반송의 흔적',
+    cine: { intro: 'xmas_intro', normal: 'xmas_normal', true: 'xmas_true' },
+    saveKey: (name) => 'christmas:' + name,
+    carry: () => [],
+    startItems: () => ['talisman'],
   },
   // 히든 테마: 모든 테마를 한 번씩 깨거나 만렙이 되면 열린다 (서버가 확인)
   zombie: {
@@ -221,7 +231,7 @@ function enlarge(ch) {
   (ch.walls || []).forEach((w) => { pos(w); w.w = w.w > 0.5 ? sc2(w.w) : w.w; w.d = w.d > 0.5 ? sc2(w.d) : w.d; });
   for (const g of [ch.ghost, ...(ch.ghosts || [])]) if (g?.spawn) { g.spawn = g.spawn.map(sc2); g.sense = Math.round((g.sense || 6) * 1.1 * 10) / 10; }
 }
-for (const s of Object.values(SCENARIOS)) s.chapters.forEach(enlarge);
+for (const s of Object.values(SCENARIOS)) if (!s.special) s.chapters.forEach(enlarge);
 
-export const scenarioList = () => Object.values(SCENARIOS).map((s) => ({ id: s.id, title: s.title, short: s.short, desc: s.desc, difficulty: s.difficulty || 3, hidden: !!s.hidden, chapters: s.chapters.map((c) => c.title) }));
+export const scenarioList = () => Object.values(SCENARIOS).map((s) => ({ id: s.id, title: s.title, short: s.short, desc: s.desc, difficulty: s.difficulty || 3, hidden: !!s.hidden, special: !!s.special, chapters: s.chapters.map((c) => c.title) }));
 export const relicIcons = (s) => s.relics.map((id) => ITEMS[id]?.icon || '·');
