@@ -310,7 +310,7 @@ export class GameInstance {
       return this.lockResult(p, o, ok);
     }
     const seq = ['buttons', 'dial', 'wires', 'simon', 'rotate', 'stars'].includes(o.lock.input);
-    const answers = Array.isArray(o.lock.answer) && seq ? [o.lock.answer.join(',')] : [].concat(o.lock.answer);
+    const answers = Array.isArray(o.lock.answer) && seq ? [o.lock.answer, ...(o.lock.alts || [])].map((v) => v.join(',')) : [].concat(o.lock.answer);
     // 말 입력은 쉼표·마침표·느낌표 같은 문장부호를 무시한다 ("수아야, 같이 집에 가자!")
     const loose = (v) => norm(v).replace(/[,.!?~'"…。、！？]/g, '');
     const eq = o.lock.input === 'text' ? (a) => loose(a) === loose(given) : (a) => norm(a) === norm(given);
