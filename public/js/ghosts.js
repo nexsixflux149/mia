@@ -360,8 +360,8 @@ export function createGhost(type = 'woman') {
   } else if (type === 'marionette') {
     // 줄 인형: 위에서 내려온 실에 매달려 덜렁거리는 나무 인형. 얼굴엔 금 간 웃음
     const wood = M('#c8a070', { roughness: 0.6 }), cloth = M('#5a2a6a');
-    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.55, 0.22), cloth); torso.position.y = 1.4; body.add(torso);
-    const hip = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.2, 0.2), cloth); hip.position.y = 1.0; body.add(hip);
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.55, 0.22), cloth); torso.position.y = 1.4; body.add(torso); P.torso = torso;
+    const hip = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.2, 0.2), cloth); hip.position.y = 1.0; body.add(hip); P.hip = hip;
     for (const s of [-1, 1]) { const j = new THREE.Mesh(new THREE.SphereGeometry(0.05, 14, 10), wood); j.position.set(0.24 * s, 1.62, 0); body.add(j); }
     P.legs = [-1, 1].map((s) => { const l = limb(0.5, 0.05, wood); l.position.set(0.1 * s, 0.92, 0); body.add(l); const low = limb(0.45, 0.045, wood); low.position.y = -0.5; l.add(low); const k = new THREE.Mesh(new THREE.SphereGeometry(0.055, 14, 10), wood); k.position.y = -0.5; l.add(k); return l; });
     P.arms = [-1, 1].map((s) => { const a = limb(0.4, 0.04, wood); a.position.set(0.24 * s, 1.62, 0); body.add(a); const low = limb(0.38, 0.035, wood); low.position.y = -0.4; a.add(low); return a; });
@@ -371,7 +371,7 @@ export function createGhost(type = 'woman') {
     eyes(head, 0.04, 0.18, 0.07, 0.022);
     const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.06, 0.12), M('#e8d4b8')); jaw.position.set(0, -0.18, 0.05); head.add(jaw); P.mouth = jaw;
     for (const s of [-1, 1]) { const cr = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.12, 0.005), M('#2a1a10')); cr.position.set(0.07 * s, -0.13, 0.17); head.add(cr); }
-    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.21, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.45), M('#2a1a10')); head.add(hair);
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.21, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.45), M('#2a1a10')); head.add(hair); P.hair = hair;
     P.strings = [];
     const bar = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.04, 0.04), M('#3a2a1a')); bar.position.y = 3.6; g.add(bar); P.bar = bar;
     for (const [x, y] of [[-0.24, 1.62], [0.24, 1.62], [0, 2.15], [-0.1, 0.92], [0.1, 0.92]]) { const s = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 3.6 - y, 5), new THREE.MeshBasicMaterial({ color: '#d8d0c0', transparent: true, opacity: 0.6 })); s.position.set(x, (3.6 + y) / 2, 0); g.add(s); P.strings.push(s); }
@@ -491,6 +491,42 @@ export function createGhost(type = 'woman') {
 }
 
 // state: { mode: 'wander'|'hunt'|'pause', lit, moving }
+// 크리스마스편 자동인형: 같은 줄 인형에 산타 외투 · 모자 · 흰 수염 · 방울 · 사탕지팡이 조종대를 입힌다
+export function dressXmas(g) {
+  const u = g.userData; if (!u || u.type !== 'marionette' || u.xmas) return g; u.xmas = true;
+  const P = u.parts, red = M('#a3121c', { roughness: 0.75 }), fur = M('#f4f1ea', { roughness: 1 }), gold = M('#d8a828', { metalness: 0.8, roughness: 0.3, emissive: '#3a2a00', emissiveIntensity: 0.4 });
+  if (P.torso) P.torso.material = red;
+  if (P.hip) P.hip.material = M('#141010', { roughness: 0.6 }); // 검은 허리띠
+  const body = u.body;
+  const add = (geo, mat, x, y, z, parent = body) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); parent.add(m); return m; };
+  add(new THREE.BoxGeometry(0.42, 0.07, 0.26), fur, 0, 1.14, 0); // 외투 아래 흰 털
+  add(new THREE.BoxGeometry(0.06, 0.5, 0.235), fur, 0, 1.42, 0.005); // 가운데 털 띠
+  add(new THREE.BoxGeometry(0.12, 0.09, 0.03), gold, 0, 1.0, 0.11); // 금 버클
+  for (const y of [1.3, 1.45, 1.6]) add(new THREE.SphereGeometry(0.022, 10, 8), gold, 0, y, 0.125);
+  // 손목 방울
+  for (const a of P.arms || []) { const low = a.children.find((c) => c.isGroup); const b = add(new THREE.SphereGeometry(0.045, 12, 10), gold, 0, -0.4, 0, low || a); add(new THREE.CylinderGeometry(0.05, 0.05, 0.05, 12), fur, 0, -0.33, 0, low || a); b.userData.bell = true; }
+  // 산타 모자 + 흰 수염 (머리카락 대신)
+  if (P.hair) P.hair.material = fur;
+  const head = P.head;
+  if (head) {
+    const hat = new THREE.Group(); hat.position.set(0, 0.16, 0); hat.rotation.z = -0.35; head.add(hat);
+    add(new THREE.ConeGeometry(0.2, 0.42, 18), red, 0.02, 0.2, 0, hat);
+    add(new THREE.TorusGeometry(0.19, 0.045, 10, 22), fur, 0, 0, 0, hat).rotation.x = Math.PI / 2;
+    add(new THREE.SphereGeometry(0.06, 12, 10), fur, 0.03, 0.43, 0, hat);
+    const beard = add(new THREE.SphereGeometry(0.17, 18, 12, 0, Math.PI * 2, Math.PI * 0.5, Math.PI * 0.5), fur, 0, -0.17, 0.06, head); beard.scale.set(1, 1.2, 0.8);
+    P.hat = hat;
+  }
+  // 조종대를 빨강·하양 줄무늬 사탕지팡이로
+  if (P.bar) {
+    P.bar.material = M('#f4f1ea', { roughness: 0.4 });
+    for (let i = 0; i < 7; i++) { const st = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.048, 0.048), M('#c8101c', { roughness: 0.4 })); st.position.x = -0.3 + i * 0.1; P.bar.add(st); }
+    const hook = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.022, 8, 16, Math.PI), M('#c8101c', { roughness: 0.4 })); hook.position.set(0.35, 0.09, 0); hook.rotation.z = -Math.PI / 2; P.bar.add(hook);
+  }
+  // 은은한 붉은 빛 (어둠 속에서 다가오는 게 보이게)
+  const glow = new THREE.PointLight('#ff3020', 0.8, 3.2); glow.position.set(0, 1.9, 0.4); body.add(glow);
+  return g;
+}
+
 export function animateGhost(g, dt, t, st, distToMe) {
   const u = g.userData, P = u.parts; const tt = t + u.t0;
   const hunting = st.mode === 'hunt';
@@ -595,6 +631,7 @@ export function animateGhost(g, dt, t, st, distToMe) {
     P.arms.forEach((a, i) => (a.rotation.z = (i ? -1 : 1) * (0.4 + Math.abs(Math.sin(tt * 4 + i)) * 1.1 * j)));
     P.head.rotation.z = Math.sin(tt * 1.7) * 0.5; P.mouth.position.y = -0.18 - Math.abs(Math.sin(tt * 6)) * 0.05 * j;
     P.bar.rotation.z = Math.sin(tt * 2) * 0.2;
+    if (P.hat) P.hat.rotation.z = -0.35 + Math.sin(tt * 5) * 0.15 * (0.4 + j);
   } else if (u.type === 'crawler') {
     const sp = hunting ? 13 : 5;
     P.limbs.forEach((L, i) => { const ph = tt * sp + (i === 0 || i === 3 ? 0 : Math.PI); L.up.rotation.x = Math.sin(ph) * 0.55 * L.sz; L.low.rotation.x = Math.max(0, Math.sin(ph)) * 0.5; });

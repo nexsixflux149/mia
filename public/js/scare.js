@@ -126,6 +126,41 @@ const SCARES = {
     const jaw = s * (0.08 + Math.abs(Math.sin(t * 18)) * 0.25); x.fillStyle = '#000'; x.fillRect(cx - s * 0.18, cy + s * 0.28, s * 0.36, jaw); x.fillStyle = '#e8d4b8'; x.fillRect(cx - s * 0.2, cy + s * 0.28 + jaw, s * 0.4, s * 0.14);
     x.strokeStyle = '#2a1a10'; x.lineWidth = 3; for (const sx of [-1, 1]) { x.beginPath(); x.moveTo(cx + sx * s * 0.2, cy + s * 0.28); x.lineTo(cx + sx * s * 0.2, cy + s * 0.5 + jaw); x.stroke(); }
   },
+  // 크리스마스 자동인형: 산타 모자를 쓴 나무 인형이 실에 매달려 떨어지며 방울을 흔들고 턱을 딱딱거린다
+  xmasPuppet(x, w, h, t) {
+    dark(x, w, h, 0.96); const cx = w / 2 + Math.sin(t * 22) * 9, drop = Math.min(1, t * 2.6), cy = -h * 0.2 + drop * h * 0.66, s = Math.min(w, h) * 0.4;
+    x.strokeStyle = 'rgba(235,225,205,.75)'; x.lineWidth = 2; for (const ox of [-0.7, -0.3, 0.3, 0.7]) { x.beginPath(); x.moveTo(cx + ox * s, 0); x.lineTo(cx + ox * s * 0.85, cy + s * 0.75); x.stroke(); }
+    // 빨간 외투 깃 + 흰 털 장식
+    x.fillStyle = '#8a0e16'; x.beginPath(); x.moveTo(cx - s * 0.95, cy + s * 1.4); x.quadraticCurveTo(cx, cy + s * 0.55, cx + s * 0.95, cy + s * 1.4); x.fill();
+    for (let i = -4; i <= 4; i++) ell(x, cx + i * s * 0.11, cy + s * 0.74 + Math.abs(i) * s * 0.04, s * 0.1, s * 0.07, '#f2efe8');
+    // 금 간 나무 얼굴
+    ell(x, cx, cy, s * 0.5, s * 0.6, '#e8d4b8');
+    x.strokeStyle = '#3a2414'; x.lineWidth = 2.5; x.beginPath(); x.moveTo(cx + s * 0.12, cy - s * 0.55); x.lineTo(cx + s * 0.05, cy - s * 0.3); x.lineTo(cx + s * 0.16, cy - s * 0.12); x.lineTo(cx + s * 0.08, cy + s * 0.05); x.stroke();
+    ell(x, cx - s * 0.24, cy + s * 0.1, s * 0.09, s * 0.06, '#e0303a'); ell(x, cx + s * 0.24, cy + s * 0.1, s * 0.09, s * 0.06, '#e0303a');
+    // 빛나는 빨간 눈
+    for (const sx of [-1, 1]) { ell(x, cx + sx * s * 0.18, cy - s * 0.12, s * 0.1, s * 0.11, '#120000'); const g = x.createRadialGradient(cx + sx * s * 0.18, cy - s * 0.12, 0, cx + sx * s * 0.18, cy - s * 0.12, s * 0.09); g.addColorStop(0, '#fff2c0'); g.addColorStop(0.35, '#ff2a1a'); g.addColorStop(1, 'rgba(255,0,0,0)'); x.fillStyle = g; x.fillRect(cx + sx * s * 0.18 - s * 0.1, cy - s * 0.23, s * 0.2, s * 0.22); }
+    // 딱딱거리는 호두까기 턱 + 이빨
+    const jaw = s * (0.08 + Math.abs(Math.sin(t * 18)) * 0.26); x.fillStyle = '#000'; x.fillRect(cx - s * 0.2, cy + s * 0.28, s * 0.4, jaw);
+    x.fillStyle = '#f4f0e6'; for (let i = 0; i < 6; i++) x.fillRect(cx - s * 0.19 + i * s * 0.065, cy + s * 0.28, s * 0.05, s * 0.06);
+    x.fillStyle = '#e8d4b8'; x.fillRect(cx - s * 0.22, cy + s * 0.28 + jaw, s * 0.44, s * 0.14);
+    x.fillStyle = '#f2efe8'; x.fillRect(cx - s * 0.22, cy + s * 0.38 + jaw, s * 0.44, s * 0.06); // 하얀 수염 끝
+    // 산타 모자: 빨간 고깔 + 흰 테 + 흔들리는 방울
+    const tip = { x: cx + s * 0.75 + Math.sin(t * 16) * s * 0.08, y: cy - s * 0.75 };
+    x.fillStyle = '#b5121b'; x.beginPath(); x.moveTo(cx - s * 0.55, cy - s * 0.42); x.quadraticCurveTo(cx - s * 0.1, cy - s * 1.35, tip.x, tip.y); x.quadraticCurveTo(cx + s * 0.3, cy - s * 0.8, cx + s * 0.55, cy - s * 0.42); x.fill();
+    ell(x, cx, cy - s * 0.42, s * 0.6, s * 0.12, '#f4f1ea'); ell(x, tip.x, tip.y, s * 0.1, s * 0.1, '#f4f1ea');
+    ell(x, cx - s * 0.6, cy + s * 0.95, s * 0.07, s * 0.07, '#d8a828'); ell(x, cx + s * 0.6, cy + s * 0.95, s * 0.07, s * 0.07, '#d8a828');
+  },
+  // 선물 상자: 리본이 풀리며 뚜껑이 튀어 오르고, 안에서 하얀 얼굴이 솟아오른다
+  xmasGift(x, w, h, t) {
+    dark(x, w, h, 0.95); const cx = w / 2, s = Math.min(w, h) * 0.42, by = h * 0.92, k = Math.min(1, t * 2.2), up = Math.min(1, Math.max(0, (t - 0.25) * 2.4));
+    x.fillStyle = '#1d5a2c'; x.fillRect(cx - s * 0.75, by - s * 0.7, s * 1.5, s * 0.7); x.fillStyle = '#c9a227'; x.fillRect(cx - s * 0.08, by - s * 0.7, s * 0.16, s * 0.7);
+    // 튀어 오른 뚜껑
+    x.save(); x.translate(cx - s * 0.8, by - s * 0.7 - k * s * 0.5); x.rotate(-k * 0.9); x.fillStyle = '#226b34'; x.fillRect(0, -s * 0.16, s * 1.6, s * 0.16); x.fillStyle = '#c9a227'; x.fillRect(s * 0.72, -s * 0.16, s * 0.16, s * 0.16); x.restore();
+    // 용수철 목 + 얼굴
+    const fy = by - s * 0.7 - up * s * 1.05; x.strokeStyle = '#9a9a9a'; x.lineWidth = 6; x.beginPath(); for (let i = 0; i <= 12; i++) { const yy = by - s * 0.7 - (i / 12) * up * s * 0.75; x.lineTo(cx + (i % 2 ? 1 : -1) * s * 0.12, yy); } x.stroke();
+    if (up > 0) { const fs = s * (0.6 + up * 0.5); hair(x, cx, fy, fs * 0.7, 40); paleFace(x, cx, fy, fs * 0.7); hollowEyes(x, cx, fy, fs * 0.7, t); mouth(x, cx, fy + fs * 0.24, fs * 0.7, t);
+      x.fillStyle = '#b5121b'; x.beginPath(); x.moveTo(cx - fs * 0.45, fy - fs * 0.45); x.lineTo(cx + fs * 0.25, fy - fs * 1.05); x.lineTo(cx + fs * 0.45, fy - fs * 0.45); x.fill(); ell(x, cx, fy - fs * 0.45, fs * 0.48, fs * 0.08, '#f4f1ea'); ell(x, cx + fs * 0.25, fy - fs * 1.05, fs * 0.07, fs * 0.07, '#f4f1ea'); }
+  },
   // 거미처럼 천장을 기는 여자: 위에서 거꾸로 매달린 얼굴과 사방으로 꺾인 팔다리
   crawler(x, w, h, t) {
     dark(x, w, h, 0.92); const cx = w / 2, cy = h * (0.15 + Math.min(1, t * 2) * 0.35), s = Math.min(w, h) * 0.35;
@@ -314,6 +349,7 @@ const POOLS = {
   mia: ['child', 'face', 'smiles', 'hands', 'writing', 'faces'],
   zombie: ['face', 'hands', 'faces', 'smiles', 'writing', 'face'],
   park: ['mascot', 'mascot', 'balloons', 'jackbox', 'child', 'smiles', 'tv', 'crawler', 'marionette', 'faces', 'hands'],
+  christmas: ['xmasPuppet', 'xmasPuppet', 'xmasGift', 'xmasGift', 'marionette', 'doll', 'smiles', 'child', 'jackbox', 'faces'],
   clown: ['clown', 'jackbox', 'balloons', 'marionette', 'ringmaster', 'smiles', 'clown', 'crawler', 'tv', 'teeth'],
 };
 export const SCARE_TYPES = Object.keys(SCARES).filter((k) => k !== 'clownHead');
@@ -326,7 +362,7 @@ export function pickScare(type, scenario = 'gwimun') {
   return SCARES[type] ? type : pool[0];
 }
 
-const SOUND = { mascot: 'scream_child', clown: 'clown_laugh', jackbox: 'jackbox', balloons: 'pop', marionette: 'creak', crawler: 'scream', ringmaster: 'growl', smiles: 'giggle', tv: 'glitch', eye: 'growl', teeth: 'growl', static: 'glitch', writing: 'glitch', eyes: 'growl', skull: 'scream', drowned: 'scream_wet', doll: 'scream_child', child: 'scream_child', faceless: 'sting', shadow: 'growl', mirror: 'glass', handprints: 'bang', hang: 'creak', blood: 'scream' };
+const SOUND = { xmasPuppet: 'scream', xmasGift: 'scream_child', mascot: 'scream_child', clown: 'clown_laugh', jackbox: 'jackbox', balloons: 'pop', marionette: 'creak', crawler: 'scream', ringmaster: 'growl', smiles: 'giggle', tv: 'glitch', eye: 'growl', teeth: 'growl', static: 'glitch', writing: 'glitch', eyes: 'growl', skull: 'scream', drowned: 'scream_wet', doll: 'scream_child', child: 'scream_child', faceless: 'sting', shadow: 'growl', mirror: 'glass', handprints: 'bang', hang: 'creak', blood: 'scream' };
 
 export function jumpscare(type, audio) {
   const c = cv();

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { createAvatar, animateAvatar, textSprite, OPTIONS, SKIN, ACCENT, HAIRC, EYEC, DEFAULT_LOOK, EMOTES, EMOTE_DUR } from './avatar.js';
 import { Cinema } from './cinema.js';
 import { xmasMirrorPanel } from './xmas-mirrors.js';
-import { createGhost, animateGhost } from './ghosts.js';
+import { createGhost, animateGhost, dressXmas } from './ghosts.js';
 import { renderDoc } from './paper.js';
 import { buildLobby, buildChapter, disposeWorld, LS } from './world.js';
 import { AudioFX } from './audio.js';
@@ -990,7 +990,7 @@ function syncGhosts(ghosts) {
     for (const gs of ghosts) {
       live.add(gs.i);
       let e = S.ghosts.get(gs.i);
-      if (!e || e.G.userData.type !== gs.type) { if (e) scene.remove(e.G); const G = createGhost(gs.type); G.position.set(gs.x, 0, gs.z); scene.add(G); e = { G, st: gs, soundT: 0 }; S.ghosts.set(gs.i, e); }
+      if (!e || e.G.userData.type !== gs.type) { if (e) scene.remove(e.G); const G = createGhost(gs.type); if (S.scenario?.id === 'christmas') { dressXmas(G); if (!e) audio.play('sting'); } G.position.set(gs.x, 0, gs.z); scene.add(G); e = { G, st: gs, soundT: 0 }; S.ghosts.set(gs.i, e); } // 크리스마스편: 산타 자동인형 + 원래 등장음
       e.st = gs;
     }
   }
@@ -1045,7 +1045,7 @@ function updateOthers(dt, t) {
     e.soundT -= dt;
     if (gs.v && d < 13 && e.soundT < 0) {
       const sounds = { zombie: ['zombie', 1.7], janitor: ['stomp', 0.55], elder: ['pipe', 2.2], woman: ['whisper', 2.4], mudang: ['crawl', 0.45], child: ['giggle', 3], sailor: ['water_step', 0.6], doll: ['clock_tick', 0.4], father: ['snip', 1.1], dalgyal: ['hum', 2.6], slender: ['static_hiss', 1.8], nurse: ['cart', 0.9], headless: ['drag', 0.8], shadow: ['whisper', 3] };
-      const [snd, gap] = sounds[gs.type] || ['whisper', 2];
+      const [snd, gap] = S.scenario?.id === 'christmas' && gs.type === 'marionette' ? [['musicbox_far', 'giggle', 'creak', 'whisper'][Math.floor(Math.random() * 4)], 2.2] : sounds[gs.type] || ['whisper', 2]; // 크리스마스 자동인형: 고장 난 오르골 · 웃음 · 삐걱
       e.soundT = gap * (gs.mode === 'hunt' ? 1 : 1.8) * (0.6 + d / 13);
       if (Math.random() < 1 - d / 15) audio.play(snd);
       // (귀신 가까이에서 나던 종소리 — 무당 방울 · 인형의 '띵' — 는 뺐다)

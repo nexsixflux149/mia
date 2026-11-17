@@ -75,6 +75,8 @@ function parseAbc(abc, key) {
   return out;
 }
 
+// 크리스마스편에서도 원래 소리로 내는 귀신 · 점프스케어 소리
+const XMAS_GHOST_SOUNDS = new Set(['scream', 'scream_wet', 'scream_child', 'sting', 'sting_low', 'growl', 'glitch', 'bang', 'whisper', 'breath', 'giggle', 'creak', 'drag', 'laugh', 'clown_laugh', 'jackbox', 'chain', 'static_hiss', 'teleport', 'musicbox_far', 'glass', 'pop']);
 export class AudioFX {
   constructor() { this.ctx = null; this.amb = null; this.mode = null; this.classicEffects = false; this.xmasMechanical = false; }
   init() {
@@ -413,7 +415,6 @@ export class AudioFX {
     const gap = 1100 - level * 650;
     if (now - (this.lastBeat || 0) < gap) return;
     this.lastBeat = now;
-    if (this.xmasMechanical) return this.xmasEffect('heartbeat');
     this.tone(55, 0.14, { type: 'sine', gain: 0.35 * level + 0.1, release: 0.1, slide: 40 });
     this.tone(50, 0.12, { type: 'sine', gain: 0.25 * level + 0.08, release: 0.1, at: 0.18, slide: 38 });
   }
@@ -450,15 +451,20 @@ export class AudioFX {
     });
   }
 
-  xmasEffect(name) {
-    // 같은 소리가 연달아 겹치거나 한꺼번에 몰리면 '삐삐' 에러음처럼 들린다 → 소리별 간격 + 전체 개수 제한
+  // 같은 소리가 연달아 겹치거나 한꺼번에 몰리면 '삐삐' 에러음처럼 들린다 → 소리별 간격 + 전체 개수 제한 (true = 재생해도 됨)
+  xmasGate(name) {
     const now = performance.now();
     this.xmasLast ||= {};
-    const minGap = name === 'step' ? 200 : name === 'heartbeat' ? 400 : 140;
-    if (now - (this.xmasLast[name] || 0) < minGap) return;
+    const minGap = name === 'step' ? 200 : name === 'heartbeat' ? 400 : XMAS_GHOST_SOUNDS.has(name) ? 700 : 140;
+    if (now - (this.xmasLast[name] || 0) < minGap) return false;
     this.xmasRecent = (this.xmasRecent || []).filter((t) => now - t < 300);
-    if (name !== 'unlock' && name !== 'click' && this.xmasRecent.length >= 3) return;
+    if (name !== 'unlock' && name !== 'click' && this.xmasRecent.length >= 3) return false;
     this.xmasLast[name] = now; this.xmasRecent.push(now);
+    return true;
+  }
+
+  xmasEffect(name) {
+    if (!this.xmasGate(name)) return;
     const pulse = (f, end, time, at = 0, gain = .066) =>
       this.tone(f, time, { type: 'triangle', slide: end, at, gain, attack: .008, release: .05 });
     // 발소리: 눈 밟는 부드러운 '사각' (사각파 삐 소리 없이 잡음만)
@@ -490,7 +496,11 @@ export class AudioFX {
 
   play(name) {
     if (!this.ctx) return;
-    if (this.xmasMechanical) return this.xmasEffect(name);
+    if (this.xmasMechanical) {
+      // 크리스마스편도 귀신 · 점프스케어 소리는 다른 테마에서 쓰던 원래 소리 그대로 (장치 소리만 부드러운 전용음)
+      if (!XMAS_GHOST_SOUNDS.has(name)) return this.xmasEffect(name);
+      if (!this.xmasGate(name)) return;
+    }
     if (!this.classicEffects && (name === 'door' || name === 'creak')) return;
     if (this.buf && (!this.classicEffects || name === 'thunder') && this.playSample(name)) return;
     switch (name) {
