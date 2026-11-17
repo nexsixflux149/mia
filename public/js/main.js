@@ -1327,7 +1327,7 @@ socket.on('game:ending', (e) => {
     showEndExtras();
     if (clear?.photoId && !clear.queued) publishClearPhoto(clear).catch((err) => console.warn('클리어 사진 생성 실패:', err));
     $('#ending').classList.remove('hidden');
-    audio.ambient(null); audio.play(e.type === 'true' || S.fear === 0 ? 'bell' : 'scream');
+    audio.ambient(null); audio.play(e.type === 'true' || S.fear === 0 || audio.xmasMechanical ? 'bell' : 'scream'); // 크리스마스편 엔딩은 따뜻한 종소리로
   }, 1200);
 });
 $('#endBtn').onclick = () => { $('#ending').classList.add('hidden'); socket.emit('party:quit'); };
@@ -3375,3 +3375,4 @@ applyMobile(); addEventListener('resize', applyMobile);
   $('#inventory').addEventListener('click', (e) => { const s = e.target.closest('.slot'); if (s?.dataset.lp) { e.stopImmediatePropagation(); e.preventDefault(); delete s.dataset.lp; } }, true);
 }
 if (window.__dbg) Object.assign(window.__dbg, { setFloor: (f) => { S.floor = String(f || ''); enterLobby({ x: me.x, z: me.z }); }, eatSnack, fx, GPU_INFO, openGallery, takeSnap, graphics, gfx, PERF, applyGfx, restoreFaded, SET, S, me, cam, openShop, openBag, toggleRide, swingSword, doEmote, interact, lobbyAct, scene, camera, cinema, openRank, openFeedback, openStamps, openClearPhoto, rememberClear, showEndExtras, playHiddenPreview, openJournal });
+

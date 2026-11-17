@@ -390,7 +390,11 @@ export class AudioFX {
     if (!this.ctx) return;
     const now = performance.now();
     if (level <= 0) { this.chaseOn = false; return; }
-    if (!this.chaseOn) { this.chaseOn = true; this.chaseStep = 0; this.play('sting_low'); }
+    if (!this.chaseOn) {
+      this.chaseOn = true; this.chaseStep = 0;
+      // 추격 시작음은 4초에 한 번만 (거리가 경계값 근처를 오가면 계속 다시 울리던 문제)
+      if (now - (this.lastSting || 0) > 4000) { this.lastSting = now; this.play('sting_low'); }
+    }
     if (this.xmasMechanical || this.score) return; // 전용 BGM 위에 기존 추격음을 겹치지 않는다
     const gap = 330 - level * 130;
     if (now - (this.lastChase || 0) < gap) return;
@@ -447,10 +451,24 @@ export class AudioFX {
   }
 
   xmasEffect(name) {
+    // 같은 소리가 연달아 겹치거나 한꺼번에 몰리면 '삐삐' 에러음처럼 들린다 → 소리별 간격 + 전체 개수 제한
+    const now = performance.now();
+    this.xmasLast ||= {};
+    const minGap = name === 'step' ? 200 : name === 'heartbeat' ? 400 : 140;
+    if (now - (this.xmasLast[name] || 0) < minGap) return;
+    this.xmasRecent = (this.xmasRecent || []).filter((t) => now - t < 300);
+    if (name !== 'unlock' && name !== 'click' && this.xmasRecent.length >= 3) return;
+    this.xmasLast[name] = now; this.xmasRecent.push(now);
     const pulse = (f, end, time, at = 0, gain = .066) =>
-      this.tone(f, time, { type: 'square', slide: end, at, gain, attack: .006, release: .045 });
-    if (name === 'step') { pulse(105, 71, .06, 0, .032); this.noise(.027, { freq: 1450, q: 5, gain: .032 }); return; }
-    if (name === 'heartbeat') { pulse(66, 48, .10, 0, .04); pulse(56, 43, .08, .14, .027); return; }
+      this.tone(f, time, { type: 'triangle', slide: end, at, gain, attack: .008, release: .05 });
+    // 발소리: 눈 밟는 부드러운 '사각' (사각파 삐 소리 없이 잡음만)
+    if (name === 'step') { this.noise(.05, { freq: 1100, q: 1.2, gain: .028, release: .04 }); return; }
+    // 심장박동: 낮고 둥근 사인파 '쿵-쿵'
+    if (name === 'heartbeat') {
+      this.tone(58, .13, { type: 'sine', slide: 42, gain: .11, attack: .01, release: .1 });
+      this.tone(52, .11, { type: 'sine', slide: 39, at: .17, gain: .075, attack: .01, release: .09 });
+      return;
+    }
     if (/scream|sting|growl|glitch|bang|thunder|wrong/.test(name)) {
       this.tone(142, .22, { type: 'triangle', slide: 72, gain: .063, attack: .026, release: .12 });
       this.tone(89, .14, { type: 'sine', slide: 57, at: .085, gain: .033, attack: .018, release: .085 });
@@ -465,7 +483,9 @@ export class AudioFX {
       [262, 330].forEach((f, i) => this.tone(f, .12, { type: 'triangle', slide: f * .96, at: i * .072, gain: .043, attack: .016, release: .065 }));
       return;
     }
-    pulse(780, 435, .075, 0, .043);
+    if (name === 'click') { pulse(1180, 980, .045, 0, .028); return; }
+    // 그 밖의 소리(째깍 · 전원 · 순간이동 등)는 날카로운 삐 대신 작은 방울 소리
+    this.tone(1046.5, .18, { type: 'sine', gain: .026, attack: .006, release: .16 });
   }
 
   play(name) {
