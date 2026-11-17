@@ -130,7 +130,7 @@ const THEMES = {
 };
 // 챕터별 벽지 · 바닥 (같은 테마라도 장소에 따라 다르다)
 const ROOMS = {
-  christmas: { 0: ['panel', 'parquet'], 2: ['metal', 'metal'] },
+  christmas: { 0: ['panel', 'parquet'], 1: ['metal', 'concrete'], 3: ['damask', 'parquet'], 4: ['shipwood', 'deck'], 5: ['metal', 'metal'] },
   gwimun: { 1: ['school', 'planks'], 2: ['school', 'planks'], 3: ['hanji', 'jangpan'], 5: ['hanji', 'jangpan'], 6: ['stone', 'stone'] },
   ophelia: { 1: ['shipwood', 'deck'], 2: ['shipwood', 'deck'], 3: ['metal', 'metal'] },
   doll: { 0: ['damask', 'parquet'], 1: ['damask', 'parquet'], 2: ['damask', 'parquet'], 3: ['boards', 'planks'] },
@@ -2087,7 +2087,7 @@ export function buildChapter(scene, ch, themeId = 'gwimun') {
   if (dust) root.add(dust);
 
   if (themeId === 'christmas') {
-    const updateXmas = decorateXmas(root, ch.id);
+    const updateXmas = decorateXmas(root, ch.look ?? ch.id); // 챕터가 늘어나 장식 모양(look)을 따로 받는다
     anims.push((t) => updateXmas(t, Boolean(objects.clock_constellation?.done)));
   }
   scene.add(root);

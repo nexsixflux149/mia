@@ -434,6 +434,8 @@ body.mobile .lobby-notice { top: 120px; font-size: 13px; border-radius: 14px; }
 .rank-tabs button { opacity: .75; }
 .rank-tabs button:focus { outline: none; }
 .rank-tabs button.on { background: #c0262d !important; color: #fff !important; opacity: 1; box-shadow: 0 0 10px rgba(255,60,60,.6); }
+.rank-tabs button.hid { background: #12300c; color: #8aff5a; border-color: #4fbf2a; }
+.rank-tabs button.hid.on { background: #3f9a1c !important; color: #fff !important; box-shadow: 0 0 10px rgba(138,255,90,.6); }
 .rank-row { display: grid; grid-template-columns: 34px 1fr auto; gap: 4px 10px; padding: 8px 10px; border-bottom: 1px solid #2a1e26; align-items: center; }
 .rank-row.me { background: rgba(255, 211, 106, .1); }
 .rank-no { font-weight: 800; text-align: center; }

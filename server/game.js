@@ -68,7 +68,7 @@ export class GameInstance {
   clientChapter() {
     const c = this.ch;
     return {
-      id: c.id, title: c.title, place: c.place, outdoor: !!c.outdoor, size: c.size, spawn: c.spawn,
+      id: c.id, look: c.look, title: c.title, place: c.place, outdoor: !!c.outdoor, size: c.size, spawn: c.spawn,
       ambient: c.ambient, ground: c.ground, floor: c.floor, wall: c.wall, fog: c.fog, rain: !!c.rain, water: !!c.water,
       walls: c.walls || [], props: c.props || [], intro: c.intro,
       objects: c.objects.map((o) => ({

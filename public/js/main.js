@@ -1134,7 +1134,7 @@ loop();
 
 // 로비 테마 관문: 가까이 가면 설명 말풍선
 const THEME_INFO = {
-  christmas: { title: '🎄 크리스마스 특별판 — 자정에 반송된 선물', tag: '특별판 · 광학 퍼즐 · 3챕터', color: '#ffe0a0',
+  christmas: { title: '🎄 크리스마스 특별판 — 자정에 반송된 선물', tag: '특별판 · 광학 퍼즐 · 6챕터', color: '#ffe0a0',
     story: '12월 24일 23:57. 당신 앞으로 도착한 소포의 발송일은 내일이다. 소포를 가져간 붉은 외투를 쫓아, 자정이 되기 전에 마지막 열차를 찾아라.' },
   zombie: { title: '🧟 데드 시티 — 마지막 헬기 (히든)', tag: '히든 테마 · 좀비 도시 → 백화점 5층 → 옥상 헬기 · 7챕터 · 역대급 퍼즐 · 약 4~5시간', color: '#8aff5a',
     story: '2026년 11월, R-9 감염 사태 사흘째. 무너진 한빛시에서 구조 헬기 매-7의 마지막 방송이 들린다. "05시 정각, 그랜드 한빛 백화점 옥상." 좀비로 가득한 백화점을 지하주차장부터 옥상까지 올라가 헬기에 오르자. 그리고 — 노란 풍선을 든 아이를 찾아서.' },
@@ -2597,7 +2597,7 @@ function openRank(opt = {}) {
     if ($('#modal').classList.contains('hidden') || $('#modalBody').firstChild !== holder) return; // 그새 닫았거나 다른 창을 열었다
     const wrap = holder; wrap.innerHTML = '';
     const mains = el('div', 'rank-main'); const sub = el('div', 'rank-sub'); const tabs = el('div', 'rank-tabs'); const list = el('div', 'rank-list'); const mine = el('div', 'rank-mine');
-    const scs = (S.scenarios || []).filter((x) => !x.hidden || S.hiddenOk);
+    const scs = S.scenarios || []; // 히든 테마도 랭킹은 누구나 볼 수 있다 (버튼 색만 다름)
     let main = opt.main || S.rankMain || 'week';
     let cur = opt.theme || S.rankTheme || scs[0]?.id;
     S.rankTab = () => ({ main, theme: cur });
@@ -2642,7 +2642,7 @@ function openRank(opt = {}) {
       mine.classList.toggle('hidden', !mine.textContent);
     };
     [['week', '📅 주간 랭킹'], ['month', '🗓️ 월간 랭킹'], ['total', '👑 총 랭킹'], ['theme', '🚪 테마 랭킹']].forEach(([id, label]) => { const b = el('button', 'btn small', label); b.dataset.id = id; b.onclick = () => { main = id; draw(); }; mains.appendChild(b); });
-    scs.forEach((x) => { const b = el('button', 'btn tiny', x.short); b.dataset.id = x.id; b.onclick = () => { cur = x.id; draw(); }; tabs.appendChild(b); });
+    scs.forEach((x) => { const b = el('button', 'btn tiny' + (x.hidden ? ' hid' : ''), x.hidden ? '🧟 ' + x.short : x.short); b.dataset.id = x.id; b.onclick = () => { cur = x.id; draw(); }; tabs.appendChild(b); });
     wrap.append(mains, sub, tabs, list, mine);
     try { draw(); } catch (e) { list.innerHTML = ''; list.appendChild(el('div', 'muted', '랭킹을 표시하지 못했어요.')); console.error(e); }
   });

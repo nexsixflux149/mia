@@ -494,6 +494,24 @@ export class AudioFX {
     this.tone(1046.5, .18, { type: 'sine', gain: .026, attack: .006, release: .16 });
   }
 
+  // 점프스케어 전용: 크리스마스편의 소리 간격 제한(xmasGate)을 건너뛰고, 비명 위에 충격음 · 불협 스팅 · 지직거림을 겹쳐 크게 터뜨린다
+  scare(name) {
+    if (!this.ctx) return;
+    const xmas = this.xmasMechanical;
+    this.xmasMechanical = false;
+    try {
+      this.play(name);
+      if (xmas) {
+        this.play('sting');
+        this.noise(0.4, { freq: 140, type: 'lowpass', gain: 1.4, attack: 0.002, release: 0.35 }); // 쾅
+        this.tone(46, 1.0, { type: 'square', gain: 0.45, slide: 26, attack: 0.003, release: 0.7 });
+        [622, 659, 932].forEach((f, i) => this.tone(f, 0.9, { type: 'sawtooth', gain: 0.07, slide: f * 0.7, detune: i * 31, at: 0.03 })); // 날카로운 불협화음
+        for (let i = 0; i < 7; i++) this.noise(0.05, { freq: 600 + Math.random() * 5000, q: 4, gain: 0.3, at: 0.12 + i * 0.06 }); // 지직
+      }
+    } finally { this.xmasMechanical = xmas; }
+    if (xmas) { this.xmasLast ||= {}; this.xmasLast[name] = this.xmasLast.sting = performance.now(); }
+  }
+
   play(name) {
     if (!this.ctx) return;
     if (this.xmasMechanical) {

@@ -372,7 +372,8 @@ export function jumpscare(type, audio) {
   const draw = SCARES[type] || SCARES.face;
   const dur = type === 'flash' ? 380 : type === 'writing' || type === 'static' ? 900 : 1100;
   const start = performance.now();
-  audio?.play(type === 'flash' ? 'sting' : SOUND[type] || 'scream');
+  const snd = type === 'flash' ? 'sting' : SOUND[type] || 'scream';
+  if (audio?.scare) audio.scare(snd); else audio?.play(snd);
   if (navigator.userActivation?.hasBeenActive && navigator.vibrate) navigator.vibrate([200, 50, 200]);
   return new Promise((res) => {
     const frame = (now) => {

@@ -117,7 +117,7 @@ export const SCENARIOS = {
   },
   christmas: {
     id: 'christmas', title: '크리스마스 특별판 — 자정에 반송된 선물', short: '크리스마스',
-    desc: '크리스마스 특별판 · 반송 우체국 → 달빛 온실 → 0번 신호탑 · 3챕터', difficulty: 3, special: true,
+    desc: '크리스마스 특별판 · 반송 우체국 → 전신실 → 달빛 온실 → 장난감 공방 → 마지막 객차 → 0번 신호탑 · 6챕터', difficulty: 4, special: true,
     chapters: XMAS_CHAPTERS, endings: XMAS_ENDINGS, relics: XMAS_RELICS, relicName: '반송의 흔적',
     cine: { intro: 'xmas_intro', normal: 'xmas_normal', true: 'xmas_true' },
     saveKey: (name) => 'christmas:' + name,
