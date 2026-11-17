@@ -1322,7 +1322,7 @@ export function buildLobby(scene, opts = {}) {
   add({ t: 'lantern_string', x: 0, z: 9, len: 14 });
 
   const themes = placeThemes(LOBBY_THEMES.filter((th) => !th.hidden || opts.hidden).map((th) => ({ ...th })));
-  themes.push({ id: 'christmas', x: 17.2, z: -7.3, color: '#ffe0a0', glow: '#36172a', label: '🎄 크리스마스 특별판' });
+  themes.push({ id: 'christmas', x: -8, z: -4.4, color: '#ffe0a0', glow: '#36172a', label: '🎄 크리스마스 특별판' });
   const exhibits = themes.map((th) => buildExhibit(root, colliders, th));
   const extra = buildLobbyExtras(root, colliders, add);
   const snapBoard = buildSnapBoard(root, colliders);
@@ -1517,9 +1517,9 @@ function buildLobbyExtras(root, colliders, add) {
       }
     }
   }
-  // ── 그네 (광장 서북쪽) — 가만히 있다가 누가 타면 흔들리고, 내리면 다시 멈춘다
+  // ── 그네 (캠프파이어 서쪽) — 가만히 있다가 누가 타면 흔들리고, 내리면 다시 멈춘다
   {
-    const cx = -7.4, cz = -5.6, ry = Math.atan2(-cx, -cz); // 광장 가운데를 바라보게
+    const cx = -11.5, cz = 4, ry = Math.atan2(-cx, -cz); // 광장 가운데를 바라보게
     const g = new THREE.Group(); g.position.set(cx, 0, cz); g.rotation.y = ry; root.add(g);
     const frameM = pm('#c0392b', { metalness: 0.4, roughness: 0.5 }), H = 2.5, L = 1.95;
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const leg = mesh(new THREE.CylinderGeometry(0.05, 0.06, H / Math.cos(0.32), 10), frameM, sx * 1.55, H / 2, sz * 0.4, g); leg.rotation.x = -sz * 0.32; }
