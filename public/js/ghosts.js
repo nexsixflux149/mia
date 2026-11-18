@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { loadXmasGhostModel } from './xmas-models.js';
+import { dressWomanGhost } from './refined-models.js';
 
 // 귀신 종류: woman(하얀 여자) · janitor(소사) · elder(이장, 꺾인 목) · mudang(거꾸로 기는 무당) · child
 // 재질 · 지오메트리는 종류별로 한 번만 만들어 돌려 쓴다 (귀신이 나타났다 사라질 때마다 새로 만들지 않음)
@@ -487,6 +489,7 @@ export function createGhost(type = 'woman') {
   u.fog = [];
   for (let i = 0; i < 6; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: fogTex, transparent: true, depthWrite: false, opacity: 0.6 })); s.scale.setScalar(1.2 + Math.random()); s.position.set((Math.random() - 0.5) * 0.8, 0.3 + Math.random() * 1.2, (Math.random() - 0.5) * 0.8); g.add(s); u.fog.push(s); }
   g.userData = u;
+  if (type === 'woman') dressWomanGhost(g);
   return g;
 }
 
@@ -524,6 +527,7 @@ export function dressXmas(g) {
   }
   // 은은한 붉은 빛 (어둠 속에서 다가오는 게 보이게)
   const glow = new THREE.PointLight('#ff3020', 0.8, 3.2); glow.position.set(0, 1.9, 0.4); body.add(glow);
+  loadXmasGhostModel(g);
   return g;
 }
 
@@ -628,7 +632,11 @@ export function animateGhost(g, dt, t, st, distToMe) {
     const j = hunting ? 1 : 0.4; const sn = Math.sin(tt * (hunting ? 7 : 2.5));
     u.body.position.y = 0.1 + Math.abs(Math.sin(tt * 3)) * 0.12 * j; // 실에 들려 껑충
     P.legs[0].rotation.x = sn * 0.9 * j; P.legs[1].rotation.x = -sn * 0.9 * j;
-    P.arms.forEach((a, i) => (a.rotation.z = (i ? -1 : 1) * (0.4 + Math.abs(Math.sin(tt * 4 + i)) * 1.1 * j)));
+    P.arms.forEach((a, i) => {
+      const swing = Math.abs(Math.sin(tt * 4 + i)) * j;
+      a.rotation.z = u.xmasModelLoaded ? (i ? 1 : -1) * (.24 + swing * .45) : (i ? -1 : 1) * (.4 + swing * 1.1);
+      if (u.xmasModelLoaded) a.rotation.x = hunting ? -.44 - swing * .28 : -swing * .20;
+    });
     P.head.rotation.z = Math.sin(tt * 1.7) * 0.5; P.mouth.position.y = -0.18 - Math.abs(Math.sin(tt * 6)) * 0.05 * j;
     P.bar.rotation.z = Math.sin(tt * 2) * 0.2;
     if (P.hat) P.hat.rotation.z = -0.35 + Math.sin(tt * 5) * 0.15 * (0.4 + j);

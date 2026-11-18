@@ -21,6 +21,7 @@ export const storeKind = () => (pool ? 'db' : 'file');
 
 /** 시작할 때 한 번: 저장소 연결 + 기록 불러오기. keys 는 ['saves','hearts','ranks'] 같은 이름 목록 */
 export async function openStore(dataDir, keys) {
+  finishBatch(dataDir);
   const out = {};
   for (const k of keys) out[k] = readFile(dataDir, k) || {};
   if (!DB_URL) return out;
@@ -44,6 +45,58 @@ async function writeDb(key, obj) {
   await pool.query(`INSERT INTO ${TABLE} (key, value, updated_at) VALUES ($1, $2::jsonb, now()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`, [key, JSON.stringify(obj)]);
 }
 
+// 파일 저장은 복구용 기록을 먼저 확정한다. 중간에 종료돼도 다음 시작 때 다시 적용한다.
+const batchFile = (dataDir) => path.join(dataDir, '.store-batch.json');
+function finishBatch(dataDir) {
+  let transaction;
+  try { transaction = fs.readFileSync(batchFile(dataDir), 'utf8'); }
+  catch (error) { if (error.code === 'ENOENT') return; throw error; }
+  for (const [key, value] of Object.entries(JSON.parse(transaction))) {
+    fs.writeFileSync(path.join(dataDir, key + '.json'), JSON.stringify(value));
+  }
+  fs.unlinkSync(batchFile(dataDir));
+}
+
+// DB 쓰기를 순서대로 처리해 변경 전의 예약 저장이 뒤늦게 덮어쓰지 않게 한다.
+let dbWrites = Promise.resolve();
+function enqueueDb(write) {
+  const task = dbWrites.then(write);
+  dbWrites = task.catch(() => {});
+  return task;
+}
+
+export function persistBatch(dataDir, records) {
+  if (!pool) {
+    fs.mkdirSync(dataDir, { recursive: true });
+    finishBatch(dataDir);
+    const temp = batchFile(dataDir) + '.tmp';
+    fs.writeFileSync(temp, JSON.stringify(records));
+    fs.renameSync(temp, batchFile(dataDir));
+    try { finishBatch(dataDir); } catch (error) { console.warn('  [저장] 변경 기록 적용 보류:', error.message); }
+    return Promise.resolve();
+  }
+  const payload = JSON.stringify(records);
+  for (const key of Object.keys(records)) {
+    clearTimeout(timers.get(key));
+    timers.delete(key);
+    pending.delete(key);
+  }
+  return enqueueDb(async () => {
+    // 한 SQL 문으로 전체 변경을 저장한다. 일시 장애 시 같은 변경만 다시 시도한다.
+    for (;;) {
+      try {
+        await pool.query(`INSERT INTO ${TABLE} (key, value)
+          SELECT key, value FROM jsonb_each($1::jsonb)
+          ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`, [payload]);
+        return;
+      } catch (error) {
+        console.warn('  [DB] 닉네임 변경 저장 재시도:', error.message);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
+  });
+}
+
 // 자주 바뀌어도 1초에 한 번만 저장한다
 const timers = new Map(); const pending = new Map();
 export function persist(dataDir, key, obj, pretty = false) {
@@ -56,10 +109,10 @@ export function persist(dataDir, key, obj, pretty = false) {
 async function flushKey(key) {
   const p = pending.get(key); if (!p) return; pending.delete(key);
   if (pool) {
-    try { await writeDb(key, p.obj); } catch (e) { console.warn(`  [DB] ${key} 저장 실패, 다시 시도합니다:`, e.message); if (!pending.has(key)) persist(p.dataDir, key, p.obj, p.pretty); }
+    try { await enqueueDb(() => writeDb(key, p.obj)); } catch (e) { console.warn(`  [DB] ${key} 저장 실패, 다시 시도합니다:`, e.message); if (!pending.has(key)) persist(p.dataDir, key, p.obj, p.pretty); }
     return;
   }
-  try { fs.mkdirSync(p.dataDir, { recursive: true }); fs.writeFileSync(path.join(p.dataDir, key + '.json'), JSON.stringify(p.obj, null, p.pretty ? 2 : 0)); } catch {}
+  try { fs.mkdirSync(p.dataDir, { recursive: true }); finishBatch(p.dataDir); fs.writeFileSync(path.join(p.dataDir, key + '.json'), JSON.stringify(p.obj, null, p.pretty ? 2 : 0)); } catch {}
 }
 
 const CLEAR_PHOTO_PREFIX = 'clear_photo:';
@@ -109,5 +162,6 @@ export async function flushAll() {
   for (const t of timers.values()) clearTimeout(t);
   timers.clear();
   await Promise.all([...pending.keys()].map(flushKey));
+  await dbWrites;
   if (pool) await pool.end().catch(() => {});
 }

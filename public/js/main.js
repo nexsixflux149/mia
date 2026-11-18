@@ -30,7 +30,7 @@ socket.on('connect', () => {
     // 오래 끊겨 서버가 내 자리를 이미 정리했다면 새 캐릭터로 로비에서 다시 시작한다 (예전 파티 · 게임 화면도 함께 정리)
     if (!res.resumed) { S.me = res.id; S.myName = res.name; voice.myId = res.id; dropOther(res.id); S.party = null; closeModal(); S.storyQueue = []; closeStory(true); rebuildMyAvatar(); toast('연결이 오래 끊겨 로비에서 다시 시작합니다.'); }
     S.resume = { id: res.id, token: res.token }; if (!S.admin) store.set('gwimun-resume', { ...S.resume, name: res.name, at: Date.now() });
-    if (res.account && !S.admin) store.set('mia-account', res.account);
+    if (res.account && !S.admin) applyAccountName(res.account);
     S.items = res.items; if (res.shop) S.shop = res.shop; if (res.hiddenOk != null) S.hiddenOk = res.hiddenOk; if (res.unlockedBy) S.unlockedBy = res.unlockedBy; renderInv(); renderParty();
     if ('champ' in res) setChamp(res.champ);
     if (res.resumed && String(res.room || '').startsWith('inst:') && S.room !== 'game') socket.emit('game:state'); // 게임 중이었다면 그 게임 화면으로
@@ -98,15 +98,24 @@ let look = { ...DEFAULT_LOOK, ...store.get('gwimun-look', {}) };
 // 닉네임을 비워 두면 입장을 못 해서 그냥 나가 버린다 → 처음 온 사람에게는 무서운 닉네임을 미리 채워 둔다
 const RAND_NICK = () => ['겁쟁이', '떨리는', '도망치는', '숨은', '용감한', '길잃은', '소심한', '울보'][Math.random() * 8 | 0] + ['토끼', '고양이', '여우', '곰', '유령', '탐정', '인형', '미아'][Math.random() * 8 | 0] + (10 + (Math.random() * 90 | 0));
 $('#nick').value = store.get('gwimun-nick', '') || RAND_NICK();
-// 고정 계정: 이 기기에 계정이 있으면 닉네임이 정해져 있다 (바꿀 수 없음)
+// 고정 계정의 닉네임은 접속 화면에 표시한다.
 function applyAccountLock() {
   const a = store.get('mia-account', null); const n = $('#nick'), note = $('#nickNote');
   // 안내 문구는 한 줄(짧은 글)이 기본이고, 자세한 설명(.more)은 넓은 화면에서만 보인다 — 두 줄이 되면 모바일에서 아래 버튼을 밀어냈다
   const say = (short, more) => { if (!note) return; note.textContent = short; note.appendChild(Object.assign(document.createElement('span'), { className: 'more', textContent: ' ' + more })); };
-  if (a?.name) { n.value = a.name; n.readOnly = true; n.classList.add('locked'); say('🔒 이 기기의 고정 계정 닉네임이에요.', '(레벨 · 코인 · 도장표가 여기에 쌓여요)'); }
-  else { n.readOnly = false; n.classList.remove('locked'); say('⚠️ 정한 닉네임은 고정 계정이 되어 못 바꿔요.', '(이 기기 · IP에 묶여 레벨 · 코인이 쌓이니 신중하게!)'); }
+  if (a?.name) { n.value = a.name; n.readOnly = true; n.classList.add('locked'); say('🔒 이 기기의 고정 계정 닉네임이에요.', '(닉네임은 광장 상점의 변경권으로 바꿀 수 있어요)'); }
+  else { n.readOnly = false; n.classList.remove('locked'); say('닉네임을 정하면 이 기기의 고정 계정이 생겨요.', '(이 기기 · IP에 묶여 레벨 · 코인이 쌓이니 신중하게!)'); }
 }
 applyAccountLock();
+function applyAccountName(account) {
+  const changed = S.myName !== account.name;
+  S.myName = account.name;
+  store.set('mia-account', account);
+  store.set('gwimun-nick', account.name);
+  if (S.resume) store.set('gwimun-resume', { ...S.resume, name: account.name, at: Date.now() });
+  applyAccountLock();
+  if (changed && myAvatar) setTag(myAvatar, account.name, '#ffe08a');
+}
 // 로그인 화면을 '지금 실제로 보이는 영역'에 맞춘다: 주소창이 늘었다 줄었다 하거나 키보드가 올라와도 입장 막대가 화면 밖으로 밀려나지 않게
 // (--app-h · --app-top 은 css 의 body.mobile #login 이 쓴다. 영역이 좁으면 .short · .tiny 로 로고 · 미리보기를 줄인다)
 function fitLogin() {
@@ -962,7 +971,7 @@ function syncOther(p) {
   g.userData.target = p;
   setLight(g, p.light);
   const inParty = !!S.party?.members.some((m) => m.id === p.id);
-  if (g.userData.inParty !== inParty) { g.userData.inParty = inParty; setTag(g, (inParty ? '★ ' : '') + p.name, inParty ? '#8fd3ff' : '#fff'); }
+  if (g.userData.inParty !== inParty || g.userData.tagName !== p.name) { g.userData.inParty = inParty; g.userData.tagName = p.name; setTag(g, (inParty ? '★ ' : '') + p.name, inParty ? '#8fd3ff' : '#fff'); }
 }
 const syncAllOthers = () => { for (const p of S.net.values()) syncOther(p); };
 function dropOther(id) { S.net.delete(id); const g = S.others.get(id); if (g) { removeAvatar(g); S.others.delete(id); } }
@@ -2950,7 +2959,7 @@ async function loadShareInfo() {
 
 // ─────────────────────────── 레벨 · 코인 · 상점 · 내 물건 · 선물
 const GOLD_ORDER = ['gold_hat', 'gold_mask', 'gold_gloves', 'gold_top', 'gold_bottom', 'gold_shoes', 'gold_tail']; // 황금 고양이 세트 (비매품 · 주간랭킹 1~3위 보상)
-const SHOP_ORDER = ['popper', 'rocket', 'wings_fairy', 'mount_pony', 'wings_angel', 'mount_broom', 'mount_cat', 'mount_dog', 'mount_wolf', 'mount_unicorn', 'wings_devil', 'mount_trex', 'wings_dragon', 'sword', 'mount_ufo', 'mount_lion', 'mount_turtle', 'mount_human', 'costume_robot', 'mount_carriage', 'chainsaw', 'mask_paper', 'mask_rabbit', 'mask_fox', 'mask_bear', 'mask_hahoe', 'mask_wolf', 'mask_venice', 'mask_ghost', 'mask_oni', 'mount_sleigh', 'costume_xmas', ...GOLD_ORDER, 'gold_staff'];
+const SHOP_ORDER = ['rename_ticket', 'popper', 'rocket', 'wings_fairy', 'mount_pony', 'wings_angel', 'mount_broom', 'mount_cat', 'mount_dog', 'mount_wolf', 'mount_unicorn', 'wings_devil', 'mount_trex', 'wings_dragon', 'sword', 'mount_ufo', 'mount_lion', 'mount_turtle', 'mount_human', 'costume_robot', 'mount_carriage', 'chainsaw', 'mask_paper', 'mask_rabbit', 'mask_fox', 'mask_bear', 'mask_hahoe', 'mask_wolf', 'mask_venice', 'mask_ghost', 'mask_oni', 'mount_sleigh', 'costume_xmas', ...GOLD_ORDER, 'gold_staff'];
 const coinsText = () => (S.profile?.coins === -1 ? '∞' : String(S.profile?.coins ?? 0));
 // 손에 든 것: 0 없음 · 1 전설의 검 · 2 황금 고양이 지팡이
 function holdCode() { const it = S.profile?.items; return S.holdSaw && it?.chainsaw ? 3 : S.holdStaff && it?.gold_staff ? 2 : S.holdSword && it?.sword ? 1 : 0; }
@@ -3172,7 +3181,9 @@ function openShop() {
     }
     info.innerHTML = `<div class="sh-t">${it.icon} ${it.name}</div><div class="sh-d">${it.desc}</div><div class="sh-lv${locked ? ' locked' : ''}">${it.lv > 1 ? `🔒 Lv.${it.lv} 이상 구매 가능` : '🔓 누구나 구매 가능'}${locked ? ` · 현재 Lv.${pf.lv}` : ' ✓'}</div><div class="muted">${it.max > 1 ? `최대 ${it.max}개까지 가질 수 있어요 · 지금 ${have}개` : '아이템별 1개만 가질 수 있어요'}${it.kind === 'mount' ? ` · 탄 동안 이동 속도 ${sel === 'mount_turtle' ? 2 : 1.5}배 (Z)` : ''}${it.kind === 'sword' ? ' · 귀신 30번 베면 깨져요' : ''}${it.kind === 'saw' ? ' · 귀신 퇴치 무제한 (B)' : ''}</div>`;
     const buy = el('button', 'btn primary', locked ? `🔒 Lv.${it.lv} 부터` : have >= it.max ? (it.max > 1 ? '가득 찼어요' : '이미 있어요') : `🪙 ${it.price.toLocaleString()} 코인에 사기`);
-    buy.disabled = locked || have >= it.max;
+    const needsAccount = it.kind === 'rename' && pf.admin;
+    buy.disabled = locked || have >= it.max || needsAccount;
+    if (needsAccount) buy.textContent = '고정 계정 전용';
     buy.onclick = () => { socket.emit('shop:buy', sel); audio.play('click'); };
     const bag = el('button', 'btn', '🎒 내 물건'); bag.onclick = () => openBag();
     const row = el('div', 'row'); row.append(buy, bag); info.appendChild(row);
@@ -3181,10 +3192,11 @@ function openShop() {
   w.append(head, top, grid);
   previewItem(sel); draw();
   S.shopRefresh = () => { if ($('#modalBody').firstChild === w) draw(); else S.shopRefresh = null; };
-  openModal('🛒 코인 상점', '날개 · 탈것 · 코스튬 · 가면 · 폭죽 · 전설의 검 · 🏆 주간랭킹 1~3위 보상(비매품)', w);
+  openModal('🛒 코인 상점', '닉네임 변경권 · 날개 · 탈것 · 코스튬 · 가면 · 폭죽 · 전설의 검 · 🏆 주간랭킹 1~3위 보상(비매품)', w);
   $('#modal .modal-card').classList.add('shop-mode'); // 위는 고정, 아래 물건 목록만 스크롤
   const stop = () => { if ($('#modalBody').firstChild !== w || $('#modal').classList.contains('hidden')) { pv.on = false; S.shopRefresh = null; } else setTimeout(stop, 500); }; setTimeout(stop, 500);
 }
+socket.on('account:renamed', applyAccountName);
 socket.on('shop:bought', ({ id }) => { audio.play('pickup'); const it = S.shop[id]; if (it?.kind === 'sword') holdWeapon('sword'); if (it?.kind === 'saw') holdWeapon('saw'); });
 // ───── 내 물건 (착용 · 사용 · 선물)
 function openBag() {
@@ -3226,6 +3238,12 @@ function openBag() {
         const b = el('button', 'btn tiny' + (held ? ' primary' : ''), held ? '넣기' : '들기'); b.onclick = () => { holdWeapon(held ? '' : kind); draw(); };
         const sw = el('button', 'btn tiny', '휘두르기 (B)'); sw.onclick = () => { holdWeapon(kind); closeModal(); swingSword(); };
         acts.append(b, sw);
+      } else if (it.kind === 'rename') {
+        const b = el('button', 'btn tiny primary', '사용');
+        b.disabled = S.room !== 'lobby';
+        b.title = '광장에서 닉네임을 바꿀 수 있어요.';
+        b.onclick = openRenameTicket;
+        acts.appendChild(b);
       } else {
         const b = el('button', 'btn tiny primary', it.kind === 'pop' ? '🎉 펑!' : '🎆 쏘기'); b.onclick = () => { closeModal(); useShopItem(id); };
         acts.appendChild(b);
@@ -3240,6 +3258,45 @@ function openBag() {
   openModal('🎒 내 물건', '날개·탈것·코스튬·가면은 착용하면 모두에게 보여요 · 아이템별 1개만 가질 수 있어요 (폭죽은 여러 개)', w);
   footBtn('🛒 상점', () => openShop());
   footBtn('🎫 도장표', () => openStamps());
+}
+function openRenameTicket() {
+  const form = el('form', 'bag custom');
+  const label = el('label', 'muted', '새 닉네임');
+  label.htmlFor = 'renameNick';
+  const input = el('input');
+  input.id = label.htmlFor;
+  input.maxLength = 12;
+  input.required = true;
+  input.autocomplete = 'off';
+  input.placeholder = '새 닉네임 (최대 12자)';
+  const message = el('div', 'muted');
+  message.setAttribute('role', 'status');
+  const row = el('div', 'row');
+  const cancel = el('button', 'btn', '취소');
+  cancel.type = 'button';
+  cancel.onclick = openBag;
+  const submit = el('button', 'btn primary', '변경권 1장 사용');
+  submit.type = 'submit';
+  row.append(cancel, submit);
+  form.append(label, input, message, row);
+  form.onsubmit = event => {
+    event.preventDefault();
+    if (submit.disabled) return;
+    submit.disabled = true;
+    message.textContent = '닉네임을 확인하고 있어요.';
+    socket.timeout(12000).emit('shop:rename', input.value, (error, result) => {
+      submit.disabled = false;
+      if (!result?.account) {
+        message.textContent = error ? '응답이 늦어지고 있어요. 현재 닉네임을 확인해 주세요.' : result?.error || '닉네임을 바꾸지 못했어요.';
+        return;
+      }
+      applyAccountName(result.account);
+      if ($('#modalBody').firstChild === form && S.modalOpen) openBag();
+      audio.play('pickup');
+      toast(`닉네임을 ${result.account.name}(으)로 바꿨어요!`);
+    });
+  };
+  openModal('🎫 닉네임 변경권', `현재 닉네임은 ${S.myName}입니다. 변경이 완료되면 변경권 1장이 사용돼요.`, form);
 }
 function pickGiftTarget(id) {
   const it = S.shop[id]; const w = el('div', 'bag');

@@ -1,7 +1,7 @@
 // ───── 고정 계정: 가입·로그인 없이, 접속한 IP와 기기에 계정을 묶는다
 //
 // · 처음 들어올 때 정한 닉네임이 그 IP·기기의 고정 계정이 된다. (레벨·코인·이어하기·도장표는 닉네임에 쌓인다)
-// · 그 기기는 다음부터 닉네임을 바꿀 수 없고, 자동으로 같은 계정으로 들어온다.
+// · 기기에 저장된 열쇠로 다음에도 같은 계정에 들어온다.
 // · 계정이 있는 닉네임은 그 계정의 기기, 또는 그 계정이 쓰던 IP에서만 쓸 수 있다. (남이 닉네임만 따라 써서 계정을 가져가는 것 방지)
 // · 휴대폰 데이터는 IP가 수시로 바뀌고, 같은 와이파이를 쓰는 친구·가족은 IP가 같다.
 //   그래서 IP 하나에 계정이 여러 개 있을 수 있고(같이 하는 친구), 기기에 남겨 둔 열쇠로 IP가 바뀌어도 같은 계정을 찾는다.
@@ -38,6 +38,11 @@ export class Accounts {
     this.byName = new Map();
     this.made = new Map(); // ipKey -> { n, t } 오늘 새로 만든 계정 수
     for (const a of Object.values(data.list)) this.byName.set(a.name, a);
+  }
+  rename(account, name) {
+    this.byName.delete(account.name);
+    account.name = name;
+    this.byName.set(name, account);
   }
   get size() { return this.byName.size; }
   ipKey(ip) { return createHash('sha256').update(this.data.salt + '|' + ip).digest('hex').slice(0, 24); }
