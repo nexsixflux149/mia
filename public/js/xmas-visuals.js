@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { textSprite } from './avatar.js';
+import { wrapGift } from './gift-ribbon.js';
 
 const gold = '#d9ab63';
 const warm = '#ffdb9b';
@@ -40,8 +41,10 @@ function gift(g, m, ribbon, s, x, y, z) {
   g.add(parcel);
   box(parcel, m, s, s * .78, s, 0, .39 * s, 0);
   box(parcel, m, s * 1.08, .14 * s, s * 1.08, 0, .79 * s, 0);
-  box(parcel, ribbon, s * .15, .86 * s, s * 1.085, 0, .43 * s, 0);
-  box(parcel, ribbon, s * 1.085, .86 * s, s * .15, 0, .43 * s, 0);
+  wrapGift((x, y, z, w, h, d) => box(parcel, ribbon, w, h, d, x, y, z), {
+    width: s, depth: s, bottom: 0, lidBottom: .72 * s, top: .86 * s,
+    lidWidth: 1.08 * s, lidDepth: 1.08 * s, ribbonWidth: .15 * s,
+  });
   for (const side of [-1, 1]) {
     const loop = hoop(parcel, ribbon, s * .14, s * .028, side * s * .12, s * .96, 0);
     loop.rotation.z = side * .45; loop.scale.y = .63;

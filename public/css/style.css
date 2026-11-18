@@ -30,8 +30,6 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); c
 #login { background: radial-gradient(ellipse at 50% 30%, #1d1015 0%, #050407 70%); }
 .login-card { width: min(860px, 94vw); background: rgba(10,8,10,.85); border: 1px solid var(--line); border-radius: 18px; padding: 26px; box-shadow: 0 0 80px rgba(179,38,30,.15); }
 .logo { text-align: center; margin-bottom: 18px; }
-.logo-han { font-family: var(--story); font-weight: 800; font-size: 64px; color: var(--blood2); letter-spacing: 12px; text-shadow: 0 0 24px rgba(224,74,63,.55); animation: flick 5s infinite; }
-.logo-ko { font-family: var(--story); font-size: 22px; letter-spacing: 14px; margin-top: -6px; }
 .logo-sub { color: var(--muted); font-size: 14px; margin-top: 6px; }
 @keyframes flick { 0%, 92%, 100% { opacity: 1; } 93% { opacity: .2; } 94% { opacity: 1; } 96% { opacity: .4; } }
 .login-body { display: flex; gap: 24px; align-items: stretch; flex-wrap: wrap; justify-content: center; }
@@ -256,7 +254,7 @@ body.mobile .mbtn[data-k="admin"] { display: none; } body.mobile.is-admin .mbtn[
 #sharePanel #shareNote { font-size: 11px; margin-top: 4px; }
 #emotePanel { position: absolute; right: 14px; bottom: 56px; z-index: 12; display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px; width: 240px; }
 #emotePanel .btn { text-align: left; }
-#cine { position: fixed; inset: 0; z-index: 80; pointer-events: none; }
+#cine { position: fixed; inset: 0; z-index: 80; touch-action: none; }
 #cine .bar { position: absolute; left: 0; right: 0; height: 11vh; background: #000; }
 #cine .bar.top { top: 0; } #cine .bar.bot { bottom: 0; }
 #cine .cap { position: absolute; left: 0; right: 0; bottom: 13vh; text-align: center; white-space: pre-line; font-family: var(--story); font-weight: 800; font-size: clamp(16px, 2.4vw, 26px); line-height: 1.6; color: #f3ece0; text-shadow: 0 2px 8px #000, 0 0 2px #000; opacity: 0; transition: opacity 1s; padding: 0 16px; }
@@ -323,7 +321,6 @@ body.cine-on #hud, body.cine-on #toasts, body.cine-on #vignette, body.cine-on #t
 #splash.out { opacity: 0; pointer-events: none; }
 #splash .sp-text { text-align: center; font-family: var(--story); color: #e8e0e4; padding: 0 16px; }
 #splash .sp-sub { font-size: clamp(20px, 3.4vw, 38px); letter-spacing: .32em; opacity: 0; filter: blur(8px); animation: spIn 2.6s ease .5s forwards; }
-#splash .sp-dash { font-size: clamp(18px, 2.6vw, 28px); color: #8a6a74; margin: 10px 0 4px; opacity: 0; animation: spIn 1.6s ease 2.2s forwards; }
 #splash .sp-main { font-size: clamp(64px, 12vw, 140px); font-weight: 800; letter-spacing: .3em; padding-left: .3em; color: #f2e8ea; text-shadow: 0 0 30px rgba(200,40,50,.55), 0 0 4px rgba(255,255,255,.4); opacity: 0; filter: blur(14px); animation: spIn 3s ease 2.8s forwards, spFlick 6s ease 6s infinite; }
 #splash .sp-skip { position: absolute; bottom: 36px; font-size: 13px; color: #6a6068; letter-spacing: .1em; opacity: 0; animation: spIn 1s ease 4s forwards; }
 @keyframes spIn { to { opacity: 1; filter: blur(0); } }
@@ -830,8 +827,6 @@ body.mobile #login #adminToggle { align-self: flex-end; margin: 0; padding: 4px 
 body.mobile #login #adminRow { margin: 2px 0 0; }
 body.mobile #login #adminRow input { font-size: 16px; padding: 10px 12px; }
 body.mobile #login .logo { order: 1; margin: 0; }
-body.mobile #login .logo-han { font-size: 34px; }
-body.mobile #login .logo-ko { font-size: 17px; }
 body.mobile #login .logo-sub { font-size: 11px; margin-top: 2px; }
 body.mobile #login .pv-wrap { order: 2; align-self: center; flex: 0 0 auto; }
 body.mobile #login #preview { width: 150px; height: 190px; }
@@ -846,8 +841,6 @@ body.mobile #login .cpanels { order: 5; flex: 1 1 0; min-height: 110px; overflow
 body.mobile #login .warn { order: 6; margin: 0; font-size: 10.5px; line-height: 1.4; }
 /* 화면이 낮을 때 (주소창이 보일 때 · 작은 폰) */
 body.mobile #login.short .logo-sub, body.mobile #login.short .pv-tip { display: none; }
-body.mobile #login.short .logo-han { font-size: 28px; }
-body.mobile #login.short .logo-ko { font-size: 15px; margin-top: -4px; }
 body.mobile #login.short #preview { width: 104px; height: 132px; }
 /* 아주 낮을 때 (키보드가 올라왔거나 가로 모드) */
 body.mobile #login.tiny .logo, body.mobile #login.tiny .pv-wrap, body.mobile #login.tiny .nick-note { display: none; }
@@ -901,3 +894,32 @@ body.mobile #login.tiny .logo, body.mobile #login.tiny .pv-wrap, body.mobile #lo
 #fearSel option[value="1"], .fear-sel option[value="1"] { color: #8fd3ff; }
 #fearSel option[value="2"], .fear-sel option[value="2"] { color: #ffbf6a; }
 #fearSel option[value="3"], .fear-sel option[value="3"] { color: #ff8a8a; }
+
+
+#timeLimitIntro {
+  position: fixed; inset: 0; z-index: 81; display: grid; place-items: center;
+  background: rgba(5, 2, 9, .65); text-align: center; perspective: 850px; touch-action: none;
+}
+.limit-card {
+  display: flex; flex-direction: column; align-items: center; gap: .18rem;
+  color: #fff2dc; padding: 1rem; animation: limitReveal 1s ease both;
+}
+.limit-icon { color: #ffc979; font-size: clamp(24px, 5vw, 52px); line-height: 1; }
+.limit-label { font-size: clamp(16px, 3.5vw, 28px); font-weight: 700; }
+.limit-card strong {
+  font-size: clamp(60px, 16vw, 160px); line-height: 1.05; color: #ffe4a8;
+  text-shadow: 0 2px #ab6a3c, 0 4px #7d4035, 0 6px #532631, 0 8px #321a25, 0 12px 20px #10040f;
+}
+.limit-message {
+  margin-top: .6rem; padding: .45rem .8rem; border: 1px solid #c48958;
+  border-radius: .6rem; background: #211222; font-size: clamp(12px, 3.2vw, 18px);
+}
+@keyframes limitReveal {
+  0% { opacity: 0; transform: translateZ(-140px) scale(.72) rotateX(12deg); }
+  24%, 78% { opacity: 1; transform: translateZ(0) scale(1); }
+  100% { opacity: 0; transform: scale(1.04); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .limit-card { animation: none; }
+}
+body.mobile #login .logo { padding: 0; margin: 0; }

@@ -1,9 +1,13 @@
 import * as THREE from 'three';
 import { buildProp, FOOT, setPropTheme, markShared, disposeTree } from './props.js';
 import { buildXmasProp, decorateXmas } from './xmas-visuals.js';
+import { wrapGift } from './gift-ribbon.js';
+import { loadXmasOpticalModel } from './xmas-models.js';
+import { dressScenery } from './refined-models.js';
 import { textSprite, createAvatar, animateAvatar } from './avatar.js';
 import { buildWings, buildMount, buildSword, buildBalloon, BALLOON_COLORS, buildSnack } from './gear.js';
 const HOTDOG_POS = [16, 18], CANDY_POS = [-10.9, 21.4]; // 핫도그는 팝콘 가게 옆, 솜사탕은 커피 가게 옆 같은 줄 (광장 가장자리 같은 반지름)
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const DEG = Math.PI / 180;
@@ -22,6 +26,7 @@ function place(root, p) {
   g.position.set(p.x, p.y || 0, p.z);
   g.rotation.y = (p.r || 0) * DEG;
   root.add(g);
+  dressScenery(g, root, p);
   return g;
 }
 
@@ -379,7 +384,7 @@ function buildExhibit(root, colliders, th) {
   portal.position.set(0, 2.05, -0.6); g.add(portal);
   const light = new THREE.PointLight(th.color, 5, 9, 2); light.position.set(0, 2, 0.6);
   if (!matchMedia('(pointer: coarse)').matches) g.add(light);
-  const P = (p, s = 1) => { const m = buildProp(p); m.position.set(p.x, p.y || 0.3, p.z); m.rotation.y = (p.r || 0) * DEG; m.scale.setScalar(s); g.add(m); return m; };
+  const P = (p, s = 1) => { const m = buildProp(p); m.position.set(p.x, p.y || 0.3, p.z); m.rotation.y = (p.r || 0) * DEG; m.scale.setScalar(s); g.add(m); dressScenery(m, root, p); return m; };
   const spin = [];
   if (th.id === 'gwimun') {
     P({ t: 'jangseung_m', x: -2.3, z: 0.2 }, 0.85); P({ t: 'jangseung_f', x: 2.3, z: 0.2 }, 0.85);
@@ -412,6 +417,7 @@ function buildExhibit(root, colliders, th) {
       prop.position.set(x, .18, .65);
       prop.scale.setScalar(t === 'xmas_fir' ? .72 : .85);
       g.add(prop);
+      dressScenery(prop, g, { t });
     }
   } else if (th.id === 'zombie') {
     P({ t: 'barrel', x: -2.2, z: 0.6 }, 0.9); P({ t: 'debris', x: 2.2, z: 0.6 }, 1.2); P({ t: 'blood_smear', x: 0.4, z: 1.6 }, 1.2);
@@ -583,12 +589,13 @@ function buildPark(root, colliders, add) {
     const ry = (r * Math.PI) / 180;
     interactives.push({ id: 'bench' + i, kind: 'sit', x, z, r: 1.5, label: '벤치', verb: '앉기', seat: { x: x - Math.sin(ry) * 0.04, z: z - Math.cos(ry) * 0.04, y: 0.43, ry } });
   });
-  // 피크닉 테이블 (양쪽 긴 의자에 앉기 — 테이블 위로 올라가지 않는다)
+  // 피크닉 테이블 (양쪽 긴 의자는 앉기, 상판은 점프로 착지)
   [[-1.8, 12.5], [2.2, 12.2]].forEach(([x, z], i) => {
     const g = new THREE.Group(); g.position.set(x, 0, z); root.add(g);
-    mesh(new THREE.BoxGeometry(1.8, 0.1, 0.9), pm('#c98a5a'), 0, 0.78, 0, g);
+    const tableTop = { hw: 0.9, hd: 0.45, y: 0.83 };
+    mesh(new THREE.BoxGeometry(tableTop.hw * 2, 0.1, tableTop.hd * 2), pm('#c98a5a'), 0, tableTop.y - 0.05, 0, g);
     for (const sx of [-1, 1]) { mesh(new THREE.BoxGeometry(0.1, 0.78, 0.8), pm('#8a5a3a'), 0.75 * sx, 0.39, 0, g); mesh(new THREE.BoxGeometry(1.8, 0.07, 0.3), pm('#c98a5a'), 0, 0.45, 0.7 * sx, g); mesh(new THREE.BoxGeometry(0.08, 0.42, 0.24), pm('#8a5a3a'), 0.78 * sx, 0.21, 0.7, g); mesh(new THREE.BoxGeometry(0.08, 0.42, 0.24), pm('#8a5a3a'), 0.78 * sx, 0.21, -0.7, g); }
-    colliders.push({ x, z, hw: 0.95, hd: 0.5 });
+    colliders.push({ x, z, hw: 0.95, hd: 0.5, landing: tableTop });
     // 의자 자리 넷: 테이블을 마주 보고 앉는다 (back: 일어날 때는 뒤로)
     const seats = [];
     for (const sz of [-1, 1]) for (const sx of [-1, 1]) seats.push({ x: x + 0.45 * sx, z: z + 0.7 * sz, y: 0.41, ry: sz > 0 ? Math.PI : 0, back: true });
@@ -670,7 +677,9 @@ function buildSnapBoard(root, colliders, renderer) {
   const title = textSprite('📸 클리어 기념 폴라로이드', { size: 36, bg: 'rgba(34,16,26,.9)', color: '#ffe3b3', border: '#ffd390', maxW: 850 });
   title.position.set(0, cy + H / 2 + 0.9, 0); title.scale.multiplyScalar(1.5); g.add(title);
   const geo = new THREE.PlaneGeometry(SNAP_W, SNAP_H), tiles = [];
-  const blank = snapTileTex(); // 사진이 없는 칸은 모두 이 한 장을 같이 쓴다
+  const blank = markShared(snapTileTex()); // 사진이 없는 칸은 모두 이 한 장을 같이 쓴다
+  const pendingPhotos = new Map();
+  let disposed = false;
   const photoTex = new Map(); // 사진 id → 질감. 한 번 만든 사진은 다시 디코드하지 않는다
   for (let i = 0; i < SNAP_COLS * SNAP_ROWS; i++) {
     const c = i % SNAP_COLS, r = Math.floor(i / SNAP_COLS);
@@ -681,15 +690,19 @@ function buildSnapBoard(root, colliders, renderer) {
   // 사진은 id별로 한 번만 디코드해 질감을 만든다. 목록이 바뀌어도 남아 있는 사진은 그대로 쓴다
   const load = (photo) => {
     if (photoTex.has(photo.id)) return Promise.resolve(photoTex.get(photo.id));
-    return new Promise((resolve) => {
-      const im = new Image();
-      im.onload = () => im.decode().catch(() => {}).then(() => resolve(keepTex(photo.id, im)));
-      im.onerror = () => resolve(null);
-      im.src = photo.img;
-    });
+    if (!pendingPhotos.has(photo.id)) {
+      const task = new Promise((resolve) => {
+        const im = new Image();
+        im.onload = () => im.decode().catch(() => {}).then(() => resolve(disposed ? null : keepTex(photo.id, im)));
+        im.onerror = () => resolve(null);
+        im.src = photo.img;
+      }).finally(() => pendingPhotos.delete(photo.id));
+      pendingPhotos.set(photo.id, task);
+    }
+    return pendingPhotos.get(photo.id);
   };
   const keepTex = (id, im) => {
-    const t = snapTileTex(im);
+    const t = markShared(snapTileTex(im));
     if (photoTex.has(id)) { t.dispose(); return photoTex.get(id); } // 같은 사진이 먼저 만들어졌다
     photoTex.set(id, t); renderer?.initTexture(t); return t; // 화면 밖 칸도 첫 복귀 때 몰아서 올리지 않도록, 디코드가 끝나는 순간 GPU에 올린다
   };
@@ -701,14 +714,13 @@ function buildSnapBoard(root, colliders, renderer) {
       ids = want;
       const request = ++revision;
       const textures = await Promise.all(photos.map(load));
-      if (request !== revision) return; // 더 새 목록이 이미 와 있다
-      if (!root.parent) { ids = ''; return; } // 로비를 떠나 있었다면 돌아왔을 때 다시 그리도록 비워 둔다
+      if (disposed || request !== revision) return;
       tiles.forEach((tile, i) => { tile.material.map = textures[i] || blank; tile.material.needsUpdate = true; });
       const shown = new Set(photos.map((photo) => photo.id));
       for (const [id, t] of photoTex) if (!shown.has(id)) { t.dispose(); photoTex.delete(id); } // 목록에서 밀려난 사진만 치운다
       flash = 1;
     },
-    dispose() { for (const t of photoTex.values()) t.dispose(); photoTex.clear(); }, // 로비를 지울 때 사진 질감도 함께 치운다
+    dispose() { disposed = true; blank.dispose(); for (const t of photoTex.values()) t.dispose(); photoTex.clear(); }, // 로비를 지울 때 사진 질감도 함께 치운다
     update(dt) { if (flash > 0) { flash = Math.max(0, flash - dt * 1.5); highlight.emissiveIntensity = 0.18 + flash * 0.52; } },
   };
 }
@@ -1083,7 +1095,9 @@ function buildLobbyDeco(root, colliders, themes) {
     const red = pm('#d8202a', { emissive: '#5a0008', emissiveIntensity: 0.35, roughness: 0.55 }), gold = pm('#ffd23a', { metalness: 0.5, roughness: 0.3, emissive: '#a07000', emissiveIntensity: 0.5 });
     mesh(new THREE.BoxGeometry(0.62, 0.5, 0.62), red, 0, 0.25, 0, box);
     mesh(new THREE.BoxGeometry(0.7, 0.14, 0.7), red, 0, 0.55, 0, box); // 뚜껑
-    for (const r of [0, Math.PI / 2]) { const b1 = mesh(new THREE.BoxGeometry(0.12, 0.52, 0.64), gold, 0, 0.26, 0, box); b1.rotation.y = r; const b2 = mesh(new THREE.BoxGeometry(0.12, 0.15, 0.72), gold, 0, 0.55, 0, box); b2.rotation.y = r; }
+    wrapGift((x, y, z, w, h, d) => mesh(new THREE.BoxGeometry(w, h, d), gold, x, y, z, box), {
+      width: .62, depth: .62, bottom: 0, lidBottom: .48, top: .62, lidWidth: .70, lidDepth: .70, ribbonWidth: .12,
+    });
     for (const s of [-1, 1]) { const loop = mesh(new THREE.TorusGeometry(0.12, 0.04, 8, 16), gold, s * 0.11, 0.7, 0, box); loop.scale.set(1, 0.75, 0.55); loop.rotation.z = s * 0.5; }
     mesh(new THREE.SphereGeometry(0.06, 10, 8), gold, 0, 0.66, 0, box);
     const glowS = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: '#ffe08a', transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending })); glowS.scale.setScalar(1.8); glowS.position.y = 0.4; g.add(glowS);
@@ -1098,192 +1112,45 @@ function buildLobbyDeco(root, colliders, themes) {
 
 function buildChristmasTree(root, colliders) {
   const CENTER = { x: 10.5, z: -7.6 };
-  const TIERS = 10;
-  const BASE = 1.12;
-  const STEP = 0.76;
-
-  function randomSource() {
-    let seed = 17531;
-    return () => {
-      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-      return seed / 4294967296;
-    };
-  }
-
-  function tierRadius(tier) {
-    return 3.16 * (1 - tier / (TIERS + 0.25)) ** 1.13;
-  }
-
-  function pineTier(radius, height, turn) {
-    const geometry = new THREE.BufferGeometry();
-    const positions = [], indices = [];
-    const rings = [[0, 0.81], [.06, 1], [.17, .88], [.35, .65], [.58, .44], [.78, .24], [1, .025]];
-    const sides = 72;
-    for (const [y, r] of rings) {
-      for (let j = 0; j <= sides; j++) {
-        const a = j / sides * Math.PI * 2;
-        const edge = 1 + Math.cos(a * 13 + turn) * .075 + Math.cos(a * 7 - turn) * .045 + Math.sin(a * 31) * .021;
-        positions.push(Math.cos(a) * radius * r * edge, y * height + (1 - y) * Math.sin(a * 13 + turn) * .07, Math.sin(a) * radius * r * edge);
-      }
-    }
-    for (let i = 0; i < rings.length - 1; i++) {
-      for (let j = 0; j < sides; j++) {
-        const a = i * (sides + 1) + j, b = a + sides + 1;
-        indices.push(a, b, a + 1, a + 1, b, b + 1);
-      }
-    }
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setIndex(indices);
-    geometry.computeVertexNormals();
-    return geometry;
-  }
-
   const tree = new THREE.Group();
   tree.name = '광장 크리스마스 트리';
   tree.position.set(CENTER.x, 0, CENTER.z);
   root.add(tree);
-  colliders.push({ ...CENTER, hw: 1.5, hd: 1.5, noSpread: true });
+  colliders.push({ ...CENTER, hw: 2.82, hd: 2.82, noSpread: true });
 
-  const rng = randomSource();
-  const standard = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: .64, ...options });
-  const add = (geometry, material, x, y, z) => {
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.set(x, y, z);
-    tree.add(mesh);
-    return mesh;
-  };
-  const bronze = standard('#c89951', { metalness: .62, emissive: '#7d4820', emissiveIntensity: .26, roughness: .31 });
-  const stone = standard('#182324', { metalness: .25, roughness: .57 });
-  add(new THREE.CylinderGeometry(1.42, 1.58, .18, 48), stone, 0, .09, 0);
-  add(new THREE.CylinderGeometry(1.37, 1.44, .09, 48), bronze, 0, .215, 0);
-  add(new THREE.CylinderGeometry(1.15, 1.37, .52, 48), stone, 0, .5, 0);
-  add(new THREE.CylinderGeometry(1.23, 1.19, .09, 48), bronze, 0, .77, 0);
-  add(new THREE.CylinderGeometry(.21, .33, 1.55, 12), standard('#4e3427'), 0, 1.04, 0);
-
-  const greens = ['#123629', '#194532', '#21503a', '#285f42'].map(color =>
-    standard(color, { emissive: '#112d1e', emissiveIntensity: .32, side: THREE.DoubleSide }));
-  const needles = [];
-  const strands = [];
-  for (let tier = 0; tier < TIERS; tier++) {
-    const y = BASE + tier * STEP;
-    const radius = tierRadius(tier);
-    const height = tier === TIERS - 1 ? 1.35 : 1.64;
-    add(pineTier(radius, height, tier * .61), greens[tier % greens.length], 0, y, 0);
-    const n = Math.max(12, Math.round(radius * 16));
-    for (let k = 0; k < n * 2; k++) {
-      const a = k / n * Math.PI * 2 + tier * .57;
-      const upper = k >= n;
-      const r = radius * (upper ? .69 : .91) * (.94 + rng() * .14);
-      needles.push({ a, r, y: y + (upper ? .47 : .15) + rng() * .14, length: radius * (.25 + rng() * .15), upper });
+  let modelLights = [];
+  const asset = new URL('../models/christmas-tree.glb', import.meta.url);
+  new GLTFLoader().load(asset.href, ({ scene: model }) => {
+    if (root.userData.disposed) {
+      disposeObject(model);
+      return;
     }
-    if (tier >= TIERS - 1) continue;
-    const strand = [];
-    for (let k = 0; k <= 120; k++) {
-      const a = k / 120 * Math.PI * 2;
-      const wave = (1 + Math.cos(a * 6 + tier * 1.3)) * .5;
-      const r = radius * (1.20 - wave * .14);
-      strand.push(new THREE.Vector3(Math.cos(a) * r, y + .15 + wave * .31, Math.sin(a) * r));
-    }
-    const path = new THREE.CatmullRomCurve3(strand.slice(0, -1), true);
-    add(new THREE.TubeGeometry(path, 96, Math.max(.013, radius * .011), 5, true), bronze, 0, 0, 0);
-    strands.push(path);
-  }
-
-  const matrix = new THREE.Object3D();
-  const up = new THREE.Vector3(0, 1, 0);
-  const axis = new THREE.Vector3();
-  const tipGeometry = new THREE.ConeGeometry(1, 1, 6);
-  const tips = new THREE.InstancedMesh(tipGeometry, greens[2], needles.length);
-  tips.name = '솔가지 끝';
-  const leafTints = ['#a6c5a7', '#dae7c2', '#80af99', '#ffffff'].map(c => new THREE.Color(c));
-  needles.forEach(({ a, r, y, length, upper }, i) => {
-    matrix.position.set(Math.cos(a) * r, y, Math.sin(a) * r);
-    axis.set(Math.cos(a), upper ? -.20 : -.38, Math.sin(a)).normalize();
-    matrix.quaternion.setFromUnitVectors(up, axis);
-    matrix.scale.set(length * .24, length, length * .29);
-    matrix.updateMatrix();
-    tips.setMatrixAt(i, matrix.matrix);
-    tips.setColorAt(i, leafTints[i % leafTints.length]);
-  });
-  tree.add(tips);
-
-  const ornaments = [], lights = [];
-  strands.forEach((path, tier) => {
-    const count = 31 - tier * 2;
-    for (let i = 0; i < count; i++) {
-      const p = path.getPoint((i + .45) / count);
-      lights.push(new THREE.Vector3(p.x * 1.025, p.y + .038, p.z * 1.025));
-      if (i % 3 === (tier % 3)) ornaments.push({ p: p.clone().add(new THREE.Vector3(0, -.17, 0)), size: (.11 + rng() * .075) * (1 - tier * .046) });
-    }
-  });
-  const palette = ['#d29a49', '#f7dfad', '#9f243b', '#bb6f77', '#f6e4c9'].map(c => new THREE.Color(c));
-  const ornamentsMesh = new THREE.InstancedMesh(
-    new THREE.SphereGeometry(1, 12, 9),
-    standard('#ffffff', { metalness: .46, roughness: .24, emissive: '#665031', emissiveIntensity: .28 }),
-    ornaments.length,
-  );
-  const caps = new THREE.InstancedMesh(new THREE.CylinderGeometry(.5, .65, .36, 8), bronze, ornaments.length);
-  matrix.quaternion.identity();
-  ornaments.forEach(({ p, size }, i) => {
-    matrix.position.copy(p); matrix.scale.set(size, size * 1.1, size); matrix.updateMatrix();
-    ornamentsMesh.setMatrixAt(i, matrix.matrix);
-    ornamentsMesh.setColorAt(i, palette[i % palette.length]);
-    matrix.position.y += size * 1.1; matrix.scale.setScalar(size * .65); matrix.updateMatrix();
-    caps.setMatrixAt(i, matrix.matrix);
-  });
-  tree.add(ornamentsMesh, caps);
-
-  const textureCanvas = document.createElement('canvas');
-  textureCanvas.width = textureCanvas.height = 64;
-  const ctx = textureCanvas.getContext('2d');
-  const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-  grad.addColorStop(0, 'rgba(255,255,255,1)');
-  grad.addColorStop(.16, 'rgba(255,236,181,1)');
-  grad.addColorStop(.34, 'rgba(255,198,107,.32)');
-  grad.addColorStop(1, 'rgba(255,178,71,0)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 64, 64);
-  const glow = new THREE.CanvasTexture(textureCanvas);
-  glow.colorSpace = THREE.SRGBColorSpace;
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), new THREE.MeshBasicMaterial({
-    map: glow, color: '#d7994e', transparent: true, depthWrite: false,
-    blending: THREE.AdditiveBlending, opacity: .24, toneMapped: false,
-  }));
-  ground.rotation.x = -Math.PI / 2;
-  ground.position.y = .018;
-  tree.add(ground);
-  const collections = [[], [], []];
-  lights.forEach((p, i) => collections[i % 3].push(p.x, p.y, p.z));
-  const lightMaterials = collections.map((positions, i) => {
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    const material = new THREE.PointsMaterial({
-      map: glow, size: .39 + i * .045, color: ['#ffe8bf', '#ffca79', '#fff4df'][i],
-      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false,
+    model.scale.setScalar(1.095);
+    model.rotation.y = -.14;
+    const lights = [];
+    model.traverse(node => {
+      node.userData.noOcc = true;
+      if (!node.isMesh) return;
+      for (const material of [].concat(node.material)) {
+        if (material.name === 'Warm micro lights') lights.push(material);
+        if (material.name.startsWith('Noble fir')) {
+          material.emissive.set('#2a4c26');
+          material.emissiveIntensity = .48;
+        }
+        if (material.metalness > .35 && material.emissiveIntensity <= 1) {
+          material.emissive.copy(material.color);
+          material.emissiveIntensity = .27;
+        }
+      }
     });
-    tree.add(new THREE.Points(geometry, material));
-    return material;
+    tree.add(model);
+    modelLights = [...new Set(lights)];
+  }, undefined, (error) => {
+    if (root.parent) console.warn('크리스마스 트리 모델 로딩 실패:', error);
   });
-
-  const starShape = new THREE.Shape();
-  for (let i = 0; i < 10; i++) {
-    const a = Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? .36 : .85;
-    starShape[i === 0 ? 'moveTo' : 'lineTo'](Math.cos(a) * r, Math.sin(a) * r);
-  }
-  starShape.closePath();
-  const starGeometry = new THREE.ExtrudeGeometry(starShape, { depth: .13, bevelEnabled: true, bevelSegments: 3, bevelSize: .075, bevelThickness: .045 });
-  starGeometry.center();
-  const star = add(starGeometry, standard('#ffdb8d', { metalness: .55, roughness: .25, emissive: '#f8a93f', emissiveIntensity: .72 }), 0, 9.51, 0);
-  star.rotation.y = -.13;
-  const crown = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: '#ffc977', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: .83 }));
-  crown.position.copy(star.position);
-  crown.scale.setScalar(3);
-  tree.add(crown);
-  tree.traverse(n => { n.userData.noOcc = true; });
 
   return t => {
-    lightMaterials.forEach((material, i) => { material.opacity = .78 + Math.sin(t * 1.38 + i * 2.1) * .17; });
-    crown.material.opacity = .66 + Math.sin(t * 1.45) * .11;
+    for (const material of modelLights) material.emissiveIntensity = 2.1 + Math.sin(t * 1.45) * .22;
   };
 }
 
@@ -1299,6 +1166,7 @@ export function attachLobby(scene, w) {
 export function buildLobby(scene, opts = {}) {
   setPropTheme('lobby');
   const root = new THREE.Group();
+  root.userData.reusableLobby = true;
   const colliders = [];
   // 핏빛 달이 뜬 한밤의 폐놀이공원
   scene.background = new THREE.Color('#05050b');
@@ -2061,6 +1929,7 @@ export function buildChapter(scene, ch, themeId = 'gwimun') {
   const objects = {}; objectsRef = objects;
   for (const o of ch.objects) {
     const g = place(root, o);
+    if (themeId === 'christmas' && o.id === 'glass_prism') loadXmasOpticalModel(g, root, o.id);
     if (g.userData.flicker) flickers.push(g.userData.flicker);
     const f = footOf(o, g);
     const entry = { data: o, group: g, foot: f, visible: true };
@@ -2142,8 +2011,13 @@ export function buildChapter(scene, ch, themeId = 'gwimun') {
   return { root, colliders, walls, objects, flickers, ceiling, update, outdoor: !!ch.outdoor, size: ch.size };
 }
 
+function disposeObject(root) {
+  root.traverse((o) => { if (!o.userData.sharedArtGeometry) o.geometry?.dispose?.(); if (o.material && !o.userData.sharedArtMaterial) { (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { m.map?.dispose?.(); m.dispose?.(); }); } });
+}
+
 export function disposeWorld(scene, w) {
   if (!w) return;
+  w.root.userData.disposed = true;
   scene.remove(w.root);
   w.snapBoard?.dispose?.(); // 사진 질감 (로비에만 있다)
   // 지오메트리·텍스처만 지운다(disposeTree). 재료는 지우지 않는다: 셰이더 프로그램이 사라져 다음 입장 때 재컴파일로 끊긴다

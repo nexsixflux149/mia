@@ -1,5 +1,6 @@
 import { decorateXmas, buildXmasProp } from './xmas-visuals.js';
 import { createAvatar, animateAvatar } from './avatar.js';
+import { dressScenery } from './refined-models.js';
 import * as THREE from 'three';
 
 export function makeXmasShots(c, kind, looks) {
@@ -19,11 +20,13 @@ export function makeXmasShots(c, kind, looks) {
         const tree = buildXmasProp({ t: 'xmas_fir' });
         tree.position.set(side * (6.7 + (z === -10 ? 1.4 : 0)), 0, z);
         root.add(tree);
+        dressScenery(tree, root, { t: 'xmas_fir' });
       }
     }
     parcel = buildXmasProp({ t: 'xmas_stack' });
     parcel.position.set(.3, 0, -2.4);
     root.add(parcel);
+    dressScenery(parcel, root, { t: 'xmas_stack' });
     const cast = [
       { outfit: 'blazer', accent: '#ad2749', hair: 'bob', hairColor: '#301e24', eyes: 'big' },
       { outfit: 'sailor', accent: '#efb764', hair: 'bowl', hairColor: '#2c1921', eyes: 'big' },

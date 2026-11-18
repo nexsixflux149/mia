@@ -155,7 +155,7 @@ export function drawFace(canvas, look, img) {
 }
 
 // ───────────────────────── 아바타 생성
-export function createAvatar(look) {
+export function createAvatar(look, { legColor } = {}) {
   look = { ...DEFAULT_LOOK, ...look };
   const g = new THREE.Group();
   // 피부는 아주 살짝 스스로 빛나게: 어두운 맵에서도 얼굴이 뭉개지지 않고 말랑해 보인다
@@ -179,7 +179,7 @@ export function createAvatar(look) {
   for (const s of [-1, 1]) {
     // 엉덩이 높이에서 땅까지 내려오는 긴 다리 (허벅지 · 무릎 · 종아리 · 신발)
     const H = SD.hip; const pivot = new THREE.Group(); pivot.position.set(0.12 * s, H, 0);
-    const thigh = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, 0.03, 8, 24), mat(O.legs)); thigh.position.y = -H * 0.42; pivot.add(thigh);
+    const thigh = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, 0.03, 8, 24), mat(legColor ?? O.legs)); thigh.position.y = -H * 0.42; pivot.add(thigh);
     const shoe = new THREE.Mesh(new THREE.SphereGeometry(0.1, 32, 20), mat(O.shoes, { roughness: 0.45 })); shoe.scale.set(1, 0.6, 1.4); shoe.position.set(0, -H + 0.05, 0.035); pivot.add(shoe);
     // 신발 밑창 + 앞코 반짝임
     const sole = new THREE.Mesh(new THREE.CylinderGeometry(0.104, 0.108, 0.024, 28), mat('#f4efe6', { roughness: 0.8 })); sole.scale.set(1, 1, 1.4); sole.position.set(0, -H + 0.012, 0.035); pivot.add(sole);
@@ -202,7 +202,7 @@ export function createAvatar(look) {
     upper.add(pivot); arms.push(pivot);
   }
   // 허리 아래: 다리와 몸통 사이 엉덩이 (반바지처럼 옷 아랫단 색)
-  const hips = new THREE.Mesh(new THREE.SphereGeometry(0.25, 51, 32, 0, Math.PI * 2, Math.PI * 0.35, Math.PI * 0.65), mat(O.legs)); hips.scale.set(0.72, 0.45, 0.72); hips.position.y = SD.hip + 0.02; rig.add(hips);
+  const hips = new THREE.Mesh(new THREE.SphereGeometry(0.25, 51, 32, 0, Math.PI * 2, Math.PI * 0.35, Math.PI * 0.65), mat(legColor ?? O.legs)); hips.scale.set(0.72, 0.45, 0.72); hips.position.y = SD.hip + 0.02; rig.add(hips);
   addOutfit(upper, look, O);
   const accFx = addAccessory(upper, arms, look);
 
@@ -696,6 +696,7 @@ export const EXPR = {
   fart: { eyes: 'closed', mouth: 'grin', brows: 'soft', cheeks: 'blush' },
   v: { eyes: 'wink', mouth: 'grin', brows: 'soft', cheeks: 'blush' },
 };
+export const jumpElevation = (elapsed) => Math.sin(Math.PI * Math.min(1, elapsed / 0.7)) * 0.9;
 export const EMOTE_DUR = Object.fromEntries(EMOTES.map((e) => [e[0], e[3]]));
 
 export function animateAvatar(g, dt, moving, t, crouch = false, emote = null, et = 0) {
@@ -733,7 +734,7 @@ export function animateAvatar(g, dt, moving, t, crouch = false, emote = null, et
         L[0].rotation.x = Math.max(0, b) * 0.8; L[1].rotation.x = Math.max(0, -b) * 0.8; head.rotation.z = b * 0.2; break;
       }
       case 'spin': ry = et * 9; A[0].rotation.z = -1.4; A[1].rotation.z = 1.4; y = 0.05; break;
-      case 'jump': { const k = Math.min(1, et / 0.7); y = Math.sin(Math.PI * k) * 0.9; A[0].rotation.z = -2.6 * Math.sin(Math.PI * k); A[1].rotation.z = 2.6 * Math.sin(Math.PI * k); L[0].rotation.x = -0.5 * Math.sin(Math.PI * k); L[1].rotation.x = -0.5 * Math.sin(Math.PI * k); break; }
+      case 'jump': { const k = Math.min(1, et / 0.7); y = jumpElevation(et); A[0].rotation.z = -2.6 * Math.sin(Math.PI * k); A[1].rotation.z = 2.6 * Math.sin(Math.PI * k); L[0].rotation.x = -0.5 * Math.sin(Math.PI * k); L[1].rotation.x = -0.5 * Math.sin(Math.PI * k); break; }
       case 'lie': rx = 1.45; y = 0.4; A[0].rotation.x = -2.8; A[1].rotation.x = -2.8; L[0].rotation.x = Math.sin(et * 4) * 0.4 + 0.2; L[1].rotation.x = -Math.sin(et * 4) * 0.4 + 0.2; head.rotation.x = -0.6; break;
       case 'sit': y = -0.075; L[0].rotation.x = -1.5; L[1].rotation.x = -1.5; A[0].rotation.x = -0.4; A[1].rotation.x = -0.4; head.rotation.z = Math.sin(t * 1.2) * 0.08; break; // 엉덩이 밑면이 앉는 자리(바닥·벤치·통나무·그네·놀이기구 좌석) 표면에 닿게
       case 'clap': { const c = Math.abs(Math.sin(et * 12)); A[0].rotation.x = -1.3; A[1].rotation.x = -1.3; A[0].rotation.z = -0.2 - c * 0.5; A[1].rotation.z = 0.2 + c * 0.5; y = c * 0.03; break; }

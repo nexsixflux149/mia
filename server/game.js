@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { SCENARIOS, relicIcons } from './scenarios.js';
 import { ITEMS, RECIPES } from './items.js';
+import { themeAssistPercent } from './progress.js';
 import { traceXmasMirrors } from '../public/js/xmas-mirrors.js';
 
 const COOP_WINDOW = 8000;
@@ -26,10 +27,11 @@ export class GameInstance {
     this.taken = new Set();
     this.coopPress = {};
     this.hintLevel = {};
+    this.talismansUsed = 0;
     this.wrong = {};
     this.onChapter = onChapter;
     this.onEnd = onEnd; this.onAdvance = onAdvance;
-    this.limitMs = limitMs; this.overWarned = false; // 제한 시간 (쉬운 테마 60분 · 어려운 테마 120분)
+    this.limitMs = limitMs; this.overWarned = false; // 제한 시간 (난이도별 30분 · 60분 · 120분)
     this.ghost = null;
     this.ended = false;
     this.startedAt = Date.now(); this.startChapter = chapter; // 랭킹: 처음부터 시작한 판만 기록
@@ -113,9 +115,13 @@ export class GameInstance {
   ghostTypes() { return [...new Set(this.chapters.flatMap((c) => [c.ghost, ...(c.ghosts || [])]).filter(Boolean).map((g) => g.type || 'woman'))]; }
 
   hintsUsed() { return Object.values(this.hintLevel).reduce((a, b) => a + b, 0); }
+  assistState() {
+    const hintsUsed = this.hintsUsed(), talismansUsed = this.talismansUsed || 0;
+    return { hintsUsed, talismansUsed, assistXpPercent: themeAssistPercent(hintsUsed, talismansUsed) };
+  }
   fullState() {
     return {
-      elapsed: Date.now() - this.startedAt, hintsUsed: this.hintsUsed(), timed: this.startChapter === 0, limitMs: this.limitMs,
+      elapsed: Date.now() - this.startedAt, ...this.assistState(), timed: this.startChapter === 0, limitMs: this.limitMs,
       chapterIdx: this.chapterIdx,
       chapter: this.clientChapter(),
       objects: this.objState(),
@@ -137,7 +143,7 @@ export class GameInstance {
   }
 
   syncAll() {
-    this.emit('game:sync', { objects: this.objState(), objective: this.objective(), dark: this.dark, relics: this.relicCount(), hintsUsed: this.hintsUsed(), elapsed: Date.now() - this.startedAt });
+    this.emit('game:sync', { objects: this.objState(), objective: this.objective(), dark: this.dark, relics: this.relicCount(), ...this.assistState(), elapsed: Date.now() - this.startedAt });
   }
 
   // ───── 효과 적용
@@ -355,11 +361,13 @@ export class GameInstance {
   }
 
   useItem(p, item) {
+    if (this.ended) return;
     const i = p.inv.indexOf(item);
     if (i === -1) return;
     const def = ITEMS[item];
     if (def?.use === 'talisman') {
       p.inv.splice(i, 1);
+      ++this.talismansUsed;
       this.emitTo(p.id, 'inv', p.inv);
       const act = this.ghosts.filter((gh) => gh.active);
       if (act.length) {
@@ -375,6 +383,7 @@ export class GameInstance {
       } else {
         this.emit('toast', { text: `${p.name} 님이 부적을 태웠다. …주변은 고요하다. 아깝게 썼다.` });
       }
+      this.syncAll();
     }
   }
 
@@ -391,6 +400,7 @@ export class GameInstance {
   }
 
   hint(p) {
+    if (this.ended) return;
     const ob = this.objective();
     if (!ob) return;
     const list = this.ch.objectives;
@@ -453,9 +463,10 @@ export class GameInstance {
     const all = relics >= this.sc.relics.length;
     const end = all ? this.sc.endings.true : this.sc.endings.normal;
     const ms = Date.now() - this.startedAt, full = this.startChapter === 0;
+    const over = !!this.limitMs && ms > this.limitMs;
     const photoId = randomUUID();
-    this.emit('game:ending', { ...end, photoId, relics, type: all ? 'true' : 'normal', total: this.sc.relics.length, icons: relicIcons(this.sc), cine: all ? this.sc.cine.true : this.sc.cine.normal, ms, full, hints: this.hintsUsed(), over: this.overtime() });
-    this.onEnd?.({ photoId, ms, full, type: all ? 'true' : 'normal', hints: this.hintsUsed(), over: this.overtime() });
+    this.emit('game:ending', { ...end, photoId, relics, type: all ? 'true' : 'normal', total: this.sc.relics.length, icons: relicIcons(this.sc), cine: all ? this.sc.cine.true : this.sc.cine.normal, ms, full, hints: this.hintsUsed(), over });
+    this.onEnd?.({ photoId, ms, full, type: all ? 'true' : 'normal', hints: this.hintsUsed(), over });
   }
 
   // 매 틱마다 호출 — 귀신 AI

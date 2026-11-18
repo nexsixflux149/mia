@@ -12,8 +12,12 @@ export const CLEAR_COINS = 10;      // 한 번 깰 때마다 10코인
 export const CHAPTER_XP = 40;       // 챕터를 넘길 때마다
 /** 클리어 경험치: 테마 난이도와 공포도에 따라 (처음부터 깬 판은 전부, 이어하기는 절반) */
 export const clearXp = (difficulty, fear, full) => Math.round((300 + difficulty * 260) * [0.6, 0.85, 1, 1.25][fear ?? 2] * (full ? 1 : 0.5));
-/** 제한 시간: 쉬운 테마(난이도 2 이하) 60분, 어려운 테마 120분 */
-export const timeLimitMs = (difficulty) => (difficulty <= 2 ? 60 : 120) * 60 * 1000;
+export const themeAssistPercent = (hints, talismans) => Math.max(50, 100 - hints * 5 - talismans * 10);
+export const themeRewardXp = (base, hints, talismans, replay) =>
+  Math.round(base * themeAssistPercent(hints, talismans) / 100 * (replay ? 0.8 : 1));
+
+/** 제한 시간: 난이도 1은 30분, 2는 60분, 3 이상은 120분 */
+export const timeLimitMs = (difficulty) => (difficulty === 1 ? 30 : difficulty <= 2 ? 60 : 120) * 60 * 1000;
 
 /** 주간랭킹 1~3위 보상(비매품)의 설명 */
 export const GOLD_NOTE = '비매품 - 매주 주간랭킹 1~3위에게 아직 없는 부위 하나를 무작위 지급';
