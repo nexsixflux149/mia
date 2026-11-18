@@ -4,6 +4,7 @@ import { buildXmasProp, decorateXmas } from './xmas-visuals.js';
 import { textSprite, createAvatar, animateAvatar } from './avatar.js';
 import { buildWings, buildMount, buildSword, buildBalloon, BALLOON_COLORS, buildSnack } from './gear.js';
 const HOTDOG_POS = [16, 18], CANDY_POS = [-10.9, 21.4]; // 핫도그는 팝콘 가게 옆, 솜사탕은 커피 가게 옆 같은 줄 (광장 가장자리 같은 반지름)
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const DEG = Math.PI / 180;
@@ -1131,7 +1132,7 @@ function buildChristmasTree(root, colliders) {
   tree.name = '광장 크리스마스 트리';
   tree.position.set(CENTER.x, 0, CENTER.z);
   root.add(tree);
-  colliders.push({ ...CENTER, hw: 1.5, hd: 1.5, noSpread: true });
+  colliders.push({ ...CENTER, hw: 2.82, hd: 2.82, noSpread: true });
 
   const rng = randomSource();
   const standard = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: .64, ...options });
@@ -1270,7 +1271,45 @@ function buildChristmasTree(root, colliders) {
   tree.add(crown);
   tree.traverse(n => { n.userData.noOcc = true; });
 
+  let modelLights = null;
+  const asset = new URL('../models/christmas-tree.glb', import.meta.url);
+  new GLTFLoader().load(asset.href, ({ scene: model }) => {
+    if (!root.parent) {
+      disposeObject(model);
+      return;
+    }
+    // Leave the old tree visible until the complete replacement is ready.
+    disposeObject(tree);
+    tree.clear();
+    model.scale.setScalar(1.095);
+    model.rotation.y = -.14;
+    const lights = [];
+    model.traverse(node => {
+      node.userData.noOcc = true;
+      if (!node.isMesh) return;
+      for (const material of [].concat(node.material)) {
+        if (material.name === 'Warm micro lights') lights.push(material);
+        if (material.name.startsWith('Noble fir')) {
+          material.emissive.set('#2a4c26');
+          material.emissiveIntensity = .48;
+        }
+        if (material.metalness > .35 && material.emissiveIntensity <= 1) {
+          material.emissive.copy(material.color);
+          material.emissiveIntensity = .27;
+        }
+      }
+    });
+    tree.add(model);
+    modelLights = [...new Set(lights)];
+  }, undefined, (error) => {
+    if (root.parent) console.warn('크리스마스 트리 모델 로딩 실패:', error);
+  });
+
   return t => {
+    if (modelLights) {
+      for (const material of modelLights) material.emissiveIntensity = 2.1 + Math.sin(t * 1.45) * .22;
+      return;
+    }
     lightMaterials.forEach((material, i) => { material.opacity = .78 + Math.sin(t * 1.38 + i * 2.1) * .17; });
     crown.material.opacity = .66 + Math.sin(t * 1.45) * .11;
   };
@@ -2123,8 +2162,12 @@ export function buildChapter(scene, ch, themeId = 'gwimun') {
   return { root, colliders, walls, objects, flickers, ceiling, update, outdoor: !!ch.outdoor, size: ch.size };
 }
 
+function disposeObject(root) {
+  root.traverse((o) => { o.geometry?.dispose?.(); if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { m.map?.dispose?.(); m.dispose?.(); }); } });
+}
+
 export function disposeWorld(scene, w) {
   if (!w) return;
   scene.remove(w.root);
-  w.root.traverse((o) => { o.geometry?.dispose?.(); if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { m.map?.dispose?.(); m.dispose?.(); }); } });
+  disposeObject(w.root);
 }
