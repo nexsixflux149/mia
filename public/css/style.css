@@ -902,7 +902,7 @@ body.mobile #login.tiny .logo, body.mobile #login.tiny .pv-wrap, body.mobile #lo
 }
 .limit-card {
   display: flex; flex-direction: column; align-items: center; gap: .18rem;
-  color: #fff2dc; padding: 1rem; animation: limitReveal 1s ease both;
+  color: #fff2dc; padding: 1rem; animation: limitReveal 3s ease both;
 }
 .limit-icon { color: #ffc979; font-size: clamp(24px, 5vw, 52px); line-height: 1; }
 .limit-label { font-size: clamp(16px, 3.5vw, 28px); font-weight: 700; }
@@ -916,7 +916,7 @@ body.mobile #login.tiny .logo, body.mobile #login.tiny .pv-wrap, body.mobile #lo
 }
 @keyframes limitReveal {
   0% { opacity: 0; transform: translateZ(-140px) scale(.72) rotateX(12deg); }
-  24%, 78% { opacity: 1; transform: translateZ(0) scale(1); }
+  8%, 94% { opacity: 1; transform: translateZ(0) scale(1); }
   100% { opacity: 0; transform: scale(1.04); }
 }
 @media (prefers-reduced-motion: reduce) {

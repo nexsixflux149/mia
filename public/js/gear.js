@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createAvatar } from './avatar.js';
+import { createAvatar, SNOW_RELEASE } from './avatar.js';
 import { boxG, markShared } from './props.js';
 
 // ───── 상점 물건 모양 (날개 · 탈것 · 전설의 검) + 사용 효과 (폭죽 · 검 · 방귀)
@@ -1350,10 +1350,15 @@ export function animateGear(g, t, dt, moving) {
     u.rig.rotation.x = 0;
     if (u.legs) { u.legs[0].rotation.set(-1.25, 0, -0.45); u.legs[1].rotation.set(-1.25, 0, 0.45); }
     // 운전 자세: 두 팔을 앞으로 뻗어 핸들(고삐·빗자루 자루)을 잡는다 — 걸을 때처럼 흔들지 않는다. 점프 중에는 만세 (점프 동작이 든 팔 그대로)
-    if (u.arms && !jy) { const sway = Math.sin(t * 1.8) * 0.04; u.arms[0].rotation.set(-1.15 + sway, 0, 0.32); u.arms[1].rotation.set(-1.15 - sway, 0, -0.32); }
+    if (u.arms && !jy) {
+      const sway = Math.sin(t * 1.8) * 0.04;
+      if (u.expr !== 'snow') u.arms[0].rotation.set(-1.15 + sway, 0, 0.32);
+      u.arms[1].rotation.set(-1.15 - sway, 0, -0.32);
+    }
   }
   if (u.gSword) {
     u.gSword.userData.anim(t, u.swingT > 0);
+    if (u.expr === 'snow') return;
     if (u.swingT > 0) { u.swingT -= dt; const k = 1 - Math.max(0, u.swingT) / 0.45; u.arms[0].rotation.x = -2.6 + Math.sin(k * Math.PI) * 2.4; u.arms[0].rotation.z = -0.3; }
     else if (u.gSwordKind === '2' && !u.gMount) { u.arms[0].rotation.x = -0.5 + (moving ? Math.sin(t * 9) * 0.07 : 0); } // 지팡이: 걸을 때도 세워서 든다 (긴 지팡이가 땅을 휘젓지 않게)
     else if (!moving) { u.arms[0].rotation.x = -0.5; }
@@ -1511,10 +1516,46 @@ export function giftPuffFx(x, y, z) {
   for (let i = 0; i < m; i++) { const a = Math.random() * Math.PI * 2, s = 1.5 + Math.random() * 2.5; sv.push([Math.cos(a) * s, 2 + Math.random() * 3, Math.sin(a) * s]); sq.setXYZ(i, x, y + 0.3, z); }
   addFx(sp, 1.6, (o, t, dt) => { for (let i = 0; i < m; i++) { const q = sv[i]; q[1] -= 5 * dt; sq.setXYZ(i, sq.getX(i) + q[0] * dt, Math.max(0.05, sq.getY(i) + q[1] * dt), sq.getZ(i) + q[2] * dt); } sq.needsUpdate = true; o.material.opacity = Math.max(0, 1 - t / 1.6); });
 }
+export function snowballFx(avatar, isCurrent) {
+  const ball = new THREE.Mesh(new THREE.IcosahedronGeometry(.14, 2), new THREE.MeshStandardMaterial({
+    color: '#f1f9ff', roughness: .9, emissive: '#b0d9ff', emissiveIntensity: .3,
+  }));
+  ball.name = 'snowball';
+  ball.visible = false;
+  const start = new THREE.Vector3(), end = new THREE.Vector3();
+  const flight = .72;
+  let released = false;
+  addFx(ball, SNOW_RELEASE + flight, (mesh, t) => {
+    if (!isCurrent(released)) return false;
+    if (!released) {
+      const u = avatar.userData;
+      if (u.gCostumeId === 'costume_xmas') {
+        start.set(-.38, 1, .63);
+        u.rig.localToWorld(start);
+      } else {
+        start.set(0, -.39, .04);
+        u.arms[0].localToWorld(start);
+      }
+      mesh.position.copy(start);
+      mesh.visible = true;
+      if (t < SNOW_RELEASE) return;
+      end.set(0, .12, 6.3);
+      avatar.localToWorld(end);
+      released = true;
+    }
+    const k = Math.min(1, (t - SNOW_RELEASE) / flight);
+    const angle = Math.PI * k;
+    mesh.position.lerpVectors(start, end, (1 - Math.cos(angle)) / 2);
+    mesh.position.y += Math.sin(angle) * 1.35;
+    mesh.rotation.x = k * 9;
+    mesh.scale.setScalar(1 - THREE.MathUtils.smoothstep(k, .86, 1) * .72);
+  });
+}
+
 export function updateFx(dt) {
   for (let i = FX.length - 1; i >= 0; i--) {
-    const f = FX[i]; f.t += dt; f.step(f.obj, f.t, dt);
-    if (f.t >= f.life) { fxScene.remove(f.obj); f.obj.geometry?.dispose(); if (f.obj.material && !f.obj.material.map?.isCanvasTexture) f.obj.material.dispose?.(); FX.splice(i, 1); }
+    const f = FX[i]; f.t += dt;
+    if (f.step(f.obj, f.t, dt) === false || f.t >= f.life) { fxScene.remove(f.obj); f.obj.geometry?.dispose(); if (f.obj.material && !f.obj.material.map?.isCanvasTexture) f.obj.material.dispose?.(); FX.splice(i, 1); }
   }
 }
 export const fxCount = () => FX.length;

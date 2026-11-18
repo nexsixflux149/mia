@@ -35,7 +35,7 @@ export function dressScenery(target, root, prop) {
   const lanternCount = prop.t === 'lantern_string' ? prop.len || 10 : 0;
   if (lanternCount && (!Number.isInteger(lanternCount) || lanternCount < 1 || lanternCount > 64)) return;
   const modelId = prop.t === 'cage' && prop.open ? 'cage-open' : prop.t;
-  copyModel(modelId).then(template => {
+  return copyModel(modelId).then(template => {
     if (root.userData.disposed || (!root.parent && !root.userData.reusableLobby)) return;
     let model = template;
     const wheel = prop.t === 'ferris_wheel' ? target.userData.wheel : null;

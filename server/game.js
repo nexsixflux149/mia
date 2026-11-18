@@ -13,7 +13,7 @@ const norm = (s) => String(s ?? '').replace(/\s+/g, '').toLowerCase();
 
 // 한 파티의 방탈출 진행 상태(서버 권한)
 export class GameInstance {
-  constructor({ id, io, party, players, chapter, fear = 2, scenario = 'gwimun', onChapter, onEnd, onAdvance, limitMs = 0 }) {
+  constructor({ id, io, party, players, chapter, fear = 2, scenario = 'gwimun', onChapter, onEnd, onAdvance, photoMember, limitMs = 0 }) {
     this.sc = SCENARIOS[scenario] || SCENARIOS.gwimun;
     this.chapters = this.sc.chapters;
     this.fear = fear; // 0 왕초보(귀신 없음) · 1 순한맛 · 2 보통 · 3 매운맛
@@ -30,7 +30,7 @@ export class GameInstance {
     this.talismansUsed = 0;
     this.wrong = {};
     this.onChapter = onChapter;
-    this.onEnd = onEnd; this.onAdvance = onAdvance;
+    this.onEnd = onEnd; this.onAdvance = onAdvance; this.photoMember = photoMember;
     this.limitMs = limitMs; this.overWarned = false; // 제한 시간 (난이도별 30분 · 60분 · 120분)
     this.ghost = null;
     this.ended = false;
@@ -465,7 +465,7 @@ export class GameInstance {
     const ms = Date.now() - this.startedAt, full = this.startChapter === 0;
     const over = !!this.limitMs && ms > this.limitMs;
     const photoId = randomUUID();
-    this.emit('game:ending', { ...end, photoId, relics, type: all ? 'true' : 'normal', total: this.sc.relics.length, icons: relicIcons(this.sc), cine: all ? this.sc.cine.true : this.sc.cine.normal, ms, full, hints: this.hintsUsed(), over });
+    this.emit('game:ending', { ...end, photoId, members: this.photoMember && this.members().map(this.photoMember), relics, type: all ? 'true' : 'normal', total: this.sc.relics.length, icons: relicIcons(this.sc), cine: all ? this.sc.cine.true : this.sc.cine.normal, ms, full, hints: this.hintsUsed(), over });
     this.onEnd?.({ photoId, ms, full, type: all ? 'true' : 'normal', hints: this.hintsUsed(), over });
   }
 

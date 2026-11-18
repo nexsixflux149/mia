@@ -9,7 +9,7 @@ import { AudioFX } from './audio.js';
 import { jumpscare, pickScare } from './scare.js';
 import { Voice } from './voice.js';
 import { FX, makeBeam } from './fx.js';
-import { applyGear, animateGear, initFx, updateFx, popperFx, rocketFx, swordFx, shatterFx, fartFx, giftPuffFx, buildCashStack, releaseBalloon } from './gear.js';
+import { applyGear, animateGear, initFx, updateFx, popperFx, rocketFx, swordFx, shatterFx, fartFx, snowballFx, giftPuffFx, buildCashStack, releaseBalloon } from './gear.js';
 import { FRAMES, shootPhoto, composePhoto, drawStampCard, loadPhotoFonts } from './photo.js';
 import { GraphicsUpgrade } from './graphics-upgrade.js';
 import { gfx } from './visual-upgrade.js';
@@ -749,7 +749,15 @@ function updateMove(dt) {
   // 놀이기구·벤치: 움직이면 내리고, 아니면 자리 위치를 따라간다
   if (S.mount) {
     if (ix || iz) dismount();
-    else { const p = mountPos(); if (p) { me.x = p.x; me.z = p.z; me.y = p.y; me.ry = wrapAng(p.ry); } me.moving = false; myAvatar.position.set(me.x, me.y, me.z); myAvatar.rotation.y = me.ry; return; }
+    else {
+      if (S.em === 'snow' && (S.emT += dt) > EMOTE_DUR.snow) S.em = S.mount.kind === 'sit' || S.world?.rides?.[S.mount.ride]?.sit ? 'sit' : '';
+      const p = mountPos();
+      if (p) { me.x = p.x; me.z = p.z; me.y = p.y; me.ry = wrapAng(p.ry); }
+      me.moving = false;
+      myAvatar.position.set(me.x, me.y, me.z);
+      myAvatar.rotation.y = me.ry;
+      return;
+    }
   }
   let vx = 0, vz = 0;
   const runKey = !!(keys.ShiftLeft || keys.ShiftRight);
@@ -777,7 +785,7 @@ function updateMove(dt) {
   me.moving = !!(vx || vz) && !blocked;
   const jumping = S.room === 'lobby' && !S.perch && S.em === 'jump';
   const previousFeetY = jumping ? jumpElevation(S.emT) : 0;
-  if (S.em) { S.emT += dt; const d = EMOTE_DUR[S.em]; if ((me.moving && S.em !== 'jump') || (d && S.emT > d)) S.em = ''; }
+  if (S.em) { S.emT += dt; const d = EMOTE_DUR[S.em]; if ((me.moving && S.em !== 'jump' && S.em !== 'snow') || (d && S.emT > d)) S.em = ''; }
   const feetY = jumping ? jumpElevation(S.emT) : 0;
   const ox = me.x, oz = me.z;
   const nx = me.x + (me.moving ? vx * speed * dt : 0);
@@ -1027,7 +1035,15 @@ function syncOther(p) {
     g.userData.lv = lk.lv; g.position.copy(pos);
     S.others.set(p.id, g);
   }
-  if (g.userData.eid !== p.eid || g.userData.em !== p.em) { const fresh = g.userData.eid != null; g.userData.eid = p.eid; g.userData.em = p.em; g.userData.emT = 0; if (p.em === 'jump' && fresh) audio.play('pickup'); if (p.em === 'fart' && fresh) doFart(g, p.x, p.y || 0, p.z, p.ry); }
+  if (g.userData.eid !== p.eid || g.userData.em !== p.em) {
+    const fresh = g.userData.eid != null;
+    g.userData.eid = p.eid;
+    g.userData.em = p.em;
+    g.userData.emT = 0;
+    if (p.em === 'jump' && fresh) audio.play('pickup');
+    if (p.em === 'fart' && fresh) doFart(g, p.x, p.y || 0, p.z, p.ry);
+    if (p.em === 'snow') throwSnow(g, () => g.userData.eid === p.eid && g.userData.em === 'snow');
+  }
   if (g.userData.et !== p.et) { const fresh = g.userData.et != null; g.userData.et = p.et; if (fresh && p.et) { g.userData.eatT = 0.9; const sn = (p.gear || '').split('|')[6] || ''; if (myAvatar && Math.hypot(p.x - me.x, p.z - me.z) < 9) setTimeout(() => audio.play(sn[0] === 'c' ? 'slurp' : 'crunch'), 320); } }
   g.userData.target = p;
   setLight(g, p.light);
@@ -1328,7 +1344,7 @@ socket.on('enter:lobby', (pos) => {
 socket.on('inv', (inv) => { const before = S.inv.length; S.inv = inv; if (!inv.includes('flashlight')) S.light = false; renderInv(); if (inv.length > before) audio.play('pickup'); });
 // 욕설 채팅 경고 · 채팅 금지
 socket.on('chat:blocked', (b) => { addChat({ channel: 'system', text: b.text }); toast(b.text); if (b.muted) { S.chatMutedUntil = Date.now() + b.left * 1000; } });
-function showTimeLimit(ms, ranked) {
+function showTimeLimit(ms, ranked, sequence) {
   const screen = document.getElementById('timeLimitIntro');
   screen.querySelector('strong').textContent = `${Math.round(ms / 60000)}분`;
   screen.querySelector('.limit-message').textContent = ranked
@@ -1336,9 +1352,9 @@ function showTimeLimit(ms, ranked) {
     : '이어하기는 랭킹에 반영되지 않습니다';
   screen.classList.remove('hidden');
   return new Promise(resolve => setTimeout(() => {
-    screen.classList.add('hidden');
+    if (sequence === gameStartSequence) screen.classList.add('hidden');
     resolve();
-  }, 1000));
+  }, 3000));
 }
 socket.on('game:start', async (st) => {
   const sequence = ++gameStartSequence;
@@ -1350,7 +1366,7 @@ socket.on('game:start', async (st) => {
   closeModal(); S.fear = st.fear ?? 2;
   S.scenario = st.scenario || null; updateFearBadge();
   if (st.chapterIdx === 0 && (st.elapsed ?? 0) < 8000 && S.scenario?.id) resetJournalFor(S.scenario.id); // 처음부터 새로 시작
-  if (st.showTimeLimit && st.limitMs) { resetInput(); await showTimeLimit(st.limitMs, st.timed); }
+  if (st.showTimeLimit && st.limitMs) { resetInput(); await showTimeLimit(st.limitMs, st.timed, sequence); }
   if (sequence !== gameStartSequence) return;
   if (st.chapterIdx === 0 && !S.skipPrologue) { resetInput(); await cinema.play(st.scenario?.cine?.intro || 'prologue', { looks: partyLooks(), audio, fear: S.fear }); }
   if (sequence === gameStartSequence) enterChapter(st, true);
@@ -1458,8 +1474,12 @@ function stampList(nowId) {
 }
 function rememberClear(e) {
   const sc = S.scenario; if (!sc) return;
-  const members = [{ name: S.myName, look: { ...look }, gear: myGear() }];
-  for (const m of S.party?.members || []) { if (m.id === S.me) continue; const lk = S.looks.get(m.id)?.look; if (lk) members.push({ name: m.name, look: lk, gear: S.net.get(m.id)?.gear || '' }); }
+  const roster = e.members || (S.party?.members || []).flatMap(m => {
+    const lk = S.looks.get(m.id)?.look;
+    return lk ? [{ id: m.id, name: m.name, look: lk, gear: S.net.get(m.id)?.gear || '' }] : [];
+  });
+  const self = e.members?.find(m => m.id === S.me) || { name: S.myName, look: { ...look }, gear: myGear() };
+  const members = [self, ...roster.filter(m => m.id !== S.me)];
   const frame = FRAMES[Math.floor(Math.random() * FRAMES.length)].id;
   const clear = { photoId: e.photoId, frame, id: sc.id, title: sc.short || sc.title, icon: THEME_ICON[sc.id] || '', ending: e.type, timeText: e.ms && e.full ? fmtMs(e.ms) : '', hints: e.ms && e.full ? e.hints ?? 0 : null, members, ghostTypes: sc.ghostTypes || [], tint: themeColor(sc.id), date: new Date(), photo: null };
   S.lastClear = clear;
@@ -3032,12 +3052,21 @@ function eatSnack() {
 function doEmote(id) {
   if (!myAvatar) return;
   if (id === 'jump' && S.em === 'jump' && S.emT < 0.7) return; // 공중에 떠 있는 동안(발이 땅에 닿기 전)에는 다시 뛸 수 없다
+  if (id === 'snow' && (S.em === 'snow' || S.em === 'jump')) return;
   S.em = id; S.emT = 0; S.eid++;
+  if (id === 'snow') {
+    const eid = S.eid;
+    throwSnow(myAvatar, () => S.eid === eid && S.em === 'snow');
+  }
   if (id === 'jump') audio.play('pickup');
   if (id === 'boo') { socket.emit('boo'); audio.play('sting'); }
   if (id === 'heart') { burstHearts(myAvatar, 6); }
   if (id === 'fart') doFart(myAvatar, me.x, me.y || 0, me.z, me.ry);
   $('#emotePanel').classList.add('hidden');
+}
+function throwSnow(avatar, stillThrowing) {
+  const world = S.world;
+  snowballFx(avatar, released => S.world === world && (released || (avatar.parent && stillThrowing())));
 }
 function toggleEmotePanel() { $('#emotePanel').classList.toggle('hidden'); }
 // 감정표현 창이 열려 있을 때 창 바깥(화면 · 조이스틱 · 다른 버튼)을 누르면 닫는다. 😀 버튼은 원래대로 열고 닫기

@@ -1021,6 +1021,7 @@ io.on('connection', (sock) => {
         }
       },
       limitMs: timeLimitMs(sc.difficulty || 3),
+      photoMember: (p) => ({ id: p.id, name: p.name, look: p.look, gear: gearOf(p) }),
       onEnd: ({ photoId, ms, full, type, hints = 0, over = false } = {}) => {
         registerClearPhoto(photoId, inst.members(), sc);
         const names = party.members.map((id) => players.get(id)?.name).filter(Boolean);

@@ -674,7 +674,9 @@ function addOutfitHeadwear(head, l) {
 }
 
 // 감정표현(이모트) 목록: [id, 이름, 아이콘, 지속시간(초, 0=계속)]
+export const SNOW_RELEASE = .36;
 export const EMOTES = [
+  ['snow', '눈 던지기', '❄️', 1.05],
   ['wave', '인사', '👋', 2.5], ['dance', '춤추기', '💃', 0], ['spin', '빙글빙글', '🌀', 0], ['jump', '뛰기', '⬆️', 0.7],
   ['lie', '엎드리기', '🛌', 0], ['sit', '앉기', '🪑', 0], ['clap', '박수', '👏', 2.5], ['heart', '하트', '🫶', 2.5],
   ['boo', '놀래키기', '👻', 1.3], ['shiver', '덜덜', '🥶', 0], ['bow', '꾸벅', '🙇', 2], ['fart', '방귀 뿡', '💨', 2.2],
@@ -720,7 +722,7 @@ export function animateAvatar(g, dt, moving, t, crouch = false, emote = null, et
   if (u.setBlink) { u.blinkT -= dt; if (u.blinkT < 0) { u.blinkOn = !u.blinkOn; u.setBlink(u.blinkOn); u.blinkT = u.blinkOn ? 0.13 : 2.4 + Math.random() * 3.2; } }
   const vOn = emote === 'v' && !moving;
   for (const a of A) { const vf = a.userData.vf; if (vf && vf.visible !== vOn) vf.visible = vOn; }
-  if (emote && (!moving || emote === 'jump')) {
+  if (emote && (!moving || emote === 'jump' || emote === 'snow')) {
     const w = Math.sin(et * 10);
     switch (emote) {
       // 브이: 두 손을 얼굴 옆으로 들어 ✌ (기념 사진 포즈)
@@ -740,6 +742,17 @@ export function animateAvatar(g, dt, moving, t, crouch = false, emote = null, et
       case 'clap': { const c = Math.abs(Math.sin(et * 12)); A[0].rotation.x = -1.3; A[1].rotation.x = -1.3; A[0].rotation.z = -0.2 - c * 0.5; A[1].rotation.z = 0.2 + c * 0.5; y = c * 0.03; break; }
       case 'heart': A[0].rotation.z = -2.7; A[1].rotation.z = 2.7; A[0].rotation.x = -0.3; A[1].rotation.x = -0.3; head.rotation.z = Math.sin(et * 3) * 0.15; y = Math.abs(Math.sin(et * 3)) * 0.05; break;
       case 'boo': { const k = Math.min(1, et / 0.25); A[0].rotation.z = -2.5 * k; A[1].rotation.z = 2.5 * k; A[0].rotation.x = -0.8 * k; A[1].rotation.x = -0.8 * k; rx = 0.35 * k; head.scale.setScalar(1 + 0.25 * k * (et < 0.8 ? 1 : 0)); y = 0.15 * k; break; }
+      case 'snow': {
+        const elapsed = Math.max(0, et);
+        const windup = THREE.MathUtils.smoothstep(elapsed, 0, .24);
+        const throwArm = THREE.MathUtils.smoothstep(elapsed, .24, SNOW_RELEASE);
+        const recover = THREE.MathUtils.smoothstep(elapsed, .52, 1.03);
+        A[0].rotation.set((-2.9 * windup + 1.52 * throwArm) * (1 - recover), 0, (-.64 * windup + .54 * throwArm) * (1 - recover));
+        A[1].rotation.x = -.6 * windup * (1 - recover);
+        rx = (-.17 * windup + .35 * throwArm) * (1 - recover);
+        ry = (.26 * windup - .42 * throwArm) * (1 - recover);
+        break;
+      }
       case 'shiver': rz = Math.sin(t * 60) * 0.04; A[0].rotation.set(-1.2, 0, 0.9); A[1].rotation.set(-1.2, 0, -0.9); y = -0.06; head.rotation.x = 0.2; break;
       case 'bow': { const k = Math.sin(Math.min(1, et / 1.2) * Math.PI); rx = 0.9 * k; break; }
       // 방귀: 엉덩이를 쭉 내밀고 → 뿡! → 몸을 흔들며 낄낄
@@ -758,7 +771,7 @@ export function animateAvatar(g, dt, moving, t, crouch = false, emote = null, et
   // 손전등: 웅크리면 몸이 앞으로 숙여져 빛이 몸 안에 갇히므로, 몸보다 앞·아래로 옮긴다
   if (g.userData.spot) { g.userData.spot.position.set(0, 0.72 - u.crouch * 0.15, 0.42 + u.crouch * 0.2); g.userData.beam?.position.copy(g.userData.spot.position); }
   // 감정표현 중에는 표정도 바뀐다
-  const want = emote && (!moving || emote === 'jump') ? emote : null;
+  const want = emote && (!moving || emote === 'jump' || emote === 'snow') ? emote : null;
   if (u.expr !== want) { u.expr = want; u.setExpr?.(want); }
 }
 

@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { buildProp, isShared } from './props.js';
+import { dressScenery } from './refined-models.js';
+import { buildXmasProp } from './xmas-visuals.js';
 import { makeXmasShots } from './xmas-cinema.js';
 import { createAvatar, animateAvatar } from './avatar.js';
 import { createGhost, animateGhost } from './ghosts.js';
@@ -39,6 +41,7 @@ export class Cinema {
 
   // ── 세트 만들기
   clear() {
+    for (const set of Object.values(this.sets || {})) set.userData.disposed = true;
     this.scene.traverse((o) => { if (!o.isSprite && !isShared(o.geometry)) o.geometry?.dispose?.(); }); // 공유 지오메트리·스프라이트는 로비·챕터와 같이 쓰므로 남긴다
     this.scene.clear();
     this.sets = {};
@@ -46,7 +49,14 @@ export class Cinema {
   }
   set(name, build) { const g = new THREE.Group(); g.visible = false; build(g); this.scene.add(g); this.sets[name] = g; return g; }
   show(...names) { for (const [n, g] of Object.entries(this.sets)) g.visible = names.includes(n); }
-  prop(g, p) { const m = buildProp(p); m.position.set(p.x || 0, p.y || 0, p.z || 0); m.rotation.y = ((p.r || 0) * Math.PI) / 180; g.add(m); return m; }
+  prop(g, p) {
+    const m = buildXmasProp(p) || buildProp(p);
+    m.position.set(p.x || 0, p.y || 0, p.z || 0);
+    m.rotation.y = ((p.r || 0) * Math.PI) / 180;
+    g.add(m);
+    m.userData.modelReady = dressScenery(m, g, p);
+    return m;
+  }
 
   buildRoad() {
     return this.set('road', (g) => {
@@ -108,7 +118,7 @@ export class Cinema {
       this.prop(g, { t: 'bus_stop', x: 0, z: -3, r: 180 }); this.prop(g, { t: 'bench', x: 0, z: -3.3 });
       const lamp = this.prop(g, { t: 'lamp', x: 2.5, z: -2.5 }); this.stopLamp = lamp.userData.flicker;
       for (let i = 0; i < 14; i++) this.prop(g, { t: 'pine', x: -20 + i * 3, z: -9 - Math.random() * 4 });
-      const bus = buildProp({ t: 'bus' }); bus.position.set(30, 0, 1.6); g.add(bus); this.stopBus = bus;
+      this.stopBus = this.prop(g, { t: 'bus', x: 30, z: 1.6 });
       this.crew = (looks.length ? looks : [{}]).slice(0, 4).map((l, i) => { const a = createAvatar(l); a.position.set(-1.5 + i * 1.1, 0, -1.4); a.visible = false; g.add(a); return a; });
       g.add(new THREE.HemisphereLight('#6a7aa0', '#141418', 1.2));
       const key = new THREE.PointLight('#ffd9a0', 14, 9, 1.6); key.position.set(1.5, 3, 1.5); g.add(key);
@@ -153,6 +163,8 @@ export class Cinema {
     for (const x of [-13, 12]) { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.2, 12, 6), new THREE.MeshStandardMaterial({ color: '#2a2018' })); m.position.set(x, 9, 0); g.add(m); }
     const pm = new THREE.MeshBasicMaterial({ color: glow });
     for (let i = 0; i < 22; i++) for (const s of [-1, 1]) { const p = new THREE.Mesh(new THREE.CircleGeometry(0.25, 10), pm); p.position.set(-13 + i * 1.25, 2.4, s * 3.52); p.rotation.y = s > 0 ? 0 : Math.PI; if (Math.random() < 0.6) g.add(p); }
+    this.prop(g, { t: 'rowboat', x: -3.8, y: 5.8, z: 3.2, r: 90 });
+    this.prop(g, { t: 'rowboat', x: -3.8, y: 5.8, z: -3.2, r: -90 });
     const l = new THREE.PointLight(glow, 30, 40, 1.4); l.position.set(0, 6, 0); g.add(l);
     return g;
   }
@@ -166,12 +178,12 @@ export class Cinema {
       g.position.set(0, 0, 800);
       const sea = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshStandardMaterial({ color: '#0c1a24', roughness: 0.2, metalness: 0.5 })); sea.rotation.x = -Math.PI / 2; g.add(sea); this.sea = sea;
       const isle = new THREE.Group(); isle.position.set(-24, 0, -30); g.add(isle);
-      for (let i = 0; i < 14; i++) { const r = buildProp({ t: 'rock' }); r.position.set((Math.random() - 0.5) * 12, -0.2, (Math.random() - 0.5) * 10); r.scale.set(4, 3, 4); isle.add(r); }
-      const lh = buildProp({ t: 'lighthouse' }); lh.position.set(0, 0.5, 0); isle.add(lh);
+      for (let i = 0; i < 14; i++) { this.prop(isle, { t: 'rock', x: (Math.random() - 0.5) * 12, y: -0.2, z: (Math.random() - 0.5) * 10 }).scale.set(4, 3, 4); }
+      this.prop(isle, { t: 'lighthouse', y: 0.5 });
       const beam = this.beamMesh(); beam.position.set(0, 9.7, 0); isle.add(beam); this.beam = beam; beam.visible = false;
       this.lhLight = new THREE.PointLight('#fff2c0', 0, 60, 1.2); this.lhLight.position.set(0, 9.7, 0); isle.add(this.lhLight);
       const ship = this.shipModel(); ship.position.set(30, -0.5, -40); ship.rotation.y = 0.5; g.add(ship); this.ghostShip = ship;
-      const boat = buildProp({ t: 'rowboat' }); boat.position.set(0, -0.1, 10); g.add(boat); this.boat = boat;
+      const boat = this.prop(g, { t: 'rowboat', y: -0.1, z: 10 }); this.boat = boat;
       const lantern = new THREE.PointLight('#ffc070', 9, 9, 1.6); lantern.position.set(0, 1.6, 1.2); boat.add(lantern);
       const lb = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), new THREE.MeshBasicMaterial({ color: '#ffd58a' })); lb.position.copy(lantern.position); boat.add(lb);
       this.boatCrew = (looks.length ? looks : [{}]).slice(0, 4).map((l, i) => { const a = createAvatar(l); a.scale.setScalar(0.7); a.position.set((i % 2 ? 0.3 : -0.3), 0.15, -1 + i * 0.6); a.userData.rig.position.y = -0.2; boat.add(a); return a; });
@@ -209,13 +221,11 @@ export class Cinema {
       this.mWindows = [];
       for (let r = 0; r < 2; r++) for (let c = 0; c < 6; c++) { const w = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.8), new THREE.MeshBasicMaterial({ color: '#0a0c10' })); w.position.set(-7 + c * 2.8, 2.6 + r * 3.6, -9.98); g.add(w); this.mWindows.push(w); }
       this.dollWin = this.mWindows[9];
-      const sil = buildProp({ t: 'doll' }); sil.scale.setScalar(2.4); sil.position.set(this.dollWin.position.x, this.dollWin.position.y - 0.9, -10.3); g.add(sil); this.silDoll = sil;
+      const sil = this.prop(g, { t: 'doll', x: this.dollWin.position.x, y: this.dollWin.position.y - 0.9, z: -10.3 }); sil.scale.setScalar(2.4); this.silDoll = sil;
       for (const s of [-1, 1]) { const p = new THREE.Mesh(new THREE.BoxGeometry(1, 3, 1), new THREE.MeshStandardMaterial({ color: '#3a3a3e' })); p.position.set(3 * s, 1.5, 6); g.add(p); }
-      for (let i = 0; i < 20; i++) { const t = buildProp({ t: 'pine' }); t.position.set((i % 2 ? 1 : -1) * (8 + Math.random() * 14), 0, -30 + i * 3); t.scale.setScalar(1.6); g.add(t); }
-      const car = new THREE.Group(); car.position.set(0, 0, 40); g.add(car); this.car = car;
-      const body = new THREE.Mesh(new THREE.BoxGeometry(2, 1, 4.2), new THREE.MeshStandardMaterial({ color: '#2a3a5a', roughness: 0.4, metalness: 0.4 })); body.position.y = 0.8; car.add(body);
-      const cab = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.8, 2.2), new THREE.MeshStandardMaterial({ color: '#1a2230' })); cab.position.set(0, 1.6, 0.3); car.add(cab);
-      for (const sx of [-1, 1]) for (const sz of [-1.4, 1.4]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.3, 14), new THREE.MeshStandardMaterial({ color: '#111' })); w.rotation.z = Math.PI / 2; w.position.set(sx * 1.05, 0.4, sz); car.add(w); }
+      for (let i = 0; i < 20; i++) { this.prop(g, { t: 'pine', x: (i % 2 ? 1 : -1) * (8 + Math.random() * 14), z: -30 + i * 3 }).scale.setScalar(1.6); }
+      const car = new THREE.Group(); car.position.z = 40; g.add(car); this.car = car;
+      this.prop(car, { t: 'car', r: 180, color: '#2a3a5a' });
       for (const sx of [-1, 1]) { const sp = new THREE.SpotLight('#fff1c8', 80, 40, 0.45, 0.5, 1.3); sp.position.set(sx * 0.7, 0.9, -2.1); const tg = new THREE.Object3D(); tg.position.set(sx * 0.7, 0, -20); car.add(tg); sp.target = tg; car.add(sp); }
       g.add(new THREE.HemisphereLight('#5a5a80', '#0a0a12', 1.3));
       const moonM = new THREE.DirectionalLight('#9fb0d8', 1.4); moonM.position.set(-15, 25, 20); g.add(moonM);
@@ -230,10 +240,10 @@ export class Cinema {
       g.position.set(800, 0, 800);
       const fl = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.MeshStandardMaterial({ color: '#4a2e26' })); fl.rotation.x = -Math.PI / 2; g.add(fl);
       const wall = new THREE.Mesh(new THREE.PlaneGeometry(20, 6), new THREE.MeshStandardMaterial({ color: '#8a6a78' })); wall.position.set(0, 3, -4); g.add(wall);
-      const cake = buildProp({ t: 'cake_table' }); g.add(cake); this.cakeLight = cake.userData.flicker;
+      this.cakeLight = this.prop(g, { t: 'cake_table' }).userData.flicker;
       const kids = [{ outfit: 'pajama', hair: 'bob', ears: 'none', accent: '#ffd166' }, { outfit: 'blazer', hair: 'short', ears: 'none' }, { outfit: 'sailor', hair: 'twintail', ears: 'none' }, { outfit: 'detective', hair: 'spiky', ears: 'none' }, { outfit: 'maid', hair: 'ponytail', ears: 'none' }];
       this.partyKids = kids.map((l, i) => { const a = createAvatar({ ...l, eyes: 'smile', mouth: 'open' }); const ang = Math.PI + (i - 2) * 0.55; a.position.set(Math.sin(ang) * 2, 0, Math.cos(ang) * 2); a.lookAt(0, 0, 0); g.add(a); return a; });
-      this.partyDolls = this.partyKids.map((k) => { const d = buildProp({ t: 'doll' }); d.scale.setScalar(2.2); d.position.copy(k.position); d.lookAt(0, 0, 0); d.visible = false; g.add(d); return d; });
+      this.partyDolls = this.partyKids.map((k) => { const d = this.prop(g, { t: 'doll', x: k.position.x, z: k.position.z }); d.scale.setScalar(2.2); d.lookAt(0, 0, 0); d.visible = false; return d; });
       this.clara = createAvatar({ outfit: 'nurse', hair: 'long', hairColor: '#e8c170', ears: 'none', eyes: 'big', eyeColor: '#3b7dd8', mouth: 'smile', hat: 'ribbon', accent: '#7ab0e8', body: '#fff1e6' });
       this.clara.position.set(0, 0, -1.6); g.add(this.clara);
       g.add(new THREE.HemisphereLight('#ffe0c0', '#332222', 1.2));
@@ -244,7 +254,7 @@ export class Cinema {
       g.position.set(-800, 0, -800);
       const back = new THREE.Mesh(new THREE.PlaneGeometry(8, 5), new THREE.MeshStandardMaterial({ color: '#3a2228' })); back.position.set(0, 2.5, -0.6); g.add(back);
       for (let i = 0; i < 3; i++) { const s = new THREE.Mesh(new THREE.BoxGeometry(8, 0.1, 1.2), new THREE.MeshStandardMaterial({ color: '#2a1810' })); s.position.set(0, 0.8 + i * 1.4, 0); g.add(s); }
-      for (let i = 0; i < 8; i++) { const d = buildProp({ t: 'doll' }); d.scale.setScalar(1.4); d.position.set(-3.2 + (i % 4) * 2.1, 0.85 + Math.floor(i / 4) * 2.8, 0); g.add(d); }
+      for (let i = 0; i < 8; i++) { this.prop(g, { t: 'doll', x: -3.2 + (i % 4) * 2.1, y: 0.85 + Math.floor(i / 4) * 2.8 }).scale.setScalar(1.4); }
       this.shelfCrew = (looks.length ? looks : [{}]).slice(0, 4).map((l, i) => { const a = createAvatar({ ...l, eyes: 'dot', mouth: 'flat' }); a.scale.setScalar(0.55); a.position.set(-2.4 + i * 1.6, 2.25, 0.1); g.add(a); return a; });
       const c = new THREE.PointLight('#ffb070', 6, 8, 1.6); c.position.set(0, 3, 3); g.add(c); this.shelfLight = c;
       g.add(new THREE.HemisphereLight('#6a4a4a', '#100808', 0.5));
@@ -347,6 +357,11 @@ export class Cinema {
       this.wardChair = this.prop(g, { t: 'wheelchair', x: 0, z: 1, r: 90 });
       this.wardNurse = createAvatar({ outfit: 'nurse', hair: 'bun', hairColor: '#1a1414', ears: 'none', eyes: 'closed', mouth: 'flat', body: '#e8e4e0', accent: '#ffffff' });
       this.wardNurse.position.set(12, 0, 0); this.wardNurse.rotation.y = -Math.PI / 2; g.add(this.wardNurse);
+      this.wardGhost = createGhost('nurse');
+      this.wardGhost.position.set(2.8, 0, -.8);
+      this.wardGhost.rotation.y = -1.3;
+      this.wardGhost.visible = false;
+      g.add(this.wardGhost);
       this.wardCrew = (looks.length ? looks : [{}]).slice(0, 4).map((l, i) => { const a = createAvatar(l); a.position.set(-13 + i * 0.9, 0, (i % 2) * 0.8 - 0.4); a.rotation.y = Math.PI / 2; g.add(a); return a; });
       g.add(new THREE.HemisphereLight('#8a9a9a', '#101010', 0.5));
       // 화재: 침대마다 일렁이는 불꽃 + 위로 피어오르는 검은 연기·재 먼지 + 불티 (불 나는 장면에서만 보인다)
@@ -390,8 +405,8 @@ export class Cinema {
     if (kind === 'hosp_intro') {
       return [
         { dur: 9, caption: '2026년 11월 9일, 새벽 1시.\n경기 북부 — 1995년에 문을 닫은 백야요양병원.', setup: (c) => { c.show('ward'); c.night(0.08, '#05070a'); A()?.ambient('hospital'); },
-          update: (c, t, k, dt) => { blink(c, t, 2); c.wardCrew.forEach((a) => { a.position.x += dt * 0.6; animateAvatar(a, dt, true, t); }); c.look(1600 - 16 + k * 4, 1.8, 3.5, 1600 - 8 + k * 6, 1.2, 0); } },
-        { dur: 10, sepia: true, caption: "1994년 12월 24일, 성탄 전야.\n원장은 7병동 환자 다섯에게 '수면 치료'를 지시했다.", setup: (c) => { c.show('ward'); c.scene.background = new THREE.Color('#d8c8a8'); c.scene.fog = new THREE.Fog('#d8c8a8', 10, 40); c.wardCrew.forEach((a) => (a.visible = false)); c.wardNurse.position.x = 12; A()?.ambient(null); A()?.play('bell'); },
+          update: (c, t, k, dt) => { blink(c, t, 2); c.wardGhost.visible = t > 6 && t < 8; if (c.wardGhost.visible) animateGhost(c.wardGhost, dt, t, { mode: 'wander' }, 8); c.wardCrew.forEach((a) => { a.position.x += dt * 0.6; animateAvatar(a, dt, true, t); }); c.look(1600 - 16 + k * 4, 1.8, 3.5, 1600 - 8 + k * 6, 1.2, 0); } },
+        { dur: 10, sepia: true, caption: "1994년 12월 24일, 성탄 전야.\n원장은 7병동 환자 다섯에게 '수면 치료'를 지시했다.", setup: (c) => { c.show('ward'); c.scene.background = new THREE.Color('#d8c8a8'); c.scene.fog = new THREE.Fog('#d8c8a8', 10, 40); c.wardCrew.forEach((a) => (a.visible = false)); c.wardNurse.position.x = 12; c.wardGhost.visible = false; A()?.ambient(null); A()?.play('bell'); },
           update: (c, t, k, dt) => { c.wardLights.forEach((l) => (l.intensity = 4)); c.wardNurse.position.set(12 - t * 1.2, 0, -0.6); animateAvatar(c.wardNurse, dt, true, t); c.look(1600 - 7, 1.8, 2.2, 1600 + c.wardNurse.position.x, 1.2, -0.6); } },
         { dur: 8, caption: '병실 문은 밖에서 잠겼다.\n그리고 밤 11시 40분, 불이 났다.', capAt: 1.2, setup: (c) => { c.show('ward'); c.scene.background = new THREE.Color('#1a0604'); c.scene.fog = new THREE.FogExp2('#2a0a04', 0.07); c.wardNurse.visible = false; c.wardFire.visible = true; A()?.play(c.fear >= 2 ? 'scream' : 'whisper'); A()?.play('wind'); },
           update: (c, t, k) => { c.wardFireUpdate(t); c.wardLights.forEach((l) => { l.color.set('#ff5a1a'); l.intensity = 3 + Math.random() * 4; }); c.wardChair.rotation.y = Math.PI / 2 + Math.sin(t * 2) * 0.2; c.look(1600 - 4 + k * 3, 2.4, 2.4, 1600 + 2, 0.8, -1.5); } },
@@ -672,16 +687,26 @@ export class Cinema {
 
   // ── 재생
   play(kind, { looks = [], audio, fear = 2 } = {}) {
-    this.clear();
+    if (this.active) this.skip();
+    else this.clear();
     this.audio = audio; this.fear = fear;
     const shots = this.makeShots(kind, looks);
     this.shots = shots; this.i = -1; this.t = 0; this.active = true;
     this.ui.root.classList.remove('hidden');
     document.body.classList.add('cine-on');
-    this.next();
-    return new Promise((res) => (this.done = res));
+    this.ui.fade.style.opacity = 1;
+    const models = [];
+    this.scene.traverse(o => { if (o.userData.modelReady) models.push(o.userData.modelReady); });
+    const start = () => { if (this.active && this.shots === shots && this.i === -1) this.next(); };
+    return new Promise(resolve => {
+      this.done = resolve;
+      if (!models.length) { start(); return; }
+      this.loadTimer = setTimeout(start, 3500);
+      Promise.allSettled(models).then(start);
+    });
   }
   next() {
+    clearTimeout(this.loadTimer);
     this.i++;
     const s = this.shots[this.i];
     if (!s) return this.finish();
@@ -696,6 +721,7 @@ export class Cinema {
   finish() {
     if (!this.active) return;
     this.active = false;
+    clearTimeout(this.loadTimer);
     this.r.domElement.style.filter = '';
     this.ui.root.classList.add('hidden'); document.body.classList.remove('cine-on'); this.ui.cap.classList.remove('on'); this.ui.ttl.classList.remove('on');
     this.audio?.ambient(null);

@@ -1118,6 +1118,11 @@ function buildChristmasTree(root, colliders) {
   root.add(tree);
   colliders.push({ ...CENTER, hw: 2.82, hd: 2.82, noSpread: true });
 
+  const fill = new THREE.PointLight('#ffe0aa', 44, 16, 2);
+  fill.position.set(0, 2.9, 2.65);
+  const uplight = new THREE.PointLight('#ffb878', 32, 13, 2);
+  uplight.position.set(-2.7, .5, -1.7);
+  tree.add(fill, uplight);
   let modelLights = [];
   const asset = new URL('../models/christmas-tree.glb', import.meta.url);
   new GLTFLoader().load(asset.href, ({ scene: model }) => {
@@ -1132,7 +1137,12 @@ function buildChristmasTree(root, colliders) {
       node.userData.noOcc = true;
       if (!node.isMesh) return;
       for (const material of [].concat(node.material)) {
-        if (material.name === 'Warm micro lights') lights.push(material);
+        if (material.name === 'Warm micro lights' || material.name.startsWith('Star')) {
+          material.emissive.set('#ffce78');
+          material.emissiveIntensity = 3.5;
+          lights.push(material);
+          continue;
+        }
         if (material.name.startsWith('Noble fir')) {
           material.emissive.set('#2a4c26');
           material.emissiveIntensity = .48;
@@ -1150,7 +1160,7 @@ function buildChristmasTree(root, colliders) {
   });
 
   return t => {
-    for (const material of modelLights) material.emissiveIntensity = 2.1 + Math.sin(t * 1.45) * .22;
+    for (const material of modelLights) material.emissiveIntensity = 3.5 + Math.sin(t * 1.45) * .35;
   };
 }
 

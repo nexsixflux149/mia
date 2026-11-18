@@ -78,7 +78,7 @@ function parseAbc(abc, key) {
 // 크리스마스편에서도 원래 소리로 내는 귀신 · 점프스케어 소리
 const XMAS_GHOST_SOUNDS = new Set(['scream', 'scream_wet', 'scream_child', 'sting', 'sting_low', 'growl', 'glitch', 'bang', 'whisper', 'breath', 'giggle', 'creak', 'drag', 'laugh', 'clown_laugh', 'jackbox', 'chain', 'static_hiss', 'teleport', 'musicbox_far', 'glass', 'pop']);
 export class AudioFX {
-  constructor() { this.ctx = null; this.amb = null; this.mode = null; this.classicEffects = false; this.xmasMechanical = false; }
+  constructor() { this.ctx = null; this.amb = null; this.mode = null; this.classicEffects = false; this.xmasMechanical = false; this.waterSources = new Set(); }
   init() {
     if (this.ctx) { this.ctx.resume(); return; }
     this.ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -120,7 +120,13 @@ export class AudioFX {
     const g = c.createGain(); const t0 = this.t + at;
     g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(gain, t0 + attack); g.gain.setValueAtTime(gain, t0 + Math.max(attack, dur - release)); g.gain.linearRampToValueAtTime(0, t0 + dur);
     s.connect(f).connect(g).connect(this.master); s.start(t0); s.stop(t0 + dur + 0.05);
-    return { f, g };
+    return { f, g, source: s };
+  }
+  waterNoise(dur, options) {
+    if (this.mode === 'lobby') return;
+    const { source } = this.noise(dur, options);
+    this.waterSources.add(source);
+    source.onended = () => this.waterSources.delete(source);
   }
   tone(freq, dur, { type = 'sine', gain = 0.2, attack = 0.01, release = 0.2, at = 0, slide = null, detune = 0 } = {}) {
     const c = this.ctx; const o = c.createOscillator(); o.type = type; o.frequency.value = freq; o.detune.value = detune;
@@ -136,8 +142,13 @@ export class AudioFX {
     if (!this.ctx || this.mode === mode) return;
     this.mode = mode;
     this.score = null; clearInterval(this.scoreTimer);
+    clearInterval(this.horrorTimer); clearInterval(this.tickTimer);
+    if (!mode || mode === 'lobby') {
+      for (const source of this.waterSources) source.stop(this.t + .06);
+      this.waterSources.clear();
+    }
     if (this.tuneBus) { const old = this.tuneBus; this.tuneBus = null; clearTimeout(this.tuneTimer); old.gain.linearRampToValueAtTime(0, this.t + 1.2); setTimeout(() => old.disconnect(), 1500); }
-    if (this.amb) { const a = this.amb; a.g.gain.linearRampToValueAtTime(0, this.t + 1.5); setTimeout(() => a.nodes.forEach((n) => { try { n.stop(); } catch {} }), 1700); this.amb = null; }
+    if (this.amb) { const a = this.amb; a.g.gain.linearRampToValueAtTime(0, this.t + (!mode || mode === 'lobby' ? .18 : 1.5)); setTimeout(() => a.nodes.forEach((n) => { try { n.stop(); } catch {} }), 1700); this.amb = null; }
     if (!mode) return;
     if (['xmas', 'xmas_intro', 'xmas_normal', 'xmas_true'].includes(mode)) {
       this.xmasScore(mode);
@@ -146,10 +157,6 @@ export class AudioFX {
     const c = this.ctx; const g = c.createGain(); g.gain.value = 0; g.connect(this.master);
     const nodes = [];
     if (mode === 'lobby') {
-      // 로비: 잔잔한 LOFI 비트 (자작곡) — 먼지 낀 레코드 잡음 위로 느린 붐뱁 드럼 · 로즈 피아노 화음 · 둥근 베이스
-      g.gain.linearRampToValueAtTime(0.6, this.t + 2);
-      const vin = c.createBufferSource(); vin.buffer = this.noiseBuf; vin.loop = true; const vf = c.createBiquadFilter(); vf.type = 'bandpass'; vf.frequency.value = 3200; vf.Q.value = 0.6;
-      const vg = c.createGain(); vg.gain.value = 0.012; vin.connect(vf).connect(vg).connect(g); vin.start(); nodes.push(vin);
       this.lofiScore();
     } else {
       // 낮은 드론 + 바람
@@ -232,7 +239,6 @@ export class AudioFX {
         const idx = Math.max(0, Math.min(PENTA.length - 1, PENTA.indexOf(st.mel) + (Math.random() < 0.5 ? -1 : 1) * (1 + (Math.random() < 0.3 ? 1 : 0))));
         st.mel = PENTA[idx] ?? 69; this.tone(hz(st.mel), stepDur * 3, { at, type: 'triangle', gain: 0.018, attack: 0.02, release: stepDur * 2.5 });
       }
-      if (Math.random() < 0.25) this.noise(0.012, { at: at + Math.random() * stepDur, freq: 2000 + Math.random() * 4000, q: 2, gain: 0.03 + Math.random() * 0.04 }); // 레코드 바늘 튀는 소리
     };
     this.scoreTimer = setInterval(() => {
       if (!this.ctx || this.score !== st || this.mode !== 'lobby') return clearInterval(this.scoreTimer);
@@ -572,7 +578,7 @@ export class AudioFX {
       case 'jingle': for (let i = 0; i < 6; i++) this.tone(2400 + Math.random() * 900, 0.25, { type: 'triangle', gain: 0.03, at: i * 0.05, release: 0.2 }); break;
       case 'pipe': [0, 0.25].forEach((a) => this.noise(0.05, { freq: 1500, q: 4, gain: 0.25, at: a })); break;
       case 'crawl': for (let i = 0; i < 4; i++) this.noise(0.06, { freq: 900 + Math.random() * 600, q: 3, gain: 0.12, at: i * 0.09 }); break;
-      case 'water_step': this.noise(0.25, { freq: 400, q: 0.8, gain: 0.22, release: 0.2 }); this.noise(0.1, { freq: 1600, q: 3, gain: 0.06, at: 0.1 }); break;
+      case 'water_step': this.waterNoise(0.25, { freq: 400, q: 0.8, gain: 0.22, release: 0.2 }); this.waterNoise(0.1, { freq: 1600, q: 3, gain: 0.06, at: 0.1 }); break;
       case 'snip': [0, 0.18].forEach((d) => { this.noise(0.05, { freq: 5200, q: 6, gain: 0.25, at: d }); this.tone(2600, 0.04, { type: 'square', gain: 0.04, at: d }); }); break;
       case 'musicbox': [1046, 988, 880, 988, 1046, 1046, 1046].forEach((f, i) => this.tone(f, 0.5, { type: 'triangle', gain: 0.06, at: i * 0.35, release: 0.45 })); break;
       case 'morse_short': this.tone(700, 0.12, { type: 'sine', gain: 0.12 }); break;
@@ -604,7 +610,7 @@ export class AudioFX {
       case 'thunder': this.noise(3, { freq: 120, type: 'lowpass', gain: 0.6, attack: 0.05, release: 2.6 }); this.noise(0.3, { freq: 2000, gain: 0.2 }); break;
       case 'foghorn': this.tone(110, 3, { type: 'sawtooth', gain: 0.09, attack: 0.4, release: 1.2 }); this.tone(111.5, 3, { type: 'square', gain: 0.03, attack: 0.4, release: 1.2 }); break;
       case 'hull': this.tone(65 + Math.random() * 20, 2.2, { type: 'sawtooth', gain: 0.05, slide: 50, attack: 0.6, release: 1 }); this.noise(1.6, { freq: 300, q: 4, gain: 0.05, attack: 0.5 }); break;
-      case 'wave': this.noise(3.5, { freq: 700, q: 0.5, gain: 0.15, attack: 1.4, release: 1.8 }); break;
+      case 'wave': this.waterNoise(3.5, { freq: 700, q: 0.5, gain: 0.15, attack: 1.4, release: 1.8 }); break;
       case 'shipbell': [1, 2.4].forEach((m) => this.tone(880 * m, 2.5, { gain: 0.04 / m, release: 2.3 })); this.tone(880, 2.5, { gain: 0.03, at: 0.6, release: 2.3 }); break;
       case 'chain': for (let i = 0; i < 8; i++) this.tone(1800 + Math.random() * 1500, 0.08, { type: 'triangle', gain: 0.04, at: i * 0.06 }); break;
       case 'drip': break; // (물방울 '뽀옥' 소리 — 뺐다)
@@ -613,7 +619,7 @@ export class AudioFX {
       case 'teleport': this.play('sting'); this.noise(0.6, { freq: 300, q: 0.4, gain: 0.3, release: 0.5 }); break;
       case 'radio': this.noise(3.5, { freq: 1800, q: 0.5, gain: 0.12, release: 0.5 }); for (let i = 0; i < 8; i++) this.tone(300 + Math.random() * 200, 0.2, { type: 'sawtooth', gain: 0.03, at: 0.5 + i * 0.35 }); break;
       case 'power': this.tone(60, 1.5, { type: 'sawtooth', gain: 0.08, slide: 120 }); this.noise(0.2, { freq: 4000, gain: 0.1 }); break;
-      case 'water': this.noise(3, { freq: 500, q: 0.6, gain: 0.25, attack: 0.5, release: 1.5 }); break;
+      case 'water': this.waterNoise(3, { freq: 500, q: 0.6, gain: 0.25, attack: 0.5, release: 1.5 }); break;
       case 'talisman': this.noise(0.8, { freq: 3000, q: 0.5, gain: 0.2, release: 0.6 }); this.tone(1400, 0.8, { gain: 0.08, slide: 300 }); break;
       case 'scream': {
         if (!this.classicEffects) { this.play('sting'); break; }

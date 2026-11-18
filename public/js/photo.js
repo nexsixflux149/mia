@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { createAvatar, animateAvatar } from './avatar.js';
 import { createGhost, animateGhost, dressXmas } from './ghosts.js';
-import { applyGear } from './gear.js';
+import { applyGear, animateGear } from './gear.js';
 import { isShared } from './props.js';
 
 export const OUT_W = 1080, OUT_H = 1350; // 완성된 사진 (4:5)
@@ -94,9 +94,10 @@ export async function shootPhoto({ members = [], ghostTypes = [], themeId, tint 
     const n = members.length;
     const avatars = members.map((m, i) => {
       const a = createAvatar(m.look || {});
-      const x = (i - (n - 1) / 2) * 0.82;
-      a.position.set(x, 0, 0.55 + (n > 2 && (i === 0 || i === n - 1) ? -0.12 : 0)); a.rotation.y = -x * 0.14;
-      if (m.gear) { const [w = '', , , , c = ''] = String(m.gear).split('|'); try { applyGear(a, `${w}||0|0|${c}`); } catch {} } // 날개 · 코스튬만 (탈것 · 검은 뺀다)
+      a.rotation.y = -(i - (n - 1) / 2) * 0.18;
+      const gear = (m.gear || '').split('|');
+      if (gear[1]) gear[2] = '1';
+      applyGear(a, gear.join('|'));
       scene.add(a);
       return a;
     });
@@ -104,13 +105,50 @@ export async function shootPhoto({ members = [], ghostTypes = [], themeId, tint 
     const photos = members.map((m) => m.look).filter((l) => l?.photoOn && l.photo);
     if (photos.length) await Promise.all(photos.map((l) => new Promise((res) => { const im = new Image(); im.onload = im.onerror = res; im.src = l.photo; setTimeout(res, 1500); })));
     await new Promise((res) => setTimeout(res, photos.length ? 160 : 30));
-    avatars.forEach((a, i) => { for (let k = 0; k < 2; k++) animateAvatar(a, 0.016, false, 1.1 + i * 0.9, false, 'v', 0.63 + i * 0.31); a.userData.setBlink?.(false); a.userData.setExpr?.('v'); });
+    const visibleBounds = (actor) => {
+      const box = new THREE.Box3(), part = new THREE.Box3();
+      actor.updateMatrixWorld(true);
+      actor.traverseVisible(o => {
+        if (!o.isMesh || o.material?.opacity === 0) return;
+        if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+        box.union(part.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld));
+      });
+      return box;
+    };
+    const lineup = avatars.map((a, i) => {
+      const time = 1.1 + i * 0.9;
+      animateAvatar(a, 0.016, false, time, false, 'v', 0.63 + i * 0.31);
+      animateGear(a, time, 0.016, false);
+      a.userData.setBlink?.(false);
+      a.userData.setExpr?.('v');
+      return visibleBounds(a);
+    });
+    const width = lineup.reduce((sum, box) => sum + box.max.x - box.min.x, 0) + (n - 1) * .16;
+    const portrait = new THREE.Box3();
+    let edge = -width / 2;
+    avatars.forEach((a, i) => {
+      const box = lineup[i];
+      a.position.set(edge - box.min.x, 0, .55 - box.max.z);
+      edge += box.max.x - box.min.x + .16;
+      portrait.union(box.translate(a.position));
+    });
+    const ghostLift = Math.max(0, portrait.max.y - 1.8);
+    const ghostZ = Math.min(-1.1, portrait.min.z - .28);
+    for (const ghost of ghosts) {
+      ghost.position.z = ghostZ;
+      ghost.position.y += ghostLift;
+      portrait.union(visibleBounds(ghost));
+    }
 
-    // 카메라: 사람 수에 맞춰 물러난다
-    const cam = new THREE.PerspectiveCamera(27, PW / PH, 0.1, 60);
-    const halfW = ((n - 1) / 2) * 0.82 + 0.62, halfH = 1.5;
-    const d = Math.max(halfH, halfW / (PW / PH), ghosts.length > 1 ? 1.6 / (PW / PH) : 0) / Math.tan((27 * Math.PI) / 360);
-    cam.position.set(0, 1.4, 0.55 + d); cam.lookAt(0, 1.3, 0);
+    const cam = new THREE.PerspectiveCamera(35, PW / PH, 0.1, 90);
+    const center = portrait.getCenter(new THREE.Vector3());
+    const size = portrait.getSize(new THREE.Vector3());
+    const d = Math.max(size.y, size.x / cam.aspect) * .56 / Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
+    cam.position.set(center.x, center.y, portrait.max.z + d);
+    cam.lookAt(center);
+    wall.position.z = Math.min(wall.position.z, portrait.min.z - .8);
+    scene.fog.near = d + 2;
+    scene.fog.far = d + 13;
     r.render(scene, cam);
     const out = document.createElement('canvas'); out.width = PW; out.height = PH;
     out.getContext('2d').drawImage(gl, 0, 0);
