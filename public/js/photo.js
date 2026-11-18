@@ -3,7 +3,7 @@
 //  ② 2D 캔버스에서 테두리(액자) · 도장표 · 글씨를 얹어 한 장의 사진으로 만든다 (테두리는 다시 고를 수 있다)
 import * as THREE from 'three';
 import { createAvatar, animateAvatar } from './avatar.js';
-import { createGhost, animateGhost } from './ghosts.js';
+import { createGhost, animateGhost, dressXmas } from './ghosts.js';
 import { applyGear } from './gear.js';
 
 export const OUT_W = 1080, OUT_H = 1350; // 완성된 사진 (4:5)
@@ -36,7 +36,7 @@ export async function loadPhotoFonts() {
  * members: [{ look, gear }] (최대 4명, 맨 앞이 나) · ghostTypes: 그 테마의 귀신 종류 · tint: 테마 색
  * 돌려주는 값: 그림이 담긴 캔버스 (PW × PH)
  */
-export async function shootPhoto({ members = [], ghostTypes = [], tint = '#ff3a2a' }) {
+export async function shootPhoto({ members = [], ghostTypes = [], themeId, tint = '#ff3a2a' }) {
   members = members.slice(0, 4); if (!members.length) members = [{ look: {} }];
   const gl = document.createElement('canvas'); gl.width = PW; gl.height = PH;
   const r = new THREE.WebGLRenderer({ canvas: gl, antialias: true, preserveDrawingBuffer: true });
@@ -70,6 +70,7 @@ export async function shootPhoto({ members = [], ghostTypes = [], tint = '#ff3a2
     if (types.length === 1 && members.length > 1) types.push(types[0]);
     const ghosts = types.map((type, i) => {
       let g; try { g = createGhost(type); } catch { g = createGhost('woman'); }
+      if (themeId === 'christmas') dressXmas(g);
       g.traverse((o) => { if (o.isLight) o.intensity *= 0.35; });
       const h = new THREE.Box3().setFromObject(g).max.y || 1.8;
       const k = (h < 1.85 ? Math.min(1.9, 2.05 / h) : 1) * 1.1; g.scale.setScalar(k); // 파티원 머리 위로 얼굴이 보이게 크게
@@ -79,6 +80,14 @@ export async function shootPhoto({ members = [], ghostTypes = [], tint = '#ff3a2
       try { animateGhost(g, 0.016, 2.3 + i * 1.7, { mode: 'hunt', lit: false, v: true, type }, 3); } catch {}
       return g;
     });
+
+    let ghostWait;
+    try {
+      await Promise.race([
+        Promise.all(ghosts.map(g => g.userData.modelReady)),
+        new Promise(resolve => { ghostWait = setTimeout(resolve, 3500); }),
+      ]);
+    } finally { clearTimeout(ghostWait); }
 
     // 파티원: 앞줄에서 ✌
     const n = members.length;
@@ -106,7 +115,13 @@ export async function shootPhoto({ members = [], ghostTypes = [], tint = '#ff3a2
     out.getContext('2d').drawImage(gl, 0, 0);
     return out;
   } finally {
-    scene.traverse((o) => { o.geometry?.dispose?.(); const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : []; for (const m of ms) { m.map?.dispose?.(); m.dispose?.(); } });
+    scene.traverse(o => {
+      if (!o.userData.sharedArtGeometry) o.geometry?.dispose?.();
+      if (o.userData.sharedArtMaterial) return;
+      const materials = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+      for (const material of materials) { material.map?.dispose?.(); material.dispose?.(); }
+    });
+    scene.clear();
     r.dispose(); try { r.forceContextLoss(); } catch {}
   }
 }

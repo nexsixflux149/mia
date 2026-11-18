@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createAvatar, animateAvatar, textSprite, OPTIONS, SKIN, ACCENT, HAIRC, EYEC, DEFAULT_LOOK, EMOTES, EMOTE_DUR } from './avatar.js';
+import { createAvatar, animateAvatar, textSprite, OPTIONS, SKIN, ACCENT, HAIRC, EYEC, DEFAULT_LOOK, EMOTES, EMOTE_DUR, jumpElevation } from './avatar.js';
 import { Cinema } from './cinema.js';
 import { xmasMirrorPanel } from './xmas-mirrors.js';
 import { createGhost, animateGhost, dressXmas } from './ghosts.js';
@@ -9,7 +9,7 @@ import { AudioFX } from './audio.js';
 import { jumpscare, pickScare } from './scare.js';
 import { Voice } from './voice.js';
 import { FX, makeBeam } from './fx.js';
-import { applyGear, animateGear, initFx, updateFx, popperFx, rocketFx, swordFx, shatterFx, fartFx, giftPuffFx, buildCashStack } from './gear.js';
+import { applyGear, animateGear, initFx, updateFx, popperFx, rocketFx, swordFx, shatterFx, fartFx, giftPuffFx, buildCashStack, releaseBalloon } from './gear.js';
 import { FRAMES, shootPhoto, composePhoto, drawStampCard, loadPhotoFonts } from './photo.js';
 import { GraphicsUpgrade } from './graphics-upgrade.js';
 import { gfx } from './visual-upgrade.js';
@@ -18,7 +18,7 @@ const $ = (s) => document.querySelector(s);
 // 글꼴(이름표 · 쪽지 같은 캔버스 글씨)이 준비될 때까지 잠깐 기다린다. 느린 회선에서 화면이 멈추지 않게 최대 1.2초만 (글꼴 파일은 /fonts, 줄여 담아 약 160KB)
 await Promise.race([document.fonts.load('16px "Gowun Dodum"').catch(() => []), new Promise((r) => setTimeout(r, 1200))]);
 // 화면(클라이언트)과 서버가 주고받는 방식의 버전 — 서버(server/index.js 의 PROTO)와 맞춘다
-const PROTO = 3;
+const PROTO = 4;
 // 웹소켓으로 바로 붙는다 (막힌 곳에서는 예전 방식으로 자동 전환) — 처음 붙을 때 오가는 양이 줄어든다
 const socket = io({ transports: ['websocket', 'polling'], tryAllTransports: true });
 // 연결이 끊겼다 다시 붙으면(모바일 앱 전환 등) 같은 플레이어로 이어서 접속
@@ -31,6 +31,8 @@ socket.on('connect', () => {
     if (!res.resumed) { S.me = res.id; S.myName = res.name; voice.myId = res.id; dropOther(res.id); S.party = null; closeModal(); S.storyQueue = []; closeStory(true); rebuildMyAvatar(); toast('연결이 오래 끊겨 로비에서 다시 시작합니다.'); }
     S.resume = { id: res.id, token: res.token }; if (!S.admin) store.set('gwimun-resume', { ...S.resume, name: res.name, at: Date.now() });
     if (res.account && !S.admin) applyAccountName(res.account);
+    setLocalSnack(res.snack || '');
+    if (S.mount && res.room === 'lobby') dismount(false);
     S.items = res.items; if (res.shop) S.shop = res.shop; if (res.hiddenOk != null) S.hiddenOk = res.hiddenOk; if (res.unlockedBy) S.unlockedBy = res.unlockedBy; renderInv(); renderParty();
     if ('champ' in res) setChamp(res.champ);
     if (res.resumed && String(res.room || '').startsWith('inst:') && S.room !== 'game') socket.emit('game:state'); // 게임 중이었다면 그 게임 화면으로
@@ -255,6 +257,7 @@ function enter() {
     S.admin = !!res.admin; $('#adminBtn').classList.toggle('hidden', !S.admin); document.body.classList.toggle('is-admin', S.admin); $('#adminPass').value = '';
     S.resume = { id: res.id, token: res.token }; if (!S.admin) store.set('gwimun-resume', { ...S.resume, name: res.name, at: Date.now() }); // 운영자 접속은 기기에 남기지 않는다
     S.me = res.id; S.myName = res.name; S.items = res.items; S.unlocked = res.unlocked || 0; S.hearts = res.hearts || 0; S.unlockedBy = res.unlockedBy || {}; S.scenarios = res.scenarios || [];
+    setLocalSnack(res.snack || '');
     S.shop = res.shop || {}; S.hiddenOk = !!res.hiddenOk;
     setChamp(res.champ || null); voice.setIce(res.ice); S.lastStateAt = performance.now();
     voice.myId = res.id; dropOther(res.id); // 혹시 내 캐릭터가 '다른 사람'으로 그려져 있었다면 지운다
@@ -372,7 +375,7 @@ function setBubble(g, text, channel = 'all') {
 
 // ─────────────────────────── 월드 전환
 // 화면이 바뀔 때(로비 · 챕터 · 영상 · 창) 눌려 있던 이동 입력을 모두 푼다 — 조이스틱이 숨겨지면 '손 뗌' 신호가 오지 않아 혼자 걷던 문제 방지
-function resetInput() { S.joy = null; S.moveTarget = null; S.pendingInteract = null; for (const k in keys) keys[k] = false; const kb = document.getElementById('joyKnob'); if (kb) kb.style.transform = ''; document.getElementById('joy')?.classList.remove('act'); }
+function resetInput() { drag = null; $('#tooltip').classList.add('hidden'); canvas.style.cursor = ''; S.joy = null; S.moveTarget = null; S.pendingInteract = null; for (const k in keys) keys[k] = false; const kb = document.getElementById('joyKnob'); if (kb) kb.style.transform = ''; document.getElementById('joy')?.classList.remove('act'); }
 function enterLobby(pos) {
   if (fx.soft && !S.softWarned) { S.softWarned = true; setTimeout(() => toast(/chrome|crios/i.test(navigator.userAgent) && !/edg\//i.test(navigator.userAgent) ? '🐢 크롬 그래픽 가속이 꺼져 있어 화면이 끊길 수 있어요. 크롬 설정 → 시스템 → 「가능한 경우 그래픽 가속 사용」을 켜고 크롬을 다시 시작해 주세요.' : '🐢 브라우저 그래픽 가속이 꺼져 있어 화면이 끊길 수 있어요. 브라우저 설정에서 그래픽(하드웨어) 가속을 켜 주세요.'), 2500); }
   resetInput(); removeCash();
@@ -499,7 +502,7 @@ const keys = {};
 const typing = () => document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
 const loginOpen = () => !$('#login').classList.contains('hidden');
 addEventListener('keydown', (e) => {
-  if (!S.me || loginOpen() || cinema.active) return;
+  if (!S.me || loginOpen() || cinema.active || !$('#timeLimitIntro').classList.contains('hidden')) return;
   if (S.storyOpen && (e.code === 'Space' || e.code === 'Enter' || e.code === 'Escape')) { e.preventDefault(); closeStory(); return; }
   if (e.code === 'Escape') { if (S.modalOpen) closeModal(); hideMenus(); if (typing()) document.activeElement.blur(); S.combining = null; renderInv(); return; }
   if (S.modalOpen) { if (S.lockCtx) lockKey(e); return; }
@@ -531,10 +534,12 @@ addEventListener('blur', () => { for (const k in keys) keys[k] = false; if (S.cr
 
 let drag = null;
 canvas.addEventListener('pointerdown', (e) => {
+  if (cinema.active) return;
   if (e.button === 1) { e.preventDefault(); sendPing(); return; }
   drag = { x: e.clientX, y: e.clientY, moved: 0, btn: e.button }; canvas.setPointerCapture(e.pointerId); hideMenus(); if (typing()) document.activeElement.blur();
 });
 canvas.addEventListener('pointermove', (e) => {
+  if (cinema.active) return;
   S.mouse.x = e.clientX; S.mouse.y = e.clientY;
   if (!drag) { hoverCheck(e); return; }
   const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
@@ -591,7 +596,7 @@ function hoverCheck(e) {
   if (label) { tt.textContent = label; tt.style.left = e.clientX + 14 + 'px'; tt.style.top = e.clientY + 14 + 'px'; tt.classList.remove('hidden'); } else tt.classList.add('hidden');
 }
 function onClick(e) {
-  if (!S.me || S.modalOpen) return;
+  if (!S.me || S.modalOpen || cinema.active) return;
   if (S.room === 'lobby') { const th = pickTheme(e.clientX, e.clientY); if (th) { openThemePop(th); return; } const ck = pickClickable(e.clientX, e.clientY); if (ck) { lobbyAct(ck); return; } }
   const id = S.room === 'game' ? pickObject(e.clientX, e.clientY) : null;
   if (id) {
@@ -610,7 +615,12 @@ clickRing.rotation.x = -Math.PI / 2; scene.add(clickRing);
 function showClickFx(p) { clickRing.position.set(p.x, 0.03, p.z); clickRing.material.opacity = 0.9; clickRing.scale.setScalar(1); }
 function distTo(ent) { return Math.hypot(ent.data.x - me.x, ent.data.z - me.z); }
 function reach(ent) { const f = ent.foot; return 1.7 + (f ? Math.max(f.hw, f.hd) : 0.3); }
-function interact(id) { if (String(id).startsWith('L:')) return lobbyAct(id.slice(2)); audio.play('click'); socket.emit('game:interact', id); }
+function interact(id) {
+  if (String(id).startsWith('snack-give:')) {
+    if (S.room === 'lobby' && S.snack && !S.eatBusy) socket.emit('snack:give', id.slice('snack-give:'.length));
+    return;
+  }
+  if (String(id).startsWith('L:')) return lobbyAct(id.slice(2)); audio.play('click'); socket.emit('game:interact', id); }
 
 // 위치 찍기 (파티원에게 표시)
 function sendPing() {
@@ -674,9 +684,10 @@ function clearCallouts() { for (const c of S.callouts) for (const m of c.rings) 
 const R = 0.32;
 // 각도를 -π~π 로 (반복문 대신 나머지 연산 — 큰 값이 들어와도 한 번에 끝난다)
 const wrapAng = (a) => { a = ((a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI; return Number.isFinite(a) ? a : 0; };
-function collide(nx, nz) {
+function collide(nx, nz, feetY = 0) {
   const cols = S.world?.colliders || [];
   for (let k = 0; k < 2; k++) for (const c of cols) {
+    if (c.landing && feetY >= c.landing.y) continue;
     if (c.objId && S.world.objects[c.objId] && !S.world.objects[c.objId].visible) continue;
     const cx = Math.max(c.x - c.hw, Math.min(nx, c.x + c.hw));
     const cz = Math.max(c.z - c.hd, Math.min(nz, c.z + c.hd));
@@ -730,12 +741,29 @@ function updateMove(dt) {
     vx = 0; vz = 0;
   }
   me.moving = !!(vx || vz) && !blocked;
+  const jumping = S.room === 'lobby' && !S.perch && S.em === 'jump';
+  const previousFeetY = jumping ? jumpElevation(S.emT) : 0;
   if (S.em) { S.emT += dt; const d = EMOTE_DUR[S.em]; if ((me.moving && S.em !== 'jump') || (d && S.emT > d)) S.em = ''; }
+  const feetY = jumping ? jumpElevation(S.emT) : 0;
+  const ox = me.x, oz = me.z;
+  const nx = me.x + (me.moving ? vx * speed * dt : 0);
+  const nz = me.z + (me.moving ? vz * speed * dt : 0);
+  const landed = jumping && feetY < previousFeetY && S.world?.colliders?.find(({ x, z, landing }) => landing
+    && previousFeetY >= landing.y && feetY <= landing.y
+    && Math.abs(nx - x) <= landing.hw && Math.abs(nz - z) <= landing.hd);
+  if (landed) {
+    S.perch = { x: landed.x, z: landed.z, ...landed.landing };
+    me.y = S.perch.y;
+    S.em = '';
+  }
+  if (me.moving || landed) {
+    if (S.perch) {
+      const q = S.perch;
+      if (Math.abs(nx - q.x) <= q.hw && Math.abs(nz - q.z) <= q.hd) { me.x = nx; me.z = nz; }
+      else { S.perch = null; me.y = 0; [me.x, me.z] = collide(nx, nz); }
+    } else [me.x, me.z] = collide(nx, nz, feetY);
+  }
   if (me.moving) {
-    const ox = me.x, oz = me.z;
-    const nx = me.x + vx * speed * dt, nz = me.z + vz * speed * dt;
-    if (S.perch) { const q = S.perch; if (Math.abs(nx - q.x) <= q.hw && Math.abs(nz - q.z) <= q.hd) { me.x = nx; me.z = nz; } else { S.perch = null; me.y = 0; [me.x, me.z] = collide(nx, nz); } }
-    else [me.x, me.z] = collide(nx, nz);
     if (S.moveTarget && Math.hypot(me.x - ox, me.z - oz) < speed * dt * 0.15) { S.stuck = (S.stuck || 0) + dt; if (S.stuck > 0.6) { S.moveTarget = null; S.stuck = 0; if (S.pendingInteract) { toast('가까이 갈 수 없다. 다른 방향에서 다가가 보자.'); S.pendingInteract = null; } } } else S.stuck = 0;
     let diff = Math.atan2(vx, vz) - me.ry; diff = wrapAng(diff);
     me.ry = wrapAng(me.ry + diff * Math.min(1, dt * 12));
@@ -747,12 +775,11 @@ function updateMove(dt) {
 let sendT = 0, lastSent = '';
 function netSend(dt) {
   sendT += dt; if (sendT < 0.1 || !S.me) return; sendT = 0; // 1초에 10번, 바뀌었을 때만
-  // 놀이기구에 탄 동안에는 위치를 보내지 않는다 (다른 사람 화면은 놀이기구 자리로 직접 계산한다 — 빙글빙글 도는 내내 보낼 필요가 없다)
   const rd = rideTag();
-  const k = rd ? `ride,${rd},${S.em},${S.eid},${S.riding},${holdCode()},${S.snack || ''},${S.eatId || 0}` : `${(me.y || 0).toFixed(2)},${me.x.toFixed(2)},${me.z.toFixed(2)},${me.ry.toFixed(2)},${me.moving},${S.run},${S.crouch},${!!S.sneak},${S.em},${S.eid},${rd},${S.riding},${holdCode()},${S.snack || ''},${S.eatId || 0}`;
+  const k = `${(me.y || 0).toFixed(2)},${me.x.toFixed(2)},${me.z.toFixed(2)},${me.ry.toFixed(2)},${me.moving},${S.run},${S.crouch},${!!S.sneak},${S.em},${S.eid},${rd},${S.riding},${holdCode()}`;
   if (k === lastSent) return; lastSent = k;
   const n2 = (v) => Math.round(v * 100) / 100;
-  socket.emit('move', { x: n2(me.x), z: n2(me.z), y: n2(me.y || 0), ry: n2(me.ry), anim: me.moving, run: S.run && me.moving, crouch: S.crouch || S.sneak, sneak: !!S.sneak, em: S.em, eid: S.eid, ride: rideTag(), mount: !!S.riding, sword: holdCode(), snack: S.snack || '', eat: S.eatId || 0 });
+  socket.emit('move', { x: n2(me.x), z: n2(me.z), y: n2(me.y || 0), ry: n2(me.ry), anim: me.moving, run: S.run && me.moving, crouch: S.crouch || S.sneak, sneak: !!S.sneak, em: S.em, eid: S.eid, mount: !!S.riding, sword: holdCode() });
 }
 function rideTag() { return S.mount?.kind === 'ride' && S.room === 'lobby' ? `${S.mount.ride}:${S.mount.seat}` : ''; }
 function updateStatus() {
@@ -1153,7 +1180,6 @@ function loop() {
   if (inLobby !== S._lobbyCls) { S._lobbyCls = inLobby; document.body.classList.toggle('in-lobby', inLobby); }
   updateGameTimer();
   fx.adapt(performance.now()); // 끊기면 해상도를 조금씩 낮춘다
-  if (S.snack?.[0] === 'b' && performance.now() - (S.balloonAt || 0) > 30000) { S.snack = ''; audio.play('balloon_fly'); updateGearButtons(); toast('🎈 풍선이 하늘로 날아갔어요~'); } // 30초가 지나면 손에서 놓친다
   { const gp = S.room === 'lobby' && S.mount?.ride === 'gyro' ? S.world?.rides?.gyro?.phase?.() || '' : ''; if (gp === 'drop' && S.gyroPh !== 'drop') audio.play('drop'); S.gyroPh = gp; } // 자이로 드롭이 떨어지는 순간
   fx.render(t, { danger: S.danger, mode: inLobby ? 'lobby' : 'game' });
   renderer.autoClear = false; renderer.clearDepth(); renderer.render(overlay, camera); renderer.autoClear = true;
@@ -1258,20 +1284,42 @@ function randomHorror(dt) {
 }
 
 // ─────────────────────────── 서버 이벤트: 게임
-socket.on('enter:lobby', (pos) => { closeModal(); $('#ending').classList.add('hidden'); enterLobby(pos); });
+let gameStartSequence = 0;
+socket.on('enter:lobby', (pos) => {
+  ++gameStartSequence;
+  $('#timeLimitIntro').classList.add('hidden');
+  if (cinema.active) cinema.skip();
+  closeModal(); $('#ending').classList.add('hidden'); enterLobby(pos);
+});
 socket.on('inv', (inv) => { const before = S.inv.length; S.inv = inv; if (!inv.includes('flashlight')) S.light = false; renderInv(); if (inv.length > before) audio.play('pickup'); });
 // 욕설 채팅 경고 · 채팅 금지
 socket.on('chat:blocked', (b) => { addChat({ channel: 'system', text: b.text }); toast(b.text); if (b.muted) { S.chatMutedUntil = Date.now() + b.left * 1000; } });
+function showTimeLimit(ms, ranked) {
+  const screen = document.getElementById('timeLimitIntro');
+  screen.querySelector('strong').textContent = `${Math.round(ms / 60000)}분`;
+  screen.querySelector('.limit-message').textContent = ranked
+    ? '제한 시간 내에 클리어하면 랭킹에 반영됩니다'
+    : '이어하기는 랭킹에 반영되지 않습니다';
+  screen.classList.remove('hidden');
+  return new Promise(resolve => setTimeout(() => {
+    screen.classList.add('hidden');
+    resolve();
+  }, 1000));
+}
 socket.on('game:start', async (st) => {
+  const sequence = ++gameStartSequence;
   setThemeComms(true);
   audio.classicEffects = true;
   if (cinema.active) cinema.skip(); // 미리보기 영상을 보던 중이면 끝내고 게임으로
   closePhotoPop();
+  closeThemePop();
   closeModal(); S.fear = st.fear ?? 2;
   S.scenario = st.scenario || null; updateFearBadge();
   if (st.chapterIdx === 0 && (st.elapsed ?? 0) < 8000 && S.scenario?.id) resetJournalFor(S.scenario.id); // 처음부터 새로 시작
+  if (st.showTimeLimit && st.limitMs) { resetInput(); await showTimeLimit(st.limitMs, st.timed); }
+  if (sequence !== gameStartSequence) return;
   if (st.chapterIdx === 0 && !S.skipPrologue) { resetInput(); await cinema.play(st.scenario?.cine?.intro || 'prologue', { looks: partyLooks(), audio, fear: S.fear }); }
-  enterChapter(st, true);
+  if (sequence === gameStartSequence) enterChapter(st, true);
 });
 // 챕터 이동: 같은 소식이 겹쳐 와도 마지막 것 하나만 반영한다 (이야기 창이 두 번 뜨지 않게)
 let chapSeq = 0;
@@ -1399,7 +1447,7 @@ function prepareClearPhoto(clear) {
   if (!clear.photoTask) {
     clear.photoTask = Promise.all([
       loadPhotoFonts(),
-      shootPhoto({ members: clear.members, ghostTypes: clear.ghostTypes, tint: clear.tint }),
+      shootPhoto({ members: clear.members, ghostTypes: clear.ghostTypes, themeId: clear.id, tint: clear.tint }),
     ]).then(([, photo]) => (clear.photo = photo)).finally(() => { clear.photoTask = null; });
   }
   return clear.photoTask;
@@ -2170,7 +2218,24 @@ function openAdmin() {
   const rk = el('button', 'btn small', '🏆 랭킹 관리 (기록 지우기)'); rk.onclick = () => openRank({ main: 'theme' });
   const fbB = el('button', 'btn small', '📮 고객소리함 보기'); fbB.onclick = () => openFeedbackAdmin();
   const tools = el('div', 'row admin-tools'); tools.append(rk, fbB);
-  w.append(ta, send, statBox, tools, head, list, re); load();
+  const popup = el('div', 'admin-list');
+  const enabled = el('input'); enabled.type = 'checkbox';
+  const toggle = el('label', 'row'); toggle.append(enabled, document.createTextNode(' 광장 입장 시 팝업 표시'));
+  const message = el('textarea'); message.maxLength = 200; message.placeholder = '광장 입장 팝업 문구';
+  const savePopup = el('button', 'btn small', '입장 팝업 설정 저장');
+  savePopup.disabled = true;
+  socket.emit('admin:lobbyPopup:get', config => {
+    enabled.checked = config.enabled; message.value = config.text; savePopup.disabled = false;
+  });
+  savePopup.onclick = () => {
+    savePopup.disabled = true;
+    socket.timeout(5000).emit('admin:lobbyPopup:set', { enabled: enabled.checked, text: message.value }, (error, result) => {
+      savePopup.disabled = false;
+      toast(result?.error || (error ? '공지 설정 응답을 받지 못했어요.' : '입장 팝업 설정을 저장했어요.'));
+    });
+  };
+  popup.append(toggle, message, savePopup);
+  w.append(ta, send, popup, statBox, tools, head, list, re); load();
   openModal('🛡️ 운영자', '공지 · 방문 통계 · 랭킹 관리 · 고객소리함 · 채팅 금지 · 내보내기 · 머니 무한', w);
 }
 // ─────────────────────────── 고객소리함 (버그 · 건의사항)
@@ -2461,8 +2526,9 @@ function mountPos() {
   if (m.kind === 'ride') return S.world?.rides?.[m.ride]?.pos(m.seat) || null;
   return m.seat;
 }
-function dismount() {
+function dismount(releaseSeat = true) {
   const m = S.mount; if (!m) return;
+  if (releaseSeat && socket.connected) socket.emit('lobby:seat', '');
   S.mount = null; S.em = ''; me.y = 0; me.ry = wrapAng(me.ry); S.moveTarget = null;
   if (m.kind === 'ride') {
     const it = S.world?.interactives?.find((i) => i.id === m.ride);
@@ -2473,44 +2539,66 @@ function dismount() {
   [me.x, me.z] = collide(me.x, me.z);
   if (S.wasRiding && S.profile?.equip?.mount) { S.riding = true; updateGearButtons(); } S.wasRiding = false;
 }
-function lobbyAct(id) {
+let requestingSeat = false;
+async function claimLobbySeat(id, candidates) {
+  if (requestingSeat || !candidates.length || !socket.connected) return null;
+  const world = S.world;
+  requestingSeat = true;
+  try {
+    const chosen = await socket.timeout(3000).emitWithAck('lobby:seat', candidates.map(index => id + ':' + index));
+    if (S.room !== 'lobby' || S.world !== world) {
+      if (chosen && socket.connected) socket.emit('lobby:seat', '');
+      return null;
+    }
+    return typeof chosen === 'string' ? Number(chosen.split(':')[1]) : null;
+  } catch {
+    if (socket.connected) socket.emit('lobby:seat', '');
+    return null;
+  } finally {
+    requestingSeat = false;
+  }
+}
+async function lobbyAct(id) {
+  if (requestingSeat) return;
   if (S.mount) { dismount(); toast('내렸어요.'); return; }
   if (id === 'shop') { setTimeout(openShop, 160); return; }
   if (id === 'mailbox') { setTimeout(openFeedback, 160); return; }
   if (id === 'wishstar') { setTimeout(openWish, 160); return; }
   if (id === 'xmasgift') { if (!xmasGiftLeft()) return; if (S.xmasBusy) return; S.xmasBusy = true; audio.play('click'); socket.emit('xmas:claim'); setTimeout(() => { S.xmasBusy = false; }, 3000); return; }
-  if (S.riding) { S.riding = false; S.wasRiding = true; } // 벤치·놀이기구에서 내리면 다시 탈것에 탄다
   if (S.perch && id === 'off') { S.perch = null; me.y = 0; [me.x, me.z] = collide(me.x + Math.sin(me.ry) * 1.2, me.z + Math.cos(me.ry) * 1.2); return; }
   const it = S.world?.interactives?.find((i) => i.id === id); if (!it) return;
   audio.play('click');
   if (it.kind === 'ride') {
-    const r = S.world.rides[it.id]; let seat = -1;
-    const busy = new Set();
-    for (const g of S.others.values()) { const rd = g.userData.target?.ride; if (rd && rd.startsWith(it.id + ':')) busy.add(Number(rd.split(':')[1])); }
-    if (r.pick) seat = r.pick(busy);
-    else { let best = 1e9; for (let i = 0; i < r.seats; i++) { if (busy.has(i)) continue; const p = r.pos(i); const d = Math.hypot(p.x - me.x, p.z - me.z); if (d < best) { best = d; seat = i; } } }
-    if (seat < 0) { toast(`${it.label} 자리가 꽉 찼어요. 잠시 후 다시 타 보세요!`); return; }
+    const r = S.world.rides[it.id], candidates = [];
+    if (r.pick) {
+      const considered = new Set();
+      for (let i = 0; i < r.seats; i++) {
+        const index = r.pick(considered);
+        if (index < 0) break;
+        candidates.push(index); considered.add(index);
+      }
+    } else {
+      const distance = (index) => { const p = r.pos(index); return Math.hypot(p.x - me.x, p.z - me.z); };
+      candidates.push(...Array.from({ length: r.seats }, (_, index) => index).sort((a, b) => distance(a) - distance(b)));
+    }
+    const seat = await claimLobbySeat(it.id, candidates);
+    if (seat == null) { if (S.room === 'lobby') toast(`${it.label} 빈자리를 확보하지 못했어요.`); return; }
+    if (S.riding) { S.riding = false; S.wasRiding = true; }
     S.mount = { kind: 'ride', ride: it.id, seat }; S.perch = null; S.crouch = false;
     if (r.sit) { S.em = 'sit'; S.emT = 0; S.eid++; }
     toast(it.id === 'coaster' ? `🎢 롤러코스터 ${Math.floor(seat / 2) + 1}번째 칸에 탔어요! (움직이거나 다시 누르면 탑승장에서 내려요)` : `${it.label}에 탔어요! (움직이거나 다시 누르면 내려요)`);
   } else if (it.kind === 'sit') {
-    // 자리가 여럿이면(피크닉 테이블 의자) 가장 가까운 빈자리에 앉는다
-    let seat = it.seat;
-    if (it.seats) {
-      const taken = (q) => [...S.others.values()].some((g) => Math.hypot(g.position.x - q.x, g.position.z - q.z) < 0.3);
-      seat = it.seats.filter((q) => !taken(q)).sort((a, b) => Math.hypot(a.x - me.x, a.z - me.z) - Math.hypot(b.x - me.x, b.z - me.z))[0];
-      if (!seat) { toast(`${it.label} 자리가 꽉 찼어요.`); return; }
-    }
-    S.mount = { kind: 'sit', seat: { ...seat } }; S.perch = null; S.em = 'sit'; S.emT = 0; S.eid++;
-  } else if (it.kind === 'snack' && it.id === 'balloon') {
-    // 🎈 삐에로 풍선: 열 가지 색 중 하나 · 30초 뒤 하늘로 날아간다 (팝콘·커피를 들고 있었다면 풍선으로 바꿔 든다)
-    { let c; do { c = Math.floor(Math.random() * 10); } while (c === S.lastBalloon); S.lastBalloon = c; S.snack = 'b' + c; } S.balloonAt = performance.now(); // 열 가지 색 중 무작위 (바로 전 색은 피한다) audio.play('balloon_get'); updateGearButtons();
-    toast('🎈 삐에로가 풍선을 줬어요! 30초 뒤엔 하늘로 날아가요~');
+    const seats = it.seats || [it.seat];
+    const distance = (index) => Math.hypot(seats[index].x - me.x, seats[index].z - me.z);
+    const candidates = seats.map((_, index) => index).sort((a, b) => distance(a) - distance(b));
+    const index = await claimLobbySeat(it.id, candidates);
+    if (index == null) { if (S.room === 'lobby') toast(`${it.label} 빈자리를 확보하지 못했어요.`); return; }
+    if (S.riding) { S.riding = false; S.wasRiding = true; }
+    S.mount = { kind: 'sit', seat: { ...seats[index] } }; S.perch = null; S.em = 'sit'; S.emT = 0; S.eid++;
   } else if (it.kind === 'snack') {
-    const kind = { coffee: 'c', hotdog: 'h', cottoncandy: 's' }[it.id] || 'p', sk = SNACK_INFO[kind];
-    if (S.snack && S.snack[0] === kind && S.snack[1] === '3') { toast(`${sk.icon} 이미 가득 찬 ${sk.name}${sk.ga} 들고 있어요!`); return; }
-    S.snack = kind + '3'; audio.play(kind === 'c' ? 'coffee_get' : 'popcorn_get'); updateGearButtons();
-    toast(kind === 'c' ? '☕ STARMIA 커피를 받았어요! N 키(또는 ☕ 버튼)로 3번 마실 수 있어요.' : `${sk.icon} ${sk.got} N 키(또는 ${sk.icon} 버튼)로 3번 먹을 수 있어요.`);
+    const kind = { coffee: 'c', hotdog: 'h', cottoncandy: 's', balloon: 'b' }[it.id] || 'p';
+    if (S.snack === kind + '3' && kind !== 'b') { toast(`${SNACK_INFO[kind].name}을 이미 들고 있어요.`); return; }
+    socket.emit('snack:take', kind);
   } else if (it.kind === 'climb') {
     S.perch = it.perch; me.x = it.perch.x; me.z = it.perch.z; me.y = it.perch.y; S.mount = null;
     toast(`${it.label} 위에 올라갔어요! (가장자리로 걸어가면 내려와요)`);
@@ -2538,13 +2626,32 @@ socket.on('xmas:done', ({ already } = {}) => {
 function lobbyNearest() {
   S.nearest = null; S.nearestVerb = null;
   const p = $('#prompt');
-  if (S.mount) { S.nearest = 'L:off'; S.nearestVerb = '내리기'; }
+  let nearbyPlayer = null, nearestDistance = 2.4;
+  if (S.snack && !S.eatBusy) {
+    for (const player of S.others.values()) {
+      if (!player.visible || Math.abs(player.position.y - (me.y || 0)) > 1.5) continue;
+      const distance = Math.hypot(player.position.x - me.x, player.position.z - me.z);
+      if (distance < nearestDistance) { nearbyPlayer = player; nearestDistance = distance; }
+    }
+  }
+  if (nearbyPlayer) {
+    S.nearest = 'snack-give:' + nearbyPlayer.userData.id;
+    S.nearestVerb = '양보하기';
+    S.nearestLabel = nearbyPlayer.userData.name;
+  } else if (S.mount) { S.nearest = 'L:off'; S.nearestVerb = '내리기'; }
   else if (S.perch) { S.nearest = 'L:off'; S.nearestVerb = '내려가기'; }
   else {
     let best = 1e9;
     for (const it of S.world?.interactives || []) { if (it.id === 'xmasgift' && !xmasGiftLeft()) continue; const d = Math.hypot(it.x - me.x, it.z - me.z) - (it.id === 'xmasgift' ? 3 : 0); if (d < it.r && d < best) { best = d; S.nearest = 'L:' + it.id; S.nearestVerb = it.verb; S.nearestLabel = it.label; } }
   }
-  if (S.nearest && !S.modalOpen) { p.innerHTML = `<kbd>E</kbd>${S.nearest === 'L:off' ? '' : (S.nearestLabel || '') + ' '}${S.nearestVerb}`; p.classList.remove('hidden'); }
+  if (S.nearest && !S.modalOpen) {
+    if (nearbyPlayer) {
+      const label = `${S.nearestLabel} 님에게 양보하기`;
+      if (p.textContent !== 'E' + label) p.replaceChildren(el('kbd', '', 'E'), document.createTextNode(label));
+    }
+    else p.innerHTML = `<kbd>E</kbd>${S.nearest === 'L:off' ? '' : (S.nearestLabel || '') + ' '}${S.nearestVerb}`;
+    p.classList.remove('hidden');
+  }
   else p.classList.add('hidden');
 }
 
@@ -2857,18 +2964,36 @@ function flashRed() { const v = $('#vignette'); v.classList.add('danger'); setTi
 
 // ─────────────────────────── 감정표현
 // ───── 간식 먹기 · 마시기: 손을 입으로 가져가며 소리 → 한 번 먹을 때마다 줄고, 3번 먹으면 사라진다 (앉아서도 먹을 수 있다)
-function eatSnack() {
-  if (!S.snack || S.snack[0] === 'b' || !myAvatar || S.eatBusy) return;
-  S.eatBusy = true; S.eatId = (S.eatId || 0) + 1; myAvatar.userData.eatT = 0.9;
-  const kind = S.snack[0];
-  setTimeout(() => audio.play(kind === 'c' ? 'slurp' : kind === 's' ? 'pop' : 'crunch'), 320);
+function setLocalSnack(code, reason) {
+  const previous = S.snack || '';
+  S.snack = code;
+  S.eatBusy = false;
+  if (myAvatar) myAvatar.userData.eatT = 0;
+  updateGearButtons();
+  if (reason === 'expired') { audio.play('balloon_fly'); toast('🎈 풍선이 하늘로 날아갔어요~'); }
+  else if (reason === 'eaten' && !code) toast(SNACK_INFO[previous[0]]?.done || '냠냠!');
+  else if (reason === 'taken') {
+    audio.play(code[0] === 'b' ? 'balloon_get' : code[0] === 'c' ? 'coffee_get' : 'popcorn_get');
+    toast(code[0] === 'b' ? '🎈 풍선을 받았어요!' : SNACK_INFO[code[0]].got);
+  }
+}
+socket.on('snack:held', ({ code, reason }) => setLocalSnack(code, reason));
+socket.on('snack:balloonReleased', id => {
+  if (S.room !== 'lobby') return;
+  const avatar = id === S.me ? myAvatar : S.others.get(id);
+  releaseBalloon(avatar?.userData.gSnack);
+});
+socket.on('snack:eating', ({ kind }) => {
+  if (!myAvatar || !S.snack || S.room !== 'lobby') return;
+  S.eatBusy = true;
+  myAvatar.userData.eatT = .9;
+  const eatId = S.eatId = (S.eatId || 0) + 1;
   setTimeout(() => {
-    S.eatBusy = false; if (!S.snack) return;
-    const left = Number(S.snack[1]) - 1;
-    S.snack = left > 0 ? kind + left : '';
-    if (!left) toast(SNACK_INFO[kind]?.done || '냠냠!');
-    updateGearButtons();
-  }, 900);
+    if (S.eatBusy && S.eatId === eatId) audio.play(kind === 'c' ? 'slurp' : kind === 's' ? 'pop' : 'crunch');
+  }, 320);
+});
+function eatSnack() {
+  if (S.room === 'lobby' && S.snack && S.snack[0] !== 'b' && !S.eatBusy) socket.emit('snack:eat');
 }
 function doEmote(id) {
   if (!myAvatar) return;
@@ -3440,8 +3565,8 @@ applyMobile(); addEventListener('resize', applyMobile);
 
   // 두 손가락으로 확대/축소
   const tp = new Map(); let pinch = null;
-  canvas.addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') tp.set(e.pointerId, e); if (tp.size === 2) { const [a, b] = [...tp.values()]; pinch = { d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), dist: cam.dist }; } });
-  canvas.addEventListener('pointermove', (e) => { if (!tp.has(e.pointerId)) return; tp.set(e.pointerId, e); if (pinch && tp.size === 2) { const [a, b] = [...tp.values()]; const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); cam.dist = Math.max(2.5, Math.min(CAM_MAX, pinch.dist * pinch.d / Math.max(20, d))); } });
+  canvas.addEventListener('pointerdown', (e) => { if (cinema.active) return; if (e.pointerType === 'touch') tp.set(e.pointerId, e); if (tp.size === 2) { const [a, b] = [...tp.values()]; pinch = { d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), dist: cam.dist }; } });
+  canvas.addEventListener('pointermove', (e) => { if (cinema.active || !tp.has(e.pointerId)) return; tp.set(e.pointerId, e); if (pinch && tp.size === 2) { const [a, b] = [...tp.values()]; const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); cam.dist = Math.max(2.5, Math.min(CAM_MAX, pinch.dist * pinch.d / Math.max(20, d))); } });
   const tend = (e) => { tp.delete(e.pointerId); if (tp.size < 2) pinch = null; };
   canvas.addEventListener('pointerup', tend); canvas.addEventListener('pointercancel', tend);
 

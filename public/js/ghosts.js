@@ -489,7 +489,7 @@ export function createGhost(type = 'woman') {
   u.fog = [];
   for (let i = 0; i < 6; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: fogTex, transparent: true, depthWrite: false, opacity: 0.6 })); s.scale.setScalar(1.2 + Math.random()); s.position.set((Math.random() - 0.5) * 0.8, 0.3 + Math.random() * 1.2, (Math.random() - 0.5) * 0.8); g.add(s); u.fog.push(s); }
   g.userData = u;
-  dressGhostHead(g);
+  u.modelReady = dressGhostHead(g);
   return g;
 }
 
@@ -527,7 +527,7 @@ export function dressXmas(g) {
   }
   // 은은한 붉은 빛 (어둠 속에서 다가오는 게 보이게)
   const glow = new THREE.PointLight('#ff3020', 0.8, 3.2); glow.position.set(0, 1.9, 0.4); body.add(glow);
-  loadXmasGhostModel(g);
+  u.modelReady = loadXmasGhostModel(g);
   return g;
 }
 

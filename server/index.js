@@ -84,12 +84,12 @@ const server = http.createServer(app);
 const io = new Server(server, { maxHttpBufferSize: 2e5 });
 const SNAP_MAX = 27, PHOTO_TICKET_AGE = 7 * 24 * 60 * 60 * 1000;
 // 화면(클라이언트)과 서버가 주고받는 방식의 버전. 예전 화면이 새 서버에 붙으면 새로고침시킨다.
-const PROTO = 3;
+const PROTO = 4;
 
 // ───── 저장 (파티장 닉네임별 도달 챕터)
 const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, 'data');
 // DATABASE_URL 이 있으면 무료 DB에, 없으면 data 폴더 파일에 저장 (server/store.js)
-const { saves, hearts, ranks, profiles, stats, accounts: accountData, feedback, clearPhotoTickets } = await openStore(DATA_DIR, ['saves', 'hearts', 'ranks', 'profiles', 'stats', 'accounts', 'feedback', 'clearPhotoTickets']).catch((e) => {
+const { saves, hearts, ranks, profiles, stats, accounts: accountData, feedback, clearPhotoTickets, lobbyPopup } = await openStore(DATA_DIR, ['saves', 'hearts', 'ranks', 'profiles', 'stats', 'accounts', 'feedback', 'clearPhotoTickets', 'lobbyPopup']).catch((e) => {
   console.error('\n  [DB] 데이터베이스에 연결하지 못했어요. DATABASE_URL 주소를 확인해 주세요.\n  ', e.message, '\n'); process.exit(1);
 });
 const snaps = await loadClearPhotos(DATA_DIR, SNAP_MAX);
@@ -111,10 +111,14 @@ const fmtTime = (ms) => { const d = Math.round(ms / 100); const m = Math.floor(d
 const partyLabel = (names) => (names.length > 1 ? `${names[0]} 외 ${names.length - 1}명` : names[0] || '누군가');
 const lobbyNotice = (text) => io.to('lobby').emit('lobby:notice', { text });
 const RENAME_LAUNCH_NOTICE = "상점에 '닉네임 변경권' 판매가 시작되었습니다.";
-function sendRenameLaunchNotice(player) {
-  if (player.sawRenameLaunchNotice) return;
-  player.sawRenameLaunchNotice = true;
-  io.to(player.id).emit('lobby:notice', { text: RENAME_LAUNCH_NOTICE });
+function lobbyPopupSettings() {
+  return { enabled: lobbyPopup.enabled ?? true, text: lobbyPopup.text ?? RENAME_LAUNCH_NOTICE };
+}
+function sendLobbyPopup(player) {
+  const { enabled, text } = lobbyPopupSettings();
+  if (!enabled || !text || player.seenLobbyPopup === (lobbyPopup.revision || 0)) return;
+  player.seenLobbyPopup = lobbyPopup.revision || 0;
+  io.to(player.id).emit('lobby:notice', { text });
 }
 const save = () => persist(DATA_DIR, 'saves', saves, true);
 // ───── 레벨 · 코인 · 상점
@@ -131,12 +135,15 @@ const profChecked = new Set(); // 서버가 켜진 뒤 처음 볼 때 한 번씩
 const prof = (name) => {
   const pf = (profiles[name] ||= blankProfile()); pf.items ||= {}; pf.equip ||= { wings: '', mount: '' }; pf.equip.costume ??= ''; pf.equip.gold ??= ''; pf.equip.mask ??= '';
   // 탈것 · 코스튬 · 날개 · 검 · 비매품은 아이템별 1개만 (폭죽은 max 개까지): 혹시 예전 기록에 더 들어 있으면 줄여 둔다
-  if (!profChecked.has(name)) { profChecked.add(name); for (const [id, n] of Object.entries(pf.items)) { const it = SHOP[id]; if (it && n > it.max) pf.items[id] = it.max; } if (pf.equip.gold && pf.equip.costume) pf.equip.costume = ''; } // (고양이 세트와 로봇 코스튬은 함께 입지 않는다)
+  if (!profChecked.has(name)) { profChecked.add(name); for (const [id, n] of Object.entries(pf.items)) { const it = SHOP[id]; if (it && n > it.max) pf.items[id] = it.max; } if (goldConflictsWithCostume(pf.equip)) pf.equip.costume = ''; } // (고양이 세트와 로봇 코스튬은 함께 입지 않는다)
   return pf;
 };
 const findByName = (name) => [...players.values()].find((p) => p.name === name && !p.offline);
 const sendProfile = (p) => { if (p) io.to(p.id).emit('profile', { ...profileView(prof(p.name), p.admin), hiddenOk: hiddenOk(p.name) }); };
 // 장비 문자열: 날개|탈것|타는 중|손에 든 것(0 없음 · 1 전설의 검 · 2 황금 고양이 지팡이)|코스튬|황금 고양이 부위 글자
+function goldConflictsWithCostume({ gold, costume }) {
+  return Boolean(gold && costume && (costume !== 'costume_xmas' || gold !== 'm'));
+}
 const gearOf = (p) => { const pf = prof(p.name), e = pf.equip; return `${e.wings || ''}|${e.mount || ''}|${p.riding && e.mount ? 1 : 0}|${Number(p.sword) || 0}|${e.costume || ''}|${goldWorn(pf)}|${p.snack || ''}|${e.mask || ''}`; };
 /** 모든 테마를 한 번씩 깼거나 만렙이면 히든 테마가 열린다 */
 function hiddenOk(name) {
@@ -197,7 +204,7 @@ function partyInfo(party) {
     id: party.id, leader: party.leader,
     members: party.members.map((id) => { const p = players.get(id); return p && { id, name: p.name, mic: !!p.mic, inGame: p.room !== 'lobby' }; }).filter(Boolean),
     instId: party.instId || null,
-    unlocked: saves[players.get(party.leader)?.name] ?? 0,
+    unlocked: checkpointFor(SCENARIOS.gwimun, players.get(party.leader)?.name),
     unlockedBy: unlockedFor(players.get(party.leader)?.name),
     scenarios: scenarioList(),
     hiddenOk: hiddenOk(players.get(party.leader)?.name),
@@ -210,12 +217,40 @@ function syncParty(party) {
   for (const id of party.members) io.to(id).emit('party', info);
 }
 
+const lobbySeatCounts = { carousel: 6, wheel: 8, coaster: 8, gyro: 10, swing: 2, table0: 4, table1: 4 };
+function lobbySeatAvailable(player, seat) {
+  if (player.room !== 'lobby' || typeof seat !== 'string') return false;
+  const match = /^([a-z0-9]+):(0|[1-9])$/.exec(seat);
+  if (!match) return false;
+  const [, id, index] = match;
+  const count = Object.hasOwn(lobbySeatCounts, id) ? lobbySeatCounts[id] : /^(?:bench[0-5]|log[0-3][ab])$/.test(id) ? 1 : 0;
+  if (Number(index) >= count) return false;
+  return ![...players.values()].some(other => other !== player && other.room === 'lobby' && other.ride === seat);
+}
+const snackNames = { c: '커피', s: '솜사탕', h: '핫도그', p: '팝콘', b: '풍선' };
+
+function setHeldSnack(player, code = '', expiresAt = 0, reason = '') {
+  clearTimeout(player.snackTimer);
+  clearTimeout(player.snackEatTimer);
+  player.snackTimer = player.snackEatTimer = null;
+  if (player.snack?.startsWith('b') && (reason === 'expired' || (reason === 'taken' && !code.startsWith('b')))) {
+    io.to('lobby').emit('snack:balloonReleased', player.id);
+  }
+  player.snack = code;
+  player.snackExpiresAt = expiresAt;
+  if (expiresAt) {
+    player.snackTimer = setTimeout(() => setHeldSnack(player, '', 0, 'expired'), Math.max(0, expiresAt - Date.now()));
+  }
+  io.to(player.id).emit('snack:held', { code, reason });
+}
+
 function joinRoom(p, room) {
   const sock = io.sockets.sockets.get(p.sid);
   if (!sock) return;
   if (p.room) sock.leave(p.room);
   io.to(p.room).emit('player:leave', p.id);
-  p.room = room; p.y = 0; p._sr = null;
+  if (room !== 'lobby' && p.snack) setHeldSnack(p);
+  p.room = room; p.ride = ''; p.y = 0; p._sr = null;
   sock.join(room);
   needFull(room); // 새로 들어온 화면이 방 안 모두를 볼 수 있게 다음 번에는 전체를 보낸다
 }
@@ -223,6 +258,8 @@ function joinRoom(p, room) {
 function dropPlayer(p) {
   if (!players.has(p.id) || !p.offline) return;
   clearTimeout(p.dropTimer);
+  clearTimeout(p.snackTimer);
+  clearTimeout(p.snackEatTimer);
   leaveParty(p);
   io.to(p.room).emit('player:leave', p.id);
   players.delete(p.id);
@@ -237,9 +274,22 @@ function toLobby(p) {
   p.inv = [...START_ITEMS];
   p.light = false;
   io.to(p.id).emit('enter:lobby', { x: p.x, z: p.z });
-  sendRenameLaunchNotice(p);
+  sendLobbyPopup(p);
+  if (p.rankTimeout) {
+    p.rankTimeout = false;
+    io.to(p.id).emit('lobby:notice', { text: '제한 시간 내에 클리어 하지 못해 랭킹에 등록되지 않았습니다' });
+  }
   io.to(p.id).emit('inv', p.inv);
   broadcastRoster();
+}
+
+function returnFromEnding(player, party) {
+  toLobby(player);
+  if (!party.members.some(id => players.get(id)?.room === 'inst:' + party.instId)) {
+    instances.delete(party.instId);
+    party.instId = null;
+  }
+  syncParty(party);
 }
 
 function leaveParty(p) {
@@ -270,7 +320,7 @@ io.on('connection', (sock) => {
   // 입장 · 이어 접속 때 화면에 돌려주는 내 정보
   const helloInfo = (p, extra = {}) => {
     const a = p.acct ? accountData.list[p.acct] : null;
-    return { id: p.id, token: p.token, name: p.name, admin: !!p.admin, items: ITEMS, unlocked: saves[p.name] ?? 0, unlockedBy: unlockedFor(p.name), scenarios: scenarioList(), hearts: hearts[p.name] || 0, hiddenOk: hiddenOk(p.name), shop: SHOP, account: a ? { id: a.id, key: a.key, name: a.name } : null, champ: champView(), ice: ICE_EXTRA, ...extra };
+    return { id: p.id, token: p.token, name: p.name, admin: !!p.admin, items: ITEMS, unlocked: checkpointFor(SCENARIOS.gwimun, p.name), unlockedBy: unlockedFor(p.name), scenarios: scenarioList(), hearts: hearts[p.name] || 0, hiddenOk: hiddenOk(p.name), shop: SHOP, snack: p.snack || '', account: a ? { id: a.id, key: a.key, name: a.name } : null, champ: champView(), ice: ICE_EXTRA, ...extra };
   };
 
   sock.on('hello', (h, ack) => {
@@ -334,7 +384,7 @@ io.on('connection', (sock) => {
       if (i && me.room === 'inst:' + party.instId) sock.emit('game:sync', i.fullState());
       else if (me.room === 'lobby') {
         sock.emit('enter:lobby', { x: me.x, z: me.z });
-        sendRenameLaunchNotice(me);
+        sendLobbyPopup(me);
       }
       broadcastRoster();
       flushMail(me);
@@ -373,14 +423,66 @@ io.on('connection', (sock) => {
     if (left <= 0) send(); else if (!p.fullTimer) p.fullTimer = setTimeout(send, left);
   });
 
+  sock.on('lobby:seat', (seat, ack) => {
+    if (!me || me.room !== 'lobby') return typeof ack === 'function' && ack(false);
+    me.usesSeatClaims = true;
+    if (seat === '') {
+      me.ride = '';
+      if (typeof ack === 'function') ack('');
+      return;
+    }
+    const candidates = Array.isArray(seat) ? seat.slice(0, 10) : [seat];
+    const chosen = candidates.find(candidate => lobbySeatAvailable(me, candidate));
+    if (chosen) me.ride = chosen;
+    if (typeof ack === 'function') ack(chosen || null);
+  });
+
+  sock.on('snack:take', (kind) => {
+    if (!me || me.room !== 'lobby' || typeof kind !== 'string' || !Object.hasOwn(snackNames, kind)) return;
+    if (kind === 'b') {
+      let color = Math.floor(Math.random() * 10);
+      if (color === me.lastBalloon) color = (color + 1 + Math.floor(Math.random() * 9)) % 10;
+      me.lastBalloon = color;
+      setHeldSnack(me, 'b' + color, Date.now() + 30000, 'taken');
+    } else if (me.snack !== kind + '3') setHeldSnack(me, kind + '3', 0, 'taken');
+  });
+  sock.on('snack:eat', () => {
+    if (!me || me.room !== 'lobby' || !/^[pchs][123]$/.test(me.snack) || me.snackEatTimer) return;
+    const player = me;
+    const [kind, amount] = player.snack;
+    player.eat = (player.eat || 0) + 1;
+    sock.emit('snack:eating', { kind });
+    player.snackEatTimer = setTimeout(() => {
+      setHeldSnack(player, amount > 1 ? kind + (amount - 1) : '', 0, 'eaten');
+    }, 900);
+  });
+  sock.on('snack:give', (id) => {
+    if (!me || me.room !== 'lobby' || !me.snack || me.snackEatTimer) return;
+    const target = players.get(id);
+    if (!target || target === me || target.offline || target.room !== 'lobby'
+      || Math.hypot(target.x - me.x, target.z - me.z) > 2.6 || Math.abs((target.y || 0) - (me.y || 0)) > 1.6) {
+      sock.emit('toast', { text: '상대에게 더 가까이 가면 양보할 수 있어요.' });
+      return;
+    }
+    const code = me.snack, expiresAt = me.snackExpiresAt;
+    if (expiresAt && expiresAt <= Date.now()) { setHeldSnack(me, '', 0, 'expired'); return; }
+    setHeldSnack(me);
+    setHeldSnack(target, code, expiresAt);
+    sock.emit('toast', { text: `${target.name} 님에게 ${snackNames[code[0]]} 양보 완료!` });
+    io.to(target.id).emit('toast', { text: `${me.name} 님에게서 ${snackNames[code[0]]} 선물이 도착했어요!` });
+  });
+
   sock.on('move', (m) => {
     if (!me || !m) return;
     if ([m.x, m.z, m.ry].some((v) => typeof v !== 'number' || !isFinite(v))) return;
     me.x = m.x; me.z = m.z; me.ry = m.ry; me.y = typeof m.y === 'number' && isFinite(m.y) ? Math.max(0, Math.min(12, m.y)) : 0; me.anim = m.anim ? 1 : 0; me.run = !!m.run; me.crouch = !!m.crouch; me.sneak = !!m.sneak;
     me.em = typeof m.em === 'string' ? m.em.slice(0, 10) : ''; me.eid = Number(m.eid) | 0;
-    me.ride = typeof m.ride === 'string' && /^[a-z0-9]{1,12}:\d{1,2}$/.test(m.ride) ? m.ride : '';
+    if (m.ride !== undefined && !me.usesSeatClaims) {
+      const seat = m.ride;
+      if (!seat) me.ride = '';
+      else if (lobbySeatAvailable(me, seat)) me.ride = seat;
+    }
     me.riding = !!m.mount && !!prof(me.name).equip.mount;
-    me.snack = typeof m.snack === 'string' && /^([pchs][123]|b[0-9])$/.test(m.snack) ? m.snack : ''; me.eat = Number(m.eat) | 0; // 손에 든 간식(팝콘·커피 · 남은 횟수)과 먹은 횟수
     { const its = prof(me.name).items; me.sword = m.sword === 3 ? (its.chainsaw ? 3 : 0) : m.sword === 2 ? (its[GOLD_STAFF] ? 2 : 0) : m.sword ? (its.sword ? 1 : 0) : 0; } // 손에 든 것: 1 전설의 검 · 2 황금 고양이 지팡이 · 3 전기톱
   });
 
@@ -550,7 +652,7 @@ io.on('connection', (sock) => {
 
     const saveKeys = Object.values(SCENARIOS).flatMap(scenario => {
       const from = scenario.saveKey(previous), to = scenario.saveKey(name);
-      return [[from, to], [from + ':clear', to + ':clear']];
+      return [[from, to], [from + ':clear', to + ':clear'], [from + ':checkpoint', to + ':checkpoint']];
     });
     if (accounts.byName.has(name) || Object.hasOwn(profiles, name) || Object.hasOwn(hearts, name) ||
         saveKeys.some(([, to]) => Object.hasOwn(saves, to))) {
@@ -616,7 +718,7 @@ io.on('connection', (sock) => {
   sock.on('shop:equip', ({ id, on } = {}) => {
     if (!me) return;
     // 고양이 세트를 입으면 입고 있던 로봇 코스튬은 저절로 벗겨진다
-    const dropCostume = (pf) => { const c = SHOP[pf.equip.costume]; if (!c) return; pf.equip.costume = ''; sock.emit('toast', { text: `${c.icon} ${c.name}을(를) 벗었어요. (황금 고양이 세트와는 함께 입을 수 없어요)` }); };
+    const dropCostume = (pf) => { const c = SHOP[pf.equip.costume]; if (!c || !goldConflictsWithCostume(pf.equip)) return; pf.equip.costume = ''; sock.emit('toast', { text: `${c.icon} ${c.name}을(를) 벗었어요. (황금 고양이 세트와는 함께 입을 수 없어요)` }); };
     if (id === 'gold_set') { // 가진 황금 고양이 부위를 한꺼번에 입거나 벗는다
       const pf = prof(me.name);
       pf.equip.gold = on ? GOLD_IDS.filter((g) => pf.items[g]).map((g) => SHOP[g].part).join('') : '';
@@ -634,17 +736,17 @@ io.on('connection', (sock) => {
       saveProfiles(); sendProfile(me); return;
     }
     if (it.kind === 'mask' && on && (pf.equip.gold || '').includes('m')) pf.equip.gold = pf.equip.gold.replace('m', ''); // 상점 가면을 쓰면 황금 고양이 가면은 벗는다
-    if (it.kind === 'costume' && on && pf.equip.gold) { pf.equip.gold = ''; sock.emit('toast', { text: `🏆 황금 고양이 세트를 벗었어요. (${it.icon} ${it.name}와(과)는 함께 입을 수 없어요)` }); } // 반대로 로봇 코스튬을 입으면 고양이 세트를 벗는다
+    if (it.kind === 'costume' && on && goldConflictsWithCostume({ ...pf.equip, costume: id })) { pf.equip.gold = ''; sock.emit('toast', { text: `🏆 황금 고양이 세트를 벗었어요. (${it.icon} ${it.name}와(과)는 함께 입을 수 없어요)` }); } // 반대로 로봇 코스튬을 입으면 고양이 세트를 벗는다
     pf.equip[it.kind] = on ? id : (pf.equip[it.kind] === id ? '' : pf.equip[it.kind]);
     if (it.kind === 'mount' && !on) me.riding = false;
     saveProfiles(); sendProfile(me);
   });
-  // 🎄 크리스마스 선물상자: 한 사람에 한 번 · 받자마자 트리 코스튬을 입는다 (황금 고양이 세트는 벗는다)
+  // 🎄 크리스마스 선물상자: 한 사람에 한 번 · 받자마자 트리 코스튬을 입는다 (황금 고양이 가면은 유지)
   sock.on('xmas:claim', () => {
     if (!me) return;
     const pf = prof(me.name);
     if (pf.items.costume_xmas) return sock.emit('xmas:done', { already: true });
-    pf.items.costume_xmas = 1; pf.equip.costume = 'costume_xmas'; pf.equip.gold = '';
+    pf.items.costume_xmas = 1; pf.equip.costume = 'costume_xmas'; pf.equip.gold = pf.equip.gold.includes('m') ? 'm' : '';
     saveProfiles(); sendProfile(me);
     sock.emit('xmas:done', { already: false });
   });
@@ -721,6 +823,24 @@ io.on('connection', (sock) => {
   });
   // ───── 운영자 기능 (운영자로 입장한 사람만)
   const adminOnly = (fn) => (...a) => { if (me?.admin) fn(...a); };
+  sock.on('admin:lobbyPopup:get', adminOnly((ack) => {
+    if (typeof ack === 'function') ack(lobbyPopupSettings());
+  }));
+  sock.on('admin:lobbyPopup:set', adminOnly(async (value, ack) => {
+    if (typeof ack !== 'function') return;
+    const text = typeof value?.text === 'string' ? value.text.trim() : '';
+    if (typeof value?.enabled !== 'boolean' || text.length > 200 || (value.enabled && !text)) {
+      ack({ error: '표시할 공지 문구를 1~200자로 입력해 주세요.' });
+      return;
+    }
+    Object.assign(lobbyPopup, { enabled: value.enabled, text, revision: (lobbyPopup.revision || 0) + 1 });
+    try {
+      await persistBatch(DATA_DIR, { lobbyPopup });
+      ack(lobbyPopupSettings());
+    } catch {
+      ack({ error: '공지 설정을 저장하지 못했어요.' });
+    }
+  }));
   sock.on('admin:notice', adminOnly((text) => {
     text = String(text || '').trim().slice(0, 200); if (!text) return;
     io.emit('notice', { text });
@@ -787,14 +907,14 @@ io.on('connection', (sock) => {
   // 랭킹 조회: 테마별 상위 10개
   sock.on('rank:get', (ack) => {
     const out = {};
-    for (const s of Object.values(SCENARIOS)) out[s.id] = (ranks[s.id] || []).slice(0, 10).map((r) => ({ names: r.names, ms: r.ms, fear: r.fear, ending: r.ending, at: r.at, hints: r.hints ?? null }));
+    for (const s of Object.values(SCENARIOS)) out[s.id] = (ranks[s.id] || []).filter(record => record.ms <= timeLimitMs(s.difficulty || 3)).slice(0, 10).map((r) => ({ names: r.names, ms: r.ms, fear: r.fear, ending: r.ending, at: r.at, hints: r.hints ?? null }));
     if (typeof ack === 'function') ack(out);
   });
   // 랭킹 한꺼번에: 주간 · 월간 · 총 레벨 랭킹 + 테마별 클리어 시간
   sock.on('rank:all', (ack) => {
     if (typeof ack !== 'function') return;
     const themes = {};
-    for (const s of Object.values(SCENARIOS)) themes[s.id] = (ranks[s.id] || []).slice(0, 10).map((r) => ({ names: r.names, ms: r.ms, fear: r.fear, ending: r.ending, at: r.at, hints: r.hints ?? null }));
+    for (const s of Object.values(SCENARIOS)) themes[s.id] = (ranks[s.id] || []).filter(record => record.ms <= timeLimitMs(s.difficulty || 3)).slice(0, 10).map((r) => ({ names: r.names, ms: r.ms, fear: r.fear, ending: r.ending, at: r.at, hints: r.hints ?? null }));
     const boards = levelBoards();
     const level = {};
     for (const k of ['week', 'month', 'total']) level[k] = { rows: boards[k].rows, total: boards[k].total, me: me && !me.admin ? boards[k].rankOf(me.name) : null };
@@ -873,7 +993,7 @@ io.on('connection', (sock) => {
     }
     if (party.leader !== me.id) return sock.emit('toast', { text: '파티장만 시작할 수 있습니다.' });
     if (party.instId) return;
-    const unlocked = saves[sc.saveKey(me.name)] ?? 0;
+    const unlocked = checkpointFor(sc, me.name);
     chapter = Math.max(0, Math.min(Number(chapter) || 0, unlocked, sc.chapters.length - 1));
     party.scenarioId = sc.id;
     const instId = 'i' + seq++;
@@ -884,19 +1004,29 @@ io.on('connection', (sock) => {
       joinRoom(p, 'inst:' + instId);
       p.inv = [...START_ITEMS, ...sc.startItems(chapter)];
     }
-    const leader = me;
     const inst = new GameInstance({
       id: instId, io, party, players, chapter, fear, scenario: sc.id,
-      onChapter: (idx) => { const saveName = sc.saveKey(leader.name); if ((saves[saveName] ?? 0) < idx) { saves[saveName] = idx; save(); } },
+      onChapter: (idx) => {
+        const activeLeader = players.get(party.leader);
+        if (party.instId !== instId || activeLeader?.room !== 'inst:' + instId) return;
+        if (checkpointFor(sc, activeLeader.name) === idx) return;
+        saves[sc.saveKey(activeLeader.name) + ':checkpoint'] = idx;
+        save();
+      },
       onAdvance: () => { if (inst.overtime()) return; for (const m of inst.members()) addXp(m.name, CHAPTER_XP, '챕터 통과'); },
       limitMs: timeLimitMs(sc.difficulty || 3),
       onEnd: ({ photoId, ms, full, type, hints = 0, over = false } = {}) => {
         registerClearPhoto(photoId, inst.members(), sc);
         const names = party.members.map((id) => players.get(id)?.name).filter(Boolean);
         const wasOpen = new Map(names.map((n) => [n, hiddenOk(n)]));
-        saves[sc.saveKey(leader.name)] = sc.chapters.length - 1;
-        // 함께 깬 파티원 모두 '클리어'로 기록 (히든 테마 조건 · 도장표). 값은 처음 깬 시각 (예전 기록은 1)
-        for (const n of new Set([leader.name, ...names])) { const k = sc.saveKey(n) + ':clear'; if (!(saves[k] > 1)) saves[k] = Date.now(); }
+        // 클리어 기록은 보존하고 다음 플레이의 시작 챕터만 초기화한다.
+        for (const name of new Set(names)) {
+          const key = sc.saveKey(name);
+          delete saves[key];
+          delete saves[key + ':checkpoint'];
+          if (!(saves[key + ':clear'] > 1)) saves[key + ':clear'] = Date.now();
+        }
+        if (party.pick?.scenario === sc.id) party.pick.chapter = 0;
         save();
         const clearMembers = inst.members().map(p => ({ player: p, wasOpen: wasOpen.get(p.name) }));
         setTimeout(() => {
@@ -909,6 +1039,7 @@ io.on('connection', (sock) => {
         }, 300);
         // 보상: 깰 때마다 10코인 · 제한 시간 안에 깨면 경험치 (시간 초과면 순위표·경험치 제외)
         for (const m of inst.members()) {
+          m.rankTimeout = over;
           addCoins(m.name, CLEAR_COINS);
           io.to(m.id).emit('toast', { text: `🪙 클리어 보상 ${CLEAR_COINS}코인!${over ? ' (⏰ 시간 초과 — 경험치·순위표 제외)' : ''}` });
           if (!over) addXp(m.name, clearXp(sc.difficulty || 3, fear, full), '테마 클리어');
@@ -931,7 +1062,7 @@ io.on('connection', (sock) => {
     instances.set(instId, inst);
     lobbyNotice(`🚪 ${partyLabel(party.members.map((id) => players.get(id)?.name).filter(Boolean))} 님이 '${sc.short}' 테마 게임을 시작했습니다.`);
     for (const m of inst.members()) io.to(m.id).emit('inv', m.inv);
-    io.to(inst.room).emit('game:start', inst.fullState());
+    io.to(inst.room).emit('game:start', { ...inst.fullState(), showTimeLimit: true });
     syncParty(party);
     broadcastRoster();
   });
@@ -941,9 +1072,7 @@ io.on('connection', (sock) => {
     if (!party || !party.instId) return;
     const cur = instances.get(party.instId);
     if (cur?.ended) { // 엔딩 후: 파티는 유지한 채 각자 로비로
-      toLobby(me);
-      if (!party.members.some((id) => players.get(id)?.room === 'inst:' + party.instId)) { instances.delete(party.instId); party.instId = null; }
-      syncParty(party);
+      returnFromEnding(me, party);
       return;
     }
     if (party.leader === me.id) {
@@ -967,7 +1096,12 @@ io.on('connection', (sock) => {
   });
   sock.on('inv:give', ({ item, to }) => inst()?.giveTo(me, item, to));
   sock.on('inv:combine', ({ a, b }) => inst()?.combine(me, a, b));
-  sock.on('game:state', () => { const i = inst(); if (i) sock.emit('game:start', i.fullState()); });
+  sock.on('game:state', () => {
+    const i = inst();
+    if (!i || me.room !== i.room) return;
+    if (i.ended) returnFromEnding(me, i.party);
+    else sock.emit('game:start', i.fullState());
+  });
 
   // ───── 음성 (파티원끼리 또는 광장에서 WebRTC 신호 중계)
   sock.on('voice:signal', ({ to, data }) => {
@@ -991,6 +1125,7 @@ io.on('connection', (sock) => {
     // 기다리는 동안에는 다른 사람 화면과 접속자 목록에서 빠진다 (실제로는 없는 사람이 광장에 서 있던 문제)
     const p = me;
     p.offline = true;
+    p.ride = '';
     io.to(p.room).emit('player:leave', p.id);
     broadcastRoster();
     clearTimeout(p.dropTimer);
@@ -1068,10 +1203,16 @@ function checkWeek(now = Date.now()) {
 }
 checkWeek(); setInterval(() => checkWeek(), 60 * 1000).unref?.();
 
+function checkpointFor(scenario, name) {
+  if (!name) return 0;
+  const key = scenario.saveKey(name);
+  // 예전 버전은 클리어 시 마지막 챕터를 저장했다.
+  return saves[key + ':checkpoint'] ?? (saves[key + ':clear'] ? 0 : saves[key] ?? 0);
+}
 function unlockedFor(name) {
   const out = {};
   if (!name) return out;
-  for (const s of Object.values(SCENARIOS)) { const c = saves[s.saveKey(name) + ':clear']; out[s.id] = { chapter: saves[s.saveKey(name)] ?? 0, cleared: !!c, at: c > 1 ? c : 0 }; }
+  for (const s of Object.values(SCENARIOS)) { const c = saves[s.saveKey(name) + ':clear']; out[s.id] = { chapter: checkpointFor(s, name), cleared: !!c, at: c > 1 ? c : 0 }; }
   return out;
 }
 function carryItems(ch) {

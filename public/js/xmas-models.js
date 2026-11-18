@@ -9,7 +9,7 @@ export function loadXmasGhostModel(ghost) {
       .then(({ scene }) => scene)
       .catch(error => { santaTemplate = null; throw error; });
   }
-  santaTemplate.then(model => {
+  return santaTemplate.then(model => {
     if (!ghost.parent) return;
     const { body, parts } = ghost.userData;
     const pivots = { Body: body, Head: parts.head, ArmL: parts.arms[0], ArmR: parts.arms[1], LegL: parts.legs[0], LegR: parts.legs[1] };
@@ -21,7 +21,11 @@ export function loadXmasGhostModel(ghost) {
     });
     if (replacement.length === 0) return;
     body.traverse(node => { if (node.isMesh) node.visible = false; });
-    for (const [pivot, mesh] of replacement) pivot.add(mesh);
+    for (const [pivot, mesh] of replacement) {
+      mesh.userData.sharedArtGeometry = true;
+      mesh.userData.sharedArtMaterial = true;
+      pivot.add(mesh);
+    }
     ghost.userData.xmasModelLoaded = true;
   }).catch(error => console.warn('산타 자동인형 모델 로딩 실패:', error));
 }

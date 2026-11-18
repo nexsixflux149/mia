@@ -475,10 +475,17 @@ function turtle() {
 // 엎드려 기어가는 사람: 네 발로 엉금엉금 기는 친구 등에 올라탄다 (캐릭터 모양 그대로 · 조금 크게)
 function crawler() {
   const g = new THREE.Group();
-  const av = createAvatar({ body: '#ffd6a5', accent: '#6ab0ff', ears: 'none', eyes: 'big', mouth: 'open', cheeks: 'blush', hair: 'short', hairColor: '#3a2a1e', outfit: 'sailor' });
+  const av = createAvatar({ body: '#ffd6a5', accent: '#6ab0ff', ears: 'none', eyes: 'big', mouth: 'open', cheeks: 'blush', hair: 'short', hairColor: '#3a2a1e', outfit: 'sailor' }, { legColor: '#131a30' });
   const u = av.userData; if (u.blob) av.remove(u.blob);
   const S = 1.65; av.scale.setScalar(S); av.position.z = -0.62; g.add(av);
   const rig = u.rig; rig.rotation.x = Math.PI / 2; // 앞으로 엎드린다 (머리가 앞 · 등이 위)
+  // 치마 끝 안쪽을 막아 기어갈 때도 뒤쪽에서 몸 안쪽이 드러나지 않게 한다.
+  const skirtLining = mesh(new THREE.CircleGeometry(0.39, 32),
+    new THREE.MeshBasicMaterial({ color: '#101424', side: THREE.DoubleSide }), 0, 0.229, 0, rig);
+  skirtLining.rotation.x = Math.PI / 2;
+  skirtLining.castShadow = false;
+  u.torso.scale.y = 0.65;
+  u.torso.position.y = 0.65;
   const base = 0.21; rig.position.y = base;
   if (u.head) for (const c of [...u.head.children]) if (c.isMesh && c.geometry?.type === 'CylinderGeometry' && Math.abs(c.position.y + 0.4) < 0.01) u.head.remove(c); // 목은 떼고 얼굴만
   if (u.head) { u.head.scale.setScalar(0.62); u.head.position.set(0, 0.74, -0.26); u.head.rotation.x = -Math.PI / 2 - 0.35; } // 고개를 들어 앞을 본다
@@ -1304,7 +1311,7 @@ export function applyGear(g, gear = '') {
   if (u.gearStr === gear) return; u.gearStr = gear;
   const [w = '', m = '', riding = '0', sword = '0', costume = '', gold = '', snack = '', mask = ''] = gear.split('|');
   const sn = /^([pchs][123]|b[0-9])$/.test(snack) ? snack : '';
-  if ((u.gSnackCode || '') !== sn) { if (u.gSnack?.userData.balloon && !sn.startsWith('b')) releaseBalloon(u.gSnack); u.gSnack?.parent?.remove(u.gSnack); u.gSnack = null; u.gSnackCode = sn; const arm = u.arms?.[1]; if (sn && arm) { const it = buildSnack(sn); if (!it.userData.balloon) it.scale.setScalar(1.35); it.position.set(0.02 * Math.sign(arm.position.x || 1), -0.36, 0.09); u.gSnack = it; arm.add(it); } }
+  if ((u.gSnackCode || '') !== sn) { u.gSnack?.parent?.remove(u.gSnack); u.gSnack = null; u.gSnackCode = sn; const arm = u.arms?.[1]; if (sn && arm) { const it = buildSnack(sn); if (!it.userData.balloon) it.scale.setScalar(1.35); it.position.set(0.02 * Math.sign(arm.position.x || 1), -0.36, 0.09); u.gSnack = it; arm.add(it); } }
   if (u.gWingsId !== w) { if (u.gWings) u.rig.remove(u.gWings); u.gWings = w ? buildWings(w) : null; if (u.gWings) u.rig.add(u.gWings); u.gWingsId = w; }
   const mid = riding === '1' ? m : '';
   if (u.gMountId !== mid) { if (u.gMount) g.remove(u.gMount); u.gMount = mid ? buildMount(mid) : null; if (u.gMount) g.add(u.gMount); u.gMountId = mid; }
@@ -1316,10 +1323,10 @@ export function applyGear(g, gear = '') {
     if (sw === '3' && u.arms?.[0]) { const s = buildChainsaw(); s.position.set(-0.06, -0.33, 0.04); s.rotation.set(Math.PI / 2 + 0.75, 0, 0); s.scale.setScalar(1.45); u.arms[0].add(s); u.gSword = s; }
     if (sw === '2' && u.arms?.[0]) { const s = buildStaff(); s.position.set(-0.1, -0.33, 0.05); s.rotation.set(0.66, 0, 0.36); u.arms[0].add(s); u.gSword = s; } // 머리에 묻히지 않게 바깥으로 기울여 든다
   }
-  // 로봇 코스튬은 온몸을 덮으므로 그 동안에는 황금 고양이 부위를 그리지 않는다 (코스튬을 벗으면 다시 보인다)
-  // 상점 가면을 쓰면 황금 고양이 가면(m)은 벗는다 · 코스튬을 입으면 가면도 벗는다
-  const mk = costume ? '' : MASKS[mask] ? mask : '';
-  const gset = costume ? '' : mk ? gold.replace('m', '') : gold;
+  // 트리 코스튬은 얼굴이 드러나므로 가면 한 개를 함께 쓸 수 있다.
+  const mk = (!costume || costume === 'costume_xmas') && Object.hasOwn(MASKS, mask) ? mask : '';
+  const costumeGold = costume === 'costume_xmas' ? gold.replace(/[^m]/g, '') : costume ? '' : gold;
+  const gset = mk ? costumeGold.replace('m', '') : costumeGold;
   if ((u.gCostumeId || '') !== costume) { if (u.gGold) setGold(g, ''); if (u.gMask) setMask(g, ''); setCostume(g, costume); }
   if ((u.gGoldSet || '') !== gset) setGold(g, gset);
   if ((u.gMaskId || '') !== mk) setMask(g, mk);

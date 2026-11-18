@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { buildProp, FOOT, setPropTheme } from './props.js';
 import { buildXmasProp, decorateXmas } from './xmas-visuals.js';
+import { wrapGift } from './gift-ribbon.js';
 import { loadXmasOpticalModel } from './xmas-models.js';
 import { dressScenery } from './refined-models.js';
 import { textSprite, createAvatar, animateAvatar } from './avatar.js';
@@ -416,6 +417,7 @@ function buildExhibit(root, colliders, th) {
       prop.position.set(x, .18, .65);
       prop.scale.setScalar(t === 'xmas_fir' ? .72 : .85);
       g.add(prop);
+      dressScenery(prop, g, { t });
     }
   } else if (th.id === 'zombie') {
     P({ t: 'barrel', x: -2.2, z: 0.6 }, 0.9); P({ t: 'debris', x: 2.2, z: 0.6 }, 1.2); P({ t: 'blood_smear', x: 0.4, z: 1.6 }, 1.2);
@@ -587,12 +589,13 @@ function buildPark(root, colliders, add) {
     const ry = (r * Math.PI) / 180;
     interactives.push({ id: 'bench' + i, kind: 'sit', x, z, r: 1.5, label: '벤치', verb: '앉기', seat: { x: x - Math.sin(ry) * 0.04, z: z - Math.cos(ry) * 0.04, y: 0.43, ry } });
   });
-  // 피크닉 테이블 (양쪽 긴 의자에 앉기 — 테이블 위로 올라가지 않는다)
+  // 피크닉 테이블 (양쪽 긴 의자는 앉기, 상판은 점프로 착지)
   [[-1.8, 12.5], [2.2, 12.2]].forEach(([x, z], i) => {
     const g = new THREE.Group(); g.position.set(x, 0, z); root.add(g);
-    mesh(new THREE.BoxGeometry(1.8, 0.1, 0.9), pm('#c98a5a'), 0, 0.78, 0, g);
+    const tableTop = { hw: 0.9, hd: 0.45, y: 0.83 };
+    mesh(new THREE.BoxGeometry(tableTop.hw * 2, 0.1, tableTop.hd * 2), pm('#c98a5a'), 0, tableTop.y - 0.05, 0, g);
     for (const sx of [-1, 1]) { mesh(new THREE.BoxGeometry(0.1, 0.78, 0.8), pm('#8a5a3a'), 0.75 * sx, 0.39, 0, g); mesh(new THREE.BoxGeometry(1.8, 0.07, 0.3), pm('#c98a5a'), 0, 0.45, 0.7 * sx, g); mesh(new THREE.BoxGeometry(0.08, 0.42, 0.24), pm('#8a5a3a'), 0.78 * sx, 0.21, 0.7, g); mesh(new THREE.BoxGeometry(0.08, 0.42, 0.24), pm('#8a5a3a'), 0.78 * sx, 0.21, -0.7, g); }
-    colliders.push({ x, z, hw: 0.95, hd: 0.5 });
+    colliders.push({ x, z, hw: 0.95, hd: 0.5, landing: tableTop });
     // 의자 자리 넷: 테이블을 마주 보고 앉는다 (back: 일어날 때는 뒤로)
     const seats = [];
     for (const sz of [-1, 1]) for (const sx of [-1, 1]) seats.push({ x: x + 0.45 * sx, z: z + 0.7 * sz, y: 0.41, ry: sz > 0 ? Math.PI : 0, back: true });
@@ -1076,7 +1079,9 @@ function buildLobbyDeco(root, colliders, themes) {
     const red = pm('#d8202a', { emissive: '#5a0008', emissiveIntensity: 0.35, roughness: 0.55 }), gold = pm('#ffd23a', { metalness: 0.5, roughness: 0.3, emissive: '#a07000', emissiveIntensity: 0.5 });
     mesh(new THREE.BoxGeometry(0.62, 0.5, 0.62), red, 0, 0.25, 0, box);
     mesh(new THREE.BoxGeometry(0.7, 0.14, 0.7), red, 0, 0.55, 0, box); // 뚜껑
-    for (const r of [0, Math.PI / 2]) { const b1 = mesh(new THREE.BoxGeometry(0.12, 0.52, 0.64), gold, 0, 0.26, 0, box); b1.rotation.y = r; const b2 = mesh(new THREE.BoxGeometry(0.12, 0.15, 0.72), gold, 0, 0.55, 0, box); b2.rotation.y = r; }
+    wrapGift((x, y, z, w, h, d) => mesh(new THREE.BoxGeometry(w, h, d), gold, x, y, z, box), {
+      width: .62, depth: .62, bottom: 0, lidBottom: .48, top: .62, lidWidth: .70, lidDepth: .70, ribbonWidth: .12,
+    });
     for (const s of [-1, 1]) { const loop = mesh(new THREE.TorusGeometry(0.12, 0.04, 8, 16), gold, s * 0.11, 0.7, 0, box); loop.scale.set(1, 0.75, 0.55); loop.rotation.z = s * 0.5; }
     mesh(new THREE.SphereGeometry(0.06, 10, 8), gold, 0, 0.66, 0, box);
     const glowS = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: '#ffe08a', transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending })); glowS.scale.setScalar(1.8); glowS.position.y = 0.4; g.add(glowS);
