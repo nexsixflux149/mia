@@ -155,7 +155,7 @@ export function drawFace(canvas, look, img) {
 }
 
 // ───────────────────────── 아바타 생성
-export function createAvatar(look, { legColor } = {}) {
+export function createAvatar(look, { legColor, sleeveColor } = {}) {
   look = { ...DEFAULT_LOOK, ...look };
   const g = new THREE.Group();
   // 피부는 아주 살짝 스스로 빛나게: 어두운 맵에서도 얼굴이 뭉개지지 않고 말랑해 보인다
@@ -173,6 +173,7 @@ export function createAvatar(look, { legColor } = {}) {
 
   // 몸통 · 다리 · 팔 (옷 색은 의상이 정한다)
   const O = outfitColors(look);
+  if (sleeveColor) O.sleeve = sleeveColor;
   const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.27, 0.22, 12, 32), mat(O.top));
   torso.position.y = 0.52; upper.add(torso);
   const legs = [];

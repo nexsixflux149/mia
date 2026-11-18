@@ -252,6 +252,8 @@ body.mobile .mbtn[data-k="admin"] { display: none; } body.mobile.is-admin .mbtn[
 #fearBadge { margin-top: 6px; font-size: 12px; color: #e8a0a0; }
 #sharePanel #shareUrl { font-family: monospace; font-size: 12px; word-break: break-all; color: #8fd3ff; }
 #sharePanel #shareNote { font-size: 11px; margin-top: 4px; }
+#sharePanel .official-chat { display: inline-block; margin-top: 10px; color: #ffe074; text-decoration: none; }
+#sharePanel .official-chat:focus-visible { outline: 2px solid #ffe074; outline-offset: 2px; }
 #emotePanel { position: absolute; right: 14px; bottom: 56px; z-index: 12; display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px; width: 240px; }
 #emotePanel .btn { text-align: left; }
 #cine { position: fixed; inset: 0; z-index: 80; touch-action: none; }

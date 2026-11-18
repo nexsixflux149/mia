@@ -1778,7 +1778,7 @@ export function buildChapter(scene, ch, themeId = 'gwimun') {
         spots.push({ x, z, s: 1 + R() * 0.8 });
       }
       const kind = TH.border === 'carnival' ? 'pine' : TH.border;
-      instancedForest(root, spots, kind);
+      if (themeId !== 'mia') instancedForest(root, spots, kind);
       if (kind === 'mesa') { for (let i = 0; i < 7; i++) { const a = (i / 7) * Math.PI * 2 + 0.3; deco({ t: 'mesa', x: Math.cos(a) * (W / 2 + 18), z: Math.sin(a) * (D / 2 + 16), s: 1.2 + R() * 1.4, color: pick(R, ['#8a3a20', '#9a4a28', '#7a3020']) }); } }
       if (kind === 'bamboo' || kind === 'pine_dense') instancedForest(root, spots.map((s) => ({ x: s.x * 1.12 + (R() - 0.5) * 2, z: s.z * 1.12 + (R() - 0.5) * 2, s: s.s * 1.1 })), kind === 'bamboo' ? 'bamboo' : 'pine');
       if (TH.border === 'carnival') {

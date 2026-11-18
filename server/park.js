@@ -111,7 +111,7 @@ const PARK_1 = [
       { id: 'mascot', t: 'mascot_statue', x: 8.5, z: 1.5, r: -100, s: 1.5, label: '해피 동상', kind: 'examine',
         text: '사람보다 큰 토끼 해피 동상. 한쪽 귀가 꺾여 있다.\n받침대: "해피는 언제나 여러분 곁에!"',
         reveal: { item: 'flashlight', text: '손전등으로 받침대 아래를 비추자, 어린아이 손톱으로 긁은 글씨가 보인다.\n  "해피 말 듣지 마"', flag: 'warning1' } },
-      { id: 'gate', t: 'path_gate', x: 0, z: -9.4, label: '회전문 — 놀이공원 안으로', kind: 'use', req: ['booth'],
+      { id: 'gate', t: 'ticket_gate', x: 0, z: -9.4, label: '회전문 — 놀이공원 안으로', kind: 'use', req: ['booth'],
         lockedText: '회전문이 꿈쩍도 하지 않는다. 표가 있어야 할 것 같다.',
         text: '삐걱거리는 회전문. 표 넣는 구멍이 있다.', use: { item: 'park_ticket', times: 1 }, needText: '입장권이 필요하다. (매표소)', toChapter: 1,
         on: { sound: 'gate' } },

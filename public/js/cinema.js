@@ -561,8 +561,14 @@ export class Cinema {
     return this.set('mia', (g) => {
       g.position.set(-3600, 0, 0);
       const gr = new THREE.Mesh(new THREE.PlaneGeometry(40, 60), new THREE.MeshStandardMaterial({ color: '#2a2622', roughness: 1 })); gr.rotation.x = -Math.PI / 2; g.add(gr);
-      for (const z of [-10, -2, 6, 14]) { this.prop(g, { t: 'house', x: -6, z, r: 90 }); this.prop(g, { t: 'house', x: 6, z, r: -90 }); }
-      this.prop(g, { t: 'iron_door', x: 0, z: -14 }); this.prop(g, { t: 'flyer', x: -3.2, z: -6, y: 1.4 }); this.prop(g, { t: 'pole', x: -3.2, z: -6.3 });
+      for (const z of [-10, -2, 6, 14]) {
+        this.prop(g, { t: 'alley_house', x: -6, z, r: 90 });
+        this.prop(g, { t: 'alley_house', x: 6.7, z: z + .45, r: -90 });
+      }
+      this.prop(g, { t: 'alley_wall', x: 5.1, z: 1, r: -90 });
+      this.prop(g, { t: 'alley_wall', x: -4.8, z: -5.9, r: 90 });
+      this.prop(g, { t: 'alley_shop', z: -14.4 });
+      this.prop(g, { t: 'roller_shutter', z: -14 }); this.prop(g, { t: 'flyer', x: -3.2, z: -6, y: 1.4 }); this.prop(g, { t: 'pole', x: -3.2, z: -6.3 });
       this.miaLamp = this.prop(g, { t: 'lamp', x: 3, z: -4 });
       this.miaKid = createAvatar({ outfit: 'plain', accent: '#ffd23a', hair: 'bob', hairColor: '#2b1d16', ears: 'none', eyes: 'sparkle', mouth: 'open', body: '#ffe0cc' }); this.miaKid.scale.setScalar(0.78); g.add(this.miaKid);
       this.miaGran = createAvatar({ outfit: 'plain', accent: '#8a6a9a', hair: 'bun', hairColor: '#d8d4cc', ears: 'none', eyes: 'closed', mouth: 'smile', body: '#f0d4bc' }); this.miaGran.scale.setScalar(0.95); g.add(this.miaGran);
@@ -605,7 +611,7 @@ export class Cinema {
       this.parkWheel = this.prop(g, { t: 'ferris_wheel', x: 10, z: -14, r2: 7 });
       this.parkCarousel = this.prop(g, { t: 'carousel_big', x: 0, z: -4, r2: 3.2 });
       this.prop(g, { t: 'drop_tower', x: -11, z: -12, h: 14 }); this.parkDrop = this.prop(g, { t: 'drop_car', x: -11, z: -12, y: 10 });
-      this.prop(g, { t: 'turnstile', x: -2, z: 8 }); this.prop(g, { t: 'turnstile', x: 2, z: 8 }); this.prop(g, { t: 'lantern_string', x: 0, z: 4, len: 18 });
+      this.prop(g, { t: 'ticket_gate', z: 8, r: 180 }); this.prop(g, { t: 'lantern_string', x: 0, z: 4, len: 18 });
       this.parkHappy = this.prop(g, { t: 'mascot_statue', x: 5, z: 4, r: -40, s: 1.4 });
       const KID = ['#ff8fab', '#e8c13a', '#9ab7d8', '#2fbf71', '#ffb0e0', '#b39dff'];
       this.parkKids = KID.map((c, i) => { const a = createAvatar({ outfit: 'plain', accent: c, hair: ['twintail', 'short', 'bob', 'spiky', 'ponytail', 'bowl'][i], hairColor: '#2b1d16', ears: 'none', eyes: 'sparkle', mouth: 'open', body: '#ffe0cc', hat: i === 1 ? 'cap' : 'none' }); a.position.set(-3.5 + i * 1.4, 0, 1.5); a.scale.setScalar(0.8); g.add(a); return a; });

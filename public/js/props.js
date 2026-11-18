@@ -125,6 +125,130 @@ let THEME = 'gwimun';
 export function setPropTheme(id) { THEME = id || 'gwimun'; }
 const seedOf = (p) => Math.abs(Math.round((p.x || 0) * 7.3 + (p.z || 0) * 3.1 + (p.y || 0) * 11));
 
+function paintedSign(g, text, width, height, x, y, z, bg, ink, font = 'bold 38px sans-serif') {
+  const tex = canvasTex(512, 96, (ctx, w, h) => {
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = ink; ctx.lineWidth = 2; ctx.strokeRect(8, 8, w - 16, h - 16);
+    ctx.fillStyle = ink; ctx.font = font; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, w / 2, h / 2 + 1, w - 39);
+  }, JSON.stringify([text, bg, ink, font]));
+  return Plane(g, width, height, tex, x, y, z);
+}
+
+const alleyWalls = new Map();
+function alleyWall(brick = false) {
+  if (alleyWalls.has(brick)) return alleyWalls.get(brick);
+  const texture = canvasTex(256, 128, (ctx, w, h) => {
+    ctx.fillStyle = brick ? '#aa9c88' : '#b3a891';
+    ctx.fillRect(0, 0, w, h);
+    if (brick) {
+      const colors = ['#6b3e33', '#845043', '#714635', '#8b5544'];
+      for (let j = 0; j < 12; j++) for (let k = -1; k < 8; k++) {
+        ctx.fillStyle = colors[(k + 1 + j * 3) % colors.length];
+        ctx.fillRect(k * 33 + j % 2 * 16, j * 11, 32, 10);
+      }
+    }
+    for (let i = 0; i < 420; i++) {
+      const x = (i * 97 % 997) / 997 * w, y = (i * 123 % 941) / 941 * h;
+      ctx.fillStyle = i % 3 ? '#342d261f' : '#ede3cb33';
+      ctx.fillRect(x, y, i % 7 + 1, i % 4 + 1);
+    }
+    const grime = ctx.createLinearGradient(0, 0, 0, h);
+    grime.addColorStop(0, '#41393322'); grime.addColorStop(.58, '#433d3300'); grime.addColorStop(1, '#3c3a2d9e');
+    ctx.fillStyle = grime; ctx.fillRect(0, 0, w, h);
+  }, brick ? 'alley-brick' : 'alley-plaster');
+  const material = markShared(new THREE.MeshStandardMaterial({ map: texture, roughness: .95 }));
+  alleyWalls.set(brick, material);
+  return material;
+}
+
+function alleyShutter(g, raised) {
+  const steel = M('#626862', { metalness: .42, roughness: .77 });
+  const slats = 32, visibleSlats = raised ? 7 : slats;
+  const lift = (slats - visibleSlats) * .07;
+  B(g, 2.72, visibleSlats * .07, .075, steel, 0, lift);
+  for (let i = 0; i < visibleSlats; i++) {
+    const y = lift + i * .07;
+    B(g, 2.72, .021, .105, i % 5 === 0 ? '#5e5241' : '#85877a', 0, y + .037, .013, { metalness: .4 });
+  }
+  B(g, 2.77, .088, .12, '#43392f', 0, lift, .012);
+  if (!raised) {
+    B(g, .24, .035, .07, '#46372a', 0, .23, .091);
+    B(g, .094, .13, .068, '#866b45', 0, .16, .147, { metalness: .45 });
+    g.userData.foot = [2.78, .16];
+  } else {
+    // 열린 입구 전체를 클릭할 수 있도록 시야를 가리지 않는 판을 둔다.
+    B(g, 2.66, lift, .01, '#ffffff', 0, 0, -.03, { transparent: true, opacity: 0, depthWrite: false }).castShadow = false;
+  }
+}
+
+function passageGate(g, p) {
+  const theme = p.t === 'ticket_gate' ? 'park' : THEME;
+  if (theme === 'park' || theme === 'clown') {
+    const entry = p.t === 'ticket_gate';
+    const paint = theme === 'clown' ? '#6c2930' : '#3a6266';
+    const width = entry ? 3.6 : 2.75;
+    const y = entry ? 2.51 : 2.28;
+    for (const side of [-1, 1]) {
+      const x = side * (width / 2 - .11);
+      B(g, .25, y, .27, paint, x, 0, 0, { metalness: .38 });
+      B(g, .38, .27, .39, '#4d473f', x);
+      B(g, .24, .08, .32, '#8b6346', x, .47);
+    }
+    B(g, width, .48, .26, paint, 0, y, 0, { metalness: .32 });
+    const title = entry ? '해피니스 랜드' : (p.label || '출구').split(' — ')[0];
+    const sign = paintedSign(g, title, width - .25, .36, 0, y + .24, .142, '#212c32', '#ffe09a');
+    sign.material = sign.material.clone();
+    sign.material.emissiveMap = sign.material.map;
+    sign.material.emissive.set('#ebd4a5');
+    sign.material.emissiveIntensity = .53;
+    if (entry) {
+      for (const side of [-1, 1]) {
+        const x = 1.28 * side;
+        B(g, .42, .92, .98, '#34474b', x, 0, .15, { metalness: .55 });
+        B(g, .45, .075, 1, '#738580', x, .92, .15, { metalness: .52 });
+        B(g, .21, .027, .048, '#1d2225', x, 1.0, .43);
+        B(g, .12, .024, .048, '#97d896', x, 1.0, .09, { emissive: '#72c473', emissiveIntensity: .85 });
+        const hub = C(g, .09, .09, .08, '#8d968f', x - side * .24, .91, .32);
+        hub.rotation.z = Math.PI / 2;
+        for (let k = 0; k < 3; k++) {
+          const a = k * Math.PI * 2 / 3;
+          const arm = B(g, .78, .046, .046, '#929b91', x - side * .57, .93 - Math.sin(a) * .2, .32 + (Math.cos(a) - 1) * .22, { metalness: .6 });
+          arm.rotation.y = a * .25 * side;
+        }
+      }
+    } else {
+      for (const side of [-1, 1]) {
+        B(g, .88, .07, .085, '#535f63', side * .53, 1.05);
+        for (let n = 0; n < 5; n++) B(g, .036, 1.06, .041, '#68747a', side * (.13 + n * .18));
+      }
+    }
+    g.userData.foot = [width, .38];
+  } else if (theme === 'west') {
+    for (const side of [-1, 1]) {
+      const post = B(g, .23, 2.56, .3, '#59412f', side * 1.14);
+      post.rotation.z = side * .11;
+      B(g, .39, .24, .42, '#595147', side * 1.18);
+    }
+    B(g, 2.6, .24, .46, '#4a3527', 0, 2.46);
+    B(g, 2.3, .13, .15, '#5f4931', 0, .07);
+    paintedSign(g, '폐광', 1.2, .35, 0, 2.26, .255, '#544432', '#e3c38c');
+    g.userData.foot = [2.45, .42];
+  } else {
+    const title = (p.label || '산길').split(' — ')[0];
+    for (const side of [-1, 1]) {
+      const x = side * 1.03;
+      B(g, .24, 1.14, .26, '#534634', x);
+      B(g, .33, .20, .37, '#676056', x);
+      S(g, .077, '#b69971', x, 1.16, 0);
+    }
+    B(g, 1.88, .052, .045, '#9a8b6d', 0, .77, .015);
+    B(g, .51, .30, .09, '#5e4d38', .79, .99, .13);
+    paintedSign(g, title, .96, .25, .62, 1.15, .181, '#614d39', '#eee0bc');
+    g.userData.foot = [2.36, .36];
+  }
+}
+
 // 테마별 포스터 그림
 function posterTex(p) {
   const label = String(p.label || '');
@@ -245,6 +369,74 @@ export function buildProp(p) {
       g.userData.rotors = [[rotor, 'y', p.on === false ? 0 : 14], [tr, 'x', p.on === false ? 0 : 22]];
       break;
     }
+    case 'alley_house': {
+      const brick = seedOf(p) % 2 === 0;
+      const height = brick ? 2.53 : 2.22;
+      const wall = alleyWall(brick);
+      B(g, 4.7, height, 2.84, wall);
+      B(g, 4.9, .19, 2.99, brick ? '#514940' : '#60584c');
+      const roof = brick ? '#50403b' : '#3c514f';
+      for (const side of [-1, 1]) {
+        B(g, 4.95, .095, 1.74, roof, 0, height + .16, side * .78).rotation.x = side * .16;
+        B(g, 4.96, .09, .09, '#453e36', 0, height + .06, side * 1.61);
+      }
+      B(g, 5.04, .12, .22, roof, 0, height + .30);
+      const doorX = brick ? -.97 : .89;
+      const doorColor = brick ? '#445752' : '#4a504e';
+      B(g, 1.12, 1.82, .10, '#383c3a', doorX, .10, 1.44);
+      B(g, .96, 1.68, .06, doorColor, doorX, .15, 1.505, { metalness: .32 });
+      B(g, 1.18, .10, .34, '#736b60', doorX, 0, 1.55);
+      for (const dx of [-.32, 0, .32]) B(g, .024, 1.52, .025, '#58625a', doorX + dx, .22, 1.54);
+      B(g, .068, .028, .049, '#968173', doorX + .29, .93, 1.559);
+      const wx = -doorX;
+      B(g, 1.37, .77, .1, '#746852', wx, 1.05, 1.45);
+      B(g, 1.23, .64, .035, '#363d37', wx, 1.115, 1.516);
+      for (let j = -2; j <= 2; j++) B(g, .03, .66, .04, '#62645b', wx + j * .22, 1.101, 1.552);
+      B(g, 1.43, .07, .18, '#898270', wx, 1.01, 1.469);
+      paintedSign(g, brick ? '18-7' : '18-5', .30, .14, doorX + .68, 1.42, 1.437, '#29465a', '#e9e9dc');
+      g.userData.foot = [4.72, 3.05];
+      break;
+    }
+    case 'alley_wires': {
+      const cable = M('#2b2826', { roughness: .92 });
+      for (const z of [-.25, .22]) {
+        const line = new THREE.QuadraticBezierCurve3(
+          new THREE.Vector3(-3.5, 5.42, z), new THREE.Vector3(.15, 3.8, z + .18), new THREE.Vector3(4.7, 5.42, z + .45),
+        );
+        const wire = new THREE.Mesh(geo('alley-line-' + z, () => new THREE.TubeGeometry(line, 16, .015, 5)), cable);
+        g.add(wire);
+      }
+      break;
+    }
+    case 'alley_wall': {
+      B(g, 4, 1.22, .36, alleyWall(true));
+      B(g, 4.08, .09, .44, '#5f574b', 0, 1.22);
+      B(g, 4.05, .13, .41, '#615a4f');
+      g.userData.foot = [4, .36];
+      break;
+    }
+    case 'alley_shop': {
+      const plaster = alleyWall();
+      const brick = alleyWall(true);
+      for (const side of [-1, 1]) {
+        B(g, .95, 2.95, 1.04, plaster, side * 1.87, 0, -.24);
+        B(g, .99, .3, 1.1, brick, side * 1.87, 0, -.23);
+        B(g, .12, 2.29, .17, '#615f52', side * 1.43, 0, .33, { metalness: .38 });
+      }
+      B(g, 4.72, .69, 1.05, brick, 0, 2.27, -.23);
+      B(g, 4.89, .15, 1.26, '#526059', 0, 2.94, -.17);
+      B(g, 2.79, .15, .84, '#4e4438', 0, 0, -.16);
+      B(g, 2.75, 2.12, .10, '#191612', 0, .13, -.73);
+      B(g, 2.6, .018, .08, '#ceb079', 0, .10, .08, { emissive: '#f3bb70', emissiveIntensity: .68 });
+      paintedSign(g, '달빛 문방구', 3.85, .49, 0, 2.60, .318, '#d6c49b', '#343b32', 'bold 56px serif');
+      const glow = new THREE.PointLight('#ffddab', 4.5, 6, 2);
+      glow.position.set(0, 2.32, .74);
+      g.add(glow);
+      B(g, 1.4, .045, .055, '#c6b597', 0, 2.32, .34, { emissive: '#ffbd75', emissiveIntensity: .45 });
+      break;
+    }
+    case 'roller_shutter': alleyShutter(g, false); break;
+    case 'alley_shop_entry': alleyShutter(g, true); break;
     case 'house': {
       B(g, 4.6, 2.4, 3.6, '#4d4035');
       const roof = new THREE.Mesh(new THREE.ConeGeometry(3.6, 1.6, 4), M('#2a2522')); roof.position.y = 3.2; roof.rotation.y = Math.PI / 4; roof.scale.z = 0.8; g.add(roof);
@@ -334,13 +526,8 @@ export function buildProp(p) {
       B(g, 1.3, 0.04, 1.3, '#4a3a2a', 0, 0.82, 0).rotation.y = 0.2;
       break;
     }
-    case 'path_gate': {
-      for (const s of [-1, 1]) C(g, 0.12, 0.14, 2.6, '#7a2b1d', 1 * s, 0, 0, 8);
-      B(g, 2.6, 0.14, 0.18, '#7a2b1d', 0, 2.5, 0); B(g, 2.2, 0.1, 0.12, '#7a2b1d', 0, 2.2, 0);
-      const rope = B(g, 2, 0.03, 0.03, '#d8cfa8', 0, 1.6, 0);
-      g.userData.foot = [2.4, 0.4];
-      break;
-    }
+    case 'path_gate':
+    case 'ticket_gate': passageGate(g, p); break;
     case 'bus': {
       B(g, 5, 2.2, 2.1, '#3f8f6a', 0, 0.35, 0); B(g, 5.02, 0.6, 2.12, '#e9e2cc', 0, 1.3, 0);
       for (let i = 0; i < 5; i++) B(g, 0.7, 0.5, 2.14, '#9cd6e8', -1.8 + i * 0.9, 1.35, 0, { emissive: '#6af', emissiveIntensity: 0.3 });

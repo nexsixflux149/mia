@@ -296,7 +296,7 @@ export const KIMONO_CHAPTERS = [
         text: '단장을 마친 유키가 동백 문 앞에 서서 묻는다.\n"…하루는, 왔나요?" (말 입력)',
         lock: { input: 'text', answer: ['하루가왔어요', '하루가왔어', '하루는왔어요', '하루는매년왔어요', '하루가매년왔어요', '하루는매년왔어', '매년왔어요', '하루가기다려요', '하루가기다리고있어요', '하루는기다렸어요', '하루는기다리고있어요', '네하루가왔어요', '응하루가왔어', '왔어요', '네왔어요'] },
         on: { flag: 'haru', ghost: 'stop', sound: 'bell', toast: '동백 문이 열렸다' } },
-      { id: 'exit', t: 'torii', x: 0, z: 7.6, label: '정원으로 돌아가는 문', kind: 'door', req: ['haru'], to: 'end',
+      { id: 'exit', t: 'cabin_door', x: 0, z: 7.6, r: 180, label: '정원으로 돌아가는 문', kind: 'door', req: ['haru'], to: 'end',
         lockedText: '문 앞에 동백꽃이 수북이 쌓여 길을 막고 있다.' },
     ],
     coops: {

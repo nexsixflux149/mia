@@ -155,7 +155,7 @@ export const CHAPTERS = [
         text: '멈춘 벽시계. 짧은바늘은 2와 3 사이, 긴바늘은 9를 조금 넘긴 곳 — 2시 47분.\n\n가만히 보고 있으면, 초침이 가끔 거꾸로 한 칸씩 움직인다.' },
       { id: 'memo', t: 'paper', x: 0.8, z: -4, y: 0.82, label: '교탁 위 메모', kind: 'examine',
         text: `단정한 여선생님의 글씨.\n\n"서랍 번호를 또 잊을까 봐 적어 둔다.\n 우리 반이 마지막으로 다 함께였던 시각.\n 세 자리로."\n\n메모의 날짜는 1979년 11월 7일이다. ...그날 쓴 메모인데, 어떻게 '마지막'을 알았을까.` },
-      { id: 'teacher_desk', t: 'teacher_desk', x: 0, z: -4, label: '교탁 서랍', kind: 'lock',
+      { id: 'teacher_desk', t: 'teacher_desk', x: 0, z: -4, r: 180, label: '교탁 서랍', kind: 'lock',
         text: '교탁 서랍에 3자리 다이얼 자물쇠가 달려 있다.',
         lock: { input: 'digits', len: 3, answer: '247' },
         doneText: '열린 서랍. 안은 비어 있다. 바닥에 손톱으로 긁은 자국이 있다.',

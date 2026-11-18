@@ -8,7 +8,7 @@ export function makeXmasShots(c, kind, looks) {
   const truth = kind === 'xmas_true';
   const chapter = intro ? 0 : truth ? 1 : 2;
   const actors = [];
-  let animate, parcel, marionette;
+  let animate, parcel, marionette, windowFrame, redCoat;
   c.set('xmas', root => {
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(70, 72), new THREE.MeshStandardMaterial({
       color: chapter === 1 ? '#97b7c1' : '#39303c', roughness: .78,
@@ -21,7 +21,35 @@ export function makeXmasShots(c, kind, looks) {
       }
     }
     parcel = c.prop(root, { t: 'xmas_stack', x: .3, z: -2.4 });
-    if (!truth) {
+    if (intro) {
+      windowFrame = new THREE.Group();
+      windowFrame.position.set(-1.22, 0, -4.85);
+      windowFrame.visible = false;
+      const metal = new THREE.MeshStandardMaterial({ color: '#264050', roughness: .55 });
+      for (const x of [-1.28, .55, 1.28]) {
+        const stile = new THREE.Mesh(new THREE.BoxGeometry(.075, 2.65, .09), metal);
+        stile.position.set(x, 1.36, 0);
+        windowFrame.add(stile);
+      }
+      for (const y of [.06, .42, 2.68]) {
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(2.64, .08, .10), metal);
+        rail.position.y = y;
+        windowFrame.add(rail);
+      }
+      const glass = new THREE.Mesh(new THREE.PlaneGeometry(2.57, 2.58), new THREE.MeshBasicMaterial({
+        color: '#83c3db', transparent: true, opacity: .19, depthWrite: false, side: THREE.DoubleSide,
+      }));
+      glass.position.y = 1.36;
+      windowFrame.add(glass);
+      root.add(windowFrame);
+      redCoat = createAvatar({ outfit: 'plain', accent: '#ae2331', hair: 'bob',
+        hairColor: '#231a20', body: '#e2b7a5', ears: 'none', hat: 'none' }, { legColor: '#241622', sleeveColor: '#9a202c' });
+      redCoat.name = 'Red-coated figure';
+      redCoat.position.set(-1.75, 0, -5.9);
+      redCoat.rotation.y = .8;
+      redCoat.visible = false;
+      root.add(redCoat);
+    } else if (!truth) {
       marionette = dressXmas(createGhost('marionette'));
       marionette.position.set(-1.8, 0, -6);
       marionette.visible = false;
@@ -59,8 +87,20 @@ export function makeXmasShots(c, kind, looks) {
       update: (s, t, k, dt) => { tick(t, dt); s.look(5 - k * 3.2, 3.25 - k, 8 - k * 2, .3, .7, -2.4); } },
     { dur: 7, caption: '보내는 사람은 공란. 받는 사람은 당신.\n발송일은 아직 오지 않은 내일.', setup: () => { actors[2].visible = true; actors[2].position.set(1.35, 0, -2.83); },
       update: (s, t, k, dt) => { tick(t, dt); s.look(2.4 - k * 2.5, 1.87, .65 - k * 1.1, .45, .86, -2.4); } },
-    { dur: 6, caption: '유리 너머에서 붉은 외투가 손짓했다.\n“그 열차가 떠나기 전에, 나를 찾아.”', setup: () => { marionette.visible = true; },
-      update: (s, t, k, dt) => { tick(t, dt); marionette.position.z = -6 - t * .48; s.look(-4 + k * 2, 2.2, .8 - k * 2, -1.8, 1.24, marionette.position.z); } },
+    { dur: 6, caption: '유리 너머에서 붉은 외투가 손짓했다.\n“그 열차가 떠나기 전에, 나를 찾아.”', setup: () => { actors[2].visible = false; parcel.visible = false; windowFrame.visible = redCoat.visible = true; },
+      update: (s, t, k, dt) => {
+        tick(t, dt);
+        const leaving = t > 4.1;
+        redCoat.rotation.y = leaving ? .8 + 1.55 * Math.min(1, (t - 4.1) * 2.1) : .8;
+        redCoat.position.x = -1.75 - Math.max(0, t - 4.1) * .6;
+        redCoat.position.z = -5.9 - Math.max(0, t - 4.1) * .4;
+        animateAvatar(redCoat, dt, leaving, t);
+        if (!leaving) {
+          const wave = Math.min(1, t * 2.5);
+          redCoat.userData.arms[0].rotation.set(-1.05 * wave, 0, (-1.9 + Math.sin(t * 8) * .37) * wave);
+        }
+        s.look(-3.05 + k * .9, 1.95, -1.05 - k * .7, -1.60, 1.3, -5.3);
+      } },
     closing('크리스마스 · 자정에 반송된 선물', '0번 우체국에서 시작되는 특별판'),
   ];
   if (truth) return [

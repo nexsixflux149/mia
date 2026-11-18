@@ -33,8 +33,13 @@ export const MIA_CHAPTERS = [
 
 (처음이라면: 반짝이는 물건에 다가가 클릭하면 살펴볼 수 있어요. 막히면 오른쪽 위 💡힌트!)`),
     props: [
-      { t: 'house', x: -7, z: -4, r: 90 }, { t: 'house', x: 7, z: -4, r: -90 }, { t: 'house', x: -7.5, z: 3.5, r: 90 },
-      { t: 'fence', x: 6.5, z: 3.5, r: 90 }, { t: 'lamp', x: 3.5, z: 1 }, { t: 'pole', x: -3.5, z: -1.5 },
+      { t: 'alley_house', x: -6.4, z: -4, r: 90 }, { t: 'alley_house', x: 6.9, z: -3.6, r: -90 },
+      { t: 'alley_house', x: -6.8, z: 3.25, r: 90 }, { t: 'alley_house', x: 7.8, z: 3.5, r: -90 },
+      { t: 'alley_wall', x: -5, z: -.55, r: 90 }, { t: 'alley_wall', x: 5.7, z: 2.85, r: -90 },
+      { t: 'alley_shop', x: 0, z: -5.98 }, { t: 'alley_house', x: -4.7, z: -8.5, r: 12 },
+      { t: 'alley_house', x: 3.9, z: -9.08, r: -9 }, { t: 'alley_house', x: 8.2, z: -10, r: 14 },
+      { t: 'lamp', x: 3.5, z: 1 }, { t: 'pole', x: -3.5, z: -1.5 }, { t: 'pole', x: 4.7, z: -1.1 },
+      { t: 'alley_wires', x: 0, z: -1.5 },
       { t: 'bench', x: 4.5, z: 4, r: -90 }, { t: 'crate', x: -4.5, z: 4.8 }, { t: 'bottles', x: -4, z: 4.2 },
       { t: 'leaves', x: 1, z: 2 }, { t: 'leaves', x: -2, z: -3 }, { t: 'umbrella_stand', x: 2.4, z: -4.6 },
     ],
@@ -52,14 +57,14 @@ export const MIA_CHAPTERS = [
 
 전단지는 수십 장이 겹겹이 붙어 있다. 가장 위의 것은 아직 새것이다.
 누군가 30년 동안 매년 새로 붙인 것처럼.` },
-      { id: 'memo', t: 'paper', x: 1.6, z: -5.2, y: 1.1, label: '셔터에 붙은 쪽지', kind: 'examine', goneOn: 'shop',
+      { id: 'memo', t: 'paper', x: 1.57, z: -5.56, y: 1.1, label: '셔터에 붙은 쪽지', kind: 'examine', goneOn: 'shop',
         text: `셔터 손잡이 옆에 삐뚤빼뚤한 할머니 글씨.
 
   "자물쇠 번호는 우리 미아 잃어버린 날.
    잊어버리면 안 되니까."
 
 (숫자 네 자리: 월·일)` },
-      { id: 'shutter', t: 'iron_door', x: 0, z: -5.6, label: '달빛 문방구 셔터', kind: 'lock', goneOn: 'shop', // 열면 셔터가 사라져 뒤의 문을 바로 누를 수 있다
+      { id: 'shutter', t: 'roller_shutter', x: 0, z: -5.6, label: '달빛 문방구 셔터', kind: 'lock', goneOn: 'shop',
         text: '녹슨 셔터에 네 자리 번호 자물쇠가 걸려 있다.',
         lock: { input: 'digits', len: 4, answer: '0505' },
         doneText: '셔터가 반쯤 올라가 있다. 안에서 형광등이 지직거린다.',
@@ -71,7 +76,7 @@ export const MIA_CHAPTERS = [
 
 그때 등 뒤 골목에서, 누군가 아주 천천히 걸어오는 발소리가 들렸다.
 "…미아야?"`) } },
-      { id: 'wall_mark', t: 'wall_marks', x: 6.8, z: 0.5, r: -90, label: '담벼락 낙서', kind: 'examine',
+      { id: 'wall_mark', t: 'wall_marks', x: 5.46, z: 1.3, r: -90, label: '담벼락 낙서', kind: 'examine',
         text: '아이들 키를 잰 듯한 금이 그어진 담벼락. 크레파스 글씨가 바래서 잘 보이지 않는다.',
         reveal: { item: 'flashlight', text: `손전등을 비추자 바랜 글씨가 떠올랐다.
 
@@ -81,7 +86,7 @@ export const MIA_CHAPTERS = [
 (손전등은 인벤토리에서 켤 수 있어요. 어두운 곳을 비추면 숨은 글씨가 보여요)`, flag: 'mark' } },
       { id: 'umbrella', t: 'umbrella_stand', x: 3.9, z: 1.3, label: '가로등 밑 빨간 우산', kind: 'pickup', item: 'mia_relic_1', hidden: true, req: ['mark'],
         text: '가로등 밑에 아이 우산 하나가 접힌 채 세워져 있다. 30년이 지났는데 빗물에 젖어 있다.\n손잡이에 이름 스티커: "김미아"', takenText: '우산이 있던 자리에 작은 물웅덩이만 남았다.' },
-      { id: 'shop_door', t: 'door', x: 0, z: -5.9, label: '문방구 안으로', kind: 'door', req: ['shop'], to: 1,
+      { id: 'shop_door', t: 'alley_shop_entry', x: 0, z: -5.6, label: '문방구 안으로', kind: 'door', hidden: true, req: ['shop'], to: 1,
         lockedText: '셔터가 내려져 있다.' },
     ],
     objectives: [
