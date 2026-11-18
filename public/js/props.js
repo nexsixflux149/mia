@@ -249,6 +249,129 @@ function passageGate(g, p) {
   }
 }
 
+const lampFinishes = new Map();
+function weatheredLampMetal(paint, oxide) {
+  const key = paint + oxide;
+  if (lampFinishes.has(key)) return lampFinishes.get(key);
+  const texture = canvasTex(128, 128, (ctx, w, h) => {
+    ctx.fillStyle = paint; ctx.fillRect(0, 0, w, h);
+    for (let i = 0; i < 330; i++) {
+      const x = (i * 73 % 997) / 997 * w, y = (i * 113 % 961) / 961 * h;
+      ctx.globalAlpha = i % 5 ? .23 : .68;
+      ctx.fillStyle = i % 3 ? oxide : '#c0a48a';
+      ctx.fillRect(x, y, 1 + i % 5, 1 + i % 13);
+    }
+    ctx.globalAlpha = 1;
+  }, 'lamp-metal-' + key);
+  const material = markShared(new THREE.MeshStandardMaterial({ map: texture, metalness: .35, roughness: .81 }));
+  lampFinishes.set(key, material);
+  return material;
+}
+
+function lampArm(g, material, radius, from, to) {
+  const a = new THREE.Vector3(...from), b = new THREE.Vector3(...to), axis = b.clone().sub(a);
+  const arm = C(g, radius, radius, axis.length(), material, 0, 0, 0, 8);
+  arm.position.copy(a).lerp(b, .5);
+  arm.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis.normalize());
+}
+
+function buildThemedLamp(g, p, theme) {
+  let light;
+  const lens = (color) => M(color, { emissive: color, emissiveIntensity: 1.25, roughness: .42 });
+  if (theme === 'mia') {
+    const arm = weatheredLampMetal('#737677', '#753e27');
+    const housing = weatheredLampMetal('#828a81', '#804229');
+    const post = weatheredLampMetal('#89847b', '#544739');
+    C(g, .086, .118, 3.9, post);
+    C(g, .121, .126, .18, '#57534e', 0, .12);
+    C(g, .103, .106, .096, arm, 0, 3.66);
+    B(g, .16, .26, .12, arm, -.065, 1.75, .084);
+    B(g, .076, .13, .01, '#666252', -.065, 1.80, .148);
+    lampArm(g, arm, .047, [0, 3.69, 0], [-.34, 3.95, 0]);
+    lampArm(g, arm, .039, [-.34, 3.95, 0], [-.98, 3.97, 0]);
+    const shell = S(g, .34, housing, -1.05, 3.96, 0);
+    shell.scale.set(1.18, .39, .57);
+    S(g, .30, lens('#ffcf8b'), -1.07, 3.86, 0).scale.set(1.12, .18, .54);
+    light = ['#ffc57b', 11, 9, -1.05, 3.78, 0];
+  } else if (theme === 'gwimun') {
+    const timber = weatheredLampMetal('#6e5b42', '#3b3328');
+    const enamel = weatheredLampMetal('#556454', '#7e3d2c');
+    C(g, .072, .11, 3.48, timber);
+    B(g, .09, .10, .86, enamel, 0, 3.24, .39);
+    C(g, .095, .25, .19, enamel, 0, 3.17, .73, 13);
+    S(g, .107, lens('#ffdb9d'), 0, 3.13, .73);
+    light = ['#ffd295', 8, 8, 0, 3, .73];
+  } else if (theme === 'camp') {
+    const timber = weatheredLampMetal('#5b4835', '#382e24');
+    B(g, .21, 2.74, .20, timber);
+    B(g, .16, .13, .57, timber, 0, 2.51, .25);
+    C(g, .037, .037, .23, '#45433b', 0, 2.36, .48, 8);
+    C(g, .055, .21, .13, '#35453a', 0, 2.29, .48, 10);
+    C(g, .10, .125, .235, lens('#ffd59d'), 0, 2.04, .48, 10);
+    C(g, .163, .16, .055, '#39443a', 0, 2.01, .48, 10);
+    for (const x of [-.12, .12]) B(g, .02, .253, .021, '#3c433a', x, 2.04, .56);
+    light = ['#ffc685', 7, 7.5, 0, 2.02, .51];
+  } else if (theme === 'ophelia') {
+    const iron = weatheredLampMetal('#4f6058', '#8b4734');
+    C(g, .132, .151, .19, '#4f514d');
+    C(g, .061, .078, 2.92, iron, 0, .17);
+    lampArm(g, iron, .046, [0, 3.07, 0], [0, 3.36, .26]);
+    lampArm(g, iron, .046, [0, 3.36, .26], [0, 3.36, .59]);
+    lampArm(g, iron, .041, [0, 3.36, .59], [0, 3.16, .73]);
+    C(g, .09, .22, .15, iron, 0, 3.11, .73, 10);
+    S(g, .13, lens('#ffcc82'), 0, 3.05, .73);
+    for (let i = 0; i < 6; i++) {
+      const a = i * Math.PI / 3;
+      const x = Math.cos(a), z = Math.sin(a);
+      lampArm(g, iron, .015, [x * .15, 3.13, .73 + z * .15], [x * .105, 2.94, .73 + z * .105]);
+    }
+    C(g, .122, .12, .033, iron, 0, 2.926, .73, 10);
+    light = ['#ffc77c', 8, 8, 0, 2.9, .73];
+  } else if (theme === 'park') {
+    const enamel = weatheredLampMetal('#336566', '#852f20');
+    C(g, .147, .18, .20, '#484b46');
+    C(g, .062, .087, 2.5, enamel, 0, .18);
+    B(g, 1.39, .095, .12, enamel, 0, 2.56);
+    for (const side of [-1, 1]) {
+      const x = side * .58;
+      C(g, .129, .086, .12, '#a77746', x, 2.64, 0, 10);
+      S(g, .198, lens('#ffe9bd'), x, 2.90, 0);
+      C(g, .078, .108, .042, enamel, x, 3.083, 0, 10);
+    }
+    light = ['#ffdb9f', 9, 8.5, 0, 2.7, 0];
+  } else if (theme === 'clown') {
+    const red = weatheredLampMetal('#8d322d', '#542523');
+    C(g, .15, .18, .21, '#493737');
+    C(g, .067, .089, 2.48, red, 0, .20);
+    for (let i = 0; i < 4; i++) C(g, .083, .089, .24, '#d6c4a3', 0, .42 + i * .51, 0, 10);
+    C(g, .20, .09, .12, '#95633a', 0, 2.63, 0, 12);
+    C(g, .135, .18, .27, lens('#ffbe81'), 0, 2.73, 0, 8);
+    for (const x of [-.12, .12]) B(g, .022, .29, .025, '#784938', x, 2.72, .111);
+    C(g, .055, .245, .20, red, 0, 3.0, 0, 8);
+    S(g, .056, '#be8d52', 0, 3.215, 0);
+    light = ['#ffb477', 8, 8, 0, 2.83, 0];
+  } else if (theme === 'zombie') {
+    const steel = weatheredLampMetal('#666e6d', '#7d4a32');
+    C(g, .09, .147, .26, '#646661');
+    C(g, .046, .084, 4, steel, 0, .16);
+    lampArm(g, steel, .048, [0, 3.97, 0], [0, 4.22, .46]);
+    lampArm(g, steel, .04, [0, 4.22, .46], [0, 4.22, 1.12]);
+    B(g, .32, .102, .63, '#4e5657', 0, 4.15, 1.23);
+    B(g, .23, .024, .47, lens('#caebed'), 0, 4.129, 1.26);
+    light = ['#c1e7ee', 10, 10, 0, 4.05, 1.24];
+  } else return false;
+
+  g.userData.lampTheme = theme;
+  if (!p.noLight) {
+    const [color, intensity, distance, x, y, z] = light;
+    const source = new THREE.PointLight(color, intensity, distance, 2);
+    source.position.set(x, y, z);
+    g.add(source);
+    g.userData.flicker = source;
+  }
+  return true;
+}
+
 // 테마별 포스터 그림
 function posterTex(p) {
   const label = String(p.label || '');
@@ -446,6 +569,7 @@ export function buildProp(p) {
     case 'fence': { const len = p.len || 6; for (let i = 0; i < len; i++) C(g, 0.06, 0.07, 1.2, DWOOD, -len / 2 + i + 0.5, 0, 0, 6); B(g, len, 0.08, 0.06, DWOOD, 0, 0.9, 0); B(g, len, 0.08, 0.06, DWOOD, 0, 0.45, 0); break; }
     case 'pole': { C(g, 0.1, 0.13, 6, '#4a4542'); B(g, 1.4, 0.08, 0.08, '#3a3532', 0, 5.4, 0); break; }
     case 'lamp': {
+      if (buildThemedLamp(g, p, p.lampTheme || THEME)) break;
       // 가로등: 받침 · 기둥 · 장식 고리 · 유리 등갓 · 갓 지붕
       const pole = p.color || '#2d2d30';
       C(g, 0.13, 0.16, 0.25, pole); C(g, 0.05, 0.07, 2.8, pole, 0, 0.2); C(g, 0.09, 0.09, 0.06, pole, 0, 1.0, 0, 10); C(g, 0.08, 0.06, 0.12, pole, 0, 2.86, 0, 8);

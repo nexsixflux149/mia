@@ -116,7 +116,7 @@ export class Cinema {
       const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 40), new THREE.MeshStandardMaterial({ color: '#1d2218', roughness: 1 })); ground.rotation.x = -Math.PI / 2; g.add(ground);
       const road = new THREE.Mesh(new THREE.PlaneGeometry(80, 5), new THREE.MeshStandardMaterial({ color: '#2a2a2c' })); road.rotation.x = -Math.PI / 2; road.position.set(0, 0.01, 1); g.add(road);
       this.prop(g, { t: 'bus_stop', x: 0, z: -3, r: 180 }); this.prop(g, { t: 'bench', x: 0, z: -3.3 });
-      const lamp = this.prop(g, { t: 'lamp', x: 2.5, z: -2.5 }); this.stopLamp = lamp.userData.flicker;
+      const lamp = this.prop(g, { t: 'lamp', x: 2.5, z: -2.5, lampTheme: 'gwimun' }); this.stopLamp = lamp.userData.flicker;
       for (let i = 0; i < 14; i++) this.prop(g, { t: 'pine', x: -20 + i * 3, z: -9 - Math.random() * 4 });
       this.stopBus = this.prop(g, { t: 'bus', x: 30, z: 1.6 });
       this.crew = (looks.length ? looks : [{}]).slice(0, 4).map((l, i) => { const a = createAvatar(l); a.position.set(-1.5 + i * 1.1, 0, -1.4); a.visible = false; g.add(a); return a; });
@@ -436,6 +436,7 @@ export class Cinema {
       for (let i = 0; i < 24; i++) this.prop(g, { t: 'pine', x: -30 + i * 2.6, z: -38 + Math.random() * 4 });
       ['#c9302c', '#e8c13a', '#3b7dd8', '#2fbf71'].forEach((color, i) => this.prop(g, { t: 'tent', x: -7 + i * 4.5, z: 12 + (i % 2) * 1.5, r: (i - 1.5) * 12, color }));
       this.lakeFire = this.prop(g, { t: 'campfire', x: 0, z: 4 });
+      for (const side of [-1, 1]) this.prop(g, { t: 'lamp', x: side * 4.2, z: 8.5, lampTheme: 'camp', noLight: true });
       for (let i = 0; i < 6; i++) this.prop(g, { t: 'fireflies', x: -12 + i * 5, z: -2 - Math.random() * 6 });
       const kids = [{ outfit: 'tracksuit', hair: 'spiky', accent: '#c9302c' }, { outfit: 'raincoat', hair: 'ponytail', hat: 'flower' }, { outfit: 'tracksuit', hair: 'bowl', accent: '#3b7dd8' }, { outfit: 'hoodie', hair: 'bob', accent: '#2fbf71' }];
       this.lakeKids = kids.map((l, i) => { const a = createAvatar({ ...l, ears: 'none', eyes: 'smile', mouth: 'open' }); const ang = (i / 4) * Math.PI * 2; a.position.set(Math.sin(ang) * 1.8, 0, 4 + Math.cos(ang) * 1.8); a.rotation.y = ang + Math.PI; g.add(a); return a; });
@@ -569,7 +570,7 @@ export class Cinema {
       this.prop(g, { t: 'alley_wall', x: -4.8, z: -5.9, r: 90 });
       this.prop(g, { t: 'alley_shop', z: -14.4 });
       this.prop(g, { t: 'roller_shutter', z: -14 }); this.prop(g, { t: 'flyer', x: -3.2, z: -6, y: 1.4 }); this.prop(g, { t: 'pole', x: -3.2, z: -6.3 });
-      this.miaLamp = this.prop(g, { t: 'lamp', x: 3, z: -4 });
+      this.miaLamp = this.prop(g, { t: 'lamp', x: 3, z: -4, lampTheme: 'mia' });
       this.miaKid = createAvatar({ outfit: 'plain', accent: '#ffd23a', hair: 'bob', hairColor: '#2b1d16', ears: 'none', eyes: 'sparkle', mouth: 'open', body: '#ffe0cc' }); this.miaKid.scale.setScalar(0.78); g.add(this.miaKid);
       this.miaGran = createAvatar({ outfit: 'plain', accent: '#8a6a9a', hair: 'bun', hairColor: '#d8d4cc', ears: 'none', eyes: 'closed', mouth: 'smile', body: '#f0d4bc' }); this.miaGran.scale.setScalar(0.95); g.add(this.miaGran);
       this.miaGhost = createGhost('woman'); g.add(this.miaGhost);
@@ -611,6 +612,7 @@ export class Cinema {
       this.parkWheel = this.prop(g, { t: 'ferris_wheel', x: 10, z: -14, r2: 7 });
       this.parkCarousel = this.prop(g, { t: 'carousel_big', x: 0, z: -4, r2: 3.2 });
       this.prop(g, { t: 'drop_tower', x: -11, z: -12, h: 14 }); this.parkDrop = this.prop(g, { t: 'drop_car', x: -11, z: -12, y: 10 });
+      for (const side of [-1, 1]) this.prop(g, { t: 'lamp', x: side * 5.4, z: 6.5, lampTheme: 'park', noLight: true });
       this.prop(g, { t: 'ticket_gate', z: 8, r: 180 }); this.prop(g, { t: 'lantern_string', x: 0, z: 4, len: 18 });
       this.parkHappy = this.prop(g, { t: 'mascot_statue', x: 5, z: 4, r: -40, s: 1.4 });
       const KID = ['#ff8fab', '#e8c13a', '#9ab7d8', '#2fbf71', '#ffb0e0', '#b39dff'];
@@ -653,6 +655,7 @@ export class Cinema {
     return this.set('clown', (g) => {
       g.position.set(3200, 0, 0);
       const gr = new THREE.Mesh(new THREE.PlaneGeometry(70, 50), new THREE.MeshStandardMaterial({ color: '#2a1a22', roughness: 1 })); gr.rotation.x = -Math.PI / 2; g.add(gr);
+      for (const side of [-1, 1]) this.prop(g, { t: 'lamp', x: side * 5.7, z: 5.5, lampTheme: 'clown', noLight: true });
       this.prop(g, { t: 'big_top', x: 0, z: -10, r2: 8, h: 9 });
       this.prop(g, { t: 'ticket_booth', x: -6, z: 2, r: 40 }); this.prop(g, { t: 'balloon_stand', x: 5, z: 3 }); this.prop(g, { t: 'popcorn_cart', x: 7, z: -1, r: -40 });
       this.prop(g, { t: 'lantern_string', x: 0, z: 0, len: 14 }); this.prop(g, { t: 'clown_statue', x: -3, z: 6, r: 160 }); this.prop(g, { t: 'jack_box', x: 3.5, z: -3.5 });
@@ -765,7 +768,7 @@ export class Cinema {
       const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.4, 10, 8), new THREE.MeshBasicMaterial({ color: '#ff3030' })); bulb.position.copy(this.cityBeacon.position); g.add(bulb); this.cityBulb = bulb;
       [[-6, -6, 20], [5, 2, -15], [-4, 10, 95], [7, -18, 10]].forEach(([x, z, r], i) => this.prop(g, { t: 'car', x, z, r, wreck: i % 2 === 0, taxi: i === 1 }));
       this.prop(g, { t: 'bus', x: 8, z: 12, r: 70 }); this.prop(g, { t: 'barricade', x: -2, z: -24 }); this.prop(g, { t: 'barricade', x: 3, z: -25, r: 10 });
-      for (const [x, z] of [[-9, 14], [9, -6], [-9, -20]]) this.prop(g, { t: 'lamp', x, z });
+      for (const [x, z] of [[-9, 14], [9, -6], [-9, -20]]) this.prop(g, { t: 'lamp', x, z, lampTheme: 'zombie' });
       this.cityZ = [[-3, -10], [4, -14], [-6, -18], [2, -6], [7, -20], [-1, -22]].map(([x, z]) => { const zb = createGhost('zombie'); zb.position.set(x, 0, z); zb.rotation.y = Math.random() * 6; g.add(zb); return zb; });
       this.cityCrew = (looks.length ? looks : [{}]).slice(0, 4).map((l, i) => { const a = createAvatar(l); a.position.set(-1.6 + i * 1.1, 0, 22); a.rotation.y = Math.PI; g.add(a); return a; });
       // 옥상 장면용: 헬기 · 하린 · 조종사

@@ -27,6 +27,7 @@ function copyModel(id) {
 }
 
 export function dressScenery(target, root, prop) {
+  if (target.userData.lampTheme) return;
   if (!scenery.has(prop.t) || (prop.color && !['tent', 'flagpole', 'paper_lantern', 'tree', 'car', 'facade', 'cabin_door', 'teacup', 'bumper_car', 'wall_frame', 'sconce', 'hanging_bulb', 'mesa', 'mushrooms', 'drape', 'parade_float', 'neon_sign', 'pipe_run', 'swing', 'hanging_dummy'].includes(prop.t)) || (prop.t === 'vending' && prop.on === false)) return;
   if (prop.t === 'bottles' && (prop.fallen || (prop.n && prop.n !== 4))) return;
   if (prop.t === 'bamboo' && prop.n && prop.n !== 5) return;
