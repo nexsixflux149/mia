@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { createAvatar } from './avatar.js';
+import { boxG, markShared } from './props.js';
 
 // ───── 상점 물건 모양 (날개 · 탈것 · 전설의 검) + 사용 효과 (폭죽 · 검 · 방귀)
 // 모든 날개·탈것은 조금씩 반복해서 움직이고, 살짝 빛난다.
 const MC = new Map();
-const M = (c, o = {}) => { const k = c + JSON.stringify(o); let m = MC.get(k); if (!m) { m = new THREE.MeshStandardMaterial({ color: c, roughness: 0.5, ...o }); MC.set(k, m); } return m; };
+const M = (c, o = {}) => { const k = c + JSON.stringify(o); let m = MC.get(k); if (!m) { m = markShared(new THREE.MeshStandardMaterial({ color: c, roughness: 0.5, ...o })); MC.set(k, m); } return m; };
 const glowM = (c, i = 0.6, o = {}) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: i, roughness: 0.35, ...o });
 const mesh = (geo, mat, x = 0, y = 0, z = 0, parent) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; parent?.add(m); return m; };
 const isCoarse = matchMedia('(pointer: coarse)').matches;
@@ -14,7 +15,7 @@ function sparkTex() {
   if (_spark) return _spark;
   const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
   const g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.25, 'rgba(255,255,255,.75)'); g.addColorStop(1, 'rgba(255,255,255,0)');
-  x.fillStyle = g; x.fillRect(0, 0, 64, 64); _spark = new THREE.CanvasTexture(c); return _spark;
+  x.fillStyle = g; x.fillRect(0, 0, 64, 64); _spark = markShared(new THREE.CanvasTexture(c)); return _spark;
 }
 const glowSprite = (color, size, opacity = 0.6) => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: sparkTex(), color, transparent: true, opacity, depthWrite: false, blending: THREE.AdditiveBlending })); s.scale.setScalar(size); return s; };
 
@@ -248,7 +249,7 @@ function crestTex() { // 객실 옆판 그림: 진홍 옻칠 바탕에 금테 ·
   x.fillStyle = g; x.beginPath(); x.moveTo(106, 58); x.lineTo(108, 34); x.lineTo(117, 46); x.lineTo(128, 28); x.lineTo(139, 46); x.lineTo(148, 34); x.lineTo(150, 58); x.closePath(); x.fill(); // 왕관
   for (const [px, py] of [[108, 32], [128, 26], [148, 32]]) { x.fillStyle = '#ff4a6a'; x.beginPath(); x.arc(px, py, 4, 0, Math.PI * 2); x.fill(); }
   x.strokeStyle = '#f7cf4a'; x.lineWidth = 3; for (const s of [-1, 1]) { x.beginPath(); x.moveTo(128 + s * 30, 80); x.bezierCurveTo(128 + s * 62, 60, 128 + s * 80, 104, 128 + s * 50, 112); x.bezierCurveTo(128 + s * 70, 96, 128 + s * 54, 80, 128 + s * 38, 96); x.stroke(); }
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return (_crestTex = t);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return (_crestTex = markShared(t));
 }
 function coachHorse(gold) {
   const h = new THREE.Group();
@@ -704,9 +705,9 @@ function catMaskMat() {
   x.restore();
   // 가장자리의 황금 테
   x.lineWidth = 9; x.strokeStyle = '#f0b429'; x.stroke(face);
-  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  const tex = markShared(new THREE.CanvasTexture(c)); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
   // 부드러운(번들거리지 않는) 재질 · 어두운 맵에서도 무늬가 보이게 살짝 스스로 빛난다
-  _maskMat = new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.5, roughness: 0.84, metalness: 0, emissive: '#ffffff', emissiveMap: tex, emissiveIntensity: 0.3, side: THREE.DoubleSide });
+  _maskMat = markShared(new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.5, roughness: 0.84, metalness: 0, emissive: '#ffffff', emissiveMap: tex, emissiveIntensity: 0.3, side: THREE.DoubleSide }));
   return _maskMat;
 }
 const softM = (c, e, i = 0.28) => M(c, { roughness: 0.84, metalness: 0, emissive: e, emissiveIntensity: i });
@@ -966,8 +967,8 @@ function maskPlate(key, R, PW, th0, TH, W, H, draw, mo = {}) {
     const P = (d, th) => [((d + PW / 2) / PW) * W, ((th - th0) / TH) * H];
     x.lineCap = 'round'; x.lineJoin = 'round';
     draw(x, P, W, H);
-    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
-    mat = _maskPlate[key] = new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.5, roughness: 0.8, metalness: 0, emissive: '#ffffff', emissiveMap: tex, emissiveIntensity: 0.3, side: THREE.DoubleSide, ...mo });
+    const tex = markShared(new THREE.CanvasTexture(c)); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+    mat = _maskPlate[key] = markShared(new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.5, roughness: 0.8, metalness: 0, emissive: '#ffffff', emissiveMap: tex, emissiveIntensity: 0.3, side: THREE.DoubleSide, ...mo }));
   }
   const m = new THREE.Mesh(new THREE.SphereGeometry(R, 48, 26, Math.PI / 2 - PW / 2, PW, th0, TH), mat); m.scale.set(1.08, 0.95, 1); m.castShadow = true; return m;
 }
@@ -1241,7 +1242,7 @@ function snackTex(kind) {
   if (kind === 'p') { for (let i = 0; i < 8; i++) { x.fillStyle = i % 2 ? '#ffffff' : '#e8202a'; x.fillRect(i * 16, 0, 16, 64); } x.fillStyle = '#ffd23a'; x.font = '900 22px sans-serif'; x.textAlign = 'center'; x.fillText('POP', 64, 40); }
   else if (kind === 'h') { const bg = x.createLinearGradient(0, 0, 0, 64); bg.addColorStop(0, '#e8a33a'); bg.addColorStop(0.5, '#d48a28'); bg.addColorStop(1, '#b86e1a'); x.fillStyle = bg; x.fillRect(0, 0, 128, 64); x.fillStyle = 'rgba(255,255,255,.75)'; for (let i = 0; i < 60; i++) x.fillRect((i * 37) % 128, (i * 23) % 64, 2, 2); x.strokeStyle = '#d8202a'; x.lineWidth = 4; x.beginPath(); for (let i = 0; i <= 16; i++) x.lineTo(i * 8, 20 + (i % 2) * 22); x.stroke(); }
   else { x.fillStyle = '#fbf8f2'; x.fillRect(0, 0, 128, 64); x.fillStyle = '#c99a62'; x.fillRect(0, 20, 128, 26); x.fillStyle = '#0f7a4a'; x.beginPath(); x.arc(64, 33, 15, 0, Math.PI * 2); x.fill(); x.fillStyle = '#fff'; x.font = '900 16px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('★', 64, 34); }
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; return (_snackTex[kind] = t);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; return (_snackTex[kind] = markShared(t));
 }
 export const BALLOON_COLORS = ['#ff4f6a', '#ffd23a', '#5ad1ff', '#9a7bff', '#7ee0a8', '#ff8fd0', '#ff9a3c', '#3c7bff', '#ffffff', '#c8ff4a'];
 /** 풍선 하나: 바닥(0,0,0)이 손 · 줄이 위로 1.1 · 그 위에 풍선 (up 그룹은 매 프레임 하늘을 향하게 돌린다) */
@@ -1525,20 +1526,21 @@ function billTex() {
   x.fillStyle = '#7a520c'; x.font = 'bold 22px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
   for (const [px, py] of [[38, 32], [218, 32], [38, 96], [218, 96]]) x.fillText('1000', px, py);
   x.font = 'bold 13px sans-serif'; x.fillText('MIA BANK', 128, 18);
-  _billTex = new THREE.CanvasTexture(c); _billTex.colorSpace = THREE.SRGBColorSpace;
+  _billTex = markShared(new THREE.CanvasTexture(c)); _billTex.colorSpace = THREE.SRGBColorSpace;
   return _billTex;
 }
+let _cashTop = null;
 export function buildCashStack() {
   const g = new THREE.Group(), spin = new THREE.Group(); g.add(spin);
-  const top = new THREE.MeshStandardMaterial({ map: billTex(), metalness: 0.55, roughness: 0.35, emissive: '#5a3a00', emissiveIntensity: 0.35 });
+  const top = _cashTop ??= markShared(new THREE.MeshStandardMaterial({ map: billTex(), metalness: 0.55, roughness: 0.35, emissive: '#5a3a00', emissiveIntensity: 0.35 }));
   const side = M('#e2b445', { metalness: 0.6, roughness: 0.35, emissive: '#4a3000', emissiveIntensity: 0.3 });
   const band = M('#7a4e10', { metalness: 0.5, roughness: 0.4 });
   const bw = 0.5, bd = 0.24, bh = 0.09;
   for (let i = 0; i < 3; i++) {
     const b = new THREE.Group(); b.position.y = i * (bh + 0.006); b.rotation.y = (i - 1) * 0.12; spin.add(b);
-    mesh(new THREE.BoxGeometry(bw, bh, bd), [side, side, top, top, side, side], 0, bh / 2, 0, b);
-    for (let k = 1; k < 6; k++) mesh(new THREE.BoxGeometry(bw + 0.004, 0.003, bd + 0.004), M('#b98a28'), 0, (bh * k) / 6, 0, b); // 지폐 겹 줄무늬
-    mesh(new THREE.BoxGeometry(0.09, bh + 0.008, bd + 0.012), band, 0, bh / 2, 0, b); // 가운데 띠
+    mesh(boxG(bw, bh, bd), [side, side, top, top, side, side], 0, bh / 2, 0, b);
+    for (let k = 1; k < 6; k++) mesh(boxG(bw + 0.004, 0.003, bd + 0.004), M('#b98a28'), 0, (bh * k) / 6, 0, b); // 지폐 겹 줄무늬
+    mesh(boxG(0.09, bh + 0.008, bd + 0.012), band, 0, bh / 2, 0, b); // 가운데 띠
   }
   const glow = glowSprite('#ffd24a', 1.4, 0.55); glow.position.y = 0.18; g.add(glow);
   const sparks = []; for (let i = 0; i < 8; i++) { const s = glowSprite('#fff2b0', 0.12, 0.8); g.add(s); sparks.push(s); }

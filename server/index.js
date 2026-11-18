@@ -13,7 +13,7 @@ import { SCENARIOS, scenarioList } from './scenarios.js';
 import { hasBadWord } from './filter.js';
 import { isAdminPassword, looksLikeAdmin, ADMIN_NAME } from './admin.js';
 import { ITEMS, START_ITEMS } from './items.js';
-import { openStore, persist, flushAll, storeKind, loadClearPhotos, saveClearPhoto } from './store.js';
+import { openStore, persist, persistBatch, flushAll, storeKind, loadClearPhotos, saveClearPhoto } from './store.js';
 import { MAX_LV, HIDDEN_LV, ADMIN_LV, levelOf, xpAt, CLEAR_COINS, CHAPTER_XP, clearXp, timeLimitMs, SHOP, isWear, blankProfile, profileView, dayKey, statRange, pruneStats, addPeriodXp, levelBoard, weekKey, monthKey, GOLD_IDS, GOLD_STAFF, isGold, giveGold, randomGold, goldWorn, weeklyPodium } from './progress.js';
 import { Accounts, clientIp } from './accounts.js';
 
@@ -159,6 +159,7 @@ const ICE_EXTRA = process.env.TURN_URLS ? [{ urls: process.env.TURN_URLS.split('
 const players = new Map();   // socket.id -> player
 // 채팅 욕설 경고: 닉네임별로 기억해 다시 접속해도 이어진다 (5번이면 5분 채팅 금지)
 const CHAT_WARN_MAX = 5, CHAT_MUTE_MS = 5 * 60 * 1000;
+const renaming = new Set();
 const chatPenalty = new Map(); // name -> { warns, muteUntil }
 const adminFails = new Map(); // ip -> { n, t } 운영자 비밀번호 틀린 횟수
 const parties = new Map();   // partyId -> {id, leader, members:[]}
@@ -508,6 +509,7 @@ io.on('connection', (sock) => {
   sock.on('shop:buy', (id) => {
     if (!me) return; const it = SHOP[id]; if (!it) return;
     const pf = prof(me.name); const lv = levelOf(pf.xp); const have = pf.items[id] || 0;
+    if (it.kind === 'rename' && !me.acct) return sock.emit('toast', { text: '고정 계정으로 접속하면 닉네임 변경권을 살 수 있어요.' });
     if (it.nosale) return sock.emit('toast', { text: it.gift === 'xmas' ? `${it.icon} ${it.name}은(는) 비매품이에요. 로비 소원의 별 앞 🎁 선물상자에서 받을 수 있어요.` : it.kind === 'staff' ? `${it.icon} ${it.name}은(는) 비매품이에요. 황금 고양이 세트 7종을 모두 모으면 받아요.` : `${it.icon} ${it.name}은(는) 비매품이에요. 매주 주간랭킹 1~3위에게 아직 없는 부위 하나가 무작위로 주어져요.` });
     if (!me.admin && lv < it.lv) return sock.emit('toast', { text: `🔒 Lv.${it.lv} 부터 살 수 있어요. (지금 Lv.${lv})` });
     if (have >= it.max) return sock.emit('toast', { text: it.max > 1 ? `${it.icon} ${it.name}은(는) ${it.max}개까지만 가질 수 있어요.` : `${it.icon} ${it.name}은(는) 이미 가지고 있어요.` });
@@ -519,6 +521,87 @@ io.on('connection', (sock) => {
     saveProfiles(); sendProfile(me);
     sock.emit('shop:bought', { id });
     sock.emit('toast', { text: `${it.icon} ${it.name}을(를) 샀어요!${isWear(id) ? ' (🎒 내 물건에서 착용/해제)' : ' (🎒 내 물건에서 사용)'}` });
+  });
+  sock.on('shop:rename', async (requested, ack) => {
+    if (typeof ack !== 'function') return;
+    const player = me;
+    const account = player?.acct && accountData.list[player.acct];
+    if (!account || player.sid !== sock.id) return ack({ error: '고정 계정으로 접속해 주세요.' });
+    if (player.room !== 'lobby' || parties.get(player.partyId)?.instId) return ack({ error: '광장에서만 닉네임을 바꿀 수 있어요.' });
+    if (renaming.has(account.id)) return ack({ error: '닉네임 변경을 처리 중이에요.' });
+
+    const name = typeof requested === 'string' ? requested.trim().normalize('NFC') : '';
+    const previous = player.name;
+    if (name === previous) return ack({ error: '현재 닉네임과 다른 이름을 입력해 주세요.' });
+    if (!name || name.length > 12 || /[:<>\p{Cc}\p{Cf}]/u.test(name) || name in Object.prototype || name === 'prototype') {
+      return ack({ error: '닉네임은 1~12자로 입력해 주세요. 일부 특수문자는 쓸 수 없어요.' });
+    }
+    if (hasBadWord(name) || looksLikeAdmin(name)) return ack({ error: '사용할 수 없는 닉네임이에요.' });
+
+    const saveKeys = Object.values(SCENARIOS).flatMap(scenario => {
+      const from = scenario.saveKey(previous), to = scenario.saveKey(name);
+      return [[from, to], [from + ':clear', to + ':clear']];
+    });
+    if (accounts.byName.has(name) || Object.hasOwn(profiles, name) || Object.hasOwn(hearts, name) ||
+        saveKeys.some(([, to]) => Object.hasOwn(saves, to))) {
+      return ack({ error: '이미 사용 중인 닉네임이에요.' });
+    }
+    const item = 'rename_ticket';
+    if (!(profiles[previous]?.items?.[item] > 0)) return ack({ error: '닉네임 변경권이 필요해요.' });
+
+    const records = structuredClone({ accounts: accountData, profiles, saves, hearts, ranks, stats, feedback });
+    const moveKey = (data, from, to) => {
+      if (!data || !Object.hasOwn(data, from)) return;
+      data[to] = data[from];
+      delete data[from];
+    };
+    records.accounts.list[account.id].name = name;
+    moveKey(records.profiles, previous, name);
+    delete records.profiles[name].items[item];
+    moveKey(records.hearts, previous, name);
+    for (const [from, to] of saveKeys) moveKey(records.saves, from, to);
+    const rename = value => value === previous ? name : value;
+    for (const entries of Object.values(records.ranks)) {
+      for (const row of entries) row.names = row.names.map(rename);
+    }
+    for (const day of Object.values(records.stats.days)) moveKey(day.u, previous, name);
+    for (const row of [records.stats.weekly.champ, ...(records.stats.weekly.podium || []), ...(records.stats.weekly.log || []), ...records.feedback.list]) {
+      if (row) row.name = rename(row.name);
+    }
+
+    let saved;
+    try { saved = persistBatch(DATA_DIR, records); }
+    catch (error) {
+      console.warn('  [저장] 닉네임 변경 실패:', error.message);
+      return ack({ error: '닉네임을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.' });
+    }
+    renaming.add(account.id);
+    const replace = (target, source) => {
+      for (const key of Object.keys(target)) if (!Object.hasOwn(source, key)) delete target[key];
+      Object.assign(target, source);
+    };
+    for (const [target, source] of [[profiles, records.profiles], [saves, records.saves], [hearts, records.hearts], [ranks, records.ranks], [stats, records.stats], [feedback, records.feedback]]) {
+      replace(target, source);
+    }
+    profChecked.delete(previous);
+    if (chatPenalty.has(previous)) {
+      chatPenalty.set(name, chatPenalty.get(previous));
+      chatPenalty.delete(previous);
+    }
+    accounts.rename(account, name);
+    player.name = name;
+    boardCache = null;
+    needFull(player.room);
+    broadcastRoster();
+    const party = parties.get(player.partyId);
+    if (party) syncParty(party);
+    pushChamp();
+    sendProfile(player);
+    await saved;
+    renaming.delete(account.id);
+    const info = { id: account.id, key: account.key, name: account.name };
+    io.to(player.id).emit('account:renamed', info);
+    ack({ account: info });
   });
   sock.on('shop:equip', ({ id, on } = {}) => {
     if (!me) return;
@@ -791,21 +874,29 @@ io.on('connection', (sock) => {
       joinRoom(p, 'inst:' + instId);
       p.inv = [...START_ITEMS, ...sc.startItems(chapter)];
     }
-    const saveName = sc.saveKey(me.name);
+    const leader = me;
     const inst = new GameInstance({
       id: instId, io, party, players, chapter, fear, scenario: sc.id,
-      onChapter: (idx) => { if ((saves[saveName] ?? 0) < idx) { saves[saveName] = idx; save(); } },
+      onChapter: (idx) => { const saveName = sc.saveKey(leader.name); if ((saves[saveName] ?? 0) < idx) { saves[saveName] = idx; save(); } },
       onAdvance: () => { if (inst.overtime()) return; for (const m of inst.members()) addXp(m.name, CHAPTER_XP, '챕터 통과'); },
       limitMs: timeLimitMs(sc.difficulty || 3),
       onEnd: ({ photoId, ms, full, type, hints = 0, over = false } = {}) => {
         registerClearPhoto(photoId, inst.members(), sc);
         const names = party.members.map((id) => players.get(id)?.name).filter(Boolean);
         const wasOpen = new Map(names.map((n) => [n, hiddenOk(n)]));
-        saves[saveName] = sc.chapters.length - 1;
+        saves[sc.saveKey(leader.name)] = sc.chapters.length - 1;
         // 함께 깬 파티원 모두 '클리어'로 기록 (히든 테마 조건 · 도장표). 값은 처음 깬 시각 (예전 기록은 1)
-        for (const n of new Set([me.name, ...names])) { const k = sc.saveKey(n) + ':clear'; if (!(saves[k] > 1)) saves[k] = Date.now(); }
+        for (const n of new Set([leader.name, ...names])) { const k = sc.saveKey(n) + ':clear'; if (!(saves[k] > 1)) saves[k] = Date.now(); }
         save();
-        setTimeout(() => { for (const n of names) if (!wasOpen.get(n) && hiddenOk(n) && levelOf(prof(n).xp) < HIDDEN_LV) io.emit('celebrate', { name: n, kind: 'clear', text: `🧟 ${n} 님이 모든 테마를 클리어해 히든 테마 '데드 시티'가 열렸습니다!` }); for (const n of names) { const pl = findByName(n); sendProfile(pl); if (pl) io.to(pl.id).emit('clears', unlockedFor(n)); } }, 300);
+        const clearMembers = inst.members().map(p => ({ player: p, wasOpen: wasOpen.get(p.name) }));
+        setTimeout(() => {
+          for (const { player, wasOpen } of clearMembers) {
+            const n = player.name;
+            if (!wasOpen && hiddenOk(n) && levelOf(prof(n).xp) < HIDDEN_LV) io.emit('celebrate', { name: n, kind: 'clear', text: `🧟 ${n} 님이 모든 테마를 클리어해 히든 테마 '데드 시티'가 열렸습니다!` });
+            const pl = findByName(n);
+            if (pl) { sendProfile(pl); io.to(pl.id).emit('clears', unlockedFor(n)); }
+          }
+        }, 300);
         // 보상: 깰 때마다 10코인 · 제한 시간 안에 깨면 경험치 (시간 초과면 순위표·경험치 제외)
         for (const m of inst.members()) {
           addCoins(m.name, CLEAR_COINS);

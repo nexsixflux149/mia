@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { buildProp } from './props.js';
+import { buildProp, isShared } from './props.js';
 import { makeXmasShots } from './xmas-cinema.js';
 import { createAvatar, animateAvatar } from './avatar.js';
 import { createGhost, animateGhost } from './ghosts.js';
@@ -39,7 +39,7 @@ export class Cinema {
 
   // ── 세트 만들기
   clear() {
-    this.scene.traverse((o) => { o.geometry?.dispose?.(); });
+    this.scene.traverse((o) => { if (!o.isSprite && !isShared(o.geometry)) o.geometry?.dispose?.(); }); // 공유 지오메트리·스프라이트는 로비·챕터와 같이 쓰므로 남긴다
     this.scene.clear();
     this.sets = {};
     for (const k of Object.keys(this)) if (k.startsWith('_')) delete this[k];

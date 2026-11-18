@@ -4,7 +4,7 @@ import { Cinema } from './cinema.js';
 import { xmasMirrorPanel } from './xmas-mirrors.js';
 import { createGhost, animateGhost, dressXmas } from './ghosts.js';
 import { renderDoc } from './paper.js';
-import { buildLobby, buildChapter, disposeWorld, LS } from './world.js';
+import { buildLobby, attachLobby, buildChapter, disposeWorld, LS } from './world.js';
 import { AudioFX } from './audio.js';
 import { jumpscare, pickScare } from './scare.js';
 import { Voice } from './voice.js';
@@ -13,6 +13,7 @@ import { applyGear, animateGear, initFx, updateFx, popperFx, rocketFx, swordFx, 
 import { FRAMES, shootPhoto, composePhoto, drawStampCard, loadPhotoFonts } from './photo.js';
 import { GraphicsUpgrade } from './graphics-upgrade.js';
 import { gfx } from './visual-upgrade.js';
+import { disposeTree, markShared } from './props.js';
 
 const $ = (s) => document.querySelector(s);
 // 글꼴(이름표 · 쪽지 같은 캔버스 글씨)이 준비될 때까지 잠깐 기다린다. 느린 회선에서 화면이 멈추지 않게 최대 1.2초만 (글꼴 파일은 /fonts, 줄여 담아 약 160KB)
@@ -30,7 +31,7 @@ socket.on('connect', () => {
     // 오래 끊겨 서버가 내 자리를 이미 정리했다면 새 캐릭터로 로비에서 다시 시작한다 (예전 파티 · 게임 화면도 함께 정리)
     if (!res.resumed) { S.me = res.id; S.myName = res.name; voice.myId = res.id; dropOther(res.id); S.party = null; closeModal(); S.storyQueue = []; closeStory(true); rebuildMyAvatar(); toast('연결이 오래 끊겨 로비에서 다시 시작합니다.'); }
     S.resume = { id: res.id, token: res.token }; if (!S.admin) store.set('gwimun-resume', { ...S.resume, name: res.name, at: Date.now() });
-    if (res.account && !S.admin) store.set('mia-account', res.account);
+    if (res.account && !S.admin) applyAccountName(res.account);
     S.items = res.items; if (res.shop) S.shop = res.shop; if (res.hiddenOk != null) S.hiddenOk = res.hiddenOk; if (res.unlockedBy) S.unlockedBy = res.unlockedBy; renderInv(); renderParty();
     if ('champ' in res) setChamp(res.champ);
     if (res.resumed && String(res.room || '').startsWith('inst:') && S.room !== 'game') socket.emit('game:state'); // 게임 중이었다면 그 게임 화면으로
@@ -98,15 +99,24 @@ let look = { ...DEFAULT_LOOK, ...store.get('gwimun-look', {}) };
 // 닉네임을 비워 두면 입장을 못 해서 그냥 나가 버린다 → 처음 온 사람에게는 무서운 닉네임을 미리 채워 둔다
 const RAND_NICK = () => ['겁쟁이', '떨리는', '도망치는', '숨은', '용감한', '길잃은', '소심한', '울보'][Math.random() * 8 | 0] + ['토끼', '고양이', '여우', '곰', '유령', '탐정', '인형', '미아'][Math.random() * 8 | 0] + (10 + (Math.random() * 90 | 0));
 $('#nick').value = store.get('gwimun-nick', '') || RAND_NICK();
-// 고정 계정: 이 기기에 계정이 있으면 닉네임이 정해져 있다 (바꿀 수 없음)
+// 고정 계정의 닉네임은 접속 화면에 표시한다.
 function applyAccountLock() {
   const a = store.get('mia-account', null); const n = $('#nick'), note = $('#nickNote');
   // 안내 문구는 한 줄(짧은 글)이 기본이고, 자세한 설명(.more)은 넓은 화면에서만 보인다 — 두 줄이 되면 모바일에서 아래 버튼을 밀어냈다
   const say = (short, more) => { if (!note) return; note.textContent = short; note.appendChild(Object.assign(document.createElement('span'), { className: 'more', textContent: ' ' + more })); };
-  if (a?.name) { n.value = a.name; n.readOnly = true; n.classList.add('locked'); say('🔒 이 기기의 고정 계정 닉네임이에요.', '(레벨 · 코인 · 도장표가 여기에 쌓여요)'); }
-  else { n.readOnly = false; n.classList.remove('locked'); say('⚠️ 정한 닉네임은 고정 계정이 되어 못 바꿔요.', '(이 기기 · IP에 묶여 레벨 · 코인이 쌓이니 신중하게!)'); }
+  if (a?.name) { n.value = a.name; n.readOnly = true; n.classList.add('locked'); say('🔒 이 기기의 고정 계정 닉네임이에요.', '(닉네임은 광장 상점의 변경권으로 바꿀 수 있어요)'); }
+  else { n.readOnly = false; n.classList.remove('locked'); say('닉네임을 정하면 이 기기의 고정 계정이 생겨요.', '(이 기기 · IP에 묶여 레벨 · 코인이 쌓이니 신중하게!)'); }
 }
 applyAccountLock();
+function applyAccountName(account) {
+  const changed = S.myName !== account.name;
+  S.myName = account.name;
+  store.set('mia-account', account);
+  store.set('gwimun-nick', account.name);
+  if (S.resume) store.set('gwimun-resume', { ...S.resume, name: account.name, at: Date.now() });
+  applyAccountLock();
+  if (changed && myAvatar) setTag(myAvatar, account.name, '#ffe08a');
+}
 // 로그인 화면을 '지금 실제로 보이는 영역'에 맞춘다: 주소창이 늘었다 줄었다 하거나 키보드가 올라와도 입장 막대가 화면 밖으로 밀려나지 않게
 // (--app-h · --app-top 은 css 의 body.mobile #login 이 쓴다. 영역이 좁으면 .short · .tiny 로 로고 · 미리보기를 줄인다)
 function fitLogin() {
@@ -161,7 +171,7 @@ $('#preview').addEventListener('pointerdown', (e) => { pv.drag = e.clientX; });
 addEventListener('pointerup', () => { pv.drag = null; });
 addEventListener('pointermove', (e) => { if (pv.drag != null) { pv.rot += (e.clientX - pv.drag) * 0.012; pv.drag = e.clientX; } });
 let pvTimer = null;
-function refreshPreview() { clearTimeout(pvTimer); pvTimer = setTimeout(() => { if (pv.av) { pv.av.userData.visualUpgrade?.dispose(); pv.scene.remove(pv.av); } pv.av = createAvatar(look); pv.scene.add(pv.av); }, 30); }
+function refreshPreview() { clearTimeout(pvTimer); pvTimer = setTimeout(() => { if (pv.av) { pv.av.userData.visualUpgrade?.dispose(); pv.scene.remove(pv.av); disposeTree(pv.av); } pv.av = createAvatar(look); pv.scene.add(pv.av); }, 30); }
 let pvLoop = true;
 (function loopPv(t) { requestAnimationFrame(loopPv); if (!pvLoop) return; if (pv.av) { pv.av.rotation.y = pv.rot + (pv.drag == null ? Math.sin(t / 2000) * 0.25 : 0); animateAvatar(pv.av, 0.016, false, t / 1000); } pv.renderer.render(pv.scene, pv.cam); })(0);
 buildOptions(); refreshPreview();
@@ -311,8 +321,8 @@ function watchPerf(now) {
   toast(`🎨 이 기기에서는 화면이 느려서(${Math.round(fps)} FPS) 그래픽 강화를 껐어요. ⚙ 설정에서 다시 켤 수 있어요.`);
 }
 function addLabel(owner, sprite, y) { overlay.add(sprite); S.labels.push({ owner, sprite, y }); return sprite; }
-function removeLabel(sprite) { overlay.remove(sprite); S.labels = S.labels.filter((l) => l.sprite !== sprite); sprite.material.map?.dispose(); sprite.material.dispose(); }
-function removeAvatar(g) { if (!g) return; g.userData.visualUpgrade?.dispose(); scene.remove(g); for (const l of S.labels.filter((l) => l.owner === g)) removeLabel(l.sprite); }
+function removeLabel(sprite) { overlay.remove(sprite); S.labels = S.labels.filter((l) => l.sprite !== sprite); sprite.material.map?.dispose(); }
+function removeAvatar(g) { if (!g) return; g.userData.visualUpgrade?.dispose(); scene.remove(g); disposeTree(g); for (const l of S.labels.filter((l) => l.owner === g)) removeLabel(l.sprite); }
 function updateLabels() {
   for (const l of S.labels) {
     if (!l.owner.parent) continue;
@@ -364,14 +374,43 @@ function setBubble(g, text, channel = 'all') {
 // ─────────────────────────── 월드 전환
 // 화면이 바뀔 때(로비 · 챕터 · 영상 · 창) 눌려 있던 이동 입력을 모두 푼다 — 조이스틱이 숨겨지면 '손 뗌' 신호가 오지 않아 혼자 걷던 문제 방지
 function resetInput() { S.joy = null; S.moveTarget = null; S.pendingInteract = null; for (const k in keys) keys[k] = false; const kb = document.getElementById('joyKnob'); if (kb) kb.style.transform = ''; document.getElementById('joy')?.classList.remove('act'); }
+// 로비는 한 번 지어 두고 다시 쓴다. 히든 관문이나 층이 바뀔 때만 새로 짓는다
+let lobbyWorld = null, lobbyKey = '';
+// 지금 세계를 화면에서 뗀다. 챕터는 버리고, 로비는 다음 입장을 위해 남겨 둔다
+function leaveWorld() {
+  if (!S.world) return;
+  if (S.world === lobbyWorld) scene.remove(S.world.root);
+  else disposeWorld(scene, S.world);
+}
+// 새로 지은 로비를 한 번 그려 둔다. 처음엔 안 보이던 물체(숨은 간판·화면 밖 칸)까지 지오메트리·질감·셰이더가 GPU에 올라가, 첫 복귀 때 몰아서 올리느라 끊기지 않는다
+function warmLobby(root) {
+  const saved = [];
+  root.traverse((o) => { if (!o.isLight) { saved.push([o, o.visible, o.frustumCulled]); o.visible = true; o.frustumCulled = false; } });
+  try {
+    fx.render(performance.now(), { danger: S.danger, mode: 'lobby' }); // 실제 화면과 같은 후처리 경로로 그려야 셰이더가 맞는다
+    renderer.autoClear = false; renderer.clearDepth(); renderer.render(overlay, camera);
+  } catch (e) { console.warn('로비 미리 그리기 건너뜀', e); } finally {
+    renderer.autoClear = true;
+    for (const [o, v, f] of saved) { o.visible = v; o.frustumCulled = f; }
+  }
+}
 function enterLobby(pos) {
   if (fx.soft && !S.softWarned) { S.softWarned = true; setTimeout(() => toast(/chrome|crios/i.test(navigator.userAgent) && !/edg\//i.test(navigator.userAgent) ? '🐢 크롬 그래픽 가속이 꺼져 있어 화면이 끊길 수 있어요. 크롬 설정 → 시스템 → 「가능한 경우 그래픽 가속 사용」을 켜고 크롬을 다시 시작해 주세요.' : '🐢 브라우저 그래픽 가속이 꺼져 있어 화면이 끊길 수 있어요. 브라우저 설정에서 그래픽(하드웨어) 가속을 켜 주세요.'), 2500); }
   resetInput(); removeCash();
   restoreFaded(); graphics.leave(); // 반투명해진 물체를 먼저 정리하고, 바꿔 둔 재질을 원래대로 돌린 뒤 세계를 지운다
-  disposeWorld(scene, S.world);
-  S.world = buildLobby(scene, { hidden: !!(S.hiddenOk || S.admin), champ: S.champ, floor: S.floor });
-  if (S.profile?.items?.costume_xmas || S.xmasGot) S.world.xmasGift?.hide();
+  const key = `${!!(S.hiddenOk || S.admin)}|${S.floor}`;
+  leaveWorld();
+  let built = false;
+  if (lobbyWorld && lobbyKey === key) S.world = attachLobby(scene, lobbyWorld);
+  else {
+    disposeWorld(scene, lobbyWorld);
+    lobbyWorld = S.world = buildLobby(scene, { hidden: !!(S.hiddenOk || S.admin), champ: S.champ, floor: S.floor, renderer });
+    lobbyKey = key; built = true;
+  }
+  S.world.setChamp(S.champ || null); // 챕터에 있는 동안 바뀐 이름표를 맞춘다 (같으면 아무 일도 하지 않는다)
+  if (S.profile?.items?.costume_xmas || S.xmasGot) S.world.xmasGift?.hide(); else S.world.xmasGift?.show();
   showSnaps();
+  if (built) warmLobby(S.world.root); // 새로 지은 로비는 첫 복귀 전에 한 번 그려 GPU에 미리 올린다
   socket.emit('snap:list', mergeClearPhotos);
   flushClearPhotos();
   S.room = 'lobby'; S.chapter = null; S.dark = false; S.objState = {}; S.mount = null; S.perch = null; me.y = 0;
@@ -419,7 +458,7 @@ function enterChapter(state, showIntro = true) {
   setGameClock(state.elapsed, state.timed); setHintsUsed(state.hintsUsed ?? 0); S.limitMs = state.limitMs || 0;
   if (state.fear != null) { S.fear = state.fear; if (state.scenario) S.scenario = state.scenario; updateFearBadge(); }
   restoreFaded(); graphics.leave(); // 반투명해진 물체를 먼저 정리하고, 바꿔 둔 재질을 원래대로 돌린 뒤 세계를 지운다
-  disposeWorld(scene, S.world);
+  leaveWorld();
   const ch = state.chapter;
   S.chapter = ch; S.room = 'game'; S.mount = null; S.perch = null; me.y = 0; closeThemePop(); noticeBox.classList.add('hidden');
   setThemeComms(true);
@@ -610,7 +649,7 @@ function sendPing() {
   const x = p ? p.x : me.x, z = p ? p.z : me.z;
   socket.emit('ping', { x, z });
 }
-const pingGeo = new THREE.CylinderGeometry(0.08, 0.3, 4, 12, 1, true);
+const pingGeo = markShared(new THREE.CylinderGeometry(0.08, 0.3, 4, 12, 1, true));
 socket.on('ping', ({ x, z, from }) => {
   const m = new THREE.Mesh(pingGeo, new THREE.MeshBasicMaterial({ color: '#ff5a4a', transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
   m.position.set(x, 2, z); scene.add(m);
@@ -619,7 +658,7 @@ socket.on('ping', ({ x, z, from }) => {
   audio.play('pipe');
   addChat({ channel: 'system', text: `📍 ${from} 님이 위치를 찍었습니다.` });
 });
-function clearPings() { for (const p of S.pings) { scene.remove(p.m); overlay.remove(p.label); } S.pings = []; clearCallouts(); }
+function clearPings() { for (const p of S.pings) { scene.remove(p.m); disposeTree(p.m); overlay.remove(p.label); disposeTree(p.label); } S.pings = []; clearCallouts(); }
 
 // 외치기 ('어이!' '여기야!' …) — 말풍선 + 발밑 바닥 파형 + 지도 파형으로 내 위치를 알린다
 let calloutAt = 0;
@@ -962,7 +1001,7 @@ function syncOther(p) {
   g.userData.target = p;
   setLight(g, p.light);
   const inParty = !!S.party?.members.some((m) => m.id === p.id);
-  if (g.userData.inParty !== inParty) { g.userData.inParty = inParty; setTag(g, (inParty ? '★ ' : '') + p.name, inParty ? '#8fd3ff' : '#fff'); }
+  if (g.userData.inParty !== inParty || g.userData.tagName !== p.name) { g.userData.inParty = inParty; g.userData.tagName = p.name; setTag(g, (inParty ? '★ ' : '') + p.name, inParty ? '#8fd3ff' : '#fff'); }
 }
 const syncAllOthers = () => { for (const p of S.net.values()) syncOther(p); };
 function dropOther(id) { S.net.delete(id); const g = S.others.get(id); if (g) { removeAvatar(g); S.others.delete(id); } }
@@ -993,14 +1032,14 @@ function syncGhosts(ghosts) {
     for (const gs of ghosts) {
       live.add(gs.i);
       let e = S.ghosts.get(gs.i);
-      if (!e || e.G.userData.type !== gs.type) { if (e) scene.remove(e.G); const G = createGhost(gs.type); if (S.scenario?.id === 'christmas') { dressXmas(G); if (!e) audio.play('sting'); } G.position.set(gs.x, 0, gs.z); scene.add(G); e = { G, st: gs, soundT: 0 }; S.ghosts.set(gs.i, e); } // 크리스마스편: 산타 자동인형 + 원래 등장음
+      if (!e || e.G.userData.type !== gs.type) { if (e) { scene.remove(e.G); disposeTree(e.G); } const G = createGhost(gs.type); if (S.scenario?.id === 'christmas') { dressXmas(G); if (!e) audio.play('sting'); } G.position.set(gs.x, 0, gs.z); scene.add(G); e = { G, st: gs, soundT: 0 }; S.ghosts.set(gs.i, e); } // 크리스마스편: 산타 자동인형 + 원래 등장음
       e.st = gs;
     }
   }
-  for (const [i, e] of S.ghosts) if (!live.has(i)) { scene.remove(e.G); S.ghosts.delete(i); }
+  for (const [i, e] of S.ghosts) if (!live.has(i)) { scene.remove(e.G); disposeTree(e.G); S.ghosts.delete(i); }
   if (!S.ghosts.size) { S.danger = 0; $('#vignette').classList.remove('danger'); audio.chase(0); }
 }
-function removeGhost() { for (const e of S.ghosts.values()) scene.remove(e.G); S.ghosts.clear(); S.danger = 0; $('#vignette').classList.remove('danger'); }
+function removeGhost() { for (const e of S.ghosts.values()) { scene.remove(e.G); disposeTree(e.G); } S.ghosts.clear(); S.danger = 0; $('#vignette').classList.remove('danger'); }
 socket.on('player:leave', (id) => dropOther(id));
 
 let ghostSoundT = 0;
@@ -1133,7 +1172,7 @@ function loop() {
     fill.intensity = S.room === 'lobby' ? 2.2 : 2.6;
     if (clickRing.material.opacity > 0) { clickRing.material.opacity -= dt * 1.5; clickRing.scale.multiplyScalar(1 + dt * 1.5); }
     const now = performance.now();
-    for (const p of S.pings) { p.m.material.opacity = 0.35 + Math.sin(t * 8) * 0.25; if (now > p.until) { scene.remove(p.m); overlay.remove(p.label); } }
+    for (const p of S.pings) { p.m.material.opacity = 0.35 + Math.sin(t * 8) * 0.25; if (now > p.until) { scene.remove(p.m); disposeTree(p.m); overlay.remove(p.label); disposeTree(p.label); } }
     S.pings = S.pings.filter((p) => now <= p.until);
     if (S.callouts.length) updateCallouts(now);
     drawMinimap(dt, t);
@@ -1235,14 +1274,14 @@ function randomHorror(dt) {
   if (S.fear === 1 && r >= 0.3 && r < 0.82) r = 0.9; // 순한맛: 귀신 등장 없이 소리만
   if (S.fear === 2 && r >= 0.72 && r < 0.8) r = 0.9; // 보통: 갑툭튀 없음
   if (r < 0.3 && S.world.ceiling.length && !S.dark) { S.world.ceiling.forEach((c) => (c.light.intensity = 0)); setTimeout(() => applyDark(), 1200 + Math.random() * 1500); }
-  else if (r < 0.55) { const g = createGhost('woman'); g.position.set(me.x - Math.sin(me.ry) * 3.5, 0, me.z - Math.cos(me.ry) * 3.5); g.lookAt(me.x, 0, me.z); scene.add(g); audio.play('breath'); setTimeout(() => scene.remove(g), 900); }
+  else if (r < 0.55) { const g = createGhost('woman'); g.position.set(me.x - Math.sin(me.ry) * 3.5, 0, me.z - Math.cos(me.ry) * 3.5); g.lookAt(me.x, 0, me.z); scene.add(g); audio.play('breath'); setTimeout(() => { scene.remove(g); disposeTree(g); }, 900); }
   else if (r < 0.72) {
     // 아이 귀신이 옆을 스쳐 달려간다
     const c = createGhost('child'); const side = Math.random() < 0.5 ? -1 : 1;
     const ax = Math.cos(me.ry) * side, az = -Math.sin(me.ry) * side;
     c.position.set(me.x + ax * 5 + Math.sin(me.ry) * 3, 0, me.z + az * 5 + Math.cos(me.ry) * 3); scene.add(c); audio.play('giggle');
     const start = performance.now();
-    const run = () => { const k = (performance.now() - start) / 900; c.position.x -= ax * 0.18; c.position.z -= az * 0.18; c.rotation.y = Math.atan2(-ax, -az); if (k < 1) requestAnimationFrame(run); else scene.remove(c); };
+    const run = () => { const k = (performance.now() - start) / 900; c.position.x -= ax * 0.18; c.position.z -= az * 0.18; c.rotation.y = Math.atan2(-ax, -az); if (k < 1) requestAnimationFrame(run); else { scene.remove(c); disposeTree(c); } };
     run();
   } else if (r < 0.8) scare(Math.random() < 0.5 ? 'flash' : 'random', 'random');
   else audio.play('whisper');
@@ -2950,7 +2989,7 @@ async function loadShareInfo() {
 
 // ─────────────────────────── 레벨 · 코인 · 상점 · 내 물건 · 선물
 const GOLD_ORDER = ['gold_hat', 'gold_mask', 'gold_gloves', 'gold_top', 'gold_bottom', 'gold_shoes', 'gold_tail']; // 황금 고양이 세트 (비매품 · 주간랭킹 1~3위 보상)
-const SHOP_ORDER = ['popper', 'rocket', 'wings_fairy', 'mount_pony', 'wings_angel', 'mount_broom', 'mount_cat', 'mount_dog', 'mount_wolf', 'mount_unicorn', 'wings_devil', 'mount_trex', 'wings_dragon', 'sword', 'mount_ufo', 'mount_lion', 'mount_turtle', 'mount_human', 'costume_robot', 'mount_carriage', 'chainsaw', 'mask_paper', 'mask_rabbit', 'mask_fox', 'mask_bear', 'mask_hahoe', 'mask_wolf', 'mask_venice', 'mask_ghost', 'mask_oni', 'mount_sleigh', 'costume_xmas', ...GOLD_ORDER, 'gold_staff'];
+const SHOP_ORDER = ['rename_ticket', 'popper', 'rocket', 'wings_fairy', 'mount_pony', 'wings_angel', 'mount_broom', 'mount_cat', 'mount_dog', 'mount_wolf', 'mount_unicorn', 'wings_devil', 'mount_trex', 'wings_dragon', 'sword', 'mount_ufo', 'mount_lion', 'mount_turtle', 'mount_human', 'costume_robot', 'mount_carriage', 'chainsaw', 'mask_paper', 'mask_rabbit', 'mask_fox', 'mask_bear', 'mask_hahoe', 'mask_wolf', 'mask_venice', 'mask_ghost', 'mask_oni', 'mount_sleigh', 'costume_xmas', ...GOLD_ORDER, 'gold_staff'];
 const coinsText = () => (S.profile?.coins === -1 ? '∞' : String(S.profile?.coins ?? 0));
 // 손에 든 것: 0 없음 · 1 전설의 검 · 2 황금 고양이 지팡이
 function holdCode() { const it = S.profile?.items; return S.holdSaw && it?.chainsaw ? 3 : S.holdStaff && it?.gold_staff ? 2 : S.holdSword && it?.sword ? 1 : 0; }
@@ -3172,7 +3211,9 @@ function openShop() {
     }
     info.innerHTML = `<div class="sh-t">${it.icon} ${it.name}</div><div class="sh-d">${it.desc}</div><div class="sh-lv${locked ? ' locked' : ''}">${it.lv > 1 ? `🔒 Lv.${it.lv} 이상 구매 가능` : '🔓 누구나 구매 가능'}${locked ? ` · 현재 Lv.${pf.lv}` : ' ✓'}</div><div class="muted">${it.max > 1 ? `최대 ${it.max}개까지 가질 수 있어요 · 지금 ${have}개` : '아이템별 1개만 가질 수 있어요'}${it.kind === 'mount' ? ` · 탄 동안 이동 속도 ${sel === 'mount_turtle' ? 2 : 1.5}배 (Z)` : ''}${it.kind === 'sword' ? ' · 귀신 30번 베면 깨져요' : ''}${it.kind === 'saw' ? ' · 귀신 퇴치 무제한 (B)' : ''}</div>`;
     const buy = el('button', 'btn primary', locked ? `🔒 Lv.${it.lv} 부터` : have >= it.max ? (it.max > 1 ? '가득 찼어요' : '이미 있어요') : `🪙 ${it.price.toLocaleString()} 코인에 사기`);
-    buy.disabled = locked || have >= it.max;
+    const needsAccount = it.kind === 'rename' && pf.admin;
+    buy.disabled = locked || have >= it.max || needsAccount;
+    if (needsAccount) buy.textContent = '고정 계정 전용';
     buy.onclick = () => { socket.emit('shop:buy', sel); audio.play('click'); };
     const bag = el('button', 'btn', '🎒 내 물건'); bag.onclick = () => openBag();
     const row = el('div', 'row'); row.append(buy, bag); info.appendChild(row);
@@ -3181,10 +3222,11 @@ function openShop() {
   w.append(head, top, grid);
   previewItem(sel); draw();
   S.shopRefresh = () => { if ($('#modalBody').firstChild === w) draw(); else S.shopRefresh = null; };
-  openModal('🛒 코인 상점', '날개 · 탈것 · 코스튬 · 가면 · 폭죽 · 전설의 검 · 🏆 주간랭킹 1~3위 보상(비매품)', w);
+  openModal('🛒 코인 상점', '닉네임 변경권 · 날개 · 탈것 · 코스튬 · 가면 · 폭죽 · 전설의 검 · 🏆 주간랭킹 1~3위 보상(비매품)', w);
   $('#modal .modal-card').classList.add('shop-mode'); // 위는 고정, 아래 물건 목록만 스크롤
   const stop = () => { if ($('#modalBody').firstChild !== w || $('#modal').classList.contains('hidden')) { pv.on = false; S.shopRefresh = null; } else setTimeout(stop, 500); }; setTimeout(stop, 500);
 }
+socket.on('account:renamed', applyAccountName);
 socket.on('shop:bought', ({ id }) => { audio.play('pickup'); const it = S.shop[id]; if (it?.kind === 'sword') holdWeapon('sword'); if (it?.kind === 'saw') holdWeapon('saw'); });
 // ───── 내 물건 (착용 · 사용 · 선물)
 function openBag() {
@@ -3226,6 +3268,12 @@ function openBag() {
         const b = el('button', 'btn tiny' + (held ? ' primary' : ''), held ? '넣기' : '들기'); b.onclick = () => { holdWeapon(held ? '' : kind); draw(); };
         const sw = el('button', 'btn tiny', '휘두르기 (B)'); sw.onclick = () => { holdWeapon(kind); closeModal(); swingSword(); };
         acts.append(b, sw);
+      } else if (it.kind === 'rename') {
+        const b = el('button', 'btn tiny primary', '사용');
+        b.disabled = S.room !== 'lobby';
+        b.title = '광장에서 닉네임을 바꿀 수 있어요.';
+        b.onclick = openRenameTicket;
+        acts.appendChild(b);
       } else {
         const b = el('button', 'btn tiny primary', it.kind === 'pop' ? '🎉 펑!' : '🎆 쏘기'); b.onclick = () => { closeModal(); useShopItem(id); };
         acts.appendChild(b);
@@ -3240,6 +3288,45 @@ function openBag() {
   openModal('🎒 내 물건', '날개·탈것·코스튬·가면은 착용하면 모두에게 보여요 · 아이템별 1개만 가질 수 있어요 (폭죽은 여러 개)', w);
   footBtn('🛒 상점', () => openShop());
   footBtn('🎫 도장표', () => openStamps());
+}
+function openRenameTicket() {
+  const form = el('form', 'bag custom');
+  const label = el('label', 'muted', '새 닉네임');
+  label.htmlFor = 'renameNick';
+  const input = el('input');
+  input.id = label.htmlFor;
+  input.maxLength = 12;
+  input.required = true;
+  input.autocomplete = 'off';
+  input.placeholder = '새 닉네임 (최대 12자)';
+  const message = el('div', 'muted');
+  message.setAttribute('role', 'status');
+  const row = el('div', 'row');
+  const cancel = el('button', 'btn', '취소');
+  cancel.type = 'button';
+  cancel.onclick = openBag;
+  const submit = el('button', 'btn primary', '변경권 1장 사용');
+  submit.type = 'submit';
+  row.append(cancel, submit);
+  form.append(label, input, message, row);
+  form.onsubmit = event => {
+    event.preventDefault();
+    if (submit.disabled) return;
+    submit.disabled = true;
+    message.textContent = '닉네임을 확인하고 있어요.';
+    socket.timeout(12000).emit('shop:rename', input.value, (error, result) => {
+      submit.disabled = false;
+      if (!result?.account) {
+        message.textContent = error ? '응답이 늦어지고 있어요. 현재 닉네임을 확인해 주세요.' : result?.error || '닉네임을 바꾸지 못했어요.';
+        return;
+      }
+      applyAccountName(result.account);
+      if ($('#modalBody').firstChild === form && S.modalOpen) openBag();
+      audio.play('pickup');
+      toast(`닉네임을 ${result.account.name}(으)로 바꿨어요!`);
+    });
+  };
+  openModal('🎫 닉네임 변경권', `현재 닉네임은 ${S.myName}입니다. 변경이 완료되면 변경권 1장이 사용돼요.`, form);
 }
 function pickGiftTarget(id) {
   const it = S.shop[id]; const w = el('div', 'bag');

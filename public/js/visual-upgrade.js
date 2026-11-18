@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { markShared } from './props.js';
 
 // ───── 그래픽 강화: 아바타 · 나무 · 풀 · 집 디테일 (zip 'mia-graphics-only' 를 운영용으로 다듬은 것)
 //  · gfx.on 이 꺼져 있으면 아바타 디테일을 아예 만들지 않는다 (설정 ⚙ '그래픽 강화' · 느린 기기 자동 끄기 · ?gfx=0)
@@ -8,7 +9,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 //  · 조명 · 노출 · 안개 · 해상도는 건드리지 않는다 (공포 분위기는 예전 그대로)
 export const gfx = { on: true, quality: 'medium' };
 const SHARED = {};
-const shared = (key, make) => (SHARED[key] ||= make());
+const shared = (key, make) => (SHARED[key] ||= markShared(make()));
 
 const LEVEL = { low: 0, medium: 1, high: 2 };
 const V = (x,y,z) => new THREE.Vector3(x,y,z);

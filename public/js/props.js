@@ -1,18 +1,38 @@
 import * as THREE from 'three';
 
+// 공유 자원 표시: 소품 월드를 치울 때(disposeWorld) 이 표시가 붙은 지오메트리·재질·텍스처는 지우지 않는다.
+// 로비처럼 계속 쓰는 월드와 함께 쓰기 때문이다. Symbol 키라서 clone() 으로 복사되지 않는다.
+const SHARED = Symbol.for('mia.shared');
+export const markShared = (x) => { if (x && typeof x === 'object') x[SHARED] = true; return x; };
+export const isShared = (x) => !!x?.[SHARED];
+
+// 장면에서 뗀 트리의 지오메트리·텍스처를 GPU에서 해제한다. 공유 자원(markShared)은 건드리지 않는다.
+// 재료는 해제하지 않는다: 재료를 해제하면 셰이더 프로그램도 사라져 다음 등장 때 재컴파일로 끊긴다.
+export function disposeTree(root) {
+  if (!root) return;
+  const drop = (r) => { if (r && !isShared(r)) r.dispose?.(); };
+  root.traverse((o) => {
+    if (!o.isSprite) drop(o.geometry); // 스프라이트는 three.js 가 지오메트리 하나를 모두 함께 쓴다
+    for (const m of [].concat(o.material ?? [])) {
+      if (!m || isShared(m)) continue;
+      for (const k in m) if (m[k]?.isTexture) drop(m[k]);
+    }
+  });
+}
+
 const cache = {};
 const M = (c, o = {}) => {
   const k = c + JSON.stringify(o);
-  return (cache[k] ||= new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, ...o }));
+  return (cache[k] ||= markShared(new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, ...o })));
 };
 const WOOD = '#6b4a2e', DWOOD = '#3e2a1a', METAL = '#5d6066', PAPER = '#e9e2cc', RED = '#8e1c17';
 
 // ── 지오메트리 재사용: 같은 크기의 상자·원기둥·구는 한 번만 만든다 (소품 수백 개 → 지오메트리 수십 개)
 // 공유 지오메트리는 절대 직접 변형(translate 등)하지 말 것. 변형이 필요하면 새로 만든다.
 const GC = new Map();
-export const geo = (key, make) => { let g = GC.get(key); if (!g) { g = make(); g.userData.shared = true; GC.set(key, g); } return g; };
+export const geo = (key, make) => { let g = GC.get(key); if (!g) { g = markShared(make()); GC.set(key, g); } return g; };
 const r3 = (v) => Math.round(v * 1000) / 1000;
-const boxG = (w, h, d) => geo(`b${r3(w)},${r3(h)},${r3(d)}`, () => new THREE.BoxGeometry(w, h, d));
+export const boxG = (w, h, d) => geo(`b${r3(w)},${r3(h)},${r3(d)}`, () => new THREE.BoxGeometry(w, h, d));
 // 폴리곤 디테일: PC 는 둥근 부품을 약 1.7배 촘촘하게, 휴대폰은 1.25배 (모양은 같고 더 매끈하다)
 const DETAIL = (typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches) ? 1.25 : 1.7;
 const dseg = (n) => Math.max(n, Math.round(n * DETAIL));
@@ -39,15 +59,17 @@ function canvasTex(w, h, draw, key) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   draw(c.getContext('2d'), w, h);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
-  if (key) TC.set(key, t);
+  if (key) TC.set(key, markShared(t));
   return t;
 }
 export { canvasTex };
 const TM = new Map();
 function Plane(g, w, h, tex, x, y, z, o = {}) {
-  // 같은 텍스처 + 같은 옵션이면 재질도 하나로
+  // 공유 텍스처(key 로 만든 것)만 재질을 묶는다. 나머지는 빌드마다 새로 만들고 치울 때 함께 해제한다
+  const shared = isShared(tex);
   const mk = tex.uuid + JSON.stringify(o);
-  let mt = TM.get(mk); if (!mt) { mt = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, ...o }); TM.set(mk, mt); }
+  let mt = shared ? TM.get(mk) : undefined;
+  if (!mt) { mt = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, ...o }); if (shared) TM.set(mk, markShared(mt)); }
   const m = new THREE.Mesh(geo(`p${r3(w)},${r3(h)}`, () => new THREE.PlaneGeometry(w, h)), mt);
   m.position.set(x, y, z); g.add(m); return m;
 }
@@ -243,14 +265,14 @@ export function buildProp(p) {
     case 'bus_stop': {
       B(g, 2.6, 0.1, 1.0, '#384046', 0, 2.3, 0); for (const s of [-1, 1]) B(g, 0.08, 2.3, 0.08, METAL, 1.2 * s, 0, -0.4);
       B(g, 2.6, 1.5, 0.05, '#2d3e3a', 0, 0.7, -0.45, { transparent: true, opacity: 0.6 });
-      Plane(g, 0.7, 0.9, canvasTex(140, 180, (x, w, h) => { x.fillStyle = '#ddd5bb'; x.fillRect(0, 0, w, h); x.fillStyle = '#222'; x.font = 'bold 16px sans-serif'; x.fillText('서하리', 40, 26); for (let i = 0; i < 5; i++) x.fillRect(16, 50 + i * 22, 100, 4); x.fillStyle = '#900'; x.fillRect(16, 150, 70, 5); }), 0.8, 1.4, -0.42);
+      Plane(g, 0.7, 0.9, canvasTex(140, 180, (x, w, h) => { x.fillStyle = '#ddd5bb'; x.fillRect(0, 0, w, h); x.fillStyle = '#222'; x.font = 'bold 16px sans-serif'; x.fillText('서하리', 40, 26); for (let i = 0; i < 5; i++) x.fillRect(16, 50 + i * 22, 100, 4); x.fillStyle = '#900'; x.fillRect(16, 150, 70, 5); }, 'bus_stop'), 0.8, 1.4, -0.42);
       break;
     }
     case 'bench': { B(g, 1.6, 0.08, 0.45, WOOD, 0, 0.42, 0); for (const s of [-1, 1]) B(g, 0.08, 0.42, 0.4, METAL, 0.7 * s, 0, 0); break; }
-    case 'flyer': { Plane(g, 0.4, 0.55, canvasTex(80, 110, (x, w, h) => { x.fillStyle = '#d8d0b4'; x.fillRect(0, 0, w, h); x.fillStyle = '#300'; x.font = 'bold 13px sans-serif'; x.fillText('찾습니다', 12, 18); x.fillStyle = '#555'; for (let i = 0; i < 7; i++) x.fillRect(8 + (i % 4) * 17, 30 + Math.floor(i / 4) * 24, 14, 18); }), 0, 0, 0); break; }
+    case 'flyer': { Plane(g, 0.4, 0.55, canvasTex(80, 110, (x, w, h) => { x.fillStyle = '#d8d0b4'; x.fillRect(0, 0, w, h); x.fillStyle = '#300'; x.font = 'bold 13px sans-serif'; x.fillText('찾습니다', 12, 18); x.fillStyle = '#555'; for (let i = 0; i < 7; i++) x.fillRect(8 + (i % 4) * 17, 30 + Math.floor(i / 4) * 24, 14, 18); }, 'flyer'), 0, 0, 0); break; }
     case 'monument': {
       B(g, 0.9, 0.3, 0.5, '#4c4c48'); B(g, 0.6, 1.4, 0.25, '#6d6c66', 0, 0.3, 0);
-      Plane(g, 0.5, 1.1, canvasTex(60, 130, (x, w, h) => { x.fillStyle = '#6d6c66'; x.fillRect(0, 0, w, h); x.fillStyle = '#2a2a28'; for (let i = 0; i < 9; i++) x.fillRect(22, 10 + i * 13, 16, 7); }), 0, 1.0, 0.13);
+      Plane(g, 0.5, 1.1, canvasTex(60, 130, (x, w, h) => { x.fillStyle = '#6d6c66'; x.fillRect(0, 0, w, h); x.fillStyle = '#2a2a28'; for (let i = 0; i < 9; i++) x.fillRect(22, 10 + i * 13, 16, 7); }, 'monument'), 0, 1.0, 0.13);
       break;
     }
     case 'jangseung_m': case 'jangseung_f': {
@@ -370,8 +392,9 @@ export function buildProp(p) {
       B(g, 0.05, 1.3, 0.1, WOOD, 0, 1.0, 0.02); B(g, 1.8, 0.05, 0.1, WOOD, 0, 1.63, 0.02);
       break;
     }
-    case 'shelf': { B(g, 1.6, 1.8, 0.4, '#4a3423'); for (let i = 0; i < 4; i++) for (let j = 0; j < 5; j++) if (Math.random() > 0.3) B(g, 0.12 + Math.random() * 0.1, 0.3, 0.25, ['#5a2a2a', '#2a3a5a', '#3a5a2a', '#6a5a3a'][j % 4], -0.6 + j * 0.28, 0.1 + i * 0.44, 0.05); break; }
-    case 'flag_tk': { Plane(g, 0.9, 0.6, canvasTex(90, 60, (x, w, h) => { x.fillStyle = '#f4f1ea'; x.fillRect(0, 0, w, h); x.fillStyle = '#c33'; x.beginPath(); x.arc(45, 30, 12, Math.PI, 0); x.fill(); x.fillStyle = '#336'; x.beginPath(); x.arc(45, 30, 12, 0, Math.PI); x.fill(); }), 0, 2.4, 0.06); break; }
+    // 책 너비를 0.01 단계로만 뽑아 geo 캐시 키를 11개로 묶는다 (매번 새 키가 생겨 GPU 지오메트리가 쌓이던 문제)
+    case 'shelf': { B(g, 1.6, 1.8, 0.4, '#4a3423'); for (let i = 0; i < 4; i++) for (let j = 0; j < 5; j++) if (Math.random() > 0.3) B(g, 0.12 + Math.round(Math.random() * 10) / 100, 0.3, 0.25, ['#5a2a2a', '#2a3a5a', '#3a5a2a', '#6a5a3a'][j % 4], -0.6 + j * 0.28, 0.1 + i * 0.44, 0.05); break; }
+    case 'flag_tk': { Plane(g, 0.9, 0.6, canvasTex(90, 60, (x, w, h) => { x.fillStyle = '#f4f1ea'; x.fillRect(0, 0, w, h); x.fillStyle = '#c33'; x.beginPath(); x.arc(45, 30, 12, Math.PI, 0); x.fill(); x.fillStyle = '#336'; x.beginPath(); x.arc(45, 30, 12, 0, Math.PI); x.fill(); }, 'flag_tk'), 0, 2.4, 0.06); break; }
     case 'door': {
       B(g, 1.1, 2.2, 0.12, '#3d2c1e'); B(g, 1.2, 0.1, 0.16, '#2a1e14', 0, 2.2, 0);
       B(g, 0.6, 0.6, 0.02, '#1c2226', 0, 1.3, 0.07, { emissive: '#000' }); S(g, 0.05, '#b89a5a', 0.4, 1.05, 0.09, { metalness: 0.8 });
@@ -450,7 +473,7 @@ export function buildProp(p) {
       const names = { p: ['칠성', '산신', '용왕', '바리'] };
       const col = ['#6a1e1e', '#2e4a2a', '#1e3a5a', '#5a3a6a'][Math.abs(Math.round(p.x * 3 + p.z)) % 4];
       B(g, 1.1, 1.5, 0.04, '#2a1a10', 0, -0.75, 0);
-      Plane(g, 1.0, 1.4, canvasTex(100, 140, (x, w, h) => { x.fillStyle = col; x.fillRect(0, 0, w, h); x.fillStyle = '#d8b878'; x.beginPath(); x.arc(50, 40, 18, 0, 7); x.fill(); x.fillStyle = '#c8a058'; x.fillRect(30, 60, 40, 60); x.fillStyle = '#000'; x.fillRect(42, 36, 5, 5); x.fillRect(54, 36, 5, 5); x.strokeStyle = '#e8c870'; x.lineWidth = 3; x.strokeRect(4, 4, w - 8, h - 8); }), 0, 0, 0.025);
+      Plane(g, 1.0, 1.4, canvasTex(100, 140, (x, w, h) => { x.fillStyle = col; x.fillRect(0, 0, w, h); x.fillStyle = '#d8b878'; x.beginPath(); x.arc(50, 40, 18, 0, 7); x.fill(); x.fillStyle = '#c8a058'; x.fillRect(30, 60, 40, 60); x.fillStyle = '#000'; x.fillRect(42, 36, 5, 5); x.fillRect(54, 36, 5, 5); x.strokeStyle = '#e8c870'; x.lineWidth = 3; x.strokeRect(4, 4, w - 8, h - 8); }, 'painting|' + col), 0, 0, 0.025);
       break;
     }
     case 'low_desk': { B(g, 1.0, 0.05, 0.6, '#4a2e1c', 0, 0.35, 0); for (const sx of [-1, 1]) B(g, 0.06, 0.35, 0.5, '#3a2416', 0.45 * sx, 0, 0); B(g, 0.6, 0.01, 0.4, PAPER, 0, 0.4, 0); break; }
@@ -464,7 +487,7 @@ export function buildProp(p) {
     case 'stairs_up': { for (let i = 0; i < 6; i++) B(g, 2.4, 0.25 * (i + 1), 0.35, '#4a4440', 0, 0, i * 0.12 - 0.3); g.userData.foot = [2.4, 0.8]; break; }
     case 'pillar_c': { B(g, 0.8, 3.2, 0.8, '#3c3832'); break; }
     case 'puddle': { const w = new THREE.Mesh(new THREE.CircleGeometry(1.2, 20), M('#0c1416', { roughness: 0.05, metalness: 0.6 })); w.rotation.x = -Math.PI / 2; w.position.y = 0.01; g.add(w); break; }
-    case 'wall_marks': { Plane(g, 2.2, 1.2, canvasTex(220, 120, (x, w, h) => { x.fillStyle = 'rgba(0,0,0,0)'; x.clearRect(0, 0, w, h); x.strokeStyle = 'rgba(200,180,160,.55)'; x.lineWidth = 1.5; for (let i = 0; i < 160; i++) { const bx = (i % 20) * 10 + 6, by = Math.floor(i / 20) * 14 + 6; x.beginPath(); x.moveTo(bx, by); x.lineTo(bx + (i % 5 === 4 ? -8 : 1), by + 10); x.stroke(); } }), 0, 0, 0.02, { transparent: true }); break; }
+    case 'wall_marks': { Plane(g, 2.2, 1.2, canvasTex(220, 120, (x, w, h) => { x.fillStyle = 'rgba(0,0,0,0)'; x.clearRect(0, 0, w, h); x.strokeStyle = 'rgba(200,180,160,.55)'; x.lineWidth = 1.5; for (let i = 0; i < 160; i++) { const bx = (i % 20) * 10 + 6, by = Math.floor(i / 20) * 14 + 6; x.beginPath(); x.moveTo(bx, by); x.lineTo(bx + (i % 5 === 4 ? -8 : 1), by + 10); x.stroke(); } }, 'wall_marks'), 0, 0, 0.02, { transparent: true }); break; }
     case 'child_ghost': {
       const mm = new THREE.MeshStandardMaterial({ color: '#c8d0cc', transparent: true, opacity: 0.55, emissive: '#2a3a44', emissiveIntensity: 0.8 });
       const b = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 0.3, 4, 10), mm); b.position.y = 0.38; g.add(b);
@@ -491,16 +514,16 @@ export function buildProp(p) {
     }
     case 'lostbox': { B(g, 0.5, 0.45, 0.3, '#5a4a32', 0, -0.2, 0); B(g, 0.4, 0.05, 0.02, '#d8d0b4', 0, 0.12, 0.16); C(g, 0.06, 0.06, 0.03, '#888', 0.12, -0.05, 0.16, 12, { metalness: 0.8 }).rotation.x = Math.PI / 2; break; }
     case 'eye': { S(g, 0.08, '#c8a06a', 0, 0.08, 0); S(g, 0.04, '#1a1008', 0, 0.1, 0.06); break; }
-    case 'duty_board': { B(g, 0.8, 0.35, 0.04, '#3a2616', 0, -0.17, 0); Plane(g, 0.72, 0.28, canvasTex(144, 56, (x, w, h) => { x.fillStyle = '#e9e2cc'; x.fillRect(0, 0, w, h); x.fillStyle = '#222'; x.font = 'bold 16px sans-serif'; x.fillText('오늘의 일직', 10, 22); x.fillRect(10, 40, 120, 2); }), 0, 0, 0.025); break; }
-    case 'timetable': { B(g, 1.6, 1.1, 0.04, '#5a3f28', 0, -0.55, 0); Plane(g, 1.5, 1.0, canvasTex(300, 200, (x, w, h) => { x.fillStyle = '#efe8d4'; x.fillRect(0, 0, w, h); x.strokeStyle = '#555'; for (let i = 0; i <= 6; i++) { x.beginPath(); x.moveTo(i * 50, 0); x.lineTo(i * 50, h); x.stroke(); } for (let j = 0; j <= 5; j++) { x.beginPath(); x.moveTo(0, j * 40); x.lineTo(w, j * 40); x.stroke(); } x.font = '14px sans-serif'; x.fillStyle = '#222'; ['월', '화', '수', '목', '금', '토'].forEach((d, i) => x.fillText(d, i * 50 + 18, 26)); x.fillStyle = '#a00'; x.fillRect(102, 42, 46, 156); }), 0, 0, 0.025); break; }
+    case 'duty_board': { B(g, 0.8, 0.35, 0.04, '#3a2616', 0, -0.17, 0); Plane(g, 0.72, 0.28, canvasTex(144, 56, (x, w, h) => { x.fillStyle = '#e9e2cc'; x.fillRect(0, 0, w, h); x.fillStyle = '#222'; x.font = 'bold 16px sans-serif'; x.fillText('오늘의 일직', 10, 22); x.fillRect(10, 40, 120, 2); }, 'duty_board'), 0, 0, 0.025); break; }
+    case 'timetable': { B(g, 1.6, 1.1, 0.04, '#5a3f28', 0, -0.55, 0); Plane(g, 1.5, 1.0, canvasTex(300, 200, (x, w, h) => { x.fillStyle = '#efe8d4'; x.fillRect(0, 0, w, h); x.strokeStyle = '#555'; for (let i = 0; i <= 6; i++) { x.beginPath(); x.moveTo(i * 50, 0); x.lineTo(i * 50, h); x.stroke(); } for (let j = 0; j <= 5; j++) { x.beginPath(); x.moveTo(0, j * 40); x.lineTo(w, j * 40); x.stroke(); } x.font = '14px sans-serif'; x.fillStyle = '#222'; ['월', '화', '수', '목', '금', '토'].forEach((d, i) => x.fillText(d, i * 50 + 18, 26)); x.fillStyle = '#a00'; x.fillRect(102, 42, 46, 156); }, 'timetable'), 0, 0, 0.025); break; }
     case 'safe': { B(g, 0.7, 0.7, 0.7, '#3c3f44', 0, 0, 0, { metalness: 0.6, roughness: 0.4 }); C(g, 0.12, 0.12, 0.04, '#b8b8b8', 0, 0.35, 0.36, 16, { metalness: 0.9 }).rotation.x = Math.PI / 2; break; }
-    case 'scroll': { B(g, 0.7, 0.04, 0.05, '#2a1a10', 0, 0.75, 0); Plane(g, 0.6, 1.4, canvasTex(60, 140, (x, w, h) => { x.fillStyle = '#e6dcc0'; x.fillRect(0, 0, w, h); x.fillStyle = '#111'; for (let c = 0; c < 4; c++) for (let r = 0; r < 7; r++) x.fillRect(44 - c * 12, 12 + r * 16, 7, 10); x.fillStyle = '#b22'; x.fillRect(6, 120, 8, 8); }), 0, 0, 0.02); B(g, 0.7, 0.04, 0.05, '#2a1a10', 0, -0.75, 0); break; }
+    case 'scroll': { B(g, 0.7, 0.04, 0.05, '#2a1a10', 0, 0.75, 0); Plane(g, 0.6, 1.4, canvasTex(60, 140, (x, w, h) => { x.fillStyle = '#e6dcc0'; x.fillRect(0, 0, w, h); x.fillStyle = '#111'; for (let c = 0; c < 4; c++) for (let r = 0; r < 7; r++) x.fillRect(44 - c * 12, 12 + r * 16, 7, 10); x.fillStyle = '#b22'; x.fillRect(6, 120, 8, 8); }, 'scroll'), 0, 0, 0.02); B(g, 0.7, 0.04, 0.05, '#2a1a10', 0, -0.75, 0); break; }
     case 'attic_door': { B(g, 1.0, 0.8, 0.06, '#4a2e1c', 0, -0.4, 0); B(g, 0.9, 0.03, 0.08, '#2a1a10', 0, 0, 0); B(g, 0.03, 0.7, 0.08, '#2a1a10', 0, -0.35, 0); S(g, 0.04, '#c9a24a', 0.15, -0.05, 0.05, { metalness: 0.8 }); break; }
     case 'iron_door': { B(g, 2.4, 3.2, 0.2, '#4a3a30', 0, 0, 0, { metalness: 0.6, roughness: 0.7 }); for (let i = 0; i < 6; i++) B(g, 2.4, 0.05, 0.24, '#2e2420', 0, 0.3 + i * 0.5, 0, { metalness: 0.5 }); B(g, 0.25, 0.3, 0.08, '#6a5a3a', 0.3, 1.2, 0.14, { metalness: 0.8 }); break; }
     // ── 시나리오 2: 배 · 등대
     case 'barrel': { C(g, 0.38, 0.38, 0.95, '#6a4a2e', 0, 0, 0, 14); for (const y of [0.15, 0.8]) C(g, 0.4, 0.4, 0.06, '#3a3a3c', 0, y, 0, 14, { metalness: 0.6 }); break; }
     case 'crate': { B(g, 0.9, 0.8, 0.9, '#7a5a36'); B(g, 0.92, 0.08, 0.92, '#5a3e22', 0, 0.4, 0); B(g, 0.08, 0.82, 0.92, '#5a3e22', 0, 0, 0); break; }
-    case 'gold_crate': { B(g, 1.1, 0.8, 0.8, '#6a4a2a'); Plane(g, 0.5, 0.5, canvasTex(64, 64, (x) => { x.fillStyle = '#6a4a2a'; x.fillRect(0, 0, 64, 64); x.fillStyle = '#e8c170'; x.font = 'bold 44px serif'; x.fillText('金', 10, 48); }), 0, 0.42, 0.41); break; }
+    case 'gold_crate': { B(g, 1.1, 0.8, 0.8, '#6a4a2a'); Plane(g, 0.5, 0.5, canvasTex(64, 64, (x) => { x.fillStyle = '#6a4a2a'; x.fillRect(0, 0, 64, 64); x.fillStyle = '#e8c170'; x.font = 'bold 44px serif'; x.fillText('金', 10, 48); }, 'gold_crate'), 0, 0.42, 0.41); break; }
     case 'dock': { for (let i = 0; i < 8; i++) B(g, 0.45, 0.12, 5, '#5a4630', -1.6 + i * 0.46, 0, 0); for (const s of [-1, 1]) for (const z of [-2, 2]) C(g, 0.1, 0.1, 0.9, '#3a2a1a', 1.9 * s, -0.6, z, 6); break; }
     case 'lighthouse': {
       C(g, 1.5, 2.1, 9, '#e8e4dc', 0, 0, 0, 20);
@@ -509,11 +532,11 @@ export function buildProp(p) {
       const roof = new THREE.Mesh(new THREE.ConeGeometry(1.4, 1.2, 16), M('#2a2a2a')); roof.position.y = 11.4; g.add(roof);
       g.userData.foot = [3.6, 3.6]; break;
     }
-    case 'tide_board': { C(g, 0.06, 0.06, 1.2, '#3a2a1a', -0.6); C(g, 0.06, 0.06, 1.2, '#3a2a1a', 0.6); B(g, 1.4, 0.9, 0.05, '#6a7a7a', 0, 1.1, 0); Plane(g, 1.3, 0.8, canvasTex(130, 80, (x, w, h) => { x.fillStyle = '#d8d0b4'; x.fillRect(0, 0, w, h); x.fillStyle = '#222'; x.font = 'bold 13px sans-serif'; x.fillText('물때표', 44, 18); for (let i = 0; i < 4; i++) x.fillRect(10, 30 + i * 12, 100 - i * 10, 3); }), 0, 1.55, 0.03); break; }
+    case 'tide_board': { C(g, 0.06, 0.06, 1.2, '#3a2a1a', -0.6); C(g, 0.06, 0.06, 1.2, '#3a2a1a', 0.6); B(g, 1.4, 0.9, 0.05, '#6a7a7a', 0, 1.1, 0); Plane(g, 1.3, 0.8, canvasTex(130, 80, (x, w, h) => { x.fillStyle = '#d8d0b4'; x.fillRect(0, 0, w, h); x.fillStyle = '#222'; x.font = 'bold 13px sans-serif'; x.fillText('물때표', 44, 18); for (let i = 0; i < 4; i++) x.fillRect(10, 30 + i * 12, 100 - i * 10, 3); }, 'tide_board'), 0, 1.55, 0.03); break; }
     case 'shed': { B(g, 3, 2.4, 2.6, '#4a5054'); const r = B(g, 3.3, 0.15, 3, '#2a2c2e', 0, 2.4, 0); r.rotation.z = 0.08; B(g, 1.2, 1.9, 0.06, '#5a3a24', -1.53, 0, 0).rotation.y = Math.PI / 2; g.userData.foot = [3, 2.6]; break; }
     case 'signal_lamp': { C(g, 0.06, 0.08, 1.6, '#3a3a3a'); const l = C(g, 0.22, 0.22, 0.35, '#5a5a5a', 0, 1.6, 0, 14, { metalness: 0.6 }); l.rotation.x = Math.PI / 2; S(g, 0.16, '#ffd58a', 0, 1.78, 0.18, { emissive: '#ffb347', emissiveIntensity: 2.5 }); const pl = new THREE.PointLight('#ffb35c', 3, 6, 2); pl.position.set(0, 1.8, 0.4); g.add(pl); g.userData.blink = pl; break; }
     case 'lh_door': { B(g, 1.3, 2.2, 0.15, '#3a3a40', 0, 0, 0, { metalness: 0.6 }); B(g, 1.5, 0.12, 0.2, '#2a2a2e', 0, 2.2, 0); S(g, 0.05, '#b89a5a', 0.45, 1.1, 0.1, { metalness: 0.8 }); g.userData.foot = [1.4, 0.3]; break; }
-    case 'easel': { for (const s of [-1, 1]) B(g, 0.05, 1.5, 0.05, WOOD, 0.3 * s, 0, 0).rotation.z = 0.1 * s; Plane(g, 0.8, 0.6, canvasTex(80, 60, (x) => { x.fillStyle = '#d8e0e8'; x.fillRect(0, 0, 80, 60); x.fillStyle = '#2a4a8a'; [[1, 0], [0, 1], [1, 1], [2, 1], [1, 2]].forEach(([c, r]) => x.fillRect(16 + c * 17, 6 + r * 17, 14, 14)); }), 0, 1.2, 0.04); break; }
+    case 'easel': { for (const s of [-1, 1]) B(g, 0.05, 1.5, 0.05, WOOD, 0.3 * s, 0, 0).rotation.z = 0.1 * s; Plane(g, 0.8, 0.6, canvasTex(80, 60, (x) => { x.fillStyle = '#d8e0e8'; x.fillRect(0, 0, 80, 60); x.fillStyle = '#2a4a8a'; [[1, 0], [0, 1], [1, 1], [2, 1], [1, 2]].forEach(([c, r]) => x.fillRect(16 + c * 17, 6 + r * 17, 14, 14)); }, 'easel'), 0, 1.2, 0.04); break; }
     case 'panel': { B(g, 0.9, 1.1, 0.4, '#3a3e44', 0, 0, 0, { metalness: 0.5 }); for (let i = 0; i < 9; i++) B(g, 0.15, 0.04, 0.15, '#7a8a9a', -0.22 + (i % 3) * 0.22, 1.1, -0.1 + Math.floor(i / 3) * 0.12, { emissive: '#223', emissiveIntensity: 0.6 }); break; }
     case 'rowboat': { const h = B(g, 1.3, 0.5, 3.2, '#5a3a22'); B(g, 1.1, 0.06, 0.3, '#7a5a3a', 0, 0.45, -0.4); B(g, 1.1, 0.06, 0.3, '#7a5a3a', 0, 0.45, 0.6); C(g, 0.03, 0.03, 2, '#8a6a4a', 0.8, 0.5, 0, 6).rotation.x = 1.2; g.userData.foot = [1.4, 3.2]; break; }
     case 'bunk': { B(g, 0.9, 0.08, 1.9, METAL, 0, 0.45, 0); B(g, 0.9, 0.08, 1.9, METAL, 0, 1.45, 0); B(g, 0.8, 0.12, 1.8, '#b0a890', 0, 0.53, 0); B(g, 0.8, 0.12, 1.8, '#9a9278', 0, 1.53, 0); for (const sx of [-1, 1]) for (const sz of [-1, 1]) B(g, 0.05, 2, 0.05, METAL, 0.43 * sx, 0, 0.93 * sz); g.userData.foot = [1, 2]; break; }
@@ -521,14 +544,14 @@ export function buildProp(p) {
     case 'porthole': { const r = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.06, 8, 20), M('#8a7a5a', { metalness: 0.8 })); g.add(r); const gl = new THREE.Mesh(new THREE.CircleGeometry(0.28, 20), M('#1a2a3a', { emissive: '#0a1a2a', emissiveIntensity: 1, roughness: 0.1 })); gl.position.z = 0.01; g.add(gl); break; }
     case 'lifebuoy': { const r = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.1, 10, 20), M('#e8e0d0')); g.add(r); for (let i = 0; i < 4; i++) { const s = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.105, 10, 4, Math.PI / 6), M('#c0262d')); s.rotation.z = (i * Math.PI) / 2; g.add(s); } break; }
     case 'table': { B(g, 1.2, 0.06, 0.8, WOOD, 0, 0.75, 0); for (const sx of [-1, 1]) for (const sz of [-1, 1]) B(g, 0.06, 0.75, 0.06, DWOOD, 0.52 * sx, 0, 0.33 * sz); g.userData.foot = [1.2, 0.8]; break; }
-    case 'cabin_door': { B(g, 1.0, 2.1, 0.1, '#4a3e30'); Plane(g, 0.4, 0.4, canvasTex(64, 64, (x) => { x.fillStyle = '#4a3e30'; x.fillRect(0, 0, 64, 64); x.fillStyle = p.color || '#fff'; x.beginPath(); x.arc(32, 32, 22, 0, 7); x.fill(); }), 0, 1.5, 0.06); S(g, 0.04, '#b89a5a', 0.35, 1.0, 0.07, { metalness: 0.8 }); break; }
+    case 'cabin_door': { B(g, 1.0, 2.1, 0.1, '#4a3e30'); Plane(g, 0.4, 0.4, canvasTex(64, 64, (x) => { x.fillStyle = '#4a3e30'; x.fillRect(0, 0, 64, 64); x.fillStyle = p.color || '#fff'; x.beginPath(); x.arc(32, 32, 22, 0, 7); x.fill(); }, 'cabin_door|' + (p.color || '#fff')), 0, 1.5, 0.06); S(g, 0.04, '#b89a5a', 0.35, 1.0, 0.07, { metalness: 0.8 }); break; }
     case 'pump': { B(g, 0.4, 1.0, 0.3, '#5a5048', 0, 0, 0, { metalness: 0.5 }); const lv = B(g, 0.06, 0.6, 0.06, '#c0262d', 0, 1.0, 0.1); lv.rotation.x = 0.4; S(g, 0.07, '#222', 0, 1.55, 0.3); break; }
     case 'cradle': { const b = new THREE.Mesh(new THREE.SphereGeometry(0.45, 16, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), M('#b8a888', { side: THREE.DoubleSide })); b.position.y = 0.55; b.scale.z = 1.4; g.add(b); for (const s of [-1, 1]) { const r = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.03, 6, 16, Math.PI), M(DWOOD)); r.rotation.z = Math.PI; r.position.set(0, 0.35, 0.45 * s); g.add(r); } g.userData.swing = true; break; }
     case 'iron_gate': { for (let i = -4; i <= 4; i++) C(g, 0.03, 0.03, 2.3, '#4a4a4e', i * 0.16, 0, 0, 6, { metalness: 0.7 }); B(g, 1.5, 0.06, 0.06, '#3a3a3e', 0, 2.2, 0); B(g, 1.5, 0.06, 0.06, '#3a3a3e', 0, 0.2, 0); B(g, 0.25, 0.3, 0.12, '#6a5a3a', 0.2, 1.0, 0.08, { metalness: 0.8 }); g.userData.foot = [1.5, 0.3]; break; }
     case 'telegraph': { B(g, 1.2, 0.8, 0.6, '#3a2a1c'); B(g, 0.4, 0.1, 0.25, '#2a2a2a', -0.2, 0.8, 0, { metalness: 0.6 }); B(g, 0.25, 0.04, 0.05, '#b89a5a', -0.2, 0.92, 0, { metalness: 0.8 }); S(g, 0.04, '#111', -0.08, 0.95, 0); B(g, 0.35, 0.3, 0.3, '#5a4a3a', 0.3, 0.8, 0); S(g, 0.04, '#e33', 0.3, 1.0, 0.16, { emissive: '#f00', emissiveIntensity: 1.5 }); g.userData.foot = [1.2, 0.6]; break; }
     case 'tape': { for (let i = 0; i < 8; i++) B(g, 0.06, 0.005, 0.4, PAPER, -0.2 + i * 0.06, 0, Math.sin(i) * 0.05).rotation.y = i * 0.3; break; }
     case 'headphones': { const b = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.015, 6, 14, Math.PI), M('#2a2a2a')); b.position.y = 0.1; g.add(b); for (const s of [-1, 1]) C(g, 0.045, 0.045, 0.04, '#3a3a3a', 0.1 * s, 0.02, 0, 10).rotation.z = Math.PI / 2; break; }
-    case 'map_table': { B(g, 2, 0.08, 1.2, '#5a3e26', 0, 0.85, 0); for (const sx of [-1, 1]) for (const sz of [-1, 1]) B(g, 0.08, 0.85, 0.08, DWOOD, 0.9 * sx, 0, 0.5 * sz); Plane(g, 1.8, 1.0, canvasTex(180, 100, (x) => { x.fillStyle = '#d8c89a'; x.fillRect(0, 0, 180, 100); x.strokeStyle = '#8a3a2a'; x.lineWidth = 2; x.beginPath(); x.moveTo(10, 70); x.lineTo(60, 70); x.lineTo(100, 70); x.lineTo(100, 40); x.lineTo(140, 40); x.lineTo(140, 80); x.stroke(); x.fillStyle = '#2a4a6a'; x.fillRect(150, 80, 10, 10); }), 0, 0.9, 0).rotation.x = -Math.PI / 2; g.userData.foot = [2, 1.2]; break; }
+    case 'map_table': { B(g, 2, 0.08, 1.2, '#5a3e26', 0, 0.85, 0); for (const sx of [-1, 1]) for (const sz of [-1, 1]) B(g, 0.08, 0.85, 0.08, DWOOD, 0.9 * sx, 0, 0.5 * sz); Plane(g, 1.8, 1.0, canvasTex(180, 100, (x) => { x.fillStyle = '#d8c89a'; x.fillRect(0, 0, 180, 100); x.strokeStyle = '#8a3a2a'; x.lineWidth = 2; x.beginPath(); x.moveTo(10, 70); x.lineTo(60, 70); x.lineTo(100, 70); x.lineTo(100, 40); x.lineTo(140, 40); x.lineTo(140, 80); x.stroke(); x.fillStyle = '#2a4a6a'; x.fillRect(150, 80, 10, 10); }, 'map_table'), 0, 0.9, 0).rotation.x = -Math.PI / 2; g.userData.foot = [2, 1.2]; break; }
     case 'ship_wheel': { C(g, 0.08, 0.1, 1.0, DWOOD); const w = new THREE.Group(); w.position.set(0, 1.25, 0.1); g.add(w); const r = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.04, 8, 24), M('#6a4a2a')); w.add(r); for (let i = 0; i < 8; i++) { const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.1, 6), M('#6a4a2a')); sp.rotation.z = (i * Math.PI) / 8; w.add(sp); } g.userData.foot = [0.5, 0.5]; break; }
     case 'hatch': { B(g, 1.4, 0.06, 1.4, '#3a3a3e', 0, 0, 0, { metalness: 0.6 }); const r = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.03, 6, 14), M('#8a7a5a', { metalness: 0.8 })); r.rotation.x = Math.PI / 2; r.position.y = 0.08; g.add(r); break; }
     case 'chain': { for (let i = 0; i < 10; i++) { const l = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.02, 6, 10), M('#5a5a5e', { metalness: 0.7 })); l.position.y = 3.3 - i * 0.12; l.rotation.y = (i % 2) * Math.PI / 2; g.add(l); } S(g, 0.12, '#4a4a4e', 0, 2.0, 0, { metalness: 0.7 }); break; }
@@ -547,7 +570,7 @@ export function buildProp(p) {
     case 'bookcase': { B(g, 2, 2.4, 0.45, '#3a2216'); for (let i = 0; i < 5; i++) B(g, 0.3, 0.45, 0.3, ['#7a2a2a', '#2a4a7a', '#2a6a3a', '#7a6a2a', '#5a2a6a'][i], -0.7 + i * 0.35, 1.2, 0.1); for (let i = 0; i < 4; i++) B(g, 1.9, 0.04, 0.4, '#2a1810', 0, 0.3 + i * 0.6, 0); g.userData.foot = [2, 0.45]; break; }
     case 'workbench': { B(g, 2, 0.08, 0.9, '#6a4a2e', 0, 0.85, 0); for (const sx of [-1, 1]) B(g, 0.1, 0.85, 0.8, '#4a3220', 0.9 * sx, 0, 0); S(g, 0.12, '#f4ece4', -0.4, 1.0, 0); C(g, 0.08, 0.1, 0.3, '#9ab7d8', 0.2, 0.9, 0, 10); g.userData.foot = [2, 0.9]; break; }
     case 'dollhouse': { B(g, 1.6, 1.0, 0.8, '#f2e6d8', 0, 0.6, 0); B(g, 1.6, 0.6, 0.8, '#d8c0b0', 0, 0, 0); { const sh = new THREE.Shape([new THREE.Vector2(-0.52, 0), new THREE.Vector2(0.52, 0), new THREE.Vector2(0, 0.62)]); const rg = new THREE.ExtrudeGeometry(sh, { depth: 1.8, bevelEnabled: false }); rg.translate(0, 0, -0.9); const r = new THREE.Mesh(rg, M('#7a3a3a')); r.rotation.y = Math.PI / 2; r.position.y = 1.6; r.castShadow = true; g.add(r); B(g, 0.12, 0.5, 0.12, '#5a2a2a', 0.45, 1.75, 0.2); } for (let i = 0; i < 4; i++) B(g, 0.25, 0.25, 0.02, '#ffe08a', -0.45 + (i % 2) * 0.9, 0.85 + Math.floor(i / 2) * -0.5, 0.41, { emissive: '#553', emissiveIntensity: 0.5 }); g.userData.foot = [1.6, 0.8]; break; }
-    case 'frame': { B(g, 0.8, 0.8, 0.04, '#6a4a2a'); Plane(g, 0.7, 0.7, canvasTex(70, 70, (x) => { x.fillStyle = '#f2ead8'; x.fillRect(0, 0, 70, 70); x.fillStyle = '#c0262d'; ['1001', '1111', '1111', '0110'].forEach((row, r) => [...row].forEach((v, c) => { if (v === '1') x.fillRect(8 + c * 14, 8 + r * 14, 12, 12); })); }), 0, 0.4, 0.025); break; }
+    case 'frame': { B(g, 0.8, 0.8, 0.04, '#6a4a2a'); Plane(g, 0.7, 0.7, canvasTex(70, 70, (x) => { x.fillStyle = '#f2ead8'; x.fillRect(0, 0, 70, 70); x.fillStyle = '#c0262d'; ['1001', '1111', '1111', '0110'].forEach((row, r) => [...row].forEach((v, c) => { if (v === '1') x.fillRect(8 + c * 14, 8 + r * 14, 12, 12); })); }, 'frame'), 0, 0.4, 0.025); break; }
     case 'stained_window': { B(g, 1.6, 1.6, 0.06, '#2a1a10', 0, -0.8, 0); for (let i = 0; i < 16; i++) B(g, 0.34, 0.34, 0.02, ['#7a2a3a', '#2a4a7a', '#3a6a3a', '#7a6a2a'][(i + Math.floor(i / 4)) % 4], -0.54 + (i % 4) * 0.36, -0.7 + Math.floor(i / 4) * 0.36 - 0.54 + 0.6, 0.04, { emissive: '#222', emissiveIntensity: 0.6, transparent: true, opacity: 0.85 }); break; }
     case 'mannequin': { C(g, 0.03, 0.03, 0.9, '#2a2a2a'); C(g, 0.2, 0.15, 0.6, '#e8dcc8', 0, 0.9, 0, 12); S(g, 0.12, '#e8dcc8', 0, 1.6, 0); break; }
     case 'rocking_horse': { for (const s of [-1, 1]) { const r = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.03, 6, 16, Math.PI / 2.5), M(DWOOD)); r.rotation.z = Math.PI + 0.6; r.position.set(0, 0.62, 0.15 * s); g.add(r); } B(g, 0.7, 0.25, 0.22, '#e8dcc8', 0, 0.5, 0); B(g, 0.15, 0.4, 0.15, '#e8dcc8', 0.35, 0.7, 0).rotation.z = -0.4; S(g, 0.03, '#000', 0.48, 0.95, 0.08); break; }
@@ -562,7 +585,7 @@ export function buildProp(p) {
       g.userData.foot = [1, 1]; break;
     }
     case 'music_box': { B(g, 0.6, 0.3, 0.4, '#7a3a4a', 0, 0.75, 0); B(g, 0.8, 0.75, 0.5, '#3a2228'); C(g, 0.02, 0.02, 0.15, '#c9a24a', 0, 1.05, 0, 6); S(g, 0.05, '#ffd6e0', 0, 1.2, 0); C(g, 0.06, 0.01, 0.1, '#ffd6e0', 0, 1.1, 0, 10); g.userData.foot = [0.8, 0.5]; break; }
-    case 'ouija': { B(g, 0.6, 0.02, 0.4, '#c8a878'); Plane(g, 0.56, 0.36, canvasTex(112, 72, (x) => { x.fillStyle = '#c8a878'; x.fillRect(0, 0, 112, 72); x.fillStyle = '#2a1a10'; x.font = '9px serif'; x.fillText('A B C D E F G H I J K L M', 4, 24); x.fillText('N O P Q R S T U V W X Y Z', 4, 38); x.fillText('YES          NO', 22, 12); x.fillText('1 2 3 4 5 6 7 8 9 0', 12, 52); x.fillText('GOOD BYE', 34, 66); }), 0, 0.012, 0).rotation.x = -Math.PI / 2; const pl = B(g, 0.08, 0.02, 0.1, '#f2ead8', 0.05, 0.02, 0.02); g.userData.planchette = pl; break; }
+    case 'ouija': { B(g, 0.6, 0.02, 0.4, '#c8a878'); Plane(g, 0.56, 0.36, canvasTex(112, 72, (x) => { x.fillStyle = '#c8a878'; x.fillRect(0, 0, 112, 72); x.fillStyle = '#2a1a10'; x.font = '9px serif'; x.fillText('A B C D E F G H I J K L M', 4, 24); x.fillText('N O P Q R S T U V W X Y Z', 4, 38); x.fillText('YES          NO', 22, 12); x.fillText('1 2 3 4 5 6 7 8 9 0', 12, 52); x.fillText('GOOD BYE', 34, 66); }, 'ouija'), 0, 0.012, 0).rotation.x = -Math.PI / 2; const pl = B(g, 0.08, 0.02, 0.1, '#f2ead8', 0.05, 0.02, 0.02); g.userData.planchette = pl; break; }
     case 'vanity': { B(g, 1.2, 0.8, 0.5, '#e8dcd0'); B(g, 0.9, 1.0, 0.04, '#c9a24a', 0, 0.8, -0.22, { metalness: 0.6 }); B(g, 0.8, 0.9, 0.02, '#a8bccc', 0, 0.85, -0.19, { metalness: 0.9, roughness: 0.1 }); g.userData.foot = [1.2, 0.5]; break; }
     case 'tea_table': { C(g, 0.8, 0.8, 0.05, '#f4f1ea', 0, 0.6, 0, 24); C(g, 0.08, 0.12, 0.6, '#e8dcd0'); for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; C(g, 0.06, 0.04, 0.06, '#fff', Math.cos(a) * 0.55, 0.65, Math.sin(a) * 0.55, 10); B(g, 0.35, 0.4, 0.35, '#f2d0dc', Math.cos(a) * 1.15, 0, Math.sin(a) * 1.15); } g.userData.foot = [1.7, 1.7]; break; }
     case 'canopy_bed': { B(g, 1.6, 0.5, 2.2, '#f2e6ea'); B(g, 1.5, 0.15, 2.1, '#ffd6e0', 0, 0.5, 0); for (const sx of [-1, 1]) for (const sz of [-1, 1]) C(g, 0.04, 0.04, 2.3, '#e8dcd0', 0.75 * sx, 0, 1.05 * sz, 8); B(g, 1.7, 0.05, 2.3, '#fff0f4', 0, 2.3, 0, { transparent: true, opacity: 0.7 }); for (let i = 0; i < 5; i++) C(g, 0.006, 0.006, 1.2, '#c0262d', 0.75, 2.3, -1.05 + i * 0.02, 4); g.userData.foot = [1.6, 2.2]; break; }
@@ -605,7 +628,7 @@ export function buildProp(p) {
       B(g, 1.3, 2.1, 0.06, '#1a0e08', 0, 0, 0.22);
       for (const s of [-1, 1]) B(g, 0.9, 0.7, 0.05, '#2a3a40', 1.8 * s, 1.2, 0.22, { emissive: '#ffb050', emissiveIntensity: 0.25 });
       const txt = String(p.sign || p.label || '');
-      Plane(g, 3.6, 0.8, canvasTex(360, 80, (x) => { x.fillStyle = '#e8d8b0'; x.fillRect(0, 0, 360, 80); x.strokeStyle = '#3a2414'; x.lineWidth = 6; x.strokeRect(3, 3, 354, 74); x.fillStyle = '#3a1a0a'; x.font = 'bold 44px serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(txt, 180, 42); }), 0, 3.6, 0.22);
+      Plane(g, 3.6, 0.8, canvasTex(360, 80, (x) => { x.fillStyle = '#e8d8b0'; x.fillRect(0, 0, 360, 80); x.strokeStyle = '#3a2414'; x.lineWidth = 6; x.strokeRect(3, 3, 354, 74); x.fillStyle = '#3a1a0a'; x.font = 'bold 44px serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(txt, 180, 42); }, 'facade|' + txt), 0, 3.6, 0.22);
       g.userData.foot = [6, 1.3]; break;
     }
     case 'gallows': {
@@ -675,7 +698,7 @@ export function buildProp(p) {
       for (const s of [-1, 1]) B(g, 0.08, 1.9, 0.08, '#2a1a12', 0.9 * s, 0, 0);
       B(g, 2.2, 0.08, 0.08, '#2a1a12', 0, 1.85, 0);
       const k = B(g, 1.7, 1.5, 0.06, '#b81c26', 0, 0.3, 0.05);
-      Plane(g, 1.6, 1.4, canvasTex(160, 140, (x) => { x.fillStyle = '#b81c26'; x.fillRect(0, 0, 160, 140); for (let i = 0; i < 9; i++) { const cx = 20 + (i % 3) * 60, cy = 22 + Math.floor(i / 3) * 46; x.fillStyle = '#fff4f0'; for (let j = 0; j < 5; j++) { const a = (j / 5) * Math.PI * 2; x.beginPath(); x.arc(cx + Math.cos(a) * 7, cy + Math.sin(a) * 7, 6, 0, 7); x.fill(); } x.fillStyle = '#f0c040'; x.beginPath(); x.arc(cx, cy, 3, 0, 7); x.fill(); } x.fillStyle = '#f2e6c8'; x.fillRect(0, 70, 160, 14); }), 0, 1.05, 0.09);
+      Plane(g, 1.6, 1.4, canvasTex(160, 140, (x) => { x.fillStyle = '#b81c26'; x.fillRect(0, 0, 160, 140); for (let i = 0; i < 9; i++) { const cx = 20 + (i % 3) * 60, cy = 22 + Math.floor(i / 3) * 46; x.fillStyle = '#fff4f0'; for (let j = 0; j < 5; j++) { const a = (j / 5) * Math.PI * 2; x.beginPath(); x.arc(cx + Math.cos(a) * 7, cy + Math.sin(a) * 7, 6, 0, 7); x.fill(); } x.fillStyle = '#f0c040'; x.beginPath(); x.arc(cx, cy, 3, 0, 7); x.fill(); } x.fillStyle = '#f2e6c8'; x.fillRect(0, 70, 160, 14); }, 'kimono_rack'), 0, 1.05, 0.09);
       void k; g.userData.foot = [2, 0.4]; break;
     }
     case 'koi_pond': {
@@ -748,14 +771,14 @@ export function buildProp(p) {
       const glass = B(g, 1.0, 0.8, 0.6, M('#e8f4ff', { transparent: true, opacity: 0.35 }), 0, 1.05); glass.castShadow = false;
       for (let i = 0; i < 40; i++) S(g, 0.05, '#fff6d0', (Math.random() - 0.5) * 0.85, 1.1 + Math.random() * 0.35, (Math.random() - 0.5) * 0.45);
       B(g, 1.3, 0.1, 0.8, '#ffd36a', 0, 1.85); const roof = new THREE.Mesh(new THREE.ConeGeometry(0.8, 0.5, 4), M('#ffffff')); roof.rotation.y = Math.PI / 4; roof.position.y = 2.2; g.add(roof);
-      const sign = canvasTex(256, 64, (x, w, h) => { x.fillStyle = '#ffd36a'; x.fillRect(0, 0, w, h); x.fillStyle = '#c0262d'; x.font = 'bold 40px sans-serif'; x.textAlign = 'center'; x.fillText('POPCORN', w / 2, 46); });
+      const sign = canvasTex(256, 64, (x, w, h) => { x.fillStyle = '#ffd36a'; x.fillRect(0, 0, w, h); x.fillStyle = '#c0262d'; x.font = 'bold 40px sans-serif'; x.textAlign = 'center'; x.fillText('POPCORN', w / 2, 46); }, 'popcorn_cart');
       Plane(g, 1.0, 0.25, sign, 0, 0.75, 0.36); break;
     }
     case 'ticket_booth': {
       B(g, 1.8, 1.0, 1.4, '#2f5fd0'); B(g, 1.8, 1.4, 0.1, '#c0262d', 0, 1.0, -0.65); for (const s of [-1, 1]) B(g, 0.1, 1.4, 1.4, '#c0262d', 0.85 * s, 1.0);
       const win = B(g, 1.2, 0.8, 0.04, M('#a8d0ff', { transparent: true, opacity: 0.3 }), 0, 1.2, 0.68); win.castShadow = false;
       B(g, 2.0, 0.14, 1.6, '#ffd36a', 0, 2.4); const roof = new THREE.Mesh(new THREE.ConeGeometry(1.35, 0.9, 4), M('#ffffff')); roof.rotation.y = Math.PI / 4; roof.position.y = 2.95; g.add(roof);
-      const sign = canvasTex(256, 64, (x, w, h) => { x.fillStyle = '#1a0a24'; x.fillRect(0, 0, w, h); x.fillStyle = '#ffd36a'; x.font = 'bold 34px serif'; x.textAlign = 'center'; x.fillText('TICKETS · 매표소', w / 2, 44); });
+      const sign = canvasTex(256, 64, (x, w, h) => { x.fillStyle = '#1a0a24'; x.fillRect(0, 0, w, h); x.fillStyle = '#ffd36a'; x.font = 'bold 34px serif'; x.textAlign = 'center'; x.fillText('TICKETS · 매표소', w / 2, 44); }, 'ticket_booth');
       Plane(g, 1.7, 0.42, sign, 0, 2.2, 0.72); break;
     }
     case 'cage': {
@@ -821,7 +844,7 @@ export function buildProp(p) {
     }
     case 'magic_box': {
       const box = B(g, 1.0, 1.9, 1.0, '#1a0a3a', 0, 0.2); B(g, 1.3, 0.2, 1.3, '#ffd36a', 0, 0); B(g, 1.08, 0.1, 1.08, '#ffd36a', 0, 2.1);
-      const tex = canvasTex(128, 256, (x, w, h) => { x.fillStyle = '#1a0a3a'; x.fillRect(0, 0, w, h); x.fillStyle = '#ffd36a'; for (let i = 0; i < 14; i++) { const cx = 16 + ((i * 47) % 96), cy = 18 + ((i * 83) % 220); x.beginPath(); for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + (k * Math.PI) / 5; const r = k % 2 ? 4 : 10; x.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); } x.fill(); } x.font = 'bold 22px serif'; x.fillStyle = '#ff9ad0'; x.fillText('?', 56, 140); });
+      const tex = canvasTex(128, 256, (x, w, h) => { x.fillStyle = '#1a0a3a'; x.fillRect(0, 0, w, h); x.fillStyle = '#ffd36a'; for (let i = 0; i < 14; i++) { const cx = 16 + ((i * 47) % 96), cy = 18 + ((i * 83) % 220); x.beginPath(); for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + (k * Math.PI) / 5; const r = k % 2 ? 4 : 10; x.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); } x.fill(); } x.font = 'bold 22px serif'; x.fillStyle = '#ff9ad0'; x.fillText('?', 56, 140); }, 'magic_box');
       Plane(g, 0.96, 1.85, tex, 0, 1.15, 0.51); if (p.open) box.material = M('#0a0418'); break;
     }
     case 'clown_statue': {
@@ -849,7 +872,7 @@ export function buildProp(p) {
     case 'burnt_beam': { const b = B(g, 3.0, 0.3, 0.3, '#1a120c', 0, 0.15); b.rotation.y = 0.2; const b2 = B(g, 2.2, 0.25, 0.25, '#120c08', 0.3, 0.3, 0.3); b2.rotation.set(0.1, -0.5, 0.25); for (let i = 0; i < 6; i++) S(g, 0.05, '#ff5a1a', (Math.random() - 0.5) * 2.4, 0.3, (Math.random() - 0.5) * 0.4, { emissive: '#ff3a0a', emissiveIntensity: 1.5 }); break; }
     case 'juggling_pins': { for (let i = 0; i < 5; i++) { const pin = C(g, 0.02, 0.06, 0.4, i % 2 ? '#ffffff' : '#d6303a', (i - 2) * 0.12, 0, Math.sin(i) * 0.1); pin.rotation.z = Math.PI / 2 * (i % 2 ? 0.95 : 1.05); pin.position.y = 0.06; } break; }
     case 'big_top': {
-      const r = p.r2 || 9, h = p.h || 8; const tex = canvasTex(512, 64, (x, w, hh) => { for (let i = 0; i < 16; i++) { x.fillStyle = i % 2 ? '#c0262d' : '#f4f1ea'; x.fillRect((w / 16) * i, 0, w / 16 + 1, hh); } });
+      const r = p.r2 || 9, h = p.h || 8; const tex = canvasTex(512, 64, (x, w, hh) => { for (let i = 0; i < 16; i++) { x.fillStyle = i % 2 ? '#c0262d' : '#f4f1ea'; x.fillRect((w / 16) * i, 0, w / 16 + 1, hh); } }, 'big_top');
       const wall = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h * 0.45, 32, 1, true), new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide, roughness: 0.9 })); wall.position.y = h * 0.225; g.add(wall);
       const roof = new THREE.Mesh(new THREE.ConeGeometry(r * 1.05, h * 0.55, 32, 1, true), new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide, roughness: 0.9 })); roof.position.y = h * 0.45 + h * 0.275; g.add(roof);
       C(g, 0.06, 0.06, 1.4, '#ffd36a', 0, h); const flag = B(g, 0.6, 0.35, 0.02, '#ff2a6a', 0.32, h + 1.0); g.userData.flag = flag; break;
@@ -1028,7 +1051,7 @@ export function buildProp(p) {
     }
     case 'drop_tower': {
       const h = p.h || 14; B(g, 1.4, h, 1.4, '#3a3a44', 0, 0, 0); for (let i = 0; i < h; i += 1) B(g, 1.5, 0.06, 1.5, '#ffd36a', 0, i, 0, { emissive: '#aa7a10', emissiveIntensity: i % 2 ? 0.6 : 0 });
-      B(g, 2.4, 0.6, 2.4, '#c0262d', 0, h, 0); const sign = canvasTex(256, 64, (x, w, hh) => { x.fillStyle = '#1a0a14'; x.fillRect(0, 0, w, hh); x.fillStyle = '#ffd36a'; x.font = 'bold 40px sans-serif'; x.textAlign = 'center'; x.fillText('SKY DROP', w / 2, 46); }); Plane(g, 2.2, 0.55, sign, 0, h + 0.3, 1.22); break;
+      B(g, 2.4, 0.6, 2.4, '#c0262d', 0, h, 0); const sign = canvasTex(256, 64, (x, w, hh) => { x.fillStyle = '#1a0a14'; x.fillRect(0, 0, w, hh); x.fillStyle = '#ffd36a'; x.font = 'bold 40px sans-serif'; x.textAlign = 'center'; x.fillText('SKY DROP', w / 2, 46); }, 'drop_tower'); Plane(g, 2.2, 0.55, sign, 0, h + 0.3, 1.22); break;
     }
     case 'drop_car': { const ring = new THREE.Mesh(new THREE.TorusGeometry(1.3, 0.25, 10, 28), M('#d6303a', { metalness: 0.3 })); ring.rotation.x = Math.PI / 2; ring.position.y = 0.5; g.add(ring); for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; B(g, 0.4, 0.7, 0.3, '#2a2a30', Math.cos(a) * 1.35, 0.2, Math.sin(a) * 1.35).rotation.y = -a; } break; }
     case 'swing': {
@@ -1074,7 +1097,7 @@ export function buildProp(p) {
       for (const sx of [-1, 1]) C(g, 0.06, 0.06, 2.4, '#3a3a40', 0.9 * sx, 0);
       const tex = canvasTex(256, 160, (x, w, h) => { x.fillStyle = '#e8dcb8'; x.fillRect(0, 0, w, h); x.fillStyle = '#2a6a3a'; x.fillRect(8, 8, w - 16, h - 16); x.fillStyle = '#e8dcb8'; x.font = 'bold 16px sans-serif'; x.fillText('HAPPINESS LAND', 64, 26);
         const spots = [['정문', 128, 140], ['회전목마', 60, 110], ['유령의 집', 40, 60], ['관람차', 200, 50], ['바이킹', 210, 105], ['거울 미궁', 120, 70], ['스카이드롭', 150, 30], ['방송실', 90, 40]];
-        x.font = '11px sans-serif'; spots.forEach(([n, px, py]) => { x.fillStyle = '#c0262d'; x.beginPath(); x.arc(px, py, 5, 0, 7); x.fill(); x.fillStyle = '#fff'; x.fillText(n, px + 7, py + 4); }); x.strokeStyle = 'rgba(80,0,0,.8)'; x.lineWidth = 3; x.beginPath(); x.moveTo(120, 70); x.lineTo(150, 30); x.stroke(); });
+        x.font = '11px sans-serif'; spots.forEach(([n, px, py]) => { x.fillStyle = '#c0262d'; x.beginPath(); x.arc(px, py, 5, 0, 7); x.fill(); x.fillStyle = '#fff'; x.fillText(n, px + 7, py + 4); }); x.strokeStyle = 'rgba(80,0,0,.8)'; x.lineWidth = 3; x.beginPath(); x.moveTo(120, 70); x.lineTo(150, 30); x.stroke(); }, 'park_map');
       Plane(g, 1.9, 1.2, tex, 0, 1.8, 0.04); B(g, 2.0, 1.3, 0.06, '#2a2026', 0, 1.15, -0.01); break;
     }
     case 'speaker_pole': { C(g, 0.06, 0.08, 3.2, '#4a4e54', 0, 0, 0, 10, { metalness: 0.6 }); for (const sx of [-1, 1]) { const h = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.4, 14, 1, true), M('#c8c0b0', { side: THREE.DoubleSide })); h.rotation.z = Math.PI / 2 * sx; h.position.set(0.22 * sx, 3.0, 0); g.add(h); } break; }

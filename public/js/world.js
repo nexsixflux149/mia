@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { buildProp, FOOT, setPropTheme } from './props.js';
+import { buildProp, FOOT, setPropTheme, markShared, disposeTree } from './props.js';
 import { buildXmasProp, decorateXmas } from './xmas-visuals.js';
 import { textSprite, createAvatar, animateAvatar } from './avatar.js';
 import { buildWings, buildMount, buildSword, buildBalloon, BALLOON_COLORS, buildSnack } from './gear.js';
@@ -280,9 +280,9 @@ function treeGeo(kind) {
     const leaf = kind === 'pine_dense' ? ['#18301e', '#1c3622'] : ['#1d3324', '#22392a'];
     for (let i = 0; i < 4; i++) { const cg = new THREE.ConeGeometry(1.1 - i * 0.22, 1.3, 8); cg.rotateY(i * 0.7); cg.translate(0, 1.4 + i * 0.75, 0); parts.push(coloredPart(cg, leaf[i % 2])); }
   }
-  const merged = mergeGeometries(parts); merged.computeBoundingSphere(); TREE_GEO.set(kind, merged); return merged;
+  const merged = mergeGeometries(parts); merged.computeBoundingSphere(); markShared(merged); TREE_GEO.set(kind, merged); return merged;
 }
-const TREE_MAT = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true });
+const TREE_MAT = markShared(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true }));
 function instancedForest(root, spots, kind) {
   if (!spots.length) return;
   const geo = treeGeo(kind === 'pine' || kind === 'pine_dense' || kind === 'bamboo' || kind === 'mesa' ? kind : 'pine');
@@ -442,7 +442,7 @@ function stripeTex(a, b, n = 12) {
 }
 const pm = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.6, ...o });
 const _gc = new Map();
-const G = (key, make) => (_gc.has(key) ? _gc.get(key) : (_gc.set(key, make()), _gc.get(key)));
+const G = (key, make) => (_gc.has(key) ? _gc.get(key) : (_gc.set(key, markShared(make())), _gc.get(key)));
 function mesh(geo, mat, x = 0, y = 0, z = 0, parent) { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); const big = (geo.boundingSphere || (geo.computeBoundingSphere(), geo.boundingSphere)).radius > 0.35; m.castShadow = big; m.receiveShadow = big; parent.add(m); return m; }
 
 function buildPark(root, colliders, add) {
@@ -627,7 +627,7 @@ function snapTileTex(img) {
   }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
-function buildSnapBoard(root, colliders) {
+function buildSnapBoard(root, colliders, renderer) {
   const z = 18.2;
   const g = new THREE.Group(); g.position.set(0, 0, z); g.rotation.y = Math.PI; root.add(g);
   const W = SNAP_COLS * SNAP_W + (SNAP_COLS - 1) * SNAP_GAP;
@@ -670,18 +670,29 @@ function buildSnapBoard(root, colliders) {
   const title = textSprite('📸 클리어 기념 폴라로이드', { size: 36, bg: 'rgba(34,16,26,.9)', color: '#ffe3b3', border: '#ffd390', maxW: 850 });
   title.position.set(0, cy + H / 2 + 0.9, 0); title.scale.multiplyScalar(1.5); g.add(title);
   const geo = new THREE.PlaneGeometry(SNAP_W, SNAP_H), tiles = [];
+  const blank = snapTileTex(); // 사진이 없는 칸은 모두 이 한 장을 같이 쓴다
+  const photoTex = new Map(); // 사진 id → 질감. 한 번 만든 사진은 다시 디코드하지 않는다
   for (let i = 0; i < SNAP_COLS * SNAP_ROWS; i++) {
     const c = i % SNAP_COLS, r = Math.floor(i / SNAP_COLS);
-    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: snapTileTex(), toneMapped: false }));
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: blank, toneMapped: false }));
     m.position.set(-W / 2 + SNAP_W / 2 + c * (SNAP_W + SNAP_GAP), cy + H / 2 - SNAP_H / 2 - r * (SNAP_H + SNAP_GAP), 0); g.add(m); tiles.push(m);
   }
   let ids = '', revision = 0, flash = 0;
-  const load = (photo) => new Promise((resolve) => {
-    const im = new Image();
-    im.onload = () => resolve(snapTileTex(im));
-    im.onerror = () => resolve(snapTileTex());
-    im.src = photo.img;
-  });
+  // 사진은 id별로 한 번만 디코드해 질감을 만든다. 목록이 바뀌어도 남아 있는 사진은 그대로 쓴다
+  const load = (photo) => {
+    if (photoTex.has(photo.id)) return Promise.resolve(photoTex.get(photo.id));
+    return new Promise((resolve) => {
+      const im = new Image();
+      im.onload = () => im.decode().catch(() => {}).then(() => resolve(keepTex(photo.id, im)));
+      im.onerror = () => resolve(null);
+      im.src = photo.img;
+    });
+  };
+  const keepTex = (id, im) => {
+    const t = snapTileTex(im);
+    if (photoTex.has(id)) { t.dispose(); return photoTex.get(id); } // 같은 사진이 먼저 만들어졌다
+    photoTex.set(id, t); renderer?.initTexture(t); return t; // 화면 밖 칸도 첫 복귀 때 몰아서 올리지 않도록, 디코드가 끝나는 순간 GPU에 올린다
+  };
   return {
     async set(list) {
       const photos = list.slice(0, tiles.length);
@@ -690,14 +701,14 @@ function buildSnapBoard(root, colliders) {
       ids = want;
       const request = ++revision;
       const textures = await Promise.all(photos.map(load));
-      if (request !== revision || !root.parent) { textures.forEach((t) => t.dispose()); return; }
-      tiles.forEach((tile, i) => {
-        tile.material.map.dispose();
-        tile.material.map = textures[i] || snapTileTex();
-        tile.material.needsUpdate = true;
-      });
+      if (request !== revision) return; // 더 새 목록이 이미 와 있다
+      if (!root.parent) { ids = ''; return; } // 로비를 떠나 있었다면 돌아왔을 때 다시 그리도록 비워 둔다
+      tiles.forEach((tile, i) => { tile.material.map = textures[i] || blank; tile.material.needsUpdate = true; });
+      const shown = new Set(photos.map((photo) => photo.id));
+      for (const [id, t] of photoTex) if (!shown.has(id)) { t.dispose(); photoTex.delete(id); } // 목록에서 밀려난 사진만 치운다
       flash = 1;
     },
+    dispose() { for (const t of photoTex.values()) t.dispose(); photoTex.clear(); }, // 로비를 지울 때 사진 질감도 함께 치운다
     update(dt) { if (flash > 0) { flash = Math.max(0, flash - dt * 1.5); highlight.emissiveIntensity = 0.18 + flash * 0.52; } },
   };
 }
@@ -1277,6 +1288,14 @@ function buildChristmasTree(root, colliders) {
 }
 
 
+// 만들어 둔 로비를 다시 붙인다 (챕터에서 돌아올 때 새로 짓지 않도록). 배경과 안개도 로비 것으로 되돌린다
+export function attachLobby(scene, w) {
+  setPropTheme('lobby');
+  scene.add(w.root);
+  scene.background = w.background;
+  scene.fog = w.fog;
+  return w;
+}
 export function buildLobby(scene, opts = {}) {
   setPropTheme('lobby');
   const root = new THREE.Group();
@@ -1325,7 +1344,7 @@ export function buildLobby(scene, opts = {}) {
   themes.push({ id: 'christmas', x: -8, z: -4.4, color: '#ffe0a0', glow: '#36172a', label: '🎄 크리스마스 특별판' });
   const exhibits = themes.map((th) => buildExhibit(root, colliders, th));
   const extra = buildLobbyExtras(root, colliders, add);
-  const snapBoard = buildSnapBoard(root, colliders);
+  const snapBoard = buildSnapBoard(root, colliders, opts.renderer);
   const tip = textSprite('🚪 테마 관문을 클릭하면 바로 시작! · 🎠 놀이기구도 탈 수 있어요', { size: 26, bg: 'rgba(0,0,0,.55)', maxW: 700 });
   tip.position.set(0, 7.9, 9); root.add(tip);
 
@@ -1458,7 +1477,7 @@ export function buildLobby(scene, opts = {}) {
       e.spin.forEach((s) => (s.rotation.z = Math.sin(t * 1.2 + i) * 0.15));
     });
   };
-  return { root, colliders, walls: [], objects: {}, flickers: [], ceiling: [], update, bounds: 28.5 * LS, outdoor: true, themes, exhibits, hiddenGate: !!opts.hidden, setChamp: (c) => champSign.set(c), snapBoard, shopFace: extra.shopFace, clickables: [...extra.clickables, ...deco.clickables], wishStar: deco.wishStar, xmasGift: deco.xmasGift, interactives: [...park.interactives, ...outer.interactives, ...extra.interactives, ...deco.interactives], rides: { ...park.rides, ...extra.rides, ...deco.rides } };
+  return { root, colliders, walls: [], objects: {}, flickers: [], ceiling: [], update, bounds: 28.5 * LS, outdoor: true, background: scene.background, fog: scene.fog, themes, exhibits, hiddenGate: !!opts.hidden, setChamp: (c) => champSign.set(c), snapBoard, shopFace: extra.shopFace, clickables: [...extra.clickables, ...deco.clickables], wishStar: deco.wishStar, xmasGift: deco.xmasGift, interactives: [...park.interactives, ...outer.interactives, ...extra.interactives, ...deco.interactives], rides: { ...park.rides, ...extra.rides, ...deco.rides } };
 }
 
 // ───── 로비 쉼터: 불멍 캠프파이어 + 통나무 벤치 · 타면 움직이는 그네 · 코인 상점
@@ -2126,5 +2145,7 @@ export function buildChapter(scene, ch, themeId = 'gwimun') {
 export function disposeWorld(scene, w) {
   if (!w) return;
   scene.remove(w.root);
-  w.root.traverse((o) => { o.geometry?.dispose?.(); if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { m.map?.dispose?.(); m.dispose?.(); }); } });
+  w.snapBoard?.dispose?.(); // 사진 질감 (로비에만 있다)
+  // 지오메트리·텍스처만 지운다(disposeTree). 재료는 지우지 않는다: 셰이더 프로그램이 사라져 다음 입장 때 재컴파일로 끊긴다
+  disposeTree(w.root);
 }

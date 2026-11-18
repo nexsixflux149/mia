@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { createAvatar, animateAvatar } from './avatar.js';
 import { createGhost, animateGhost } from './ghosts.js';
 import { applyGear } from './gear.js';
+import { isShared } from './props.js';
 
 export const OUT_W = 1080, OUT_H = 1350; // 완성된 사진 (4:5)
 const PW = 960, PH = 1040, PX = 60, PY = 60; // 안쪽 그림 크기 · 자리
@@ -106,7 +107,8 @@ export async function shootPhoto({ members = [], ghostTypes = [], tint = '#ff3a2
     out.getContext('2d').drawImage(gl, 0, 0);
     return out;
   } finally {
-    scene.traverse((o) => { o.geometry?.dispose?.(); const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : []; for (const m of ms) { m.map?.dispose?.(); m.dispose?.(); } });
+    // 공유 자원(markShared)은 지우지 않는다: 메인 화면이 같은 것을 계속 쓰므로, 지우면 다음 프레임에 다시 컴파일·업로드한다
+    scene.traverse((o) => { if (!o.isSprite && !isShared(o.geometry)) o.geometry?.dispose?.(); const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : []; for (const m of ms) { if (!isShared(m.map)) m.map?.dispose?.(); if (!isShared(m)) m.dispose?.(); } });
     r.dispose(); try { r.forceContextLoss(); } catch {}
   }
 }

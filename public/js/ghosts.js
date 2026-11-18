@@ -1,20 +1,21 @@
 import * as THREE from 'three';
+import { markShared } from './props.js';
 
 // 귀신 종류: woman(하얀 여자) · janitor(소사) · elder(이장, 꺾인 목) · mudang(거꾸로 기는 무당) · child
 // 재질 · 지오메트리는 종류별로 한 번만 만들어 돌려 쓴다 (귀신이 나타났다 사라질 때마다 새로 만들지 않음)
 const MC = new Map();
 const keyOf = (o) => JSON.stringify(o, (k, v) => (v && v.isTexture ? v.uuid : v));
-const M = (c, o = {}) => { const k = c + keyOf(o); let m = MC.get(k); if (!m) { m = new THREE.MeshStandardMaterial({ color: c, roughness: 0.9, ...o }); MC.set(k, m); } return m; };
+const M = (c, o = {}) => { const k = c + keyOf(o); let m = MC.get(k); if (!m) { m = markShared(new THREE.MeshStandardMaterial({ color: c, roughness: 0.9, ...o })); MC.set(k, m); } return m; };
 const PALE = () => M('#c9d1cd', { emissive: '#23303a', emissiveIntensity: 0.7 });
 const HAIR = () => M('#040404', { roughness: 0.35, metalness: 0.1, side: THREE.DoubleSide });
 const GC = new Map();
-const GG = (key, make) => { let g = GC.get(key); if (!g) { g = make(); GC.set(key, g); } return g; };
+const GG = (key, make) => { let g = GC.get(key); if (!g) { g = markShared(make()); GC.set(key, g); } return g; };
 const r3 = (v) => Math.round(v * 1000) / 1000;
 
 // 부드러운 원형 빛 (눈빛 · 안개)
 let _glow = null, _fog = null;
-function glowTex() { if (_glow) return _glow; const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); const g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.25, 'rgba(255,255,255,.55)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return (_glow = new THREE.CanvasTexture(c)); }
-function fogTexture() { if (_fog) return _fog; const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(0,0,0,.8)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); return (_fog = new THREE.CanvasTexture(c)); }
+function glowTex() { if (_glow) return _glow; const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); const g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.25, 'rgba(255,255,255,.55)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return (_glow = markShared(new THREE.CanvasTexture(c))); }
+function fogTexture() { if (_fog) return _fog; const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(0,0,0,.8)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); return (_fog = markShared(new THREE.CanvasTexture(c))); }
 
 function eyes(parent, y, z, spread = 0.055, size = 0.024, color = '#ff2a1a') {
   const em = M(color, { emissive: color, emissiveIntensity: 3, roughness: 0.2 });
@@ -59,7 +60,7 @@ function clothTex() {
   const dirt = x.createLinearGradient(0, 120, 0, 256); dirt.addColorStop(0, 'rgba(70,60,45,0)'); dirt.addColorStop(1, 'rgba(50,40,30,.75)'); x.fillStyle = dirt; x.fillRect(0, 120, 256, 136);
   for (let i = 0; i < 18; i++) { const px = Math.random() * 256, py = 80 + Math.random() * 140; x.fillStyle = `rgba(110,10,10,${0.25 + Math.random() * 0.35})`; x.beginPath(); x.ellipse(px, py, 3 + Math.random() * 12, 3 + Math.random() * 9, Math.random() * 3, 0, 7); x.fill(); x.fillRect(px - 1, py, 2, 10 + Math.random() * 40); }
   for (let i = 0; i < 1600; i++) { x.fillStyle = `rgba(0,0,0,${Math.random() * 0.07})`; x.fillRect(Math.random() * 256, Math.random() * 256, 2, 2); }
-  _cloth = new THREE.CanvasTexture(c); _cloth.colorSpace = THREE.SRGBColorSpace; _cloth.wrapS = THREE.RepeatWrapping; return _cloth;
+  _cloth = markShared(new THREE.CanvasTexture(c)); _cloth.colorSpace = THREE.SRGBColorSpace; _cloth.wrapS = THREE.RepeatWrapping; return _cloth;
 }
 // 너덜너덜한 옷자락
 function tatteredCone(r, h, color, opacity = 0.93) {
@@ -148,7 +149,7 @@ function faceTex(type) {
       if (type === 'slender') { for (const s of [-1, 1]) blot(cx + s * 24, ey, 16, 'rgba(60,60,70,.12)'); } break;
   }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
-  FT.set(type, t); return t;
+  FT.set(type, markShared(t)); return t;
 }
 // 머리 구(첫 번째 자식)를 얼굴 그림이 입혀진 부드러운 구로 바꾼다
 function dressFace(type, head) {
