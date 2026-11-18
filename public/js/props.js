@@ -338,7 +338,7 @@ export function buildProp(p) {
     case 'teacher_desk': { B(g, 1.6, 0.85, 0.8, '#4f3622'); B(g, 1.7, 0.05, 0.85, '#5f4128', 0, 0.85, 0); B(g, 0.5, 0.15, 0.02, '#3a2616', -0.4, 0.55, 0.41); break; }
     case 'blackboard': {
       const tex = canvasTex(512, 200, (x, w, h) => { x.fillStyle = '#1f3a2c'; x.fillRect(0, 0, w, h); x.strokeStyle = 'rgba(255,255,255,.75)'; x.fillStyle = 'rgba(240,240,230,.85)'; x.font = '22px "Gowun Dodum", sans-serif'; x.fillText('11월 7일 (수)', 20, 36); x.fillText('일직: 7번', 20, 70); x.fillText('오늘의 노래: 학교종', 20, 104); x.font = '13px sans-serif'; x.fillText('선생님 우리 숨바꼭질 해요', 330, 180); for (let i = 0; i < 30; i++) { x.fillStyle = 'rgba(255,255,255,.05)'; x.fillRect(Math.random() * w, Math.random() * h, 60, 10); } });
-      B(g, 4.4, 1.5, 0.08, '#5a3f28', 0, 0.85, 0); Plane(g, 4.2, 1.35, tex, 0, 1.6, 0.05);
+      B(g, 4.4, 1.5, 0.08, '#5a3f28', 0, 0.85, 0); Plane(g, 4.2, 1.35, tex, 0, 1.6, 0.05).userData.keepWithRefinedArt = true;
       B(g, 4.2, 0.05, 0.12, '#5a3f28', 0, 0.85, 0.08);
       break;
     }
@@ -492,7 +492,7 @@ export function buildProp(p) {
     case 'lostbox': { B(g, 0.5, 0.45, 0.3, '#5a4a32', 0, -0.2, 0); B(g, 0.4, 0.05, 0.02, '#d8d0b4', 0, 0.12, 0.16); C(g, 0.06, 0.06, 0.03, '#888', 0.12, -0.05, 0.16, 12, { metalness: 0.8 }).rotation.x = Math.PI / 2; break; }
     case 'eye': { S(g, 0.08, '#c8a06a', 0, 0.08, 0); S(g, 0.04, '#1a1008', 0, 0.1, 0.06); break; }
     case 'duty_board': { B(g, 0.8, 0.35, 0.04, '#3a2616', 0, -0.17, 0); Plane(g, 0.72, 0.28, canvasTex(144, 56, (x, w, h) => { x.fillStyle = '#e9e2cc'; x.fillRect(0, 0, w, h); x.fillStyle = '#222'; x.font = 'bold 16px sans-serif'; x.fillText('오늘의 일직', 10, 22); x.fillRect(10, 40, 120, 2); }), 0, 0, 0.025); break; }
-    case 'timetable': { B(g, 1.6, 1.1, 0.04, '#5a3f28', 0, -0.55, 0); Plane(g, 1.5, 1.0, canvasTex(300, 200, (x, w, h) => { x.fillStyle = '#efe8d4'; x.fillRect(0, 0, w, h); x.strokeStyle = '#555'; for (let i = 0; i <= 6; i++) { x.beginPath(); x.moveTo(i * 50, 0); x.lineTo(i * 50, h); x.stroke(); } for (let j = 0; j <= 5; j++) { x.beginPath(); x.moveTo(0, j * 40); x.lineTo(w, j * 40); x.stroke(); } x.font = '14px sans-serif'; x.fillStyle = '#222'; ['월', '화', '수', '목', '금', '토'].forEach((d, i) => x.fillText(d, i * 50 + 18, 26)); x.fillStyle = '#a00'; x.fillRect(102, 42, 46, 156); }), 0, 0, 0.025); break; }
+    case 'timetable': { B(g, 1.6, 1.1, 0.04, '#5a3f28', 0, -0.55, 0); Plane(g, 1.5, 1.0, canvasTex(300, 200, (x, w, h) => { x.fillStyle = '#efe8d4'; x.fillRect(0, 0, w, h); x.strokeStyle = '#555'; for (let i = 0; i <= 6; i++) { x.beginPath(); x.moveTo(i * 50, 0); x.lineTo(i * 50, h); x.stroke(); } for (let j = 0; j <= 5; j++) { x.beginPath(); x.moveTo(0, j * 40); x.lineTo(w, j * 40); x.stroke(); } x.font = '14px sans-serif'; x.fillStyle = '#222'; ['월', '화', '수', '목', '금', '토'].forEach((d, i) => x.fillText(d, i * 50 + 18, 26)); x.fillStyle = '#a00'; x.fillRect(102, 42, 46, 156); }), 0, 0, 0.025).userData.keepWithRefinedArt = true; break; }
     case 'safe': { B(g, 0.7, 0.7, 0.7, '#3c3f44', 0, 0, 0, { metalness: 0.6, roughness: 0.4 }); C(g, 0.12, 0.12, 0.04, '#b8b8b8', 0, 0.35, 0.36, 16, { metalness: 0.9 }).rotation.x = Math.PI / 2; break; }
     case 'scroll': { B(g, 0.7, 0.04, 0.05, '#2a1a10', 0, 0.75, 0); Plane(g, 0.6, 1.4, canvasTex(60, 140, (x, w, h) => { x.fillStyle = '#e6dcc0'; x.fillRect(0, 0, w, h); x.fillStyle = '#111'; for (let c = 0; c < 4; c++) for (let r = 0; r < 7; r++) x.fillRect(44 - c * 12, 12 + r * 16, 7, 10); x.fillStyle = '#b22'; x.fillRect(6, 120, 8, 8); }), 0, 0, 0.02); B(g, 0.7, 0.04, 0.05, '#2a1a10', 0, -0.75, 0); break; }
     case 'attic_door': { B(g, 1.0, 0.8, 0.06, '#4a2e1c', 0, -0.4, 0); B(g, 0.9, 0.03, 0.08, '#2a1a10', 0, 0, 0); B(g, 0.03, 0.7, 0.08, '#2a1a10', 0, -0.35, 0); S(g, 0.04, '#c9a24a', 0.15, -0.05, 0.05, { metalness: 0.8 }); break; }
@@ -528,7 +528,7 @@ export function buildProp(p) {
     case 'telegraph': { B(g, 1.2, 0.8, 0.6, '#3a2a1c'); B(g, 0.4, 0.1, 0.25, '#2a2a2a', -0.2, 0.8, 0, { metalness: 0.6 }); B(g, 0.25, 0.04, 0.05, '#b89a5a', -0.2, 0.92, 0, { metalness: 0.8 }); S(g, 0.04, '#111', -0.08, 0.95, 0); B(g, 0.35, 0.3, 0.3, '#5a4a3a', 0.3, 0.8, 0); S(g, 0.04, '#e33', 0.3, 1.0, 0.16, { emissive: '#f00', emissiveIntensity: 1.5 }); g.userData.foot = [1.2, 0.6]; break; }
     case 'tape': { for (let i = 0; i < 8; i++) B(g, 0.06, 0.005, 0.4, PAPER, -0.2 + i * 0.06, 0, Math.sin(i) * 0.05).rotation.y = i * 0.3; break; }
     case 'headphones': { const b = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.015, 6, 14, Math.PI), M('#2a2a2a')); b.position.y = 0.1; g.add(b); for (const s of [-1, 1]) C(g, 0.045, 0.045, 0.04, '#3a3a3a', 0.1 * s, 0.02, 0, 10).rotation.z = Math.PI / 2; break; }
-    case 'map_table': { B(g, 2, 0.08, 1.2, '#5a3e26', 0, 0.85, 0); for (const sx of [-1, 1]) for (const sz of [-1, 1]) B(g, 0.08, 0.85, 0.08, DWOOD, 0.9 * sx, 0, 0.5 * sz); Plane(g, 1.8, 1.0, canvasTex(180, 100, (x) => { x.fillStyle = '#d8c89a'; x.fillRect(0, 0, 180, 100); x.strokeStyle = '#8a3a2a'; x.lineWidth = 2; x.beginPath(); x.moveTo(10, 70); x.lineTo(60, 70); x.lineTo(100, 70); x.lineTo(100, 40); x.lineTo(140, 40); x.lineTo(140, 80); x.stroke(); x.fillStyle = '#2a4a6a'; x.fillRect(150, 80, 10, 10); }), 0, 0.9, 0).rotation.x = -Math.PI / 2; g.userData.foot = [2, 1.2]; break; }
+    case 'map_table': { B(g, 2, 0.08, 1.2, '#5a3e26', 0, 0.85, 0); for (const sx of [-1, 1]) for (const sz of [-1, 1]) B(g, 0.08, 0.85, 0.08, DWOOD, 0.9 * sx, 0, 0.5 * sz); const map = Plane(g, 1.8, 1.0, canvasTex(180, 100, (x) => { x.fillStyle = '#d8c89a'; x.fillRect(0, 0, 180, 100); x.strokeStyle = '#8a3a2a'; x.lineWidth = 2; x.beginPath(); x.moveTo(10, 70); x.lineTo(60, 70); x.lineTo(100, 70); x.lineTo(100, 40); x.lineTo(140, 40); x.lineTo(140, 80); x.stroke(); x.fillStyle = '#2a4a6a'; x.fillRect(150, 80, 10, 10); }), 0, 0.9, 0); map.rotation.x = -Math.PI / 2; map.userData.keepWithRefinedArt = true; g.userData.foot = [2, 1.2]; break; }
     case 'ship_wheel': { C(g, 0.08, 0.1, 1.0, DWOOD); const w = new THREE.Group(); w.position.set(0, 1.25, 0.1); g.add(w); const r = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.04, 8, 24), M('#6a4a2a')); w.add(r); for (let i = 0; i < 8; i++) { const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.1, 6), M('#6a4a2a')); sp.rotation.z = (i * Math.PI) / 8; w.add(sp); } g.userData.foot = [0.5, 0.5]; break; }
     case 'hatch': { B(g, 1.4, 0.06, 1.4, '#3a3a3e', 0, 0, 0, { metalness: 0.6 }); const r = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.03, 6, 14), M('#8a7a5a', { metalness: 0.8 })); r.rotation.x = Math.PI / 2; r.position.y = 0.08; g.add(r); break; }
     case 'chain': { for (let i = 0; i < 10; i++) { const l = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.02, 6, 10), M('#5a5a5e', { metalness: 0.7 })); l.position.y = 3.3 - i * 0.12; l.rotation.y = (i % 2) * Math.PI / 2; g.add(l); } S(g, 0.12, '#4a4a4e', 0, 2.0, 0, { metalness: 0.7 }); break; }
@@ -709,8 +709,8 @@ export function buildProp(p) {
       B(g, 1.7, 1.0, 0.06, '#7a5a36', 0, 0.9, 0); B(g, 1.9, 0.12, 0.3, '#3a2a1a', 0, 1.95, 0);
       // 압정으로 꽂은 종이 네 장 (글씨 줄과 얼룩이 그려진 진짜 종이)
       [[-0.45, 1.5, '#f2ead8', 0.06], [0.32, 1.47, '#ffe8a8', -0.08], [-0.18, 1.08, '#f2ead8', -0.04], [0.5, 1.05, '#d6ecff', 0.1]].forEach(([x, y, c, r], i) => {
-        const pl = Plane(g, 0.46, 0.34, paperTex('nb' + THEME + i, { w: 112, h: 84, lines: 5, base: c, title: i === 0 && THEME === 'west' ? 'WANTED' : undefined }), x, y, 0.04); pl.rotation.z = r;
-        S(g, 0.016, ['#d6303a', '#2f5fd0', '#2fbf71', '#ffd36a'][i], x, y + 0.14, 0.05);
+        const pl = Plane(g, 0.46, 0.34, paperTex('nb' + THEME + i, { w: 112, h: 84, lines: 5, base: c, title: i === 0 && THEME === 'west' ? 'WANTED' : undefined }), x, y, 0.04); pl.rotation.z = r; pl.userData.keepWithRefinedArt = true;
+        S(g, 0.016, ['#d6303a', '#2f5fd0', '#2fbf71', '#ffd36a'][i], x, y + 0.14, 0.05).userData.keepWithRefinedArt = true;
       });
       g.userData.foot = [1.7, 0.3]; break;
     }
@@ -749,14 +749,14 @@ export function buildProp(p) {
       for (let i = 0; i < 40; i++) S(g, 0.05, '#fff6d0', (Math.random() - 0.5) * 0.85, 1.1 + Math.random() * 0.35, (Math.random() - 0.5) * 0.45);
       B(g, 1.3, 0.1, 0.8, '#ffd36a', 0, 1.85); const roof = new THREE.Mesh(new THREE.ConeGeometry(0.8, 0.5, 4), M('#ffffff')); roof.rotation.y = Math.PI / 4; roof.position.y = 2.2; g.add(roof);
       const sign = canvasTex(256, 64, (x, w, h) => { x.fillStyle = '#ffd36a'; x.fillRect(0, 0, w, h); x.fillStyle = '#c0262d'; x.font = 'bold 40px sans-serif'; x.textAlign = 'center'; x.fillText('POPCORN', w / 2, 46); });
-      Plane(g, 1.0, 0.25, sign, 0, 0.75, 0.36); break;
+      Plane(g, 1.0, 0.25, sign, 0, 0.69, 0.391).userData.keepWithRefinedArt = true; break;
     }
     case 'ticket_booth': {
       B(g, 1.8, 1.0, 1.4, '#2f5fd0'); B(g, 1.8, 1.4, 0.1, '#c0262d', 0, 1.0, -0.65); for (const s of [-1, 1]) B(g, 0.1, 1.4, 1.4, '#c0262d', 0.85 * s, 1.0);
       const win = B(g, 1.2, 0.8, 0.04, M('#a8d0ff', { transparent: true, opacity: 0.3 }), 0, 1.2, 0.68); win.castShadow = false;
       B(g, 2.0, 0.14, 1.6, '#ffd36a', 0, 2.4); const roof = new THREE.Mesh(new THREE.ConeGeometry(1.35, 0.9, 4), M('#ffffff')); roof.rotation.y = Math.PI / 4; roof.position.y = 2.95; g.add(roof);
       const sign = canvasTex(256, 64, (x, w, h) => { x.fillStyle = '#1a0a24'; x.fillRect(0, 0, w, h); x.fillStyle = '#ffd36a'; x.font = 'bold 34px serif'; x.textAlign = 'center'; x.fillText('TICKETS · 매표소', w / 2, 44); });
-      Plane(g, 1.7, 0.42, sign, 0, 2.2, 0.72); break;
+      Plane(g, 1.65, 0.39, sign, 0, 2.22, 0.76).userData.keepWithRefinedArt = true; break;
     }
     case 'cage': {
       B(g, 2.2, 0.15, 2.2, '#3a2a1a'); B(g, 2.2, 0.12, 2.2, '#3a2a1a', 0, 2.2);
@@ -774,7 +774,7 @@ export function buildProp(p) {
       const pole = B(g, 0.22, 3.6, 0.12, '#ffffff', 0, 0.2, -0.15);
       for (let i = 0; i < 8; i++) B(g, 0.24, 0.04, 0.13, ['#2fbf71', '#a8d83a', '#ffd43b', '#ffa94d', '#ff6b6b', '#c0262d', '#9b59b6', '#2f5fd0'][i], 0, 0.5 + i * 0.4, -0.14);
       const bell = S(g, 0.22, '#ffd36a', 0, 3.95, -0.15, { metalness: 0.8, roughness: 0.3 }); bell.scale.y = 0.8;
-      const puck = B(g, 0.18, 0.12, 0.16, '#c9ccd0', 0, 0.6, -0.02); g.userData.puck = puck; break;
+      const puck = B(g, 0.18, 0.12, 0.16, '#c9ccd0', 0, 0.6, -0.02); puck.userData.keepWithRefinedArt = true; g.userData.puck = puck; break;
     }
     case 'cups_table': {
       B(g, 1.5, 0.08, 0.8, '#3a1424', 0, 0.78); for (const sx of [-1, 1]) for (const sz of [-1, 1]) B(g, 0.07, 0.78, 0.07, '#2a0a14', 0.65 * sx, 0, 0.32 * sz);
@@ -992,7 +992,7 @@ export function buildProp(p) {
     }
     case 'bamboo': { for (let i = 0; i < (p.n || 5); i++) { const h = 3 + ((seedOf(p) + i * 13) % 10) * 0.25; const x = Math.cos(i * 2.4) * 0.3 * (i ? 1 : 0), z = Math.sin(i * 2.4) * 0.3 * (i ? 1 : 0); C(g, 0.045, 0.05, h, M('#5a8a3a', { roughness: 0.5 }), x, 0, z, 6); for (let k = 1; k < 5; k++) C(g, 0.055, 0.055, 0.03, '#4a7a2a', x, (h * k) / 5, z, 6); const lf = S(g, 0.3, M('#3a6a2a', { flatShading: true }), x, h, z); lf.scale.set(1, 0.4, 1); } break; }
     case 'mesa': { const c = p.color || '#8a3a20'; const s = p.s || 1; const m1 = new THREE.Mesh(geo('mesa', () => { const gg = new THREE.CylinderGeometry(3.2, 4.2, 4, 7, 2); const ps = gg.attributes.position; for (let i = 0; i < ps.count; i++) { const y = ps.getY(i); const a = Math.atan2(ps.getZ(i), ps.getX(i)); const j = 1 + Math.sin(a * 3 + y) * 0.12; ps.setX(i, ps.getX(i) * j); ps.setZ(i, ps.getZ(i) * j); } gg.computeVertexNormals(); return gg; }), M(c, { flatShading: true, roughness: 1 })); m1.scale.set(s * 1.4, s, s); m1.position.y = 2 * s; g.add(m1); const band = new THREE.Mesh(cylG(3.0, 3.05, 0.3, 7), M(shade(c, 12), { flatShading: true })); band.scale.set(s * 1.4, s, s); band.position.y = 3.2 * s; g.add(band); DECO_ONLY(g); break; }
-    case 'crt_tv': { B(g, 0.6, 0.48, 0.5, '#2a2622'); const scr = Plane(g, 0.46, 0.34, canvasTex(64, 48, (x, w, h) => { const id = x.createImageData(w, h); for (let i = 0; i < id.data.length; i += 4) { const v = 60 + Math.random() * 150; id.data[i] = v * 0.8; id.data[i + 1] = v; id.data[i + 2] = v * 0.9; id.data[i + 3] = 255; } x.putImageData(id, 0, 0); }, 'crt'), 0, 0.24, 0.255, { emissive: '#8aa898', emissiveIntensity: 0.9, emissiveMap: null }); scr.material.emissiveMap = scr.material.map; C(g, 0.006, 0.006, 0.3, '#666', -0.12, 0.48, 0, 4).rotation.z = 0.5; C(g, 0.006, 0.006, 0.3, '#666', 0.12, 0.48, 0, 4).rotation.z = -0.5; break; }
+    case 'crt_tv': { B(g, 0.6, 0.48, 0.5, '#2a2622'); const scr = Plane(g, 0.46, 0.34, canvasTex(64, 48, (x, w, h) => { const id = x.createImageData(w, h); for (let i = 0; i < id.data.length; i += 4) { const v = 60 + Math.random() * 150; id.data[i] = v * 0.8; id.data[i + 1] = v; id.data[i + 2] = v * 0.9; id.data[i + 3] = 255; } x.putImageData(id, 0, 0); }, 'crt'), 0, 0.24, 0.255, { emissive: '#8aa898', emissiveIntensity: 0.9, emissiveMap: null }); scr.material.emissiveMap = scr.material.map; scr.userData.keepWithRefinedArt = true; C(g, 0.006, 0.006, 0.3, '#666', -0.12, 0.48, 0, 4).rotation.z = 0.5; C(g, 0.006, 0.006, 0.3, '#666', 0.12, 0.48, 0, 4).rotation.z = -0.5; break; }
     case 'drape': { const c = p.color || '#8a0a1a'; const w2 = p.w || 2, h2 = p.h || 3.2; const gg = geo(`drape${w2},${h2}`, () => { const pg = new THREE.PlaneGeometry(w2, h2, 24, 1); const ps = pg.attributes.position; for (let i = 0; i < ps.count; i++) ps.setZ(i, Math.sin(ps.getX(i) * 9) * 0.06); pg.computeVertexNormals(); return pg; }); const m = new THREE.Mesh(gg, M(c, { roughness: 0.95, side: THREE.DoubleSide })); m.position.y = -h2 / 2; g.add(m); B(g, w2 + 0.1, 0.12, 0.08, p.trim || '#c9a24a', 0, -0.12, 0, { metalness: 0.5 }); DECO_ONLY(g); break; }
     case 'radiator': { for (let i = 0; i < 9; i++) B(g, 0.06, 0.6, 0.14, '#b8bcb4', -0.32 + i * 0.08, 0.08, 0, { metalness: 0.4, roughness: 0.6 }); B(g, 0.74, 0.04, 0.16, '#a8aca4', 0, 0.12, 0); B(g, 0.74, 0.04, 0.16, '#a8aca4', 0, 0.62, 0); DECO_ONLY(g); break; }
     case 'wagon_wheel': { const w = new THREE.Mesh(geo('wwheel', () => new THREE.TorusGeometry(0.5, 0.05, 6, 20)), M('#5a3a1a')); w.position.y = 0.52; w.rotation.y = 0.3; w.rotation.x = 0.25; g.add(w); for (let i = 0; i < 6; i++) { const sp = new THREE.Mesh(boxG(0.04, 1.0, 0.03), M('#6a4426')); sp.rotation.z = (i * Math.PI) / 6; w.add(sp); } DECO_ONLY(g); break; }

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { loadXmasGhostModel } from './xmas-models.js';
-import { dressWomanGhost } from './refined-models.js';
+import { dressGhostHead } from './refined-models.js';
 
 // 귀신 종류: woman(하얀 여자) · janitor(소사) · elder(이장, 꺾인 목) · mudang(거꾸로 기는 무당) · child
 // 재질 · 지오메트리는 종류별로 한 번만 만들어 돌려 쓴다 (귀신이 나타났다 사라질 때마다 새로 만들지 않음)
@@ -489,7 +489,7 @@ export function createGhost(type = 'woman') {
   u.fog = [];
   for (let i = 0; i < 6; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: fogTex, transparent: true, depthWrite: false, opacity: 0.6 })); s.scale.setScalar(1.2 + Math.random()); s.position.set((Math.random() - 0.5) * 0.8, 0.3 + Math.random() * 1.2, (Math.random() - 0.5) * 0.8); g.add(s); u.fog.push(s); }
   g.userData = u;
-  if (type === 'woman') dressWomanGhost(g);
+  dressGhostHead(g);
   return g;
 }
 
