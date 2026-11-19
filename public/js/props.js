@@ -834,6 +834,31 @@ export function buildProp(p) {
     case 'scroll': { B(g, 0.7, 0.04, 0.05, '#2a1a10', 0, 0.75, 0); Plane(g, 0.6, 1.4, canvasTex(60, 140, (x, w, h) => { x.fillStyle = '#e6dcc0'; x.fillRect(0, 0, w, h); x.fillStyle = '#111'; for (let c = 0; c < 4; c++) for (let r = 0; r < 7; r++) x.fillRect(44 - c * 12, 12 + r * 16, 7, 10); x.fillStyle = '#b22'; x.fillRect(6, 120, 8, 8); }, 'scroll'), 0, 0, 0.02).userData.keepWithRefinedArt = true; B(g, 0.7, 0.04, 0.05, '#2a1a10', 0, -0.75, 0); break; }
     case 'attic_door': { B(g, 1.0, 0.8, 0.06, '#4a2e1c', 0, -0.4, 0); B(g, 0.9, 0.03, 0.08, '#2a1a10', 0, 0, 0); B(g, 0.03, 0.7, 0.08, '#2a1a10', 0, -0.35, 0); S(g, 0.04, '#c9a24a', 0.15, -0.05, 0.05, { metalness: 0.8 }); break; }
     case 'iron_door': { B(g, 2.4, 3.2, 0.2, '#4a3a30', 0, 0, 0, { metalness: 0.6, roughness: 0.7 }); for (let i = 0; i < 6; i++) B(g, 2.4, 0.05, 0.24, '#2e2420', 0, 0.3 + i * 0.5, 0, { metalness: 0.5 }); B(g, 0.25, 0.3, 0.08, '#6a5a3a', 0.3, 1.2, 0.14, { metalness: 0.8 }); break; }
+    case 'iso_door': { // 병원 격리실 문 — 흰 철문 · 사각 창 · 푸시바 · 키패드 · 표지판 (p.open 이면 초록불)
+      const ST = { metalness: 0.75, roughness: 0.35 };
+      B(g, 1.9, 3.0, 0.22, '#8f959b', 0, 0, 0, ST);
+      B(g, 1.44, 2.44, 0.26, '#e6e8e8', 0, 0.04, 0, { roughness: 0.5 });
+      B(g, 0.6, 0.6, 0.01, '#b4b8bc', 0, 1.42, 0.135, ST); B(g, 0.5, 0.5, 0.01, '#16232a', 0, 1.47, 0.142, { metalness: 0.3, roughness: 0.08 });
+      B(g, 1.4, 0.3, 0.01, '#b0b4b8', 0, 0.08, 0.136, ST);
+      B(g, 1.1, 0.06, 0.06, '#cdd1d5', 0, 0.95, 0.19, ST); for (const s of [-1, 1]) B(g, 0.05, 0.1, 0.06, '#9ea2a6', 0.5 * s, 0.93, 0.155, ST);
+      B(g, 0.06, 0.16, 0.03, '#c8ccd0', 0.56, 1.12, 0.145, ST); B(g, 0.2, 0.035, 0.035, '#d6dade', 0.48, 1.18, 0.175, ST);
+      Plane(g, 0.14, 0.2, canvasTex(56, 80, (x, w, h) => { x.fillStyle = '#23272b'; x.fillRect(0, 0, w, h); x.fillStyle = '#7fd0a0'; x.fillRect(8, 6, 40, 12); x.fillStyle = '#9aa0a6'; for (let i = 0; i < 12; i++) x.fillRect(8 + (i % 3) * 14, 24 + Math.floor(i / 3) * 13, 11, 10); }, 'iso_keypad'), 0.82, 1.3, 0.112);
+      Plane(g, 1.2, 0.3, canvasTex(384, 96, (x, w, h) => { x.fillStyle = '#f2f2ee'; x.fillRect(0, 0, w, h); x.fillStyle = '#c0262d'; x.fillRect(0, 0, 18, h); x.fillStyle = '#1a1a1a'; x.font = 'bold 34px sans-serif'; x.textAlign = 'center'; x.fillText('ISOLATION ROOM', w / 2 + 8, 42); x.fillStyle = '#c0262d'; x.font = 'bold 30px sans-serif'; x.fillText('격리실', w / 2 + 8, 82); }, 'iso_sign'), 0, 2.76, 0.112);
+      const lit = p.open ? '#2f2' : '#f22'; S(g, 0.045, lit, 0.78, 2.76, 0.13, { emissive: lit, emissiveIntensity: 2 });
+      g.userData.foot = [1.9, 0.35]; break;
+    }
+    case 'elevator_door': { // 스테인리스 양문 엘리베이터 — 층 표시등 · 호출 버튼 · 카드 리더
+      const ST = { metalness: 0.8, roughness: 0.3 };
+      const steel = cache.elevSteel ||= markShared(new THREE.MeshStandardMaterial({ color: '#d4d9de', metalness: 0.85, roughness: 0.28, map: canvasTex(64, 256, (x, w, h) => { x.fillStyle = '#c8cdd2'; x.fillRect(0, 0, w, h); for (let i = 0; i < 90; i++) { x.fillStyle = `rgba(${i % 2 ? 255 : 90},${i % 2 ? 255 : 95},${i % 2 ? 255 : 100},.12)`; x.fillRect((i * 37) % w, 0, 1, h); } }, 'steel_brush') }));
+      B(g, 2.1, 2.75, 0.24, '#8a9096', 0, 0, 0, ST);
+      for (const s of [-1, 1]) B(g, 0.79, 2.35, 0.26, steel, 0.4 * s, 0, 0);
+      B(g, 0.012, 2.35, 0.005, '#33373b', 0, 0, 0.131); B(g, 1.7, 0.03, 0.32, '#a4a8ac', 0, 0, 0.04, ST);
+      const fl = String(p.floor || '1').slice(0, 3);
+      Plane(g, 0.6, 0.24, canvasTex(150, 60, (x, w, h) => { x.fillStyle = '#0b0b0b'; x.fillRect(0, 0, w, h); x.fillStyle = '#ff8a2a'; x.font = 'bold 44px monospace'; x.textAlign = 'center'; x.fillText(fl, 55, 46); x.fillText('▲', 112, 46); }, 'elev_ind_' + fl), 0, 2.52, 0.121);
+      B(g, 0.14, 0.32, 0.02, '#b8bcc0', 0.92, 0.88, 0.12, ST); for (const y of [1.1, 0.96]) S(g, 0.03, '#eeeeea', 0.92, y, 0.135, ST);
+      B(g, 0.1, 0.14, 0.03, '#1a1a1a', 0.92, 1.3, 0.125); S(g, 0.015, '#f22', 0.92, 1.4, 0.142, { emissive: '#f00', emissiveIntensity: 2 });
+      g.userData.foot = [2.2, 0.35]; break;
+    }
     // ── 시나리오 2: 배 · 등대
     case 'barrel': { C(g, 0.38, 0.38, 0.95, '#6a4a2e', 0, 0, 0, 14); for (const y of [0.15, 0.8]) C(g, 0.4, 0.4, 0.06, '#3a3a3c', 0, y, 0, 14, { metalness: 0.6 }); break; }
     case 'crate': { B(g, 0.9, 0.8, 0.9, '#7a5a36'); B(g, 0.92, 0.08, 0.92, '#5a3e22', 0, 0.4, 0); B(g, 0.08, 0.82, 0.92, '#5a3e22', 0, 0, 0); break; }

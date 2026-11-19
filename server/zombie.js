@@ -177,7 +177,7 @@ export const ZOMBIE_CHAPTERS = [
       { t: 'car', x: -6, z: 6, r: 180 }, { t: 'car', x: 3, z: 6, r: 0 }, { t: 'car', x: 9, z: 5.6, r: 180 },
       { t: 'pillar_c', x: -8, z: 0 }, { t: 'pillar_c', x: 0, z: 0 }, { t: 'pillar_c', x: 8, z: 0 },
       { t: 'shop_cart', x: -1, z: 3, r: 40 }, { t: 'shop_cart', x: 11, z: -2, r: -20 }, { t: 'debris', x: 4, z: 2 }, { t: 'blood_smear', x: -4, z: 1.5 }, { t: 'blood_smear', x: 10, z: 1 },
-      { t: 'puddle', x: 1, z: -2 }, { t: 'pipe_run', x: 0, z: -10.6 }, { t: 'barrel', x: 13.5, z: 9.5 },
+      { t: 'puddle', x: 1, z: -2 }, { t: 'pipe_run', x: 0, z: -10.6 }, { t: 'elevator_door', x: 9, z: -10.85, floor: 'B1' }, { t: 'barrel', x: 13.5, z: 9.5 },
     ],
     objects: [
       { id: 'ticket', t: 'paper', x: -11, z: 5.4, y: 0.05, label: '바닥의 주차권', kind: 'pickup', item: 'parking_ticket',
@@ -415,7 +415,7 @@ export const ZOMBIE_CHAPTERS = [
       { id: 'fitting', t: 'curtain', x: 15.8, z: 6.6, r: -90, label: '피팅룸 커튼', kind: 'examine', once: true,
         on: { scare: 'face', sound: 'growl' },
         text: '커튼을 젖히자 — 거울 속 내 얼굴 바로 뒤에 회색 얼굴이 붙어 있었다!\n…돌아보니 아무도 없다. 거울에 피 묻은 손자국만.' },
-      { id: 'lift', t: 'iron_door', x: 12.6, z: 11.85, r: 180, label: '직원용 승강기', kind: 'use', req: ['staff'],
+      { id: 'lift', t: 'elevator_door', floor: '3', x: 12.6, z: 11.85, r: 180, label: '직원용 승강기', kind: 'use', req: ['staff'],
         lockedText: '직원 출입문이 잠겨 있다.',
         text: '4층까지만 가는 직원용 승강기. 열쇠 구멍이 있다.', use: { item: 'lift_key', times: 1 }, needText: '승강기 열쇠가 필요하다.',
         on: { flag: 'to4', toast: '승강기가 올라간다' }, toChapter: 4 },

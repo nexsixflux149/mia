@@ -107,7 +107,7 @@ export const SHIP_CHAPTERS = [
 …95년 전의 목소리다.`),
     props: [
       { t: 'bunk', x: -9, z: -1 }, { t: 'bunk', x: -9, z: 2.5 }, { t: 'barrel', x: 8.8, z: 5.2 }, { t: 'crate', x: 7.6, z: 5.3 },
-      { t: 'pipes', x: 0, z: 5.85, r: 180 }, { t: 'porthole', x: 9.85, z: -3, r: -90, y: 1.8 }, { t: 'porthole', x: 9.85, z: 4.5, r: -90, y: 1.8 },
+      { t: 'pipes', x: 0, z: 5.85, r: 180 }, { t: 'porthole', x: 9.85, z: 2.6, r: -90, y: 1.8 }, { t: 'porthole', x: 9.85, z: 4.5, r: -90, y: 1.8 },
       { t: 'puddle', x: -3, z: 2 }, { t: 'puddle', x: 4, z: 0 }, { t: 'lifebuoy', x: -9.85, z: -4.5, r: 90, y: 1.6 },
     ],
     objects: [
