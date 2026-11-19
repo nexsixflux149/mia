@@ -117,10 +117,10 @@ export const MIA_CHAPTERS = [
     props: [
       { t: 'shelf', x: -8.6, z: -1, r: 90 }, { t: 'shelf', x: 8.6, z: -1, r: -90 }, { t: 'toy_blocks', x: -7.4, z: 4.2 }, { t: 'table', x: -6.6, z: 2.4 },
       { t: 'teddy', x: 7.6, z: 4.4 }, { t: 'ddakji', x: -1.5, z: -3.8 }, { t: 'marble', x: 1.2, z: -3.7 }, { t: 'top', x: -2.4, z: 1.8 },
-      { t: 'crt_tv', x: 7.8, z: -6.2, r: -30 }, { t: 'box', x: -8.0, z: -6.0 }, { t: 'rug', x: 0, z: 1 },
+      { t: 'crt_tv', x: 7.8, z: -6.2, r: -30 }, { t: 'box', x: -8.0, z: -6.0 }, { t: 'rug', x: 0, z: 1 }, { t: 'mia_shop_shelf', x: 0, z: -6.72 },
     ],
     objects: [
-      { id: 'counter', t: 'bar_counter', x: 0, z: -4.9, label: '계산대', kind: 'examine',
+      { id: 'counter', t: 'mia_counter', x: 0, z: -4.9, label: '계산대', kind: 'examine',
         text: `계산대 위에 할머니의 장부가 펼쳐져 있다.
 
   "5월 5일. 어린이날이라 손님 많음. 미아 뽑기 한 판 공짜로 해 줌.
@@ -130,8 +130,8 @@ export const MIA_CHAPTERS = [
   "미아야, 할머니가 큰 소리 내서 미안해. 얼른 나와라."` },
       { id: 'coin_can', t: 'bucket', x: 1.6, z: -4.2, label: '계산대 아래 깡통', kind: 'pickup', item: 'gacha_coin',
         text: '녹슨 깡통 안에 뽑기 동전 하나가 남아 있다.\n(얻은 물건은 아래 인벤토리에 들어가요)', takenText: '빈 깡통.' },
-      { id: 'gacha', t: 'box', x: -3.6, z: -6.3, label: '뽑기 기계', kind: 'use',
-        text: '빨간 뽑기 기계. "한 판 100원". 동전 넣는 구멍이 있다.',
+      { id: 'gacha', t: 'mia_gacha', x: -3.6, z: -6.3, label: '뽑기 기계', kind: 'use',
+        text: '칠이 벗겨진 주황색 뽑기 기계. "100원 뽑기". 동전 넣는 구멍이 있다.',
         use: { item: 'gacha_coin', times: 1 }, needText: '동전이 없다. 가게 어딘가에 있을 것 같다. (얻은 동전을 가지고 다시 클릭하면 사용해요)',
         doneText: '뽑기 기계 손잡이가 저절로 돌아가고 있다.',
         on: { flag: 'gacha', sound: 'pop', give: 'mia_capsule',

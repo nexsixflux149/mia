@@ -78,6 +78,8 @@ const YEAR = 'public, max-age=31536000, immutable';
 app.use('/vendor/' + THREE_TAG, zstatic(THREE_DIR, { cache: YEAR }), express.static(THREE_DIR, { maxAge: '365d', immutable: true }));
 app.use('/vendor/three', zstatic(THREE_DIR, { cache: 'public, max-age=3600' }), express.static(THREE_DIR, { maxAge: '1h' }));
 // index.html 의 three.js 주소를 버전이 붙은 주소로 바꿔서 보낸다
+// 구글 플레이 앱(TWA)이 주소창 없이 열리려면 이 파일로 사이트 주인임을 밝혀야 한다 (점으로 시작하는 폴더라 static 이 건너뜀)
+app.get('/.well-known/assetlinks.json', (req, res) => res.type('application/json').sendFile(path.join(PUBLIC_DIR, '.well-known', 'assetlinks.json'), { dotfiles: 'allow' }));
 const pageTransform = (rel, text) => (rel === '/index.html' ? text.replaceAll('/vendor/three/', `/vendor/${THREE_TAG}/`) : text);
 app.use(zstatic(PUBLIC_DIR, { cache: 'no-cache', transform: pageTransform, tag: '-' + THREE_TAG }));
 app.use(express.static(PUBLIC_DIR, { setHeaders: (res, file) => res.setHeader('Cache-Control', /\.woff2$/i.test(file) ? YEAR : /\.(png|jpe?g|ico|webp|gif)$/i.test(file) ? 'public, max-age=86400' : 'no-cache') })); // 글꼴(.woff2)은 파일 이름에 해시가 붙어 있어 내용이 바뀌면 이름도 바뀐다 → 1년 캐시

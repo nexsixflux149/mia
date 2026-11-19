@@ -422,6 +422,11 @@ function enterLobby(pos) {
   socket.emit('snap:list', mergeClearPhotos);
   flushClearPhotos();
   S.room = 'lobby'; S.chapter = null; S.dark = false; S.objState = {}; S.mount = null; S.perch = null; me.y = 0;
+  if (!S.tierTip) { // 접속마다 한 번: 처음 온 사람은 입문 테마로, 나머지는 다음으로 쉬운 테마로 안내
+    S.tierTip = true; const nx = nextTheme();
+    const none = !Object.values(S.unlockedBy || {}).some((v) => v.cleared);
+    if (nx) setTimeout(() => toast(none ? '처음이라면 🔰 「달빛 문방구」부터! 조작을 하나씩 배우는 20~30분짜리 입문 테마예요.' : nextThemeText(nx)), 3500);
+  }
   setThemeComms(false);
   audio.classicEffects = false;
   audio.xmasMechanical = false;
@@ -1297,6 +1302,10 @@ const DIFF_NAME = { 1: '아주 쉬움', 2: '쉬움', 3: '보통', 4: '어려움'
 const diffOf = (id) => (S.scenarios || []).find((x) => x.id === id)?.difficulty || 3;
 const diffStars = (n) => (n > 5 ? '★★★★★💀' : '★'.repeat(n) + '☆'.repeat(5 - n));
 const diffText = (n) => `난이도 ${diffStars(n)} ${DIFF_NAME[n] || ''}`;
+const diffTier = (n) => (n <= 1 ? '🔰 입문' : n <= 3 ? '🌱 초급' : n === 4 ? '⭐ 중급' : '💀 고급');
+/** 아직 안 깬 테마 중 가장 쉬운 것 (히든 · 특별판 제외). skipId: 방금 깬 테마 */
+const nextTheme = (skipId) => { const ub = S.unlockedBy || {}; return (S.scenarios || []).filter((x) => !x.hidden && !x.special && x.id !== skipId && !ub[x.id]?.cleared).sort((a, b) => (a.difficulty || 3) - (b.difficulty || 3))[0]; };
+const nextThemeText = (x) => `👉 다음 추천: ${diffTier(x.difficulty || 3)} 「${x.short}」 ${diffStars(x.difficulty || 3)}`;
 function themeBubbleSprite(info) {
   const c = document.createElement('canvas'); const x = c.getContext('2d');
   const W = 640, pad = 28;
@@ -1586,7 +1595,8 @@ function showEndExtras() {
   const done = list.filter((x) => x.cleared).length;
   const msg = el('div', 'end-stamp-msg', hidden?.cleared ? '🧟 히든 테마까지 모두 클리어! 전설의 탈출가예요.' : done >= list.length ? '🎉 모든 테마 클리어! 히든 테마 「데드 시티」가 열렸어요.' : `🎫 도장 ${done}개 — ${list.length - done}개만 더 모으면 히든 테마가 열려요!`);
   const pb = el('button', 'btn primary end-photo', '📸 클리어 기념 사진 받기'); pb.onclick = () => openClearPhoto();
-  box.append(cv, msg, pb);
+  const nx = nextTheme(lc?.id);
+  box.append(cv, msg, ...(nx ? [el('div', 'end-stamp-msg', nextThemeText(nx))] : []), pb);
 }
 const photoPop = el('div', 'ppop hidden'); photoPop.id = 'photoPop'; document.body.appendChild(photoPop);
 function closePhotoPop() { if (photoPop.classList.contains('hidden')) return; photoPop.classList.add('hidden'); photoPop.innerHTML = ''; }
@@ -2589,10 +2599,18 @@ function renderParty() {
   const scs = (p?.scenarios || S.scenarios || []).filter((x) => !x.hidden || hidOk); // 히든 테마는 열린 사람(파티장)에게만
   const ssel = $('#scenarioSel');
   const prevSc = ssel.value || store.get('gwimun-scenario', 'mia');
-  if (ssel.options.length !== scs.length) { ssel.innerHTML = ''; scs.forEach((x) => { const o = el('option', null, `${x.hidden ? '🧟' : '🚪'} ${x.title}  ${diffStars(x.difficulty || 3)}`); o.value = x.id; o.title = x.desc; ssel.appendChild(o); }); }
+  const ub = (p ? p.unlockedBy : S.unlockedBy) || {};
+  // 쉬운 테마부터 단계(입문 · 초급 · 중급 · 고급)로 묶는다. 클리어가 바뀌면 ✅ 를 다시 그린다
+  const selKey = scs.map((x) => x.id + (ub[x.id]?.cleared ? '+' : '')).join();
+  if (ssel.dataset.k !== selKey) {
+    ssel.dataset.k = selKey; ssel.innerHTML = ''; let grp = null;
+    [...scs].sort((a, b) => (a.difficulty || 3) - (b.difficulty || 3)).forEach((x) => {
+      const t = diffTier(x.difficulty || 3); if (grp?.label !== t) { grp = el('optgroup'); grp.label = t; ssel.appendChild(grp); }
+      const o = el('option', null, `${ub[x.id]?.cleared ? '✅' : x.hidden ? '🧟' : '🚪'} ${x.title}  ${diffStars(x.difficulty || 3)}`); o.value = x.id; o.title = x.desc; grp.appendChild(o);
+    });
+  }
   if ([...ssel.options].some((o) => o.value === prevSc)) ssel.value = prevSc;
   const scInfo = scs.find((x) => x.id === ssel.value) || scs[0];
-  const ub = (p ? p.unlockedBy : S.unlockedBy) || {};
   const unlocked = ub[scInfo?.id]?.chapter ?? 0;
   $('#scenarioDesc').textContent = scInfo ? diffText(scInfo.difficulty || 3) + '\n' + scInfo.desc + (ub[scInfo.id]?.cleared ? ' · ✅ 클리어' : '') : '';
   (scInfo?.chapters || []).forEach((t, i) => { if (S.admin || i <= unlocked) { const o = el('option', null, (i === 0 ? '처음부터: ' : '이어하기: ') + t); o.value = i; sel.appendChild(o); } });

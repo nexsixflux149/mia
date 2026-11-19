@@ -12,6 +12,7 @@ export function disposeTree(root) {
   if (!root) return;
   const drop = (r) => { if (r && !isShared(r)) r.dispose?.(); };
   root.traverse((o) => {
+    if (o.isInstancedMesh) o.dispose(); // 인스턴스 위치 버퍼
     if (!o.isSprite) drop(o.geometry); // 스프라이트는 three.js 가 지오메트리 하나를 모두 함께 쓴다
     for (const m of [].concat(o.material ?? [])) {
       if (!m || isShared(m)) continue;
@@ -715,6 +716,9 @@ export function buildProp(p) {
       break;
     }
     // ── 숙직실/양호실
+    case 'mia_gacha': buildGacha(g); g.userData.foot = [0.8, 0.72]; break;
+    case 'mia_counter': buildShopCounter(g); g.userData.foot = [3.7, 1.0]; break;
+    case 'mia_shop_shelf': buildShopShelf(g); g.userData.foot = [4.4, 0.5]; break;
     case 'box': { B(g, 0.7, 0.6, 0.7, '#6d5a3c'); break; }
     case 'bucket': { C(g, 0.18, 0.14, 0.32, '#7a7f84'); break; }
     case 'screen_med': { for (let i = 0; i < 3; i++) { B(g, 0.5, 1.6, 0.03, '#d9dcd4', -0.55 + i * 0.55, 0.15, 0).rotation.y = (i - 1) * 0.3; } break; }
@@ -1488,4 +1492,254 @@ export function buildProp(p) {
     default: B(g, 0.6, 0.6, 0.6, '#777');
   }
   return g;
+}
+
+// ── 달빛 문방구 (미아 2장): 뽑기 기계 · 계산대 · 계산대 뒤 진열장 ─────────────
+// 모든 화면에서 같은 모습이 나오도록 무늬는 정해진 씨앗으로 그린다
+const rng = (s) => () => ((s = (s * 16807) % 2147483647) / 2147483647);
+const KFONT = (px, wt = 900) => `${wt} ${px}px "Noto Sans KR", "Malgun Gothic", sans-serif`;
+const texMat = (tex, o = {}) => { const k = 'm' + tex.uuid + JSON.stringify(o); let m = TM.get(k); if (!m) TM.set(k, m = markShared(new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8, ...o }))); return m; };
+const GLASS = () => M('#e4f2f8', { transparent: true, opacity: 0.16, roughness: 0.04, metalness: 0.1, depthWrite: false });
+// 칠이 벗겨지고 녹이 슨 철판
+function wornTex(key, base, { rust = 0.6, seed = 7 } = {}) {
+  return canvasTex(256, 256, (x, w, h) => {
+    const r = rng(seed);
+    const gr = x.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, shade(base, 5)); gr.addColorStop(1, shade(base, -7)); x.fillStyle = gr; x.fillRect(0, 0, w, h);
+    for (let i = 0; i < 900; i++) { x.fillStyle = `rgba(${r() < 0.5 ? '255,255,255' : '60,30,10'},${r() * 0.07})`; x.fillRect(r() * w, r() * h, 1 + r() * 3, 1 + r() * 3); }
+    x.lineWidth = 1; for (let i = 0; i < 40; i++) { x.strokeStyle = `rgba(250,240,220,${0.1 + r() * 0.2})`; const sx = r() * w, sy = r() * h; x.beginPath(); x.moveTo(sx, sy); x.lineTo(sx + (r() - 0.5) * 40, sy + (r() - 0.5) * 8); x.stroke(); }
+    for (let i = 0; i < 80 * rust; i++) {
+      const px = r() < 0.5 ? (r() < 0.5 ? r() * w * 0.14 : w - r() * w * 0.14) : r() * w, py = h * (0.35 + r() * 0.65), rr = 2 + r() * 10;
+      const rg = x.createRadialGradient(px, py, 0, px, py, rr); rg.addColorStop(0, 'rgba(105,48,18,.8)'); rg.addColorStop(0.6, 'rgba(140,72,30,.4)'); rg.addColorStop(1, 'rgba(140,72,30,0)'); x.fillStyle = rg; x.fillRect(px - rr, py - rr, rr * 2, rr * 2);
+    }
+    for (let i = 0; i < 12 * rust; i++) { x.fillStyle = 'rgba(110,55,25,.22)'; x.fillRect(r() * w, h * (0.3 + r() * 0.5), 1.5, 10 + r() * 40); }
+  }, key);
+}
+function woodTex(key, base) {
+  return canvasTex(256, 128, (x, w, h) => {
+    const r = rng(11); x.fillStyle = base; x.fillRect(0, 0, w, h);
+    for (let i = 0; i < 60; i++) { x.strokeStyle = `rgba(${r() < 0.5 ? '20,10,5' : '150,100,60'},${0.08 + r() * 0.12})`; x.lineWidth = 1 + r() * 2; const y = r() * h; x.beginPath(); x.moveTo(0, y); for (let xx = 0; xx <= w; xx += 16) x.lineTo(xx, y + Math.sin(xx * 0.03 + i) * 3); x.stroke(); }
+    for (let i = 0; i < 300; i++) { x.fillStyle = `rgba(230,210,170,${r() * 0.05})`; x.fillRect(r() * w, r() * h, 2, 1); }
+  }, key);
+}
+// 글씨 딱지: lines = [[글씨, 크기, 색], …] 를 가운데 정렬로 위에서부터
+function signTex(key, w, h, bg, lines, { border } = {}) {
+  return canvasTex(w, h, (x) => {
+    x.fillStyle = bg; x.fillRect(0, 0, w, h);
+    const r = rng(key.length * 97 + 1); for (let i = 0; i < 260; i++) { x.fillStyle = `rgba(80,50,20,${r() * 0.08})`; x.fillRect(r() * w, r() * h, 2, 2); }
+    if (border) { x.strokeStyle = border; x.lineWidth = Math.max(3, w * 0.03); x.strokeRect(x.lineWidth, x.lineWidth, w - x.lineWidth * 2, h - x.lineWidth * 2); }
+    x.textAlign = 'center'; x.textBaseline = 'middle';
+    const tot = lines.reduce((a, l) => a + l[1] * 1.15, 0); let y = (h - tot) / 2;
+    for (const [s, px, c] of lines) { x.fillStyle = c; x.font = KFONT(px); x.fillText(s, w / 2, y + px * 0.58); y += px * 1.15; }
+  }, key);
+}
+// 반쪽은 색, 반쪽은 투명한 캡슐 여러 개를 두 번의 그리기로 (InstancedMesh)
+const CAP_COL = ['#e8413a', '#f4a23a', '#f5d23c', '#5cc85a', '#3aa0e8', '#8a5ad8', '#ff7ab0', '#3ad0c0', '#ffffff'];
+function capsules(g, list) {
+  const top = geo('capT', () => new THREE.SphereGeometry(0.048, 14, 7, 0, Math.PI * 2, 0, Math.PI / 2));
+  const bot = geo('capB', () => new THREE.SphereGeometry(0.048, 14, 7, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2));
+  const a = new THREE.InstancedMesh(top, M('#ffffff', { roughness: 0.3 }), list.length);
+  const b = new THREE.InstancedMesh(bot, M('#f6f4ee', { roughness: 0.12, transparent: true, opacity: 0.6 }), list.length);
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), c = new THREE.Color(), one = new THREE.Vector3(1, 1, 1), v = new THREE.Vector3();
+  list.forEach(([px, py, pz, col, rx, rz], i) => { m4.compose(v.set(px, py, pz), q.setFromEuler(e.set(rx, 0, rz)), one); a.setMatrixAt(i, m4); b.setMatrixAt(i, m4); a.setColorAt(i, c.set(col)); });
+  for (const m of [a, b]) { m.frustumCulled = false; m.userData.noUpgrade = true; g.add(m); }
+}
+// 상자 안을 캡슐로 층층이 채운다
+function capPile(r, [x0, x1], [y0, layers], [z0, z1]) {
+  const out = [], st = 0.094;
+  for (let l = 0; l < layers; l++) for (let xx = x0 + (l % 2) * st / 2; xx <= x1; xx += st) for (let zz = z0 + (l % 2) * st / 2; zz <= z1; zz += st) {
+    if (l === layers - 1 && r() < 0.35) continue;
+    out.push([xx + (r() - 0.5) * 0.02, y0 + 0.048 + l * 0.082 + (r() - 0.5) * 0.015, zz + (r() - 0.5) * 0.02, CAP_COL[Math.floor(r() * CAP_COL.length)], r() * 6, r() * 6]);
+  }
+  return out;
+}
+
+function buildGacha(g) {
+  const orange = texMat(wornTex('gc_or', '#ea8a2a', { rust: 0.8 }), { roughness: 0.55 });
+  const chrome = texMat(wornTex('gc_cr', '#c2c5c9', { rust: 1.3, seed: 3 }), { metalness: 0.7, roughness: 0.35 });
+  const steel = M('#d6d9dd', { metalness: 0.9, roughness: 0.22 });
+  const W = 0.6, D = 0.52, r = rng(42);
+  B(g, 0.8, 0.07, 0.72, texMat(woodTex('gc_wd', '#4a2f1c')));      // 나무 받침
+  B(g, W, 0.4, D, chrome, 0, 0.07, 0);                               // 녹슨 크롬 아래 몸통
+  B(g, 0.24, 0.17, 0.02, '#0b0b0b', 0.1, 0.13, D / 2);              // 캡슐 나오는 구멍
+  const lip = B(g, 0.26, 0.02, 0.1, chrome, 0.1, 0.11, D / 2 + 0.03); lip.rotation.x = -0.35;
+  B(g, 0.62, 0.38, 0.54, orange, 0, 0.47, 0);                        // 손잡이 칸
+  for (const sx of [-0.15, 0.15]) {                                  // 동전 넣는 판 두 개
+    B(g, 0.2, 0.26, 0.03, chrome, sx, 0.52, 0.27);
+    B(g, 0.045, 0.012, 0.01, '#111', sx, 0.735, 0.286);
+    const k = C(g, 0.066, 0.066, 0.045, steel, 0, 0, 0, 18); k.rotation.x = Math.PI / 2; k.position.set(sx, 0.62, 0.305);
+    const hd = B(g, 0.15, 0.034, 0.03, steel); hd.position.set(sx, 0.62, 0.335); hd.rotation.z = sx > 0 ? 0.4 : -0.3;
+  }
+  Plane(g, 0.08, 0.22, signTex('gc_how', 64, 176, '#f3d24a', [['동전을', 13, '#7a2a10'], ['넣고', 13, '#7a2a10'], ['돌리', 13, '#7a2a10'], ['세요', 13, '#7a2a10']]), 0, 0.62, 0.272);
+  // 가운데 칸: 앞은 유리, 안에 캡슐 더미와 작은 장난감
+  B(g, 0.62, 0.34, 0.04, orange, 0, 0.85, -0.25);
+  for (const sx of [-1, 1]) B(g, 0.045, 0.34, 0.54, orange, sx * 0.288, 0.85, 0);
+  B(g, 0.53, 0.02, 0.47, '#d9d2c2', 0, 0.85, 0.01);
+  B(g, 0.53, 0.32, 0.47, GLASS(), 0, 0.86, 0.01).userData.keepWithRefinedArt = true;
+  capsules(g, [...capPile(r, [-0.22, 0.22], [0.87, 2], [-0.19, 0.06]), ...capPile(r, [-0.22, 0.22], [0.87, 1], [0.1, 0.2]).filter(() => r() < 0.4)]);
+  for (const [tx, col, hc] of [[-0.06, '#3a8a3a', '#f0c090'], [0.04, '#c03030', '#f0c090']]) { C(g, 0.022, 0.026, 0.06, col, tx, 0.87, 0.17, 10); S(g, 0.024, hc, tx, 0.955, 0.17); S(g, 0.026, '#2a1a10', tx, 0.968, 0.165); }
+  B(g, 0.11, 0.04, 0.06, '#f2c21a', 0.15, 0.885, 0.17, { roughness: 0.4 }); B(g, 0.06, 0.03, 0.05, '#f2c21a', 0.14, 0.925, 0.17, { roughness: 0.4 });
+  for (const wx of [0.115, 0.185]) for (const wz of [0.145, 0.195]) { const wh = C(g, 0.011, 0.011, 0.008, '#222', 0, 0, 0, 10); wh.rotation.x = Math.PI / 2; wh.position.set(wx, 0.885, wz); }
+  const card = Plane(g, 0.3, 0.19, signTex('gc_card', 240, 152, '#f6f1e6', [['100원', 40, '#222'], ['뽑기', 58, '#d8221c']]), 0, 1.08, 0.0); card.rotation.x = -0.12;
+  B(g, 0.64, 0.06, 0.56, orange, 0, 1.19, 0);                        // 띠
+  S(g, 0.011, steel, 0, 1.22, 0.282);
+  // 위 칸: 캡슐이 가득 찬 유리 통
+  B(g, 0.6, 0.3, 0.52, GLASS(), 0, 1.25, 0).userData.keepWithRefinedArt = true;
+  for (const [sx, sz] of [[-1, 1], [-1, -1], [1, -1]]) B(g, 0.03, 0.3, 0.03, orange, sx * 0.285, 1.25, sz * 0.245);
+  capsules(g, capPile(r, [-0.25, 0.25], [1.25, 3], [-0.21, 0.21]));
+  B(g, 0.66, 0.06, 0.58, orange, 0, 1.55, 0);                        // 뚜껑
+  B(g, 0.05, 0.03, 0.012, steel, 0, 1.565, 0.29);
+  // 오른쪽 옆판 (가게 가운데에서 보이는 쪽): 칠이 바랜 노란 딱지 두 장
+  B(g, 0.025, 1.08, 0.54, orange, 0.3, 0.47, 0);
+  const s1 = Plane(g, 0.42, 0.26, signTex('gc_s1', 336, 208, '#f2c43c', [['캡슐토이', 64, '#c8261c']], { border: '#c8261c' }), 0.314, 1.4, 0); s1.rotation.y = Math.PI / 2;
+  const s2 = Plane(g, 0.42, 0.34, signTex('gc_s2', 336, 272, '#f2c43c', [['뽑기기계', 62, '#c8261c'], ['재미있는 뽑기', 34, '#7a3a14']], { border: '#c8261c' }), 0.314, 0.97, 0); s2.rotation.y = Math.PI / 2;
+}
+
+// 진열장 한 칸에 빽빽이 꽂힌 물건 그림 (과자 봉지 · 상자 · 책 · 연필통 · 사탕 병)
+const SNACKS = ['쫀드기', '별사탕', '불량과자', '왕사탕', '풍선껌', '새콤젤리', '쌀과자', '땅콩캔디', '꿀과자', '딱지', '구슬', '색종이', '크레파스', '공책', '조립식', '로봇'];
+const BRIGHT = ['#e8312a', '#f5c518', '#2a8ae0', '#3ab04a', '#f07a1a', '#e85aa0', '#7a4ad0', '#18b0a8', '#fff2c0'];
+function shelfRowTex(i) {
+  return canvasTex(1024, 104, (x, w, h) => {
+    const r = rng(100 + i * 31);
+    const bg = x.createLinearGradient(0, 0, 0, h); bg.addColorStop(0, '#1a1008'); bg.addColorStop(1, '#3a2614'); x.fillStyle = bg; x.fillRect(0, 0, w, h);
+    let px = 4;
+    while (px < w - 10) {
+      const kind = r(), col = BRIGHT[Math.floor(r() * BRIGHT.length)];
+      if (kind < 0.42) { // 과자 봉지
+        const bw = 34 + r() * 26, bh = h * (0.6 + r() * 0.32), y = h - bh;
+        x.fillStyle = col; x.fillRect(px, y + 4, bw, bh - 4);
+        x.fillStyle = shade(col, -18); for (let k = 0; k < bw; k += 5) x.fillRect(px + k, y, 3, 5);
+        x.fillStyle = '#fff'; x.fillRect(px + 3, y + bh * 0.22, bw - 6, bh * 0.26);
+        x.fillStyle = col === '#fff2c0' ? '#c0201a' : shade(col, -25); x.font = KFONT(Math.min(15, bw / 3.2)); x.textAlign = 'center'; x.fillText(SNACKS[Math.floor(r() * 9)], px + bw / 2, y + bh * 0.42);
+        x.fillStyle = BRIGHT[Math.floor(r() * BRIGHT.length)]; x.beginPath(); x.arc(px + bw / 2, y + bh * 0.72, bw * 0.17, 0, 7); x.fill();
+        px += bw + 2;
+      } else if (kind < 0.62) { // 책 · 공책 꽂이
+        const n = 4 + Math.floor(r() * 6);
+        for (let k = 0; k < n; k++) { const bw = 7 + r() * 7, bh = h * (0.55 + r() * 0.4); x.fillStyle = BRIGHT[Math.floor(r() * BRIGHT.length)]; x.fillRect(px, h - bh, bw, bh); x.fillStyle = 'rgba(0,0,0,.25)'; x.fillRect(px + bw - 1.5, h - bh, 1.5, bh); x.fillStyle = 'rgba(255,255,255,.5)'; x.fillRect(px + 1, h - bh + 6, bw - 2, 2); px += bw + 1; }
+        px += 3;
+      } else if (kind < 0.8) { // 장난감 상자
+        const bw = 50 + r() * 40, bh = h * (0.35 + r() * 0.35), y = h - bh;
+        x.fillStyle = col; x.fillRect(px, y, bw, bh); x.fillStyle = '#fff'; x.fillRect(px + 4, y + 4, bw - 8, bh * 0.35);
+        x.fillStyle = '#c0201a'; x.font = KFONT(Math.min(14, bh * 0.3)); x.textAlign = 'center'; x.fillText(SNACKS[9 + Math.floor(r() * 7)], px + bw / 2, y + 4 + bh * 0.26);
+        x.strokeStyle = 'rgba(0,0,0,.35)'; x.strokeRect(px, y, bw, bh);
+        px += bw + 3;
+      } else if (kind < 0.9) { // 연필통
+        const bw = 26; for (let k = 0; k < 9; k++) { x.fillStyle = BRIGHT[k % BRIGHT.length]; x.fillRect(px + 2 + k * 2.5, h * 0.35 + r() * 8, 2.2, h * 0.4); }
+        x.fillStyle = '#8a8a90'; x.fillRect(px, h * 0.6, bw, h * 0.4); px += bw + 4;
+      } else { // 사탕 병
+        const bw = 36, bh = h * 0.6, y = h - bh; x.fillStyle = 'rgba(200,220,230,.35)'; x.fillRect(px, y, bw, bh);
+        for (let k = 0; k < 22; k++) { x.fillStyle = BRIGHT[Math.floor(r() * BRIGHT.length)]; x.beginPath(); x.arc(px + 5 + r() * (bw - 10), y + bh * 0.3 + r() * bh * 0.65, 3.5, 0, 7); x.fill(); }
+        x.fillStyle = '#c03020'; x.fillRect(px - 2, y - 6, bw + 4, 7); px += bw + 4;
+      }
+    }
+    const sh = x.createLinearGradient(0, 0, 0, 22); sh.addColorStop(0, 'rgba(0,0,0,.55)'); sh.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = sh; x.fillRect(0, 0, w, 22);
+  }, 'shelfrow' + i);
+}
+const packetTex = (i) => canvasTex(64, 96, (x, w, h) => {
+  const col = BRIGHT[i % BRIGHT.length], r = rng(7 + i);
+  x.fillStyle = col; x.fillRect(0, 0, w, h); x.fillStyle = shade(col, -20); for (let k = 0; k < w; k += 6) x.fillRect(k, 0, 3, 6);
+  x.fillStyle = '#fff'; x.fillRect(4, 22, w - 8, 26); x.fillStyle = col === '#fff2c0' ? '#c0201a' : shade(col, -28); x.font = KFONT(13); x.textAlign = 'center'; x.fillText(SNACKS[i % SNACKS.length], w / 2, 40);
+  x.fillStyle = BRIGHT[(i + 3) % BRIGHT.length]; x.beginPath(); x.arc(w / 2, 70, 12, 0, 7); x.fill(); x.fillStyle = 'rgba(255,255,255,.7)'; x.beginPath(); x.arc(w / 2 - 4, 66, 3 + r() * 2, 0, 7); x.fill();
+}, 'packet' + i);
+// 고리에 걸린 과자 줄 (투명 바탕)
+const hangTex = (i) => canvasTex(64, 256, (x, w) => {
+  x.fillStyle = '#c8c0b0'; x.fillRect(w / 2 - 1, 0, 2, 10);
+  for (let k = 0; k < 4; k++) { const col = BRIGHT[(i * 3 + k * 2) % BRIGHT.length], y = 10 + k * 60; x.fillStyle = col; x.fillRect(6, y, w - 12, 56); x.fillStyle = shade(col, -20); for (let q = 6; q < w - 6; q += 5) x.fillRect(q, y, 3, 5); x.fillStyle = '#fff'; x.fillRect(10, y + 14, w - 20, 18); x.fillStyle = shade(col, -30); x.font = KFONT(11); x.textAlign = 'center'; x.fillText(SNACKS[(i * 4 + k) % 9], w / 2, y + 27); }
+}, 'hang' + i);
+
+function buildShopShelf(g) {
+  const dark = texMat(woodTex('sh_dk', '#3a2616'));
+  const W = 4.4, H = 2.35, D = 0.42, ys = [0, 0.46, 0.9, 1.32, 1.72, 2.1];
+  B(g, W, H, 0.03, dark, 0, 0, -D / 2);
+  for (const sx of [-W / 2 + 0.03, -0.74, 0.74, W / 2 - 0.03]) B(g, 0.06, H, D, dark, sx, 0, 0);
+  for (const y of [...ys, H - 0.04]) B(g, W, 0.04, D, dark, 0, y, 0);
+  const r = rng(5);
+  ys.forEach((y, i) => {
+    const top = i + 1 < ys.length ? ys[i + 1] : H - 0.04, rh = top - y - 0.04;
+    Plane(g, W - 0.08, rh, shelfRowTex(i), 0, y + 0.04 + rh / 2, -D / 2 + 0.02);
+    for (const bx of [-1.45, 0, 1.45]) for (let k = 0; k < 2; k++) { // 앞쪽에 세운 과자 몇 개로 깊이를 준다
+      const ph = Math.min(rh * 0.85, 0.22 + r() * 0.08), pk = B(g, 0.15, ph, 0.04, texMat(packetTex(Math.floor(r() * 12)), { roughness: 0.6 }), bx + (k - 0.5) * 0.5 + (r() - 0.5) * 0.2, y + 0.04, 0.06 + r() * 0.08);
+      pk.rotation.y = (r() - 0.5) * 0.4; pk.rotation.x = -0.12;
+    }
+  });
+  // 맨 위: 장난감 · 조립식 상자 더미
+  [[-1.7, 0.6, 0.24, '#2a6ad0', '조립식'], [-1.05, 0.55, 0.2, '#e8312a', '로봇'], [-0.4, 0.5, 0.18, '#f5c518', '딱지'], [0.9, 0.62, 0.22, '#3ab04a', '자동차'], [1.6, 0.5, 0.26, '#e8312a', '조립식']].forEach(([bx, bw, bh, c, s], k) => {
+    B(g, bw, bh, 0.34, texMat(signTex('toybox' + k, 192, 80, c, [[s, 34, '#fff']], { border: '#fff' }), { roughness: 0.6 }), bx, H, 0).rotation.y = (k % 2 - 0.5) * 0.12;
+    if (k % 2 === 0) B(g, bw * 0.8, bh * 0.7, 0.3, texMat(signTex('toybox2' + k, 160, 64, BRIGHT[(k + 4) % BRIGHT.length], [[SNACKS[10 + k], 26, '#fff']]), { roughness: 0.6 }), bx + 0.03, H + bh, 0).rotation.y = 0.18;
+  });
+  for (const [hx, i] of [[-2.08, 0], [-1.9, 1], [1.92, 2], [2.1, 3]]) Plane(g, 0.16, 0.64, hangTex(i), hx, 1.78, D / 2 + 0.03, { transparent: true, alphaTest: 0.5, side: THREE.DoubleSide }).rotation.y = (i - 1.5) * 0.08;
+  // "영업중" 나무 팻말
+  Plane(g, 0.62, 0.22, signTex('openSign', 248, 88, '#efe6d2', [['영업중', 52, '#222']], { border: '#5a3a20' }), 0, 1.12, D / 2 + 0.05).rotation.z = 0.03;
+  for (const sx of [-0.22, 0.22]) B(g, 0.008, 0.2, 0.008, '#c8b89a', sx * 0.6, 1.22, D / 2 + 0.05).rotation.z = -sx * 0.9;
+}
+
+function buildShopCounter(g) {
+  const wood = texMat(woodTex('ct_wd', '#5e3d26')), dark = texMat(woodTex('ct_dk', '#3a2516'));
+  const L = 3.6, D = 0.9, H = 0.95, T = H + 0.07, r = rng(9);
+  // 손님 쪽으로 열린 칸이 있는 나무 계산대
+  B(g, L, 0.06, D, dark); B(g, L, 0.04, D - 0.06, dark, 0, 0.46, -0.03); B(g, L, H - 0.04, 0.04, dark, 0, 0.02, -D / 2 + 0.02);
+  for (const sx of [-L / 2 + 0.035, -0.6, 0.6, L / 2 - 0.035]) B(g, 0.07, H - 0.02, D, wood, sx, 0.02, 0);
+  B(g, L, 0.08, 0.04, wood, 0, 0, D / 2 - 0.02); B(g, L + 0.04, 0.09, 0.05, wood, 0, H - 0.09, D / 2);
+  B(g, L + 0.16, 0.07, D + 0.14, wood, 0, H, 0.03);
+  for (const [bx0, y] of [[-1.7, 0.06], [-0.52, 0.5], [0.68, 0.06], [-1.7, 0.5], [0.68, 0.5], [-0.52, 0.06]]) { // 칸마다 책 · 상자
+    let px = bx0; const end = bx0 + 1.02;
+    while (px < end - 0.08) {
+      if (r() < 0.6) { const bw = 0.035 + r() * 0.03, bh = 0.24 + r() * 0.1; const bk = B(g, bw, bh, 0.24, BRIGHT[Math.floor(r() * BRIGHT.length)], px + bw / 2, y, 0.12, { roughness: 0.7 }); if (r() < 0.15) bk.rotation.z = 0.25; px += bw + 0.006; }
+      else { const bw = 0.22 + r() * 0.12, bh = 0.12 + r() * 0.12; if (px + bw > end) break; B(g, bw, bh, 0.3, texMat(packetTex(Math.floor(r() * 16)), { roughness: 0.7 }), px + bw / 2, y, 0.08); px += bw + 0.03; }
+    }
+  }
+  // 검은 다이얼 전화기 (꼬인 줄이 계산대 앞으로 늘어진다)
+  const blk = M('#121316', { roughness: 0.3, metalness: 0.15 });
+  const ph = new THREE.Group(); ph.position.set(-1.42, T, 0.2); ph.rotation.y = 0.35; g.add(ph);
+  B(ph, 0.3, 0.025, 0.26, blk); S(ph, 0.14, blk, 0, 0.055, 0).scale.set(1.12, 0.6, 1);
+  const dial = new THREE.Mesh(geo('dial', () => new THREE.CircleGeometry(0.068, 28)), texMat(canvasTex(128, 128, (x) => { x.fillStyle = '#0d0e10'; x.beginPath(); x.arc(64, 64, 63, 0, 7); x.fill(); x.fillStyle = '#d8d4c8'; x.beginPath(); x.arc(64, 64, 26, 0, 7); x.fill(); for (let k = 0; k < 10; k++) { const a = -1.1 + k * 0.5; x.fillStyle = '#6a6a6a'; x.beginPath(); x.arc(64 + Math.cos(a) * 44, 64 + Math.sin(a) * 44, 9, 0, 7); x.fill(); } x.fillStyle = '#222'; x.font = KFONT(13); x.textAlign = 'center'; x.fillText('미아', 64, 69); }, 'dial'), { roughness: 0.35, metalness: 0.2 }));
+  dial.position.set(0, 0.1, 0.098); dial.rotation.x = -0.75; ph.add(dial);
+  for (const sx of [-0.09, 0.09]) B(ph, 0.03, 0.05, 0.05, blk, sx, 0.125, -0.02);
+  B(ph, 0.24, 0.035, 0.05, blk, 0, 0.165, -0.02); for (const sx of [-0.13, 0.13]) S(ph, 0.04, blk, sx, 0.17, -0.02).scale.set(0.9, 0.65, 1.2);
+  const base = new THREE.CatmullRomCurve3([[-1.55, T + 0.03, 0.18], [-1.64, T + 0.012, 0.4], [-1.67, T + 0.01, 0.58], [-1.69, T - 0.2, 0.62], [-1.62, T - 0.42, 0.61]].map((a) => new THREE.Vector3(...a)));
+  const pts = []; for (let k = 0; k <= 260; k++) pts.push(base.getPoint(k / 260).add(new THREE.Vector3(Math.cos(k * 0.9) * 0.011, Math.sin(k * 0.9) * 0.011, Math.sin(k * 0.9 + 1.5) * 0.008)));
+  g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 520, 0.0045, 5), blk));
+  // 사탕 유리 진열함
+  B(g, 0.56, 0.04, 0.38, dark, -0.78, T, 0.04); B(g, 0.56, 0.025, 0.38, dark, -0.78, T + 0.32, 0.04);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) B(g, 0.02, 0.28, 0.02, dark, -0.78 + sx * 0.27, T + 0.04, 0.04 + sz * 0.18);
+  for (let k = 0; k < 10; k++) B(g, 0.09, 0.05 + (k % 3) * 0.02, 0.13, texMat(packetTex(k), { roughness: 0.6 }), -0.98 + (k % 5) * 0.1, T + 0.04 + Math.floor(k / 5) * 0.09, -0.06 + Math.floor(k / 5) * 0.18).rotation.x = -0.4;
+  B(g, 0.54, 0.28, 0.36, GLASS(), -0.78, T + 0.04, 0.04).userData.keepWithRefinedArt = true;
+  // 작은 장난감 상자 더미 · 성냥갑
+  [[0.24, 0.1, '#f5c518', '딱지'], [0.22, 0.08, '#e8312a', '구슬'], [0.2, 0.07, '#2a8ae0', '색종이']].forEach(([bw, bh, c, s], k) => {
+    B(g, bw, bh, 0.16, texMat(signTex('mini' + k, 128, 56, c, [[s, 26, k ? '#fff' : '#c0201a']]), { roughness: 0.6 }), -0.22, T + [0, 0.1, 0.18][k], 0.25).rotation.y = (k - 1) * 0.2;
+  });
+  for (const [mx, mz] of [[-0.55, 0.42], [0.02, 0.4]]) B(g, 0.07, 0.02, 0.05, texMat(signTex('match', 64, 44, '#f2d43a', [['성냥', 18, '#c0201a']]), { roughness: 0.6 }), mx, T, mz).rotation.y = 0.5;
+  // 펼친 장부 (2장 단서)
+  B(g, 0.5, 0.012, 0.34, '#3a2a20', 0.32, T, 0.18);
+  for (const sx of [-1, 1]) { const pg = Plane(g, 0.23, 0.32, paperTex('ledger' + sx, { w: 128, h: 176, lines: 12, grid: sx > 0, title: sx < 0 ? '장부' : undefined }), 0.32 + sx * 0.12, T + 0.016, 0.18); pg.rotation.x = -Math.PI / 2; }
+  for (let k = 0; k < 7; k++) C(g, 0.016, 0.016, 0.004, k % 3 ? '#c8c9cc' : '#b8864a', 0.05 + r() * 0.25, T, 0.38 + r() * 0.1, 12, { metalness: 0.85, roughness: 0.3 });
+  // 열쇠고리 몇 개
+  for (let k = 0; k < 3; k++) { const kx = -0.02 + k * 0.08, kz = 0.46; const ring = new THREE.Mesh(geo('kring', () => new THREE.TorusGeometry(0.014, 0.003, 6, 16)), M('#c8c9cc', { metalness: 0.9, roughness: 0.25 })); ring.rotation.x = -Math.PI / 2; ring.position.set(kx, T + 0.004, kz); g.add(ring); B(g, 0.025, 0.008, 0.035, BRIGHT[k * 2], kx + 0.01, T, kz + 0.035); }
+  // 테이프 · 탁상 종
+  B(g, 0.17, 0.08, 0.08, '#20282e', 0.72, T, -0.18, { roughness: 0.4 }); const tp = new THREE.Mesh(geo('tape', () => new THREE.TorusGeometry(0.04, 0.012, 8, 20)), M('#d8c890', { roughness: 0.3, transparent: true, opacity: 0.85 })); tp.position.set(0.74, T + 0.11, -0.18); g.add(tp);
+  C(g, 0.05, 0.055, 0.015, '#2a2a2a', 0.98, T, 0.34, 18); const bell = new THREE.Mesh(geo('bellDome', () => new THREE.SphereGeometry(0.045, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2)), M('#cfd2d6', { metalness: 0.9, roughness: 0.2 })); bell.position.set(0.98, T + 0.015, 0.34); g.add(bell); C(g, 0.008, 0.008, 0.02, '#aaa', 0.98, T + 0.058, 0.34, 8, { metalness: 0.9 });
+  // 낡은 금속 금전등록기
+  const cr = new THREE.Group(); cr.position.set(1.14, T, -0.12); cr.rotation.y = -0.28; g.add(cr);
+  const steel = texMat(wornTex('reg_st', '#8f9195', { rust: 0.7, seed: 5 }), { metalness: 0.6, roughness: 0.42 });
+  B(cr, 0.58, 0.13, 0.52, steel); B(cr, 0.14, 0.018, 0.02, '#d0d0d0', 0, 0.05, 0.265, { metalness: 0.9, roughness: 0.2 });
+  B(cr, 0.52, 0.2, 0.3, steel, 0, 0.13, -0.08);
+  const kp = B(cr, 0.5, 0.02, 0.24, steel); kp.position.set(0, 0.29, 0.1); kp.rotation.x = 0.5;
+  for (let a = 0; a < 3; a++) for (let b = 0; b < 6; b++) { const k = C(cr, 0.017, 0.017, 0.025, b === 5 ? '#c84a30' : '#ece6d4', 0, 0, 0, 10, { roughness: 0.4 }); k.position.set(-0.19 + b * 0.075, 0.25 + a * 0.042, 0.17 - a * 0.075); k.rotation.x = 0.5; }
+  B(cr, 0.38, 0.17, 0.12, steel, 0, 0.33, -0.14);
+  Plane(cr, 0.3, 0.075, signTex('reg150', 192, 48, '#0e100e', [['1 5 0', 34, '#e8e0c0']]), 0, 0.43, -0.079);
+  const ck = C(cr, 0.05, 0.05, 0.03, steel, 0, 0, 0, 16); ck.rotation.z = Math.PI / 2; ck.position.set(0.305, 0.2, -0.05); B(cr, 0.02, 0.13, 0.02, '#3a2a20', 0.33, 0.14, -0.05);
+  // 세워 둔 메뉴판
+  Plane(g, 0.34, 0.5, canvasTex(170, 250, (x, w, h) => {
+    x.fillStyle = '#efe5cc'; x.fillRect(0, 0, w, h); x.strokeStyle = '#5a3a20'; x.lineWidth = 5; x.strokeRect(3, 3, w - 6, h - 6);
+    x.fillStyle = '#5a2a14'; x.font = KFONT(26); x.textAlign = 'center'; x.fillText('메뉴판', w / 2, 34);
+    x.font = KFONT(15, 700);
+    [['쫀드기', 50], ['별사탕', 100], ['뽑기 한 판', 100], ['딱지', 50], ['구슬', 10], ['풍선껌', 30], ['아이스크림', 200], ['색종이', 100]].forEach(([s, v], k) => { const y = 64 + k * 23; x.fillStyle = '#2a1a10'; x.textAlign = 'left'; x.fillText(s, 14, y); x.textAlign = 'right'; x.fillText(v + '원', w - 14, y); x.fillStyle = 'rgba(90,60,30,.35)'; x.fillRect(14, y + 6, w - 28, 1); });
+  }, 'menuboard'), 1.68, T + 0.27, -0.4).rotation.set(-0.16, -0.35, 0);
+  // 주판
+  B(g, 0.46, 0.02, 0.16, dark, 1.42, T, 0.36);
+  for (const sz of [-1, 1]) B(g, 0.46, 0.025, 0.015, dark, 1.42, T + 0.02, 0.36 + sz * 0.072);
+  B(g, 0.46, 0.025, 0.012, dark, 1.42, T + 0.02, 0.33);
+  const beads = new THREE.InstancedMesh(geo('bead', () => new THREE.SphereGeometry(0.011, 10, 6)), M('#5a2a16', { roughness: 0.45 }), 11 * 5);
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(1, 0.7, 1);
+  for (let a = 0; a < 11; a++) for (let b = 0; b < 5; b++) { m4.compose(new THREE.Vector3(1.22 + a * 0.04, T + 0.035, (b === 0 ? 0.31 : 0.345 + b * 0.022) + (r() < 0.3 ? -0.01 : 0)), q, sc); beads.setMatrixAt(a * 5 + b, m4); }
+  beads.frustumCulled = false; beads.userData.noUpgrade = true; g.add(beads);
 }
