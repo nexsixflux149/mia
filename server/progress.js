@@ -32,6 +32,9 @@ export const SHOP = {
   mount_broom: { name: '마녀의 빗자루', icon: '🧹', kind: 'mount', price: 100, lv: 17, max: 1, desc: '살짝 떠서 날아다니는 빗자루. 탄 동안 이동 속도 1.5배!' },
   mount_unicorn: { name: '무지개 유니콘', icon: '🦄', kind: 'mount', price: 150, lv: 25, max: 1, desc: '뿔이 빛나는 유니콘. 탄 동안 이동 속도 1.5배!' },
   wings_devil: { name: '불꽃 악마 날개', icon: '😈', kind: 'wings', price: 180, lv: 25, max: 1, desc: '붉은 불꽃이 일렁이는 날개.' },
+  wings_bat: { name: '악마 날개', icon: '🦇', kind: 'wings', price: 150, lv: 15, max: 1, desc: '불꽃 없이 검붉은 막이 쫙 펼쳐지는 박쥐 모양 악마 날개.' },
+  tail_devil: { name: '악마 꼬리', icon: '😈', kind: 'tail', price: 150, lv: 15, max: 1, desc: '끝이 스페이드 모양인 가느다란 검붉은 꼬리. 살랑살랑 흔들려요.' },
+  horn_devil: { name: '악마 뿔', icon: '🔥', kind: 'horn', price: 150, lv: 15, max: 1, desc: '불이 들어온 듯 노랗게 빛나다 끝이 빨갛게 타오르는 악마 뿔 머리띠.' },
   mount_trex: { name: '티라노사우루스', icon: '🦖', kind: 'mount', price: 220, lv: 30, max: 1, desc: '쿵쿵 걷는 티라노사우루스. 가끔 크앙! 하고 입을 벌려요. 탄 동안 이동 속도 1.5배!' },
   wings_dragon: { name: '용의 날개', icon: '🐉', kind: 'wings', price: 260, lv: 30, max: 1, desc: '보랏빛 비늘이 빛나는 커다란 용 날개.' },
   mount_ufo: { name: '꼬마 우주선', icon: '🛸', kind: 'mount', price: 300, lv: 35, max: 1, desc: '빙글빙글 불빛이 도는 우주선. 탄 동안 이동 속도 1.5배!' },
@@ -50,6 +53,7 @@ export const SHOP = {
   mask_hahoe: { name: '하회탈', icon: '😄', kind: 'mask', price: 150, lv: 25, max: 1, desc: '눈웃음 가득한 나무 하회탈. 턱이 따로 달려 말할 때 덜컥덜컥 움직여요.' },
   mask_venice: { name: '베네치아 가면', icon: '🎭', kind: 'mask', price: 300, lv: 40, max: 1, desc: '보랏빛 벨벳에 금박 무늬, 커다란 깃털과 보석이 달린 가면무도회 가면.' },
   mask_rabbit: { name: '토끼 가면', icon: '🐰', kind: 'mask', price: 40, lv: 10, max: 1, desc: '분홍 볼에 앞니 두 개, 길쭉한 귀가 가끔 폴짝 접히는 하얀 토끼 가면.' },
+  mask_menhera: { name: '멘헤라 안대', icon: '🩹', kind: 'mask', price: 100, lv: 10, max: 1, desc: '구멍이 송송 뚫린 하얀 의료용 안대. 한쪽 눈을 가리고 흰 끈을 비스듬히 둘렀어요.' },
   mask_bear: { name: '곰 가면', icon: '🐻', kind: 'mask', price: 100, lv: 20, max: 1, desc: '동그란 귀와 볼록한 주둥이, 까만 코가 달린 복슬복슬 곰 가면.' },
   mask_wolf: { name: '늑대 가면', icon: '🐺', kind: 'mask', price: 250, lv: 35, max: 1, desc: '뾰족한 귀와 송곳니, 노랗게 빛나는 눈의 잿빛 늑대 가면.' },
   mask_ghost: { name: '귀신 가면', icon: '👻', kind: 'mask', price: 450, lv: 50, max: 1, desc: '핏기 없는 얼굴에 피눈물, 긴 검은 머리가 늘어진 소름 끼치는 귀신 가면. 눈 속에서 붉은 점이 흔들려요.' },
@@ -69,7 +73,7 @@ export const SHOP = {
   // 황금 고양이 지팡이 (비매품 · kind: staff): 세트 7종을 모두 모으면 받는다. 전설의 검처럼 귀신을 물리치지만 횟수 제한이 없다
   gold_staff: { name: '황금 고양이 지팡이', icon: '🪄', kind: 'staff', price: 0, lv: 1, max: 1, nosale: true, desc: '비매품 - 황금 고양이 코스튬 세트 7종을 모두 모으면 받는 지팡이', tip: '가까운 귀신을 횟수 제한 없이 물리칠 수 있어요. (귀신 퇴치 무제한)' },
 };
-export const isWear = (id) => ['wings', 'mount', 'costume', 'mask'].includes(SHOP[id]?.kind);
+export const isWear = (id) => ['wings', 'mount', 'costume', 'mask', 'tail', 'horn'].includes(SHOP[id]?.kind);
 // ───── 황금 고양이 세트
 export const GOLD_IDS = ['gold_hat', 'gold_mask', 'gold_gloves', 'gold_top', 'gold_bottom', 'gold_shoes', 'gold_tail'];
 export const GOLD_STAFF = 'gold_staff';
@@ -89,7 +93,7 @@ export function giveGold(pf, id) {
   return { added, staff };
 }
 
-export function blankProfile() { return { xp: 0, coins: 0, items: {}, swordUses: 0, equip: { wings: '', mount: '', costume: '', gold: '', mask: '' }, at: Date.now() }; }
+export function blankProfile() { return { xp: 0, coins: 0, items: {}, swordUses: 0, equip: { wings: '', mount: '', costume: '', gold: '', mask: '', tail: '', horn: '' }, at: Date.now() }; }
 export function profileView(pf, admin) {
   const lv = admin ? ADMIN_LV : levelOf(pf.xp); // 운영자는 Lv.1000
   return { xp: pf.xp, lv, max: MAX_LV, hiddenLv: HIDDEN_LV, cur: admin ? 0 : xpAt(lv), next: admin ? 0 : lv >= MAX_LV ? xpAt(lv) : xpAt(lv + 1), coins: admin ? -1 : pf.coins, items: pf.items, swordUses: pf.swordUses, equip: pf.equip, admin: !!admin };

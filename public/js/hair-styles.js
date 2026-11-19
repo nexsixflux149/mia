@@ -192,6 +192,18 @@ function buildStyle(id) {
         }
         add(new THREE.TorusGeometry(.055,.012,5,12),[side*.38,-.55,.14],undefined,[Math.PI/2,0,0],'tie');
       }break;
+    case 'rolltwin': // 투표 보상: 리본으로 묶은 양갈래 + 돌돌 말린 롤(나선) 컬
+      cap();back(1.9);fringe(0,.14,true);
+      for(const side of [-1,1]){
+        lobe([side*.37,.22,-.17],[.12,.12,.11]);
+        add(new THREE.TorusGeometry(.085,.017,5,16),[side*.39,.21,-.17],undefined,[0,Math.PI/2,0],'tie');
+        for(const s of [-1,1])add(new THREE.SphereGeometry(1,10,8),[side*.40,.30,-.17+s*.08],[.03,.055,.075],[s*.6,0,0],'tie'); // 리본 고리
+        for(let k=0;k<3;k++){
+          const pts=[],len=.6+(k===1?.1:0),dz=(k-1)*.075;
+          for(let j=0;j<=40;j++){const t=j/40,a=j*.9+k*2.1,r=.03+.05*t;pts.push([side*(.45+t*.05+(k===1?.03:0))+Math.cos(a)*r,.2-t*len,-.17+dz+Math.sin(a)*r]);}
+          add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(p=>new THREE.Vector3(...p))),120,.036,6,false),[0,0,0]);
+        }
+      }break;
   }
   const result = {};
   for (const [key, geometries] of Object.entries(buckets)) {

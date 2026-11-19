@@ -117,7 +117,7 @@ function applyAccountName(account) {
   store.set('gwimun-nick', account.name);
   if (S.resume) store.set('gwimun-resume', { ...S.resume, name: account.name, at: Date.now() });
   applyAccountLock();
-  if (changed && myAvatar) setTag(myAvatar, account.name, '#ffe08a');
+  if (changed && myAvatar) { myAvatar.userData.name = account.name; myTag(); }
 }
 // 로그인 화면을 '지금 실제로 보이는 영역'에 맞춘다: 주소창이 늘었다 줄었다 하거나 키보드가 올라와도 입장 막대가 화면 밖으로 밀려나지 않게
 // (--app-h · --app-top 은 css 의 body.mobile #login 이 쓴다. 영역이 좁으면 .short · .tiny 로 로고 · 미리보기를 줄인다)
@@ -140,6 +140,7 @@ const JOIN_CODE = new URLSearchParams(location.search).get('p');
 if (JOIN_CODE) history.replaceState(null, '', location.pathname);
 let editMode = false;
 const SWATCH = { body: SKIN, accent: ACCENT, hairColor: HAIRC, eyeColor: EYEC };
+const isLockedLook = (key, v) => key === 'hair' && v === 'rolltwin' && !S.profile?.items?.hair_roll; // 투표 보상 헤어
 function buildOptions() {
   document.querySelectorAll('[data-sw]').forEach((el) => {
     const key = el.dataset.sw; el.innerHTML = '';
@@ -147,7 +148,7 @@ function buildOptions() {
   });
   document.querySelectorAll('[data-chip]').forEach((el) => {
     const key = el.dataset.chip; el.innerHTML = '';
-    OPTIONS[key].forEach(([v, label]) => { const d = document.createElement('div'); d.className = 'chip' + (look[key] === v ? ' on' : ''); d.textContent = label; d.onclick = () => { look[key] = v; buildOptions(); refreshPreview(); }; el.appendChild(d); });
+    OPTIONS[key].forEach(([v, label]) => { const d = document.createElement('div'); const locked = isLockedLook(key, v); d.className = 'chip' + (look[key] === v ? ' on' : '') + (locked ? ' locked' : ''); d.textContent = (locked ? '🔒 ' : '') + label; d.onclick = () => { if (locked) { toast('🗳️ 로비의 테마 투표 전광판에서 투표하면 받을 수 있어요!'); return; } look[key] = v; buildOptions(); refreshPreview(); }; el.appendChild(d); });
   });
   $('#photoOn').checked = !!look.photoOn;
 }
@@ -157,7 +158,7 @@ document.querySelectorAll('.ctab').forEach((b) => (b.onclick = () => {
 }));
 $('#randomBtn').onclick = () => {
   const pick = (a) => a[Math.floor(Math.random() * a.length)];
-  for (const k of Object.keys(OPTIONS)) look[k] = pick(OPTIONS[k])[0];
+  for (const k of Object.keys(OPTIONS)) look[k] = pick(OPTIONS[k].filter(([v]) => !isLockedLook(k, v)))[0];
   for (const k of Object.keys(SWATCH)) look[k] = pick(SWATCH[k]);
   buildOptions(); refreshPreview();
 };
@@ -345,8 +346,8 @@ scene.add(fill);
 
 function makeAvatar(id, name, lk, isMe) {
   const g = createAvatar(lk);
-  setTag(g, name, isMe ? '#ffe08a' : '#fff');
-  g.userData.name = name; g.userData.id = id;
+  g.userData.name = name; g.userData.id = id; g.userData.isMe = isMe;
+  if (isMe) { myAvatar = g; myTag(); } else setTag(g, name, '#fff');
   const spot = new THREE.SpotLight('#fff4dc', 0, 24, 0.55, 0.5, 1.2);
   spot.visible = false;
   spot.position.set(0, 0.72, 0.42);
@@ -358,8 +359,11 @@ function makeAvatar(id, name, lk, isMe) {
   scene.add(g);
   return g;
 }
-function setTag(g, name, color) { if (g.userData.tag) removeLabel(g.userData.tag); g.userData.tag = addLabel(g, textSprite(name, { size: 30, color, bg: 'rgba(10,8,12,.72)', stroke: 'rgba(0,0,0,.85)' }), 1.55); }
-function setLight(g, on) { g.userData.spot.visible = !!on && S.room === 'game'; g.userData.spot.intensity = on ? 160 : 0; g.userData.beam.visible = false; } // 빛줄기 효과는 눈부셔서 표시하지 않는다
+function setTag(g, name, color, title = '') { if (g.userData.tag) removeLabel(g.userData.tag); g.userData.tag = addLabel(g, textSprite(name, { size: 30, color, bg: 'rgba(10,8,12,.72)', stroke: 'rgba(0,0,0,.85)', sub: title }), title ? 1.59 : 1.55); }
+// 깬 테마 수(도장)에 따른 이름표 위 칭호
+function rankOf(n) { return n <= 3 ? '방린이' : n <= 6 ? '방중수' : n <= 8 ? '방고수' : n <= 10 ? '탈출러' : '고인물'; }
+function myTag() { if (myAvatar) setTag(myAvatar, myAvatar.userData.name, '#ffe08a', rankOf(Object.values(S.unlockedBy || {}).filter((v) => v.cleared).length)); }
+function setLight(g, on) { g.userData.spot.visible = !!on && (S.room === 'game' || g.userData.isMe); /* 로비에선 내 손전등만 (빛 개수를 줄여 가볍게) */ g.userData.spot.intensity = on ? 160 : 0; g.userData.beam.visible = false; } // 빛줄기 효과는 눈부셔서 표시하지 않는다
 function rebuildMyAvatar() {
   removeAvatar(myAvatar);
   myAvatar = makeAvatar(S.me, S.myName, look, true);
@@ -464,7 +468,7 @@ function enterChapter(state, showIntro = true) {
   restoreFaded(); graphics.leave(); // 반투명해진 물체를 먼저 정리하고, 바꿔 둔 재질을 원래대로 돌린 뒤 세계를 지운다
   leaveWorld();
   const ch = state.chapter;
-  S.chapter = ch; S.room = 'game'; S.mount = null; S.perch = null; me.y = 0; closeThemePop(); noticeBox.classList.add('hidden');
+  S.chapter = ch; S.room = 'game'; S.mount = null; S.perch = null; me.y = 0; closeThemePop(); S.mobileClose?.(); noticeBox.classList.add('hidden');
   setThemeComms(true);
   audio.classicEffects = true;
   audio.xmasMechanical = S.scenario?.id === 'christmas';
@@ -624,7 +628,7 @@ function hoverCheck(e) {
   let label = null;
   const th = S.room === 'lobby' ? pickTheme(e.clientX, e.clientY) : null;
   if (th) label = `${THEME_INFO[th]?.title || ''} — 클릭해서 시작`;
-  else if (S.room === 'lobby') { const ck = pickClickable(e.clientX, e.clientY); if (ck) label = { mailbox: '📮 고객소리함 — 버그 · 건의사항 보내기', wishstar: '🌠 소원의 별 — 소원빌기', xmasgift: '🎁 크리스마스 선물상자 — 선물받기' }[ck] || null; }
+  else if (S.room === 'lobby') { const ck = pickClickable(e.clientX, e.clientY); if (ck) label = { mailbox: '📮 고객소리함 — 버그 · 건의사항 보내기', wishstar: '🌠 소원의 별 — 소원빌기', vote: '🗳️ 테마 투표 전광판 — 투표하기', xmasgift: '🎁 크리스마스 선물상자 — 선물받기' }[ck] || null; }
   if (id) { const ent = S.world.objects[id]; label = (ent.done ? '✓ ' : '') + (ent.data.label || '') + (distTo(ent) > reach(ent) ? '  (클릭하면 다가감)' : ''); }
   else if (!th) { const av = pickAvatar(e.clientX, e.clientY); if (av) label = `${av.userData.name} (클릭: 메뉴)`; }
   canvas.style.cursor = label ? 'pointer' : 'default';
@@ -1020,7 +1024,7 @@ S.net = new Map();
 function applyPlayer(e) {
   let p = S.net.get(e[0]); if (!p) { p = { id: e[0] }; S.net.set(e[0], p); }
   p.x = e[1]; p.z = e[2]; p.y = e[3]; p.ry = e[4]; p.anim = e[5] & 1; p.crouch = e[5] & 2 ? 1 : 0; p.light = !!(e[5] & 4);
-  const x = e[6]; if (x) { p.name = x.n; p.lv = x.lv; p.partyId = x.pt || null; p.gear = x.g; p.em = x.em; p.eid = x.eid; p.ride = x.rd; p.et = x.et || 0; }
+  const x = e[6]; if (x) { p.name = x.n; p.lv = x.lv; p.partyId = x.pt || null; p.gear = x.g; p.em = x.em; p.eid = x.eid; p.ride = x.rd; p.et = x.et || 0; p.st = x.st || 0; }
   return p;
 }
 /** 다른 사람 한 명을 화면에 맞춘다 (캐릭터 만들기 · 외형 받기 · 감정표현 · 손전등 · 파티 표시) */
@@ -1049,7 +1053,7 @@ function syncOther(p) {
   g.userData.target = p;
   setLight(g, p.light);
   const inParty = !!S.party?.members.some((m) => m.id === p.id);
-  if (g.userData.inParty !== inParty || g.userData.tagName !== p.name) { g.userData.inParty = inParty; g.userData.tagName = p.name; setTag(g, (inParty ? '★ ' : '') + p.name, inParty ? '#8fd3ff' : '#fff'); }
+  if (g.userData.inParty !== inParty || g.userData.tagName !== p.name || g.userData.tagSt !== p.st) { g.userData.inParty = inParty; g.userData.tagName = p.name; g.userData.tagSt = p.st; setTag(g, (inParty ? '★ ' : '') + p.name, inParty ? '#8fd3ff' : '#fff', rankOf(p.st || 0)); }
 }
 const syncAllOthers = () => { for (const p of S.net.values()) syncOther(p); };
 function dropOther(id) { S.net.delete(id); const g = S.others.get(id); if (g) { removeAvatar(g); S.others.delete(id); } }
@@ -1483,7 +1487,7 @@ socket.on('game:ending', (e) => {
   }, 1200);
 });
 $('#endBtn').onclick = () => { $('#ending').classList.add('hidden'); socket.emit('party:quit'); };
-socket.on('clears', (ub) => { S.unlockedBy = ub || {}; if (!$('#ending').classList.contains('hidden')) showEndExtras(); });
+socket.on('clears', (ub) => { S.unlockedBy = ub || {}; myTag(); if (!$('#ending').classList.contains('hidden')) showEndExtras(); });
 
 // ─────────────────────────── 클리어 기념 사진 · 클리어 도장표
 const THEME_ICON = { christmas: '🎄', mia: '🔰', gwimun: '👻', ophelia: '⚓', doll: '🎎', hospital: '🏥', camp: '🏕️', west: '🤠', kimono: '🏮', clown: '🎪', park: '🎡', zombie: '🧟' };
@@ -2376,6 +2380,31 @@ function openFeedback() {
   openModal('📮 고객소리함', '버그를 발견했거나 바라는 점이 있다면 알려 주세요. 하나하나 읽고 고칩니다!', w);
   if (!document.body.classList.contains('mobile')) setTimeout(() => ta.focus(), 60);
 }
+// ─────────────────────────── 🗳️ 테마 투표 전광판: 한 사람에 한 번 · 첫 투표에 '아름다운 롤 양갈래' 헤어
+function openVote() {
+  const w = el('div', 'vote'), list = el('div', 'vote-list'), note = el('div', 'muted vote-note');
+  S.votePaint = ({ mine = '', tally = {} } = {}) => {
+    list.innerHTML = '';
+    const total = Object.values(tally).reduce((a, b) => a + b, 0) || 1;
+    for (const s of (S.scenarios || []).filter((x) => !x.hidden)) {
+      const n = tally[s.id] || 0, b = el('button', 'btn vote-row' + (mine === s.id ? ' primary' : ''));
+      const bar = el('i', 'vote-bar'); bar.style.width = (n / total) * 100 + '%';
+      b.append(bar, el('span', 'vote-name', (mine === s.id ? '✅ ' : '') + s.title), el('span', 'vote-n', n + '표'));
+      b.disabled = !!mine;
+      b.onclick = () => { list.querySelectorAll('button').forEach((x) => { x.disabled = true; }); audio.play('click'); socket.emit('vote:theme', s.id); };
+      list.appendChild(b);
+    }
+    note.textContent = mine ? '투표해 주셔서 고마워요! 💇 받은 헤어는 외형 꾸미기 › 헤어에서 고를 수 있어요.' : '한 사람에 한 번만 투표할 수 있어요. 투표하면 💇 「아름다운 롤 양갈래」 헤어를 드려요!';
+  };
+  w.append(list, note); S.votePaint(); socket.emit('vote:get');
+  openModal('🗳️ 어느 테마가 가장 좋았나요?', '투표하면 아이템을 드려요!', w);
+}
+socket.on('vote:tally', (r = {}) => {
+  S.votePaint?.(r);
+  if (!r.reward) return;
+  audio.play('pickup'); for (let i = 0; i < 4; i++) setTimeout(() => audio.play('twinkle'), 200 + i * 140);
+  toast('💇 「아름다운 롤 양갈래」 헤어를 받았어요! 외형 꾸미기 › 헤어에서 골라 보세요.'); if (myAvatar) burstHearts(myAvatar, 8);
+});
 // ─────────────────────────── 🌠 소원의 별: 별점 + 소원 → 10초 별똥별 → 소원 전달 + 커피 후원
 const WISH_WORD = ['', '아쉬워요', '그저 그래요', '괜찮아요', '좋아요!', '최고예요! 🥰'];
 function openWish() {
@@ -2408,7 +2437,7 @@ function openWishDone() {
   const w = el('div', 'wish wish-done');
   w.append(el('div', 'wish-done-icon', '🌠'), el('div', 'wish-done-msg', '별똥별이 소원을 하늘로 데려갔어요.\n꼭 이루어지길 바랄게요 ✨'));
   const coffee = el('button', 'btn primary wish-coffee', '💗 감사한 마음 전하기');
-  coffee.onclick = () => $('#coffeeBtn').onclick(); // 오른쪽 💗 버튼과 똑같이 (폰: 카카오페이 바로 열기 · PC: QR 창)
+  coffee.onclick = () => (isMobileView() ? openKakaoPay() : $('#coffeeBtn').onclick()); // 폰: 후원 링크 바로 · PC: QR 창
   const close = el('button', 'btn wish-close', '닫기'); close.onclick = closeModal;
   w.append(coffee, close);
   openModal('소원이 전달 되었어요', '', w);
@@ -2644,6 +2673,7 @@ async function lobbyAct(id) {
   if (id === 'shop') { setTimeout(openShop, 160); return; }
   if (id === 'mailbox') { setTimeout(openFeedback, 160); return; }
   if (id === 'wishstar') { setTimeout(openWish, 160); return; }
+  if (id === 'vote') { setTimeout(openVote, 160); return; }
   if (id === 'xmasgift') { if (!xmasGiftLeft()) return; if (S.xmasBusy) return; S.xmasBusy = true; audio.play('click'); socket.emit('xmas:claim'); setTimeout(() => { S.xmasBusy = false; }, 3000); return; }
   if (S.perch && id === 'off') { S.perch = null; me.y = 0; [me.x, me.z] = collide(me.x + Math.sin(me.ry) * 1.2, me.z + Math.cos(me.ry) * 1.2); return; }
   const it = S.world?.interactives?.find((i) => i.id === id); if (!it) return;
@@ -2987,7 +3017,7 @@ $('#settingsBtn').onclick = () => {
   const cr = el('div', 'credits');
   cr.innerHTML = `<div class="cr-row"><span>만든이</span><b>nexsixflux</b></div>
     <a class="cr-link" href="https://social.wanted.co.kr//community/profile/ZhZ6VwFkcMvwbQBAER6qEf?utm_source=wanted&utm_medium=share" target="_blank" rel="noopener">🔗 만든이 프로필 보러 가기 <span>›</span></a>
-    <div class="cr-coffee"><b>💗 감사한 마음 전하기</b><small>카카오페이 앱으로 QR을 찍어 주세요</small><img src="/kakaopay.png" alt="카카오페이 후원 QR" loading="lazy" /><a class="cr-pay" href="https://qr.kakaopay.com/281006011187850590005070" target="_blank" rel="noopener">💗 감사한 마음 전하기</a></div>`;
+    <div class="cr-coffee"><b>💗 감사한 마음 전하기</b><small>휴대폰 카메라나 카카오톡으로 QR을 찍어 주세요</small><img src="/kakaopay.png" alt="카카오톡 후원 QR" loading="lazy" /><a class="cr-pay" href="https://qr.kakaopay.com/281006011187850590005070" target="_blank" rel="noopener">💗 감사한 마음 전하기</a></div>`;
   wrap.appendChild(cr);
   openModal('⚙ 설정', '변경 사항은 자동으로 저장됩니다.', wrap);
 };
@@ -2996,9 +3026,12 @@ $('#settingsBtn').onclick = () => {
 const KAKAOPAY_URL = 'https://qr.kakaopay.com/281006011187850590005070';
 const openKakaoPay = () => { const w = window.open(KAKAOPAY_URL, '_blank', 'noopener'); if (!w) location.href = KAKAOPAY_URL; };
 $('#coffeeBtn').onclick = () => {
-  if (isMobileView()) return openKakaoPay();
   const w = el('div', 'coffee-pop');
-  w.innerHTML = `<img src="/kakaopay.png" alt="카카오페이 후원 QR" /><p class="coffee-msg">보내주신 마음은 게임을 만드는 큰 힘이 됩니다</p><small>카카오페이 앱으로 QR을 찍어 주세요</small>`;
+  if (isMobileView()) { // 폰: 큰 버튼 하나 + 모달 기본 '닫기'
+    w.innerHTML = `<p class="coffee-msg">보내주신 마음은 게임을 만드는 큰 힘이 됩니다</p>`;
+    const go = el('button', 'btn primary coffee-go', '💗감사한 마음 전하기'); go.onclick = () => { closeModal(); openKakaoPay(); };
+    w.appendChild(go);
+  } else w.innerHTML = `<img src="/kakaopay.png" alt="카카오톡 후원 QR" /><p class="coffee-msg">보내주신 마음은 게임을 만드는 큰 힘이 됩니다</p><small>휴대폰 카메라나 카카오톡으로 QR을 찍어 주세요</small>`;
   openModal('💗 감사한 마음 전하기', '', w);
 };
 
@@ -3173,13 +3206,13 @@ async function loadShareInfo() {
 
 // ─────────────────────────── 레벨 · 코인 · 상점 · 내 물건 · 선물
 const GOLD_ORDER = ['gold_hat', 'gold_mask', 'gold_gloves', 'gold_top', 'gold_bottom', 'gold_shoes', 'gold_tail']; // 황금 고양이 세트 (비매품 · 주간랭킹 1~3위 보상)
-const SHOP_ORDER = ['rename_ticket', 'popper', 'rocket', 'wings_fairy', 'mount_pony', 'wings_angel', 'mount_broom', 'mount_cat', 'mount_dog', 'mount_wolf', 'mount_unicorn', 'wings_devil', 'mount_trex', 'wings_dragon', 'sword', 'mount_ufo', 'mount_lion', 'mount_turtle', 'mount_human', 'costume_robot', 'mount_carriage', 'chainsaw', 'mask_paper', 'mask_rabbit', 'mask_fox', 'mask_bear', 'mask_hahoe', 'mask_wolf', 'mask_venice', 'mask_ghost', 'mask_oni', 'mount_sleigh', 'costume_xmas', ...GOLD_ORDER, 'gold_staff'];
+const SHOP_ORDER = ['rename_ticket', 'popper', 'rocket', 'wings_fairy', 'mount_pony', 'wings_angel', 'mount_broom', 'mount_cat', 'mount_dog', 'mount_wolf', 'mount_unicorn', 'wings_bat', 'tail_devil', 'horn_devil', 'wings_devil', 'mount_trex', 'wings_dragon', 'sword', 'mount_ufo', 'mount_lion', 'mount_turtle', 'mount_human', 'costume_robot', 'mount_carriage', 'chainsaw', 'mask_paper', 'mask_rabbit', 'mask_menhera', 'mask_fox', 'mask_bear', 'mask_hahoe', 'mask_wolf', 'mask_venice', 'mask_ghost', 'mask_oni', 'mount_sleigh', 'costume_xmas', ...GOLD_ORDER, 'gold_staff'];
 const coinsText = () => (S.profile?.coins === -1 ? '∞' : String(S.profile?.coins ?? 0));
 // 손에 든 것: 0 없음 · 1 전설의 검 · 2 황금 고양이 지팡이
 function holdCode() { const it = S.profile?.items; return S.holdSaw && it?.chainsaw ? 3 : S.holdStaff && it?.gold_staff ? 2 : S.holdSword && it?.sword ? 1 : 0; }
 /** 착용 중인 황금 고양이 부위 글자 (가진 것만) */
 const goldWorn = () => { const on = S.profile?.equip?.gold || '', it = S.profile?.items || {}; let out = ''; for (const id of GOLD_ORDER) { const c = S.shop[id]?.part; if (c && it[id] && on.includes(c)) out += c; } return out; };
-const myGear = () => { const e = S.profile?.equip || {}; return `${e.wings || ''}|${e.mount || ''}|${S.riding && e.mount ? 1 : 0}|${holdCode()}|${e.costume || ''}|${goldWorn()}|${S.snack || ''}|${e.mask || ''}`; };
+const myGear = () => { const e = S.profile?.equip || {}; return `${e.wings || ''}|${e.mount || ''}|${S.riding && e.mount ? 1 : 0}|${holdCode()}|${e.costume || ''}|${goldWorn()}|${S.snack || ''}|${e.mask || ''}|${e.tail || ''}|${e.horn || ''}`; };
 // 맨 아래 얇은 경험치 바 + 왼쪽 위 레벨·코인
 const xpBar = el('div'); xpBar.id = 'xpBar'; xpBar.innerHTML = '<div id="xpFill"></div><div id="xpLabel"></div>'; $('#hud').appendChild(xpBar);
 const lvChip = el('div'); lvChip.id = 'lvChip'; $('#onlineChip').after(lvChip);
@@ -3362,8 +3395,8 @@ function previewItem(id) {
   const pv = shopPreview(); const it = S.shop[id] || {};
   if (!pv.av) { pv.av = createAvatar(look); pv.sc.add(pv.av); }
   pv.walk = it.kind === 'mount' || it.kind === 'costume';
-  pv.gear = it.kind === 'wings' ? `${id}||0|0|` : it.kind === 'mount' ? `|${id}|1|0|` : it.kind === 'sword' ? '|||1|' : it.kind === 'staff' ? '|||2||hmgtbsl' : it.kind === 'saw' ? '|||3|' : it.kind === 'gold' ? `||0|0||${it.part}` : it.kind === 'costume' ? `||0|0|${id}` : it.kind === 'mask' ? `||0|0||||${id}` : '';
-  const big = ['mount_cat', 'mount_dog', 'mount_carriage', 'mount_trex', 'mount_wolf', 'mount_lion', 'mount_human'].includes(id), huge = id === 'mount_sleigh'; pv.cam.position.set(0, it.kind === 'mount' ? (huge ? 4.2 : big ? 2.2 : 1.6) : it.kind === 'mask' ? 1.15 : 1.3, it.kind === 'mount' ? (huge ? 11.5 : big ? 6.2 : 4.8) : it.kind === 'mask' ? 2.6 : 4.2); pv.cam.lookAt(0, it.kind === 'mount' ? (big ? 1.2 : 0.9) : it.kind === 'mask' ? 1.0 : 0.75, 0);
+  pv.gear = it.kind === 'wings' ? `${id}||0|0|` : it.kind === 'mount' ? `|${id}|1|0|` : it.kind === 'sword' ? '|||1|' : it.kind === 'staff' ? '|||2||hmgtbsl' : it.kind === 'saw' ? '|||3|' : it.kind === 'gold' ? `||0|0||${it.part}` : it.kind === 'costume' ? `||0|0|${id}` : it.kind === 'mask' ? `||0|0||||${id}` : it.kind === 'tail' ? `||0|0|||||${id}` : it.kind === 'horn' ? `||0|0||||||${id}` : '';
+  const big = ['mount_cat', 'mount_dog', 'mount_carriage', 'mount_trex', 'mount_wolf', 'mount_lion', 'mount_human'].includes(id), huge = id === 'mount_sleigh'; pv.cam.position.set(0, it.kind === 'mount' ? (huge ? 4.2 : big ? 2.2 : 1.6) : (it.kind === 'mask' || it.kind === 'horn') ? 1.15 : 1.3, it.kind === 'mount' ? (huge ? 11.5 : big ? 6.2 : 4.8) : (it.kind === 'mask' || it.kind === 'horn') ? 2.6 : 4.2); pv.cam.lookAt(0, it.kind === 'mount' ? (big ? 1.2 : 0.9) : (it.kind === 'mask' || it.kind === 'horn') ? 1.0 : 0.75, 0);
 }
 function openShop() {
   if (!S.profile) return;
@@ -3438,7 +3471,7 @@ function openBag() {
       row.appendChild(el('span', 'bi', it.icon));
       row.appendChild(el('span', 'bn', `${it.name}${it.max > 1 ? ` ×${n}` : ''}${it.kind === 'sword' ? ` (남은 ${pf.swordUses}/30)` : ''}${it.kind === 'staff' || it.kind === 'saw' ? ' (무제한)' : ''}`));
       const acts = el('span', 'ba');
-      if (it.kind === 'wings' || it.kind === 'mount' || it.kind === 'costume' || it.kind === 'mask') {
+      if (it.kind === 'wings' || it.kind === 'mount' || it.kind === 'costume' || it.kind === 'mask' || it.kind === 'tail' || it.kind === 'horn') {
         const on = pf.equip?.[it.kind] === id;
         const b = el('button', 'btn tiny' + (on ? ' primary' : ''), on ? '착용 중 ✓' : '착용'); b.onclick = () => { socket.emit('shop:equip', { id, on: !on }); if (it.kind === 'mount') { S.riding = !on; if (!on) { if (S.mount) dismount(); S.perch = null; me.y = 0; toast(`${it.icon} ${it.name}에 탔어요! 이동 속도 ${id === 'mount_turtle' ? 2 : 1.5}배 (Z: 내리기/타기)`); } updateGearButtons(); } };
         acts.appendChild(b);

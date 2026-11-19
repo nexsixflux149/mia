@@ -1565,6 +1565,29 @@ function buildLobbyExtras(root, colliders, add) {
     interactives.push({ id: 'mailbox', kind: 'mailbox', x: cx, z: cz, r: 1.9, label: '고객소리함', verb: '의견 보내기' });
     clickables.push({ id: 'mailbox', group: g });
   }
+  // 🗳️ 테마 투표 전광판: 고객소리함 맞은편 · 누르면 투표 창 (첫 투표에 헤어 선물)
+  {
+    const cx = -3.9, cz = 3.5; const g = new THREE.Group(); g.position.set(cx, 0, cz); g.rotation.y = Math.atan2(0 - cx, 7 - cz); root.add(g);
+    const dark = pm('#16121a', { roughness: 0.5, metalness: 0.4 }), gold = pm('#ffd36a', { roughness: 0.3, metalness: 0.6, emissive: '#a06a10', emissiveIntensity: 0.35 });
+    for (const s of [-1, 1]) mesh(new THREE.BoxGeometry(0.07, 1.2, 0.07), dark, s * 0.62, 0.6, 0, g); // 기둥
+    mesh(new THREE.BoxGeometry(1.42, 0.98, 0.08), dark, 0, 1.62, 0, g); // 틀
+    mesh(new THREE.BoxGeometry(1.46, 0.04, 0.1), gold, 0, 2.12, 0, g); mesh(new THREE.BoxGeometry(1.46, 0.04, 0.1), gold, 0, 1.12, 0, g);
+    const vc = document.createElement('canvas'); vc.width = 512; vc.height = 340; const vx = vc.getContext('2d');
+    vx.fillStyle = '#0b0a14'; vx.fillRect(0, 0, 512, 340);
+    vx.fillStyle = 'rgba(255,210,58,.08)'; for (let y = 4; y < 340; y += 8) for (let x = 4; x < 512; x += 8) vx.fillRect(x, y, 3, 3); // LED 점
+    vx.textAlign = 'center'; vx.fillStyle = '#ffd23a'; vx.font = '800 58px "Black Han Sans", "Malgun Gothic", sans-serif'; vx.fillText('테마 투표', 256, 74);
+    vx.fillStyle = '#fff3e0'; vx.font = '700 30px "Gowun Dodum", "Malgun Gothic", sans-serif'; vx.fillText('어느 테마가 가장 좋았나요?', 256, 122);
+    vx.fillStyle = '#ff8fc8'; vx.font = '800 28px "Gowun Dodum", "Malgun Gothic", sans-serif'; vx.fillText('💇 투표하면 헤어 선물!', 256, 316);
+    const vt = new THREE.CanvasTexture(vc); vt.colorSpace = THREE.SRGBColorSpace; vt.anisotropy = 4;
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.86), new THREE.MeshBasicMaterial({ map: vt, toneMapped: false })); screen.position.set(0, 1.62, 0.045); g.add(screen);
+    const bars = ['#ff6b6b', '#ffa94d', '#ffd43b', '#63e6be', '#74c0fc', '#b197fc'].map((c, i) => { const b = mesh(new THREE.BoxGeometry(0.11, 0.3, 0.02), new THREE.MeshBasicMaterial({ color: c, toneMapped: false }), -0.4 + i * 0.16, 1.4, 0.06, g); b.geometry.translate(0, 0.15, 0); b.position.y = 1.35; return b; });
+    const sign = textSprite('🗳️ 테마 투표 · 헤어 선물', { size: 30, bg: 'rgba(40,20,90,.9)', color: '#fff3e0', border: '#ffd36a' }); sign.position.set(cx, 2.65, cz); root.add(sign);
+    g.traverse((m) => { if (m.isMesh) m.userData.noOcc = true; });
+    anim.push((t) => { bars.forEach((b, i) => { b.scale.y = 0.35 + 0.65 * Math.abs(Math.sin(t * 1.3 + i * 0.9)); }); sign.position.y = 2.65 + Math.sin(t * 1.4 + 1) * 0.05; });
+    colliders.push({ x: cx, z: cz, hw: 0.72, hd: 0.2 });
+    interactives.push({ id: 'vote', kind: 'vote', x: cx, z: cz, r: 2.0, label: '테마 투표 전광판', verb: '투표하기' });
+    clickables.push({ id: 'vote', group: g });
+  }
   return { interactives, rides, clickables, update: (t) => anim.forEach((f) => f(t)), shopFace: (x, z) => shopFace(x, z) };
 }
 

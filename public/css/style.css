@@ -45,6 +45,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); c
 .sw.on { border-color: #fff; transform: scale(1.12); }
 .chip { padding: 5px 10px; border-radius: 99px; background: #1d181d; border: 1px solid var(--line); cursor: pointer; font-size: 13px; }
 .chip.on { background: var(--cute); color: #2a1520; border-color: var(--cute); }
+.chip.locked { opacity: .55; }
 .warn { font-size: 12px; color: #d88; margin: 0; line-height: 1.5; }
 
 /* ─── HUD */
@@ -230,6 +231,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); c
 .coffee-pop img { width: 240px; max-width: 80%; border-radius: 10px; background: #fff; }
 .coffee-pop .coffee-msg { margin: 10px 0 0; font-size: 17px; font-weight: 700; color: #ffd36a; }
 .coffee-pop small { color: var(--muted); font-size: 12px; }
+.coffee-go { width: 100%; margin-top: 14px; padding: 18px 14px; font-size: 20px; font-weight: 800; border-radius: 14px; }
 .cr-pay { display: block; width: 100%; box-sizing: border-box; margin-top: 10px; padding: 12px 14px; border-radius: 10px; background: #ffe066; color: #1a1208; font-weight: 800; font-size: 15px; text-align: center; text-decoration: none; }
 .cr-pay:active { transform: scale(.98); }
 body.mobile .cr-coffee img, body.mobile .cr-coffee small, body.mobile .cr-coffee > b { display: none; }
@@ -941,3 +943,11 @@ body.mobile #login.tiny .logo, body.mobile #login.tiny .pv-wrap, body.mobile #lo
   .limit-card { animation: none; }
 }
 body.mobile #login .logo { padding: 0; margin: 0; }
+/* 🗳️ 테마 투표 전광판 */
+.vote-list { display: flex; flex-direction: column; gap: 8px; max-height: 52vh; overflow-y: auto; }
+.vote-row { position: relative; overflow: hidden; display: flex; justify-content: space-between; align-items: center; gap: 10px; text-align: left; padding: 12px 14px; }
+.vote-row:disabled { opacity: 1; cursor: default; }
+.vote-bar { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(255, 210, 58, .22); pointer-events: none; }
+.vote-name, .vote-n { position: relative; }
+.vote-n { font-weight: 800; color: #ffd23a; white-space: nowrap; }
+.vote-note { margin-top: 10px; font-size: 13px; }

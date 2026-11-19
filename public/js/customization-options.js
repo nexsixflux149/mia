@@ -8,6 +8,7 @@ export const MORE_OPTIONS = {
     ['c_curl', '여성 · C컬 단발'], ['s_wave', '여성 · S컬 웨이브'], ['longstraight', '여성 · 긴 생머리'],
     ['layered', '여성 · 레이어드컷'], ['hippieperm', '여성 · 히피펌'], ['highpony', '여성 · 하이 포니테일'],
     ['lowpony', '여성 · 로우 포니테일'], ['doublebun', '여성 · 양갈래 번'], ['braids', '여성 · 양갈래 땋은 머리'],
+    ['rolltwin', '여성 · 아름다운 롤 양갈래 🗳️'],
   ],
   cheeks: [
     ['peach', '복숭아 볼'], ['stars', '별빛 볼'], ['sparkles', '반짝이 볼'], ['cherries', '체리 볼'],

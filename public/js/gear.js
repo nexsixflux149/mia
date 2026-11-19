@@ -53,6 +53,13 @@ export function buildWings(id) {
         f.scale.set(len, 0.045, 0.012); f.rotation.z = a - 0.9 + row * 0.15;
       }
       const halo = glowSprite('#fff6d8', 0.9, 0.35); halo.position.set(0.25, 0.15, -0.05); inner.add(halo);
+    } else if (kind === 'bat') { // 악마 날개: 반질반질한 까만 젤리 같은 작은 박쥐 날개 — 위는 둥글게 솟아 끝이 뾰족, 아래는 물결 톱니
+      const sh = new THREE.Shape();
+      sh.moveTo(0, 0.04); sh.quadraticCurveTo(0.08, 0.14, 0.2, 0.15); sh.quadraticCurveTo(0.44, 0.16, 0.6, -0.01);
+      sh.quadraticCurveTo(0.43, 0.03, 0.32, -0.12); sh.quadraticCurveTo(0.25, -0.03, 0.17, -0.07); sh.quadraticCurveTo(0.12, -0.02, 0.07, -0.08); sh.lineTo(0.01, -0.02); sh.closePath();
+      const geo = new THREE.ExtrudeGeometry(sh, { depth: 0.02, bevelEnabled: true, bevelThickness: 0.018, bevelSize: 0.014, bevelSegments: 4, curveSegments: 14 }); geo.translate(0, 0, -0.01);
+      const black = new THREE.MeshPhysicalMaterial({ color: '#0b0a0f', roughness: 0.12, metalness: 0.4, clearcoat: 1, clearcoatRoughness: 0.04, emissive: '#1e1030', emissiveIntensity: 0.5 });
+      mesh(geo, black, 0, 0.1, 0, inner).castShadow = true; // 머리카락·치마에 덜 가리게 조금 위로
     } else {
       const dragon = kind === 'dragon';
       const memb = glowM(dragon ? '#7a3cff' : '#ff3a1a', dragon ? 0.55 : 0.75, { transparent: true, opacity: 0.85, side: THREE.DoubleSide });
@@ -68,7 +75,7 @@ export function buildWings(id) {
   }
   g.userData.kind = kind;
   g.userData.anim = (t) => {
-    const speed = kind === 'fairy' ? 9 : kind === 'angel' ? 2.6 : kind === 'devil' ? 4 : 2.2;
+    const speed = kind === 'fairy' ? 9 : kind === 'angel' ? 2.6 : kind === 'devil' ? 4 : kind === 'bat' ? 3 : 2.2;
     const amp = kind === 'fairy' ? 0.35 : 0.22;
     for (const p of sides) p.rotation.y = p.userData.s * (0.35 + Math.sin(t * speed) * amp);
     g.position.y = Math.sin(t * 2) * 0.012;
@@ -816,6 +823,41 @@ function goldParts(u, set) {
   }
   return { parts, set, hidden, anim: (t, moving) => { for (const f of anims) f(t, moving); } };
 }
+/** 악마 꼬리: 엉덩이에서 뒤로 휘어 올라가는 가는 검붉은 꼬리 + 끝에 스페이드 모양 화살촉. 살랑살랑 흔들린다 */
+function buildDevilTail() {
+  const piv = new THREE.Group(); piv.position.set(0, 0.2, -0.15);
+  const red = M('#8a0c18', { roughness: 0.4, emissive: '#3a0006', emissiveIntensity: 0.45 });
+  const curve = new THREE.CatmullRomCurve3([[0, 0, 0], [0, -0.05, -0.16], [0.02, 0.0, -0.32], [0.05, 0.2, -0.4], [0.08, 0.36, -0.33]].map((p) => new THREE.Vector3(...p)));
+  mesh(new THREE.TubeGeometry(curve, 28, 0.022, 8, false), red, 0, 0, 0, piv);
+  const sp = new THREE.Shape(); // 스페이드: 끝이 +y 로 뾰족
+  sp.moveTo(0, 0.13); sp.quadraticCurveTo(0.03, 0.06, 0.075, 0.02); sp.quadraticCurveTo(0.05, -0.03, 0.012, -0.012); sp.lineTo(0, -0.03);
+  sp.lineTo(-0.012, -0.012); sp.quadraticCurveTo(-0.05, -0.03, -0.075, 0.02); sp.quadraticCurveTo(-0.03, 0.06, 0, 0.13);
+  const geo = new THREE.ExtrudeGeometry(sp, { depth: 0.018, bevelEnabled: true, bevelThickness: 0.006, bevelSize: 0.006, bevelSegments: 2 }); geo.translate(0, 0, -0.009);
+  const tip = mesh(geo, red, 0, 0, 0, piv); tip.position.copy(curve.getPoint(1));
+  tip.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), curve.getTangent(1));
+  piv.userData.anim = (t) => { piv.rotation.y = Math.sin(t * 2.6) * 0.42; piv.rotation.x = Math.sin(t * 1.5) * 0.08; };
+  return piv;
+}
+/** 악마 뿔: 머리 양쪽에서 바깥으로 휘었다가 안쪽으로 굽어 올라가는, 불이 들어온 듯 빛나는 뿔 (밑동 노랑 → 끝 빨강) */
+function buildDevilHorns() {
+  const g = new THREE.Group(), seg = 24, rad = 12;
+  const cols = [new THREE.Color('#ffd84a'), new THREE.Color('#ff6a0c'), new THREE.Color('#d80a06')];
+  const mat = new THREE.MeshBasicMaterial({ vertexColors: true });
+  for (const s of [-1, 1]) {
+    const curve = new THREE.CatmullRomCurve3([[0, 0, 0], [s * 0.11, 0.08, 0], [s * 0.16, 0.2, 0], [s * 0.13, 0.33, 0], [s * 0.05, 0.42, 0]].map((p) => new THREE.Vector3(...p)));
+    const geo = new THREE.TubeGeometry(curve, seg, 1, rad, false), pos = geo.attributes.position, col = [], c = new THREE.Vector3(), v = new THREE.Vector3(), k = new THREE.Color();
+    for (let i = 0; i <= seg; i++) { // 굵기를 끝으로 갈수록 가늘게 · 색은 노랑 → 주황 → 빨강
+      const t = i / seg, r = 0.062 * (1 - t) ** 0.8 + 0.003; curve.getPointAt(t, c);
+      if (t < 0.4) k.lerpColors(cols[0], cols[1], t / 0.4); else k.lerpColors(cols[1], cols[2], Math.min(1, (t - 0.4) / 0.4));
+      for (let j = 0; j <= rad; j++) { const n = i * (rad + 1) + j; v.fromBufferAttribute(pos, n).sub(c).multiplyScalar(r).add(c); pos.setXYZ(n, v.x, v.y, v.z); col.push(k.r, k.g, k.b); }
+    }
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); geo.computeVertexNormals();
+    const h = new THREE.Mesh(geo, mat); h.position.copy(sph(0.43, s * 0.62, 0.62)); h.rotation.z = -s * 0.15; g.add(h);
+    const glow = glowSprite('#ff7a20', 0.3, 0.45); glow.position.set(s * 0.1, 0.12, 0); h.add(glow);
+  }
+  g.userData.anim = (t) => { const f = 0.85 + Math.sin(t * 3.1) * 0.08 + Math.sin(t * 7.3) * 0.04; g.children.forEach((h) => { h.children[0].material.opacity = 0.45 * f; }); };
+  return g;
+}
 function setGold(g, set) {
   const u = g.userData;
   if (u.gGold) { u.gGold.parts.forEach((m) => m.parent?.remove(m)); u.gGold.hidden.forEach((o) => { o.visible = true; }); u.gGold = null; }
@@ -1003,6 +1045,24 @@ function maskPaper() { // Lv5 · 종이접시 가면: 작고 소박하다 — �
     for (const s of [-1, 1]) { const [bx, by] = eyeAt(P, s); cutOut(x, () => { x.beginPath(); x.arc(bx, by, 24, 0, Math.PI * 2); }); x.strokeStyle = '#2a2a2a'; x.lineWidth = 3; x.beginPath(); x.arc(bx, by, 25, 0, Math.PI * 2); x.stroke(); }
   }, { roughness: 0.95 }));
   const band = mesh(new THREE.TorusGeometry(0.43, 0.007, 6, 48), M('#d8b070', { roughness: 0.6 }), 0, 0.02, 0, g); band.rotation.x = Math.PI / 2; band.scale.set(1.08, 1, 1);
+  return g;
+}
+function maskMenhera() { // Lv10 · 멘헤라 안대: 오른쪽 눈(보는 사람 기준)을 덮는 하얀 의료용 안대 · 숨구멍 · 비스듬한 흰 끈
+  const g = new THREE.Group();
+  g.add(maskPlate('menhera', 0.46, 2.3, 1.05, 1.05, 512, 240, (x, P) => {
+    const strap = (a, b) => { x.strokeStyle = '#c9c9cf'; x.lineWidth = 9; x.beginPath(); x.moveTo(...a); x.lineTo(...b); x.stroke(); x.strokeStyle = '#f7f7fa'; x.lineWidth = 6; x.stroke(); };
+    strap(P(0.2, 1.62), P(-1.15, 1.92)); strap(P(0.72, 1.4), P(1.15, 1.34)); // 눈 아래로 비스듬히 · 귀 쪽으로
+    // 사각 안대: 눈과 눈썹까지 덮도록 눈보다 위쪽에 중심을 둔다
+    const [cx, cy] = P(EYE_D + 0.01, EYE_TH - 0.08), [ex] = P(EYE_D + 0.3, EYE_TH), [, ey] = P(0, EYE_TH + 0.17), hw = ex - cx, hh = ey - cy;
+    x.save(); x.translate(cx, cy); x.rotate(-0.06);
+    x.beginPath(); x.roundRect(-hw, -hh, hw * 2, hh * 2, 22);
+    const bg = x.createRadialGradient(-hw * 0.3, -hh * 0.3, 4, 0, 0, hw * 1.2); bg.addColorStop(0, '#ffffff'); bg.addColorStop(0.7, '#eeeef2'); bg.addColorStop(1, '#c8c8d0'); x.fillStyle = bg; x.fill();
+    x.strokeStyle = '#a9a9b4'; x.lineWidth = 3; x.stroke();
+    const iw = hw * 0.62, ih = hh * 0.62; // 가운데 숨구멍 판
+    x.beginPath(); x.roundRect(-iw, -ih, iw * 2, ih * 2, 12); x.fillStyle = '#d4d4dc'; x.fill(); x.strokeStyle = '#b4b4be'; x.lineWidth = 2; x.stroke();
+    x.fillStyle = '#8a8a96'; for (let i = -7; i <= 7; i++) for (let j = -5; j <= 5; j++) { const px = i * 9 + (j & 1) * 4.5, py = j * 9; if (Math.abs(px) < iw - 6 && Math.abs(py) < ih - 6) x.fillRect(px - 1.6, py - 1.6, 3.2, 3.2); }
+    x.restore();
+  }, { roughness: 0.7, emissiveIntensity: 0.22 }));
   return g;
 }
 function maskFox() { // Lv15 · 여우 가면: 하얀 바탕 붉은 무늬 · 뾰족 귀 · 튀어나온 주둥이 · 붉은 술
@@ -1218,7 +1278,7 @@ function maskGhost() { // 귀신 가면: 핏기 없는 창백한 얼굴 · 퀭�
   };
   return g;
 }
-const MASKS = { mask_paper: maskPaper, mask_fox: maskFox, mask_hahoe: maskHahoe, mask_venice: maskVenice, mask_oni: maskOni, mask_rabbit: maskRabbit, mask_bear: maskBear, mask_wolf: maskWolf, mask_ghost: maskGhost };
+const MASKS = { mask_paper: maskPaper, mask_fox: maskFox, mask_hahoe: maskHahoe, mask_venice: maskVenice, mask_oni: maskOni, mask_rabbit: maskRabbit, mask_menhera: maskMenhera, mask_bear: maskBear, mask_wolf: maskWolf, mask_ghost: maskGhost };
 /** 상점 가면 하나 (머리 기준 좌표 · 상점 미리보기에서도 쓴다) */
 export function buildMask(id) { const f = MASKS[id]; if (!f) return null; const g = f(); g.userData.gold = true; g.traverse((o) => { if (o.isMesh) o.castShadow = true; }); return g; }
 function setMask(g, id) {
@@ -1310,10 +1370,14 @@ export function buildSnack(code) {
 export function applyGear(g, gear = '') {
   const u = g.userData; if (!u.rig) return;
   if (u.gearStr === gear) return; u.gearStr = gear;
-  const [w = '', m = '', riding = '0', sword = '0', costume = '', gold = '', snack = '', mask = ''] = gear.split('|');
+  const [w = '', m = '', riding = '0', sword = '0', costume = '', gold = '', snack = '', mask = '', tail = '', horn = ''] = gear.split('|');
   const sn = /^([pchs][123]|b[0-9])$/.test(snack) ? snack : '';
   if ((u.gSnackCode || '') !== sn) { u.gSnack?.parent?.remove(u.gSnack); u.gSnack = null; u.gSnackCode = sn; const arm = u.arms?.[1]; if (sn && arm) { const it = buildSnack(sn); if (!it.userData.balloon) it.scale.setScalar(1.35); it.position.set(0.02 * Math.sign(arm.position.x || 1), -0.36, 0.09); u.gSnack = it; arm.add(it); } }
   if (u.gWingsId !== w) { if (u.gWings) u.rig.remove(u.gWings); u.gWings = w ? buildWings(w) : null; if (u.gWings) u.rig.add(u.gWings); u.gWingsId = w; }
+  const tl = tail === 'tail_devil' && !costume ? tail : ''; // 코스튬을 입으면 꼬리는 감춘다
+  if ((u.gTailId || '') !== tl) { if (u.gTail) u.rig.remove(u.gTail); u.gTail = tl ? buildDevilTail() : null; if (u.gTail) u.rig.add(u.gTail); u.gTailId = tl; }
+  const hn = horn === 'horn_devil' && !costume ? horn : '';
+  if ((u.gHornId || '') !== hn) { u.gHorn?.parent?.remove(u.gHorn); u.gHorn = hn && u.head ? buildDevilHorns() : null; if (u.gHorn) u.head.add(u.gHorn); u.gHornId = hn; }
   const mid = riding === '1' ? m : '';
   if (u.gMountId !== mid) { if (u.gMount) g.remove(u.gMount); u.gMount = mid ? buildMount(mid) : null; if (u.gMount) g.add(u.gMount); u.gMountId = mid; }
   const sw = sword === '1' || sword === '2' || sword === '3' ? sword : '';
@@ -1338,6 +1402,8 @@ export function animateGear(g, t, dt, moving) {
   if (u.baseHeld) u.baseHeld.visible = !u.gSword && !u.gCostumeId && u.expr !== 'snow';
   try { animateSnack(u, t, dt, moving); } catch {}
   u.gWings?.userData.anim(t);
+  u.gTail?.userData.anim(t);
+  u.gHorn?.userData.anim(t);
   u.gCostume?.anim(t);
   u.gGold?.anim(t, moving);
   u.gMask?.userData.anim?.(t);

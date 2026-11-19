@@ -145,7 +145,7 @@ const sendProfile = (p) => { if (p) io.to(p.id).emit('profile', { ...profileView
 function goldConflictsWithCostume({ gold, costume }) {
   return Boolean(gold && costume && (costume !== 'costume_xmas' || gold !== 'm'));
 }
-const gearOf = (p) => { const pf = prof(p.name), e = pf.equip; return `${e.wings || ''}|${e.mount || ''}|${p.riding && e.mount ? 1 : 0}|${Number(p.sword) || 0}|${e.costume || ''}|${goldWorn(pf)}|${p.snack || ''}|${e.mask || ''}`; };
+const gearOf = (p) => { const pf = prof(p.name), e = pf.equip; return `${e.wings || ''}|${e.mount || ''}|${p.riding && e.mount ? 1 : 0}|${Number(p.sword) || 0}|${e.costume || ''}|${goldWorn(pf)}|${p.snack || ''}|${e.mask || ''}|${e.tail || ''}|${e.horn || ''}`; };
 /** 모든 테마를 한 번씩 깼거나 만렙이면 히든 테마가 열린다 */
 function hiddenOk(name) {
   const p = findByName(name); if (p?.admin) return true;
@@ -187,7 +187,9 @@ let seq = 1;
 const TICK_MS = 100;
 const r2 = (v) => Math.round(v * 100) / 100;
 const dynOf = (p) => [r2(p.x), r2(p.z), r2(p.y || 0), r2(p.ry), (p.anim ? 1 : 0) | (p.crouch ? 2 : 0) | (p.light ? 4 : 0)];
-const extOf = (p) => ({ n: p.name, lv: p.lv, pt: p.partyId || '', g: gearOf(p), em: p.em || '', eid: p.eid || 0, rd: p.room === 'lobby' ? p.ride || '' : '', et: p.eat || 0 });
+const extOf = (p) => ({ n: p.name, lv: p.lv, pt: p.partyId || '', g: gearOf(p), em: p.em || '', eid: p.eid || 0, rd: p.room === 'lobby' ? p.ride || '' : '', et: p.eat || 0, st: stampsOf(p.name) });
+// 깬 테마 수(도장) — 이름표 위 칭호용. 테마 12개뿐이라 매번 세도 가볍다
+const stampsOf = (name) => name ? Object.values(SCENARIOS).filter((s) => saves[s.saveKey(name) + ':clear']).length : 0;
 const roomMeta = new Map(); // room -> { gk: 마지막으로 보낸 귀신 상태, ghosts, full: 다음 번에 전체를 보낼지, fullAt }
 const metaOf = (room) => { let m = roomMeta.get(room); if (!m) { m = { gk: 'null', ghosts: null, full: true, fullAt: 0 }; roomMeta.set(room, m); } return m; };
 const needFull = (room) => { if (room) metaOf(room).full = true; };
@@ -375,7 +377,7 @@ io.on('connection', (sock) => {
       if (viaAccount) old.token = randomBytes(16).toString('hex'); // 예전 창이 다시 붙어 자리를 되가져가지 못하게
       old.sid = sock.id; setMe(old); old._sr = null;
       // 외형은 정말 바뀌었을 때만 새로 알린다 (다시 붙을 때마다 모두가 사진 얼굴을 다시 내려받지 않게)
-      if (look) { const nl = sanitizeLook(look); if (JSON.stringify(nl) !== JSON.stringify(me.look)) { me.look = nl; me.lv++; } }
+      if (look) { const nl = sanitizeLook(look, name); if (JSON.stringify(nl) !== JSON.stringify(me.look)) { me.look = nl; me.lv++; } }
       sock.join(me.id); if (me.room) { sock.join(me.room); needFull(me.room); }
       ack(helloInfo(me, { resumed: true, room: me.room }));
       sock.emit('inv', me.inv); sendProfile(me);
@@ -401,7 +403,7 @@ io.on('connection', (sock) => {
       }
     }
     const pid = 'p' + randomBytes(6).toString('hex');
-    const np = { id: pid, sid: sock.id, token: randomBytes(16).toString('hex'), name, admin: asAdmin, acct: account?.id || null, lv: 1, look: sanitizeLook(look), x: 0, z: 5, ry: Math.PI, anim: 0, light: false, room: null, partyId: null, inv: [...START_ITEMS], mic: false };
+    const np = { id: pid, sid: sock.id, token: randomBytes(16).toString('hex'), name, admin: asAdmin, acct: account?.id || null, lv: 1, look: sanitizeLook(look, name), x: 0, z: 5, ry: Math.PI, anim: 0, light: false, room: null, partyId: null, inv: [...START_ITEMS], mic: false };
     players.set(pid, np); setMe(np);
     sock.join(pid);
     if (asAdmin) adminKit(prof(name)); // 운영자는 황금 고양이 세트와 지팡이를 처음부터 가지고 있다
@@ -488,7 +490,7 @@ io.on('connection', (sock) => {
   });
 
   // 외형은 바뀔 때만 전송 (사진 얼굴은 용량이 크므로 매 틱 보내지 않는다)
-  sock.on('look', (look) => { if (!me) return; const nl = sanitizeLook(look); if (JSON.stringify(nl) !== JSON.stringify(me.look)) { me.look = nl; me.lv++; } });
+  sock.on('look', (look) => { if (!me) return; const nl = sanitizeLook(look, me.name); if (JSON.stringify(nl) !== JSON.stringify(me.look)) { me.look = nl; me.lv++; } });
   // 놀래키기: 3.5m 안의 같은 방 사람들에게
   sock.on('boo', () => {
     if (!me) return;
@@ -725,6 +727,7 @@ io.on('connection', (sock) => {
       pf.equip.gold = on ? GOLD_IDS.filter((g) => pf.items[g]).map((g) => SHOP[g].part).join('') : '';
       if (pf.equip.gold) dropCostume(pf);
       if (pf.equip.gold.includes('m')) pf.equip.mask = ''; // 황금 고양이 가면을 쓰면 상점 가면은 벗는다
+      if (pf.equip.gold.includes('l')) pf.equip.tail = ''; // 꼬리도 하나만
       saveProfiles(); sendProfile(me); return;
     }
     const it = SHOP[id]; if (!it || !(isWear(id) || isGold(id))) return;
@@ -734,8 +737,10 @@ io.on('connection', (sock) => {
       pf.equip.gold = GOLD_IDS.map((g) => SHOP[g].part).filter((c) => cur.has(c)).join('');
       if (on) dropCostume(pf);
       if (on && it.part === 'm') pf.equip.mask = ''; // 가면은 하나만
+      if (on && it.part === 'l') pf.equip.tail = ''; // 꼬리도 하나만
       saveProfiles(); sendProfile(me); return;
     }
+    if (it.kind === 'tail' && on) pf.equip.gold = (pf.equip.gold || '').replace('l', ''); // 악마 꼬리를 달면 황금 고양이 꼬리는 뗀다
     if (it.kind === 'mask' && on && (pf.equip.gold || '').includes('m')) pf.equip.gold = pf.equip.gold.replace('m', ''); // 상점 가면을 쓰면 황금 고양이 가면은 벗는다
     if (it.kind === 'costume' && on && goldConflictsWithCostume({ ...pf.equip, costume: id })) { pf.equip.gold = ''; sock.emit('toast', { text: `🏆 황금 고양이 세트를 벗었어요. (${it.icon} ${it.name}와(과)는 함께 입을 수 없어요)` }); } // 반대로 로봇 코스튬을 입으면 고양이 세트를 벗는다
     pf.equip[it.kind] = on ? id : (pf.equip[it.kind] === id ? '' : pf.equip[it.kind]);
@@ -750,6 +755,14 @@ io.on('connection', (sock) => {
     pf.items.costume_xmas = 1; pf.equip.costume = 'costume_xmas'; pf.equip.gold = pf.equip.gold.includes('m') ? 'm' : '';
     saveProfiles(); sendProfile(me);
     sock.emit('xmas:done', { already: false });
+  });
+  // 🗳️ 로비 투표 전광판: 가장 좋았던 테마에 한 번 투표 · 첫 투표에 '아름다운 롤 양갈래' 헤어를 준다
+  sock.on('vote:get', () => sock.emit('vote:tally', { mine: me ? prof(me.name).vote || '' : '', tally: voteTally() }));
+  sock.on('vote:theme', (id) => {
+    if (!me || typeof id !== 'string' || !Object.hasOwn(SCENARIOS, id) || SCENARIOS[id].hidden) return;
+    const pf = prof(me.name), first = !pf.vote;
+    if (first) { pf.vote = id; pf.items.hair_roll = 1; saveProfiles(); sendProfile(me); }
+    sock.emit('vote:tally', { mine: pf.vote, tally: voteTally(), reward: first });
   });
   sock.on('cash:take', () => { // 💵 테마 속 돈다발 (3% 확률로 한 챕터에만 나타난다)
     if (!me || !inst()?.takeCash?.(me)) return;
@@ -1237,7 +1250,7 @@ function carryItems(ch) {
 const LOOK_ENUM = {
   ears: ['bear', 'bunny', 'cat', 'fox', 'devil', 'none'],
   hat: ['none', 'beanie', 'ribbon', 'sprout', 'cap', 'halo', 'crown', 'flower', 'tophat', 'beret', 'headphones', 'catband', 'tiara', 'strawhat', 'frog', 'mushroom'],
-  eyes: ['dot', 'big', 'sparkle', 'smile', 'sleepy', 'wink', 'star', 'heart', 'teary', 'angry', 'dizzy', 'closed', 'cat'],
+  eyes: ['dot', 'big', 'sparkle', 'smile', 'sleepy', 'wink', 'star', 'heart', 'teary', 'angry', 'dizzy', 'closed', 'cat', 'zoro'],
   brows: ['none', 'soft', 'worried', 'angry', 'thick'],
   mouth: ['smile', 'open', 'cat', 'tongue', 'o', 'flat', 'fang', 'pout', 'grin'],
   cheeks: ['blush', 'none', 'freckles', 'hearts', 'bandaid', 'swirl'],
@@ -1249,13 +1262,15 @@ const LOOK_ENUM = {
     'clown', 'ringmaster', 'magician', 'knight', 'princess', 'gothic', 'wizard', 'idol', 'hiphop', 'explorer', 'bee', 'panda'],
 };
 for (const [key, choices] of Object.entries(MORE_OPTIONS)) LOOK_ENUM[key] = [...(LOOK_ENUM[key] || []), ...choices.map(([id]) => id)];
-function sanitizeLook(l = {}) {
+function voteTally() { const t = {}; for (const pf of Object.values(profiles)) if (pf.vote) t[pf.vote] = (t[pf.vote] || 0) + 1; return t; }
+function sanitizeLook(l = {}, name) {
   const hex = (v, d) => (/^#[0-9a-f]{6}$/i.test(v) ? v : d);
   const out = {
     body: hex(l.body, '#ffd6a5'), accent: hex(l.accent, '#ff8fab'), hairColor: hex(l.hairColor, '#5a3825'), eyeColor: hex(l.eyeColor, '#5a3825'),
   };
   const defs = { ears: 'bear', hat: 'none', eyes: 'big', brows: 'soft', mouth: 'smile', cheeks: 'blush', extra: 'none', acc: 'none', pin: 'none', held: 'none', hair: 'short', outfit: 'sailor' };
   for (const [k, list] of Object.entries(LOOK_ENUM)) out[k] = list.includes(l[k]) ? l[k] : defs[k];
+  if (out.hair === 'rolltwin' && !(name && profiles[name]?.items?.hair_roll)) out.hair = defs.hair; // 투표 보상 헤어는 받은 사람만
   // 사진 얼굴: 작은 JPEG data URL 만 허용 (최대 약 60KB)
   out.photo = typeof l.photo === 'string' && l.photo.startsWith('data:image/jpeg;base64,') && l.photo.length < 80000 ? l.photo : '';
   out.photoOn = !!l.photoOn && !!out.photo;
@@ -1278,7 +1293,7 @@ setInterval(() => {
     const full = meta.full || now - meta.fullAt > 10000; // 가끔은 전체를 보내 혹시 어긋난 화면을 바로잡는다
     const out = [];
     for (const p of list) {
-      const d = dynOf(p), dk = d.join(), e = extOf(p), ek = `${e.n}|${e.lv}|${e.pt}|${e.g}|${e.em}|${e.eid}|${e.rd}|${e.et}`;
+      const d = dynOf(p), dk = d.join(), e = extOf(p), ek = `${e.n}|${e.lv}|${e.pt}|${e.g}|${e.em}|${e.eid}|${e.rd}|${e.et}|${e.st}`;
       if (full || p._sr !== room || ek !== p._ek) out.push([p.id, ...d, e]);
       else if (dk !== p._dk) out.push([p.id, ...d]);
       p._dk = dk; p._ek = ek; p._sr = room;

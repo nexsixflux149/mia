@@ -8,7 +8,7 @@ import { addHairPin, addHeldItem, addBodyAccessory, addGarmentDetails, drawMoreF
 export const OPTIONS = {
   ears: [['bear', '곰'], ['bunny', '토끼'], ['cat', '고양이'], ['fox', '여우'], ['devil', '뿔'], ['none', '없음']],
   hat: [['none', '없음'], ['beanie', '비니'], ['ribbon', '리본'], ['sprout', '새싹'], ['cap', '야구모자'], ['halo', '천사링'], ['crown', '왕관'], ['flower', '꽃핀'], ['tophat', '실크햇'], ['beret', '베레모'], ['headphones', '헤드폰'], ['catband', '고양이 머리띠'], ['tiara', '티아라'], ['strawhat', '밀짚모자'], ['frog', '개구리 모자'], ['mushroom', '버섯 모자']],
-  eyes: [['dot', '동글'], ['big', '왕눈'], ['sparkle', '반짝'], ['smile', '웃음'], ['sleepy', '졸림'], ['wink', '윙크'], ['star', '별'], ['heart', '하트'], ['teary', '글썽'], ['angry', '화남'], ['dizzy', '어질'], ['closed', '감음'], ['cat', '고양이눈']],
+  eyes: [['dot', '동글'], ['big', '왕눈'], ['sparkle', '반짝'], ['smile', '웃음'], ['sleepy', '졸림'], ['wink', '윙크'], ['star', '별'], ['heart', '하트'], ['teary', '글썽'], ['angry', '화남'], ['dizzy', '어질'], ['closed', '감음'], ['cat', '고양이눈'], ['zoro', '조로 눈']],
   brows: [['none', '없음'], ['soft', '순둥'], ['worried', '걱정'], ['angry', '버럭'], ['thick', '짙은']],
   mouth: [['smile', '미소'], ['open', '활짝'], ['cat', 'ω'], ['tongue', '메롱'], ['o', '오!'], ['flat', '무표정'], ['fang', '덧니'], ['pout', '뾰로통'], ['grin', '씨익']],
   cheeks: [['blush', '발그레'], ['none', '없음'], ['freckles', '주근깨'], ['hearts', '하트'], ['bandaid', '반창고'], ['swirl', '빙글']],
@@ -65,7 +65,20 @@ function drawEye(x, cx, side, look) {
     case 'closed': x.strokeStyle = D; x.lineWidth = 9; x.beginPath(); x.arc(cx, EY - 6, 24, Math.PI * 0.15, Math.PI * 0.85); x.stroke(); break;
     case 'blink': x.strokeStyle = D; x.lineWidth = 8; x.beginPath(); x.moveTo(cx - 26, EY + 2); x.quadraticCurveTo(cx, EY + 12, cx + 26, EY + 2); x.stroke(); x.lineWidth = 4; x.beginPath(); x.moveTo(cx + side * 24, EY + 3); x.lineTo(cx + side * 33, EY - 3); x.stroke(); break;
     case 'sleepy': x.strokeStyle = D; x.lineWidth = 9; x.beginPath(); x.moveTo(cx - 26, EY + 4); x.quadraticCurveTo(cx, EY + 16, cx + 26, EY + 4); x.stroke(); x.lineWidth = 4; x.beginPath(); x.moveTo(cx - 24, EY - 6); x.lineTo(cx + 24, EY - 6); x.stroke(); break;
-    case 'wink': if (side < 0) { ell(x, cx, EY, 20, 25, D); ell(x, cx - 6, EY - 8, 7, 7, '#fff'); } else { x.strokeStyle = D; x.lineWidth = 9; x.beginPath(); x.moveTo(cx - 22, EY - 16); x.lineTo(cx + 18, EY); x.lineTo(cx - 22, EY + 16); x.stroke(); } break;
+    case 'wink': if (side > 0) { ell(x, cx, EY, 20, 25, D); ell(x, cx - 6, EY - 8, 7, 7, '#fff'); } else { x.strokeStyle = D; x.lineWidth = 9; x.beginPath(); x.moveTo(cx - 22, EY - 16); x.lineTo(cx + 18, EY); x.lineTo(cx - 22, EY + 16); x.stroke(); } break;
+    case 'zoro': { // 한쪽은 매서운 눈, 다른 쪽은 감긴 눈 위로 세로 흉터
+      const inn = -side;
+      if (side < 0) {
+        x.beginPath(); x.moveTo(cx - inn * 28, EY - 8); x.lineTo(cx + inn * 24, EY + 4); x.quadraticCurveTo(cx, EY + 22, cx - inn * 28, EY - 8); x.closePath();
+        x.save(); x.fillStyle = '#fff'; x.fill(); x.clip(); ell(x, cx + inn * 3, EY + 5, 11, 13, ec); ell(x, cx + inn * 3, EY + 5, 5, 7, D); ell(x, cx, EY, 3, 3, '#fff'); x.restore();
+        x.strokeStyle = D; x.lineWidth = 8; x.beginPath(); x.moveTo(cx - inn * 30, EY - 10); x.lineTo(cx + inn * 26, EY + 4); x.stroke();
+        x.lineWidth = 3; x.beginPath(); x.moveTo(cx + inn * 22, EY + 6); x.quadraticCurveTo(cx, EY + 21, cx - inn * 24, EY - 4); x.stroke();
+      } else {
+        x.strokeStyle = D; x.lineWidth = 8; x.beginPath(); x.moveTo(cx - 26, EY + 2); x.quadraticCurveTo(cx, EY + 8, cx + 26, EY + 2); x.stroke();
+        x.strokeStyle = '#8c3a3a'; x.lineWidth = 6; x.beginPath(); x.moveTo(cx + 6, EY - 52); x.lineTo(cx - 3, EY + 50); x.stroke();
+      }
+      break;
+    }
     case 'star': star(x, cx, EY, 32, ec === D ? '#f1c40f' : ec); star(x, cx - 6, EY - 6, 9, '#fff'); break;
     case 'heart': heart(x, cx, EY, 26, ec === D ? '#ff4d6d' : ec); ell(x, cx - 10, EY - 10, 6, 5, '#fff'); break;
     case 'angry': ell(x, cx, EY + 4, 20, 22, D); ell(x, cx - 5, EY - 2, 6, 6, '#fff'); x.strokeStyle = D; x.lineWidth = 9; x.beginPath(); x.moveTo(cx - 30 * side, EY - 30); x.lineTo(cx + 26 * side, EY - 14); x.stroke(); break;
@@ -89,12 +102,12 @@ function drawMouth(x, m) {
   const y = MY;
   switch (m) {
     case 'open': x.beginPath(); x.moveTo(CX - 22, y - 6); x.quadraticCurveTo(CX, y + 40, CX + 22, y - 6); x.closePath(); x.fill(); ell(x, CX, y + 14, 11, 7, '#ff7b8f'); break;
-    case 'cat': x.beginPath(); x.arc(CX - 11, y, 11, 0, Math.PI); x.arc(CX + 11, y, 11, 0, Math.PI); x.stroke(); break;
+    case 'cat': x.beginPath(); x.arc(CX - 11, y, 11, 0, Math.PI); x.moveTo(CX + 22, y); x.arc(CX + 11, y, 11, 0, Math.PI); x.stroke(); break; // ω (두 호 사이에 선이 이어지지 않게 moveTo)
     case 'tongue': x.beginPath(); x.arc(CX, y - 8, 20, Math.PI * 0.15, Math.PI * 0.85); x.stroke(); ell(x, CX + 6, y + 14, 10, 13, '#ff7b8f'); break;
     case 'o': x.beginPath(); x.ellipse(CX, y + 4, 10, 13, 0, 0, Math.PI * 2); x.fill(); break;
     case 'flat': x.beginPath(); x.moveTo(CX - 16, y); x.lineTo(CX + 16, y); x.stroke(); break;
     case 'fang': x.beginPath(); x.arc(CX, y - 10, 22, Math.PI * 0.15, Math.PI * 0.85); x.stroke(); x.fillStyle = '#fff'; x.beginPath(); x.moveTo(CX + 6, y + 9); x.lineTo(CX + 16, y + 8); x.lineTo(CX + 11, y + 22); x.fill(); break;
-    case 'pout': x.beginPath(); x.arc(CX, y - 4, 7, Math.PI * 1.5, Math.PI * 0.5); x.arc(CX, y + 10, 7, Math.PI * 1.5, Math.PI * 0.5); x.stroke(); break;
+    case 'pout': x.lineWidth = 6; x.beginPath(); x.arc(CX - 8, y - 2, 8, 0, Math.PI); x.moveTo(CX + 16, y - 2); x.arc(CX + 8, y - 2, 8, 0, Math.PI); x.stroke(); break; // 작은 고양이 입 ω
     case 'grin': x.beginPath(); x.moveTo(CX - 34, y - 8); x.quadraticCurveTo(CX, y + 34, CX + 34, y - 8); x.closePath(); x.fill(); x.fillStyle = '#fff'; x.fillRect(CX - 26, y - 6, 52, 9); break;
     default: x.beginPath(); x.arc(CX, y - 10, 18, Math.PI * 0.2, Math.PI * 0.8); x.stroke();
   }
@@ -791,7 +804,7 @@ export function animateAvatar(g, dt, moving, t, crouch = false, emote = null, et
 }
 
 // 캔버스 텍스트 스프라이트
-export function textSprite(text, { color = '#fff', bg = 'rgba(0,0,0,0.6)', size = 32, maxW = 440, stroke = null, border = null, tail = false } = {}) {
+export function textSprite(text, { color = '#fff', bg = 'rgba(0,0,0,0.6)', size = 32, maxW = 440, stroke = null, border = null, tail = false, sub = '' } = {}) {
   // 2.5배 해상도로 그려서 또렷하게 (글자를 같은 색으로 덧칠해 두껍게 하던 방식은 한글이 뭉개져서 뺐다)
   const R = 2.5;
   const c = document.createElement('canvas');
@@ -801,9 +814,13 @@ export function textSprite(text, { color = '#fff', bg = 'rgba(0,0,0,0.6)', size 
   const font = light ? `600 ${size}px "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif` : `700 ${size}px "Gowun Dodum", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif`;
   x.font = font;
   const lines = wrap(x, text, maxW);
-  const w = Math.min(maxW, Math.max(...lines.map((l) => x.measureText(l).width))) + 34;
+  // sub: 이름 위에 작게 붙는 칭호 한 줄 (예: 방린이)
+  const lw = Math.max(...lines.map((l) => x.measureText(l).width));
+  const ss = Math.round(size * 0.6), sf = font.replace(`${size}px`, `${ss}px`), sh = sub ? ss + 4 : 0;
+  x.font = sf; const subW = sub ? x.measureText(sub).width : 0;
+  const w = Math.min(maxW, Math.max(lw, subW)) + 34;
   const th = tail ? 14 : 0;
-  const h = lines.length * (size + 10) + 20 + th;
+  const h = lines.length * (size + 10) + 20 + th + sh;
   c.width = Math.ceil(w * R); c.height = Math.ceil(h * R);
   x.scale(R, R);
   const cw = c.width / R, ch = c.height / R;
@@ -812,8 +829,9 @@ export function textSprite(text, { color = '#fff', bg = 'rgba(0,0,0,0.6)', size 
   if (border) { x.strokeStyle = border; x.lineWidth = 3; roundRect(x, 2, 2, cw - 4, ch - 4 - th, 16); x.stroke(); }
   if (tail) { x.fillStyle = bg; x.beginPath(); x.moveTo(cw / 2 - 12, ch - th - 4); x.lineTo(cw / 2, ch - 2); x.lineTo(cw / 2 + 12, ch - th - 4); x.fill(); }
   x.textAlign = 'center'; x.textBaseline = 'top'; x.lineJoin = 'round';
+  if (sub) { x.font = sf; x.strokeStyle = 'rgba(0,0,0,.7)'; x.lineWidth = 2.4; x.strokeText(sub, cw / 2, 10); x.fillStyle = 'rgba(220,220,230,.82)'; x.fillText(sub, cw / 2, 10); x.font = font; }
   lines.forEach((l, i) => {
-    const ty = 12 + i * (size + 10);
+    const ty = 12 + sh + i * (size + 10);
     // 어두운 테두리 + 살짝 그림자만 (글자 속은 깨끗하게)
     if (stroke || !light) { x.strokeStyle = stroke || 'rgba(0,0,0,.7)'; x.lineWidth = stroke ? 4 : 2.4; x.strokeText(l, cw / 2, ty); }
     x.fillStyle = color; x.fillText(l, cw / 2, ty);
