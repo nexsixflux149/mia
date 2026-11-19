@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { upgradeAvatar } from './visual-upgrade.js';
 import { MORE_OPTIONS, MORE_OUTFITS } from './customization-options.js';
+import { addExpandedHair } from './hair-styles.js';
 import { addHairPin, addHeldItem, addBodyAccessory, addGarmentDetails, drawMoreFace } from './customization-details.js';
 
 // ───────────────────────── 커스터마이징 옵션
@@ -539,6 +540,7 @@ function seg(r, phiS, phiL, thS, thL) { return new THREE.SphereGeometry(r, 51, 2
 const FRONT = Math.PI / 2;
 function addHair(inner, head, l, m) {
   if (l.hair === 'none') return;
+  if (addExpandedHair(inner, l, m)) return;
   const add = (geo, x = 0, y = 0, z = 0) => { const h = new THREE.Mesh(geo, m); h.position.set(x, y, z); inner.add(h); return h; };
   const back = (th) => add(seg(0.44, FRONT + 0.85, Math.PI * 2 - 1.7, 0, th));
   add(seg(0.442, 0, Math.PI * 2, 0, Math.PI * 0.3));

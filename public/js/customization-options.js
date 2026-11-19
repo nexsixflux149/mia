@@ -1,4 +1,14 @@
 export const MORE_OPTIONS = {
+  hair: [
+    ['buzzcut', '남성 · 버즈컷'], ['crewcut', '남성 · 크루컷'], ['twoblock', '남성 · 투블럭'],
+    ['dandy', '남성 · 댄디컷'], ['comma', '남성 · 쉼표머리'], ['sidepart', '남성 · 6:4 가르마'],
+    ['curtain', '남성 · 센터 가르마'], ['regent', '남성 · 리젠트'], ['slickback', '남성 · 올백'],
+    ['shadowperm', '남성 · 쉐도우펌'], ['wolfcut', '남성 · 울프컷'], ['manbun', '남성 · 묶음머리'],
+    ['pixie', '여성 · 픽시컷'], ['hushcut', '여성 · 허쉬컷'], ['lob', '여성 · 롱보브'],
+    ['c_curl', '여성 · C컬 단발'], ['s_wave', '여성 · S컬 웨이브'], ['longstraight', '여성 · 긴 생머리'],
+    ['layered', '여성 · 레이어드컷'], ['hippieperm', '여성 · 히피펌'], ['highpony', '여성 · 하이 포니테일'],
+    ['lowpony', '여성 · 로우 포니테일'], ['doublebun', '여성 · 양갈래 번'], ['braids', '여성 · 양갈래 땋은 머리'],
+  ],
   cheeks: [
     ['peach', '복숭아 볼'], ['stars', '별빛 볼'], ['sparkles', '반짝이 볼'], ['cherries', '체리 볼'],
     ['snowflakes', '눈꽃 볼'], ['catpaws', '고양이 발자국'], ['teardrop', '물방울 보석'], ['confetti', '색종이 볼'],

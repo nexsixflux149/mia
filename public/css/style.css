@@ -176,9 +176,25 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); c
 .ctab { background: none; border: 1px solid transparent; color: var(--muted); padding: 6px 12px; border-radius: 8px; cursor: pointer; font-family: var(--ui); font-size: 14px; }
 .ctab.active { color: #2a1520; background: var(--cute); }
 .cpanels { min-height: 230px; display: flex; flex-direction: column; gap: 10px; }
-.cpanel { display: flex; flex-direction: column; gap: 10px; }
+.cpanel { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.cpanel > .opt {
+  display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 12px;
+  padding: 12px; border: 1px solid rgba(211, 169, 184, .19); border-radius: 12px;
+  background: linear-gradient(110deg, rgba(83, 52, 66, .23), rgba(23, 18, 25, .6));
+}
+.cpanel > .opt > span {
+  width: auto; padding-top: 6px; font-size: 13px; font-weight: 700; line-height: 1.5; color: #d9bcc8;
+}
+.cpanel > .opt > .chips, .cpanel > .opt > .swatches {
+  min-width: 0; gap: 8px; align-content: flex-start;
+}
+.cpanel > .opt > .swatches { padding: 3px 0; }
 .opt { align-items: flex-start; }
 .opt > span { padding-top: 5px; }
+@media (max-width: 600px) {
+  .cpanel > .opt { grid-template-columns: 48px minmax(0, 1fr); gap: 8px; padding: 10px 8px; }
+  .cpanel > .opt > span { font-size: 12px; }
+}
 .photo-row { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
 #photoCrop { border-radius: 50%; background: #1a1418; border: 2px dashed var(--line); }
 .photo-ctl { display: flex; flex-direction: column; gap: 8px; min-width: 200px; }
@@ -322,7 +338,7 @@ body.cine-on #hud, body.cine-on #toasts, body.cine-on #vignette, body.cine-on #t
 #splash { position: fixed; inset: 0; z-index: 9000; background: #000; display: flex; align-items: center; justify-content: center; flex-direction: column; cursor: pointer; transition: opacity 1.4s ease; }
 #splash.out { opacity: 0; pointer-events: none; }
 #splash .sp-text { text-align: center; font-family: var(--story); color: #e8e0e4; padding: 0 16px; }
-#splash .sp-sub { font-size: clamp(20px, 3.4vw, 38px); letter-spacing: .32em; opacity: 0; filter: blur(8px); animation: spIn 2.6s ease .5s forwards; }
+#splash .sp-sub { margin-bottom: clamp(26px, 4vw, 56px); line-height: 1.65; font-size: clamp(20px, 3.4vw, 38px); letter-spacing: .32em; opacity: 0; filter: blur(8px); animation: spIn 2.6s ease .5s forwards; }
 #splash .sp-main { font-size: clamp(64px, 12vw, 140px); font-weight: 800; letter-spacing: .3em; padding-left: .3em; color: #f2e8ea; text-shadow: 0 0 30px rgba(200,40,50,.55), 0 0 4px rgba(255,255,255,.4); opacity: 0; filter: blur(14px); animation: spIn 3s ease 2.8s forwards, spFlick 6s ease 6s infinite; }
 #splash .sp-skip { position: absolute; bottom: 36px; font-size: 13px; color: #6a6068; letter-spacing: .1em; opacity: 0; animation: spIn 1s ease 4s forwards; }
 @keyframes spIn { to { opacity: 1; filter: blur(0); } }
