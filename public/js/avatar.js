@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { upgradeAvatar } from './visual-upgrade.js';
+import { MORE_OPTIONS, MORE_OUTFITS } from './customization-options.js';
+import { addHairPin, addHeldItem, addBodyAccessory, addGarmentDetails, drawMoreFace } from './customization-details.js';
 
 // ───────────────────────── 커스터마이징 옵션
 export const OPTIONS = {
@@ -17,12 +19,13 @@ export const OPTIONS = {
     ['mummy', '미라'], ['astronaut', '우주복'], ['ninja', '닌자'], ['santa', '산타'], ['raincoat', '노란 우비'], ['tracksuit', '학교 체육복'], ['dino', '공룡 잠옷'], ['cowboy', '카우보이'], ['kimono', '기모노'],
     ['clown', '삐에로'], ['ringmaster', '서커스 단장'], ['magician', '마술사'], ['knight', '기사 갑옷'], ['princess', '공주 드레스'], ['gothic', '고딕 드레스'], ['wizard', '마법사 로브'], ['idol', '아이돌 무대의상'], ['hiphop', '힙합'], ['explorer', '탐험가'], ['bee', '꿀벌 잠옷'], ['panda', '판다 잠옷']],
 };
+for (const [key, choices] of Object.entries(MORE_OPTIONS)) OPTIONS[key] = [...(OPTIONS[key] || []), ...choices];
 export const SKIN = ['#ffd6a5', '#fff1e6', '#ffe0cc', '#f1c27d', '#d4a373', '#a3714f', '#ffc8dd', '#cde7b0', '#bde0fe', '#e2c2ff', '#f6e58d', '#c9c9c9'];
 export const ACCENT = ['#ff8fab', '#ff6b6b', '#ffa94d', '#ffd43b', '#74c0fc', '#63e6be', '#b197fc', '#495057', '#ffffff', '#1c1c24'];
 export const HAIRC = ['#2b1d16', '#5a3825', '#a0652e', '#e8c170', '#f2e6d0', '#c0392b', '#ff8fab', '#7b5cff', '#3fa9f5', '#2fbf71', '#111111', '#9a9a9a'];
 export const EYEC = ['#2a1e22', '#5a3825', '#3b7dd8', '#2fbf71', '#9b59b6', '#e74c3c', '#f1c40f', '#ff8fab'];
 
-export const DEFAULT_LOOK = { body: '#ffd6a5', accent: '#ff8fab', ears: 'bear', hat: 'none', eyes: 'big', eyeColor: '#5a3825', brows: 'soft', mouth: 'smile', cheeks: 'blush', extra: 'none', acc: 'none', hair: 'short', hairColor: '#5a3825', outfit: 'sailor', photo: '', photoOn: false };
+export const DEFAULT_LOOK = { body: '#ffd6a5', accent: '#ff8fab', ears: 'bear', hat: 'none', eyes: 'big', eyeColor: '#5a3825', brows: 'soft', mouth: 'smile', cheeks: 'blush', extra: 'none', acc: 'none', pin: 'none', held: 'none', hair: 'short', hairColor: '#5a3825', outfit: 'sailor', photo: '', photoOn: false };
 
 const mat = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.7, metalness: 0, ...o });
 
@@ -110,6 +113,7 @@ function drawCheeks(x, c) {
   }
 }
 function drawExtra(x, e) {
+  drawMoreFace(x, e, 'extra');
   x.lineCap = 'round';
   if (e === 'glasses' || e === 'sunglasses') {
     for (const s of [-1, 1]) { const cx = CX + s * EX; if (e === 'sunglasses') ell(x, cx, EY, 42, 34, 'rgba(15,15,25,.92)'); x.strokeStyle = e === 'sunglasses' ? '#111' : '#3a2a20'; x.lineWidth = 7; x.beginPath(); x.ellipse(cx, EY, 42, 36, 0, 0, Math.PI * 2); x.stroke(); }
@@ -146,6 +150,7 @@ export function drawFace(canvas, look, img) {
   // 치비 비율: 이목구비를 크게
   x.save(); x.translate(256, 252); x.scale(1.55, 1.55); x.translate(-256, -250);
   drawCheeks(x, look.cheeks);
+  drawMoreFace(x, look.cheeks, 'cheeks');
   for (const s of [-1, 1]) { drawEye(x, CX + s * EX, s, look); drawBrow(x, CX + s * EX, s, look.brows); }
   // 작은 콩알 코 (빨간 코 · 마스크를 쓰면 생략)
   if (look.extra !== 'clown' && look.extra !== 'mask') { ell(x, CX, MY - 34, 7, 5, 'rgba(200,110,110,.55)'); ell(x, CX - 2, MY - 36, 2.5, 2, 'rgba(255,255,255,.6)'); }
@@ -205,6 +210,9 @@ export function createAvatar(look, { legColor, sleeveColor } = {}) {
   // 허리 아래: 다리와 몸통 사이 엉덩이 (반바지처럼 옷 아랫단 색)
   const hips = new THREE.Mesh(new THREE.SphereGeometry(0.25, 51, 32, 0, Math.PI * 2, Math.PI * 0.35, Math.PI * 0.65), mat(legColor ?? O.legs)); hips.scale.set(0.72, 0.45, 0.72); hips.position.y = SD.hip + 0.02; rig.add(hips);
   addOutfit(upper, look, O);
+  addGarmentDetails(upper, look);
+  addBodyAccessory(upper, look);
+  const baseHeld = addHeldItem(arms[0], look);
   const accFx = addAccessory(upper, arms, look);
 
   // 머리
@@ -243,13 +251,14 @@ export function createAvatar(look, { legColor, sleeveColor } = {}) {
   if (look.hat !== 'none') addHat(head, look, accent, white);
   else addOutfitHeadwear(head, look);
   tagNew(hc, 'hatPart');
+  addHairPin(head, look);
 
   // 발밑 그림자
   const blob = new THREE.Mesh(new THREE.CircleGeometry(0.42, 40), new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: 0.35, depthWrite: false }));
   blob.rotation.x = -Math.PI / 2; blob.position.y = 0.015; g.add(blob);
 
   g.traverse((o) => { if (o.isMesh && o !== blob && o !== faceMesh) o.castShadow = true; });
-  g.userData = { rig, legs, arms, head, torso, phase: Math.random() * 6, blob, crouch: 0, expr: null, accFx, blinkT: 1 + Math.random() * 3, setBlink,
+  g.userData = { rig, legs, arms, head, torso, baseHeld, phase: Math.random() * 6, blob, crouch: 0, expr: null, accFx, blinkT: 1 + Math.random() * 3, setBlink,
     setExpr: (e) => { curExpr = e && EXPR[e] ? e : null; blinking = false; redraw(); } };
   try { upgradeAvatar(g, look); } catch (e) { console.warn('[그래픽 강화] 캐릭터 디테일을 건너뜁니다', e); } // 그래픽 강화: 솔기 · 단추 · 소매 단 같은 디테일 (설정에서 끌 수 있다 · 실패해도 캐릭터는 그대로)
   return g;
@@ -299,6 +308,8 @@ function outfitColors(l) {
     bee: { top: '#f2c81a', legs: '#f2c81a', shoes: '#1a1a1a', sleeve: '#1a1a1a' },
     panda: { top: '#f8f8f6', legs: '#1a1a1e', shoes: '#1a1a1e', sleeve: '#1a1a1e' },
   };
+  const extra = MORE_OUTFITS[l.outfit];
+  if (extra) return { top: extra[0], legs: extra[1], shoes: extra[2], sleeve: extra[3] };
   return map[l.outfit] || map.plain;
 }
 
@@ -769,6 +780,7 @@ export function animateAvatar(g, dt, moving, t, crouch = false, emote = null, et
     }
   }
   rig.position.y = y; rig.rotation.set(rx, ry, rz);
+  if (u.baseHeld?.visible && !emote && !u.gSword) A[0].rotation.set(-1.08 + (moving ? s * .07 : 0), 0, -.18);
   // 손전등: 웅크리면 몸이 앞으로 숙여져 빛이 몸 안에 갇히므로, 몸보다 앞·아래로 옮긴다
   if (g.userData.spot) { g.userData.spot.position.set(0, 0.72 - u.crouch * 0.15, 0.42 + u.crouch * 0.2); g.userData.beam?.position.copy(g.userData.spot.position); }
   // 감정표현 중에는 표정도 바뀐다

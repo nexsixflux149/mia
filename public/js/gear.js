@@ -1335,6 +1335,7 @@ export function applyGear(g, gear = '') {
 /** animateAvatar 다음에 부른다: 날개·탈것 움직임 + 탄 자세 + 검 휘두르기 + 간식 들기·먹기 */
 export function animateGear(g, t, dt, moving) {
   const u = g.userData;
+  if (u.baseHeld) u.baseHeld.visible = !u.gSword && !u.gCostumeId && u.expr !== 'snow';
   try { animateSnack(u, t, dt, moving); } catch {}
   u.gWings?.userData.anim(t);
   u.gCostume?.anim(t);

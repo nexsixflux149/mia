@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url';
 import { Server } from 'socket.io';
 import { randomBytes } from 'crypto';
 import { GameInstance } from './game.js';
+import { MORE_OPTIONS } from '../public/js/customization-options.js';
 import { SCENARIOS, scenarioList } from './scenarios.js';
 import { hasBadWord } from './filter.js';
 import { isAdminPassword, looksLikeAdmin, ADMIN_NAME } from './admin.js';
@@ -983,7 +984,7 @@ io.on('connection', (sock) => {
     if (!me) return;
     let chapter = typeof opt === 'object' && opt ? opt.chapter : opt;
     const sc = SCENARIOS[opt?.scenario] || SCENARIOS.gwimun;
-    if (sc.hidden && !hiddenOk(me.name)) return sock.emit('toast', { text: '🔒 히든 테마는 모든 테마를 한 번씩 깨거나 Lv.20이 되면 열려요.' });
+    if (sc.hidden && !me.admin && !hiddenOk(me.name)) return sock.emit('toast', { text: '🔒 히든 테마는 모든 테마를 한 번씩 깨거나 Lv.20이 되면 열려요.' });
     const fq = Number(opt?.fear); // 0 왕초보 · 1 순한맛 · 2 보통 · 3 매운맛
     const fear = Number.isFinite(fq) && opt?.fear !== null && opt?.fear !== '' ? Math.max(0, Math.min(3, Math.round(fq))) : 2;
     let party = parties.get(me.partyId);
@@ -993,8 +994,8 @@ io.on('connection', (sock) => {
     }
     if (party.leader !== me.id) return sock.emit('toast', { text: '파티장만 시작할 수 있습니다.' });
     if (party.instId) return;
-    const unlocked = checkpointFor(sc, me.name);
-    chapter = Math.max(0, Math.min(Number(chapter) || 0, unlocked, sc.chapters.length - 1));
+    const unlocked = me.admin ? sc.chapters.length - 1 : checkpointFor(sc, me.name);
+    chapter = Math.max(0, Math.min(Math.floor(Number(chapter)) || 0, unlocked, sc.chapters.length - 1));
     party.scenarioId = sc.id;
     const instId = 'i' + seq++;
     party.instId = instId;
@@ -1247,12 +1248,13 @@ const LOOK_ENUM = {
     'police', 'doctor', 'chef', 'firefighter', 'pirate', 'witch', 'vampire', 'mummy', 'astronaut', 'ninja', 'santa', 'raincoat', 'tracksuit', 'dino', 'cowboy', 'kimono',
     'clown', 'ringmaster', 'magician', 'knight', 'princess', 'gothic', 'wizard', 'idol', 'hiphop', 'explorer', 'bee', 'panda'],
 };
+for (const [key, choices] of Object.entries(MORE_OPTIONS)) LOOK_ENUM[key] = [...(LOOK_ENUM[key] || []), ...choices.map(([id]) => id)];
 function sanitizeLook(l = {}) {
   const hex = (v, d) => (/^#[0-9a-f]{6}$/i.test(v) ? v : d);
   const out = {
     body: hex(l.body, '#ffd6a5'), accent: hex(l.accent, '#ff8fab'), hairColor: hex(l.hairColor, '#5a3825'), eyeColor: hex(l.eyeColor, '#5a3825'),
   };
-  const defs = { ears: 'bear', hat: 'none', eyes: 'big', brows: 'soft', mouth: 'smile', cheeks: 'blush', extra: 'none', acc: 'none', hair: 'short', outfit: 'sailor' };
+  const defs = { ears: 'bear', hat: 'none', eyes: 'big', brows: 'soft', mouth: 'smile', cheeks: 'blush', extra: 'none', acc: 'none', pin: 'none', held: 'none', hair: 'short', outfit: 'sailor' };
   for (const [k, list] of Object.entries(LOOK_ENUM)) out[k] = list.includes(l[k]) ? l[k] : defs[k];
   // 사진 얼굴: 작은 JPEG data URL 만 허용 (최대 약 60KB)
   out.photo = typeof l.photo === 'string' && l.photo.startsWith('data:image/jpeg;base64,') && l.photo.length < 80000 ? l.photo : '';

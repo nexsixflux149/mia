@@ -348,6 +348,7 @@ function makeAvatar(id, name, lk, isMe) {
   setTag(g, name, isMe ? '#ffe08a' : '#fff');
   g.userData.name = name; g.userData.id = id;
   const spot = new THREE.SpotLight('#fff4dc', 0, 24, 0.55, 0.5, 1.2);
+  spot.visible = false;
   spot.position.set(0, 0.72, 0.42);
   const tgt = new THREE.Object3D(); tgt.position.set(0, 0.2, 5); g.add(tgt); spot.target = tgt;
   g.add(spot); g.userData.spot = spot;
@@ -358,7 +359,7 @@ function makeAvatar(id, name, lk, isMe) {
   return g;
 }
 function setTag(g, name, color) { if (g.userData.tag) removeLabel(g.userData.tag); g.userData.tag = addLabel(g, textSprite(name, { size: 30, color, bg: 'rgba(10,8,12,.72)', stroke: 'rgba(0,0,0,.85)' }), 1.55); }
-function setLight(g, on) { g.userData.spot.intensity = on ? 160 : 0; g.userData.beam.visible = false; } // 빛줄기 효과는 눈부셔서 표시하지 않는다
+function setLight(g, on) { g.userData.spot.visible = !!on && S.room === 'game'; g.userData.spot.intensity = on ? 160 : 0; g.userData.beam.visible = false; } // 빛줄기 효과는 눈부셔서 표시하지 않는다
 function rebuildMyAvatar() {
   removeAvatar(myAvatar);
   myAvatar = makeAvatar(S.me, S.myName, look, true);
@@ -1090,9 +1091,33 @@ function removeGhost() { for (const e of S.ghosts.values()) { scene.remove(e.G);
 socket.on('player:leave', (id) => dropOther(id));
 
 let ghostSoundT = 0;
+const crowdFrustum = new THREE.Frustum();
+const crowdMatrix = new THREE.Matrix4();
+const crowdBounds = new THREE.Sphere();
 function updateOthers(dt, t) {
+  const crowded = S.room === 'lobby' && S.others.size >= 6;
+  if (crowded) crowdFrustum.setFromProjectionMatrix(crowdMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+  const frameDt = dt;
   for (const g of S.others.values()) {
+    dt = frameDt;
     const p = g.userData.target; if (!p) continue;
+    const u = g.userData;
+    if (crowded) {
+      crowdBounds.center.set(p.x, (p.y || 0) + 1.8, p.z);
+      crowdBounds.radius = 6; // 큰 썰매와 날개까지 화면 가장자리에서 잘리지 않게 포함한다.
+      g.visible = crowdFrustum.intersectsSphere(crowdBounds);
+      g.matrixWorldAutoUpdate = g.visible;
+      u.crowdDt = (u.crowdDt || 0) + dt;
+      const distance = Math.hypot(p.x - me.x, p.z - me.z);
+      const interval = g.visible ? (distance < 9 ? 0 : 1 / 30) : 1 / 8;
+      if (u.crowdDt < interval) continue;
+      dt = Math.min(u.crowdDt, .2);
+      u.crowdDt = 0;
+    } else {
+      g.visible = true;
+      g.matrixWorldAutoUpdate = true;
+      u.crowdDt = 0;
+    }
     if (p.ride && S.room === 'lobby') {
       const [rn, si] = p.ride.split(':'); const rp = S.world?.rides?.[rn]?.pos(Number(si));
       if (rp) { g.position.set(rp.x, rp.y, rp.z); g.rotation.y = rp.ry; g.userData.emT = (g.userData.emT || 0) + dt; animateAvatar(g, dt, false, t, false, p.em || null, g.userData.emT); applyGear(g, (p.gear || '').replace(/\|1\|/, '|0|')); animateGear(g, t, dt, false); continue; }
@@ -1105,6 +1130,7 @@ function updateOthers(dt, t) {
     animateAvatar(g, dt, !!p.anim, t, !!p.crouch, p.em || null, g.userData.emT);
     applyGear(g, p.gear || ''); animateGear(g, t, dt, !!p.anim);
   }
+  dt = frameDt;
   S.danger = 0;
   if (myAvatar) setLight(myAvatar, S.myLight ?? S.light);
   for (const e of S.ghosts.values()) {
@@ -2381,8 +2407,8 @@ function openWish() {
 function openWishDone() {
   const w = el('div', 'wish wish-done');
   w.append(el('div', 'wish-done-icon', '🌠'), el('div', 'wish-done-msg', '별똥별이 소원을 하늘로 데려갔어요.\n꼭 이루어지길 바랄게요 ✨'));
-  const coffee = el('button', 'btn primary wish-coffee', '☕ 커피 한 잔 후원하기');
-  coffee.onclick = () => $('#coffeeBtn').onclick(); // 오른쪽 ☕ 버튼과 똑같이 (폰: 카카오페이 바로 열기 · PC: QR 창)
+  const coffee = el('button', 'btn primary wish-coffee', '💗 감사한 마음 전하기');
+  coffee.onclick = () => $('#coffeeBtn').onclick(); // 오른쪽 💗 버튼과 똑같이 (폰: 카카오페이 바로 열기 · PC: QR 창)
   const close = el('button', 'btn wish-close', '닫기'); close.onclick = closeModal;
   w.append(coffee, close);
   openModal('소원이 전달 되었어요', '', w);
@@ -2540,7 +2566,7 @@ function renderParty() {
   const ub = (p ? p.unlockedBy : S.unlockedBy) || {};
   const unlocked = ub[scInfo?.id]?.chapter ?? 0;
   $('#scenarioDesc').textContent = scInfo ? diffText(scInfo.difficulty || 3) + '\n' + scInfo.desc + (ub[scInfo.id]?.cleared ? ' · ✅ 클리어' : '') : '';
-  (scInfo?.chapters || []).forEach((t, i) => { if (i <= unlocked) { const o = el('option', null, (i === 0 ? '처음부터: ' : '이어하기: ') + t); o.value = i; sel.appendChild(o); } });
+  (scInfo?.chapters || []).forEach((t, i) => { if (S.admin || i <= unlocked) { const o = el('option', null, (i === 0 ? '처음부터: ' : '이어하기: ') + t); o.value = i; sel.appendChild(o); } });
   if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
   $('#startBtn').textContent = p && p.members.length > 1 ? '방탈출 시작' : '바로 시작';
   // 파티원: 파티장이 고른 내용을 그대로 보여 주고, 시작 대신 '시작 요청'
@@ -2961,19 +2987,19 @@ $('#settingsBtn').onclick = () => {
   const cr = el('div', 'credits');
   cr.innerHTML = `<div class="cr-row"><span>만든이</span><b>nexsixflux</b></div>
     <a class="cr-link" href="https://social.wanted.co.kr//community/profile/ZhZ6VwFkcMvwbQBAER6qEf?utm_source=wanted&utm_medium=share" target="_blank" rel="noopener">🔗 만든이 프로필 보러 가기 <span>›</span></a>
-    <div class="cr-coffee"><b>☕ 커피 한 잔 후원하기</b><small>카카오페이 앱으로 QR을 찍어 주세요</small><img src="/kakaopay.png" alt="카카오페이 후원 QR" loading="lazy" /><a class="cr-pay" href="https://qr.kakaopay.com/281006011187850590005070" target="_blank" rel="noopener">☕ 커피 한 잔 후원하기</a></div>`;
+    <div class="cr-coffee"><b>💗 감사한 마음 전하기</b><small>카카오페이 앱으로 QR을 찍어 주세요</small><img src="/kakaopay.png" alt="카카오페이 후원 QR" loading="lazy" /><a class="cr-pay" href="https://qr.kakaopay.com/281006011187850590005070" target="_blank" rel="noopener">💗 감사한 마음 전하기</a></div>`;
   wrap.appendChild(cr);
   openModal('⚙ 설정', '변경 사항은 자동으로 저장됩니다.', wrap);
 };
 
-// 제작자 후원 팝업 (오른쪽 ☕ 버튼)
+// 제작자 후원 팝업 (오른쪽 💗 버튼)
 const KAKAOPAY_URL = 'https://qr.kakaopay.com/281006011187850590005070';
 const openKakaoPay = () => { const w = window.open(KAKAOPAY_URL, '_blank', 'noopener'); if (!w) location.href = KAKAOPAY_URL; };
 $('#coffeeBtn').onclick = () => {
   if (isMobileView()) return openKakaoPay();
   const w = el('div', 'coffee-pop');
-  w.innerHTML = `<img src="/kakaopay.png" alt="카카오페이 후원 QR" /><p class="coffee-msg">커피 한 잔은 큰 힘이 됩니다</p><small>카카오페이 앱으로 QR을 찍어 주세요</small>`;
-  openModal('☕ 제작자 커피 한 잔 후원하기', '', w);
+  w.innerHTML = `<img src="/kakaopay.png" alt="카카오페이 후원 QR" /><p class="coffee-msg">보내주신 마음은 게임을 만드는 큰 힘이 됩니다</p><small>카카오페이 앱으로 QR을 찍어 주세요</small>`;
+  openModal('💗 감사한 마음 전하기', '', w);
 };
 
 // ─────────────────────────── 기타
@@ -3544,7 +3570,7 @@ applyMobile(); addEventListener('resize', applyMobile);
   const panels = { party: '#partyPanel', share: '#sharePanel', roster: '#rosterPanel', chat: '#chat' };
   const btns = [
     ['party', '👥', '파티'], ['chat', '💬', '채팅'], ['roster', '🧑‍🤝‍🧑', '접속자'], ['share', '🔗', '초대 주소'],
-    ['shop', '🛒', '코인 상점'], ['bag', '🎒', '내 물건'], ['rank', '🏆', '랭킹'], ['settings', '⚙', '설정 · 지도 · 옷 · 도움말'], ['coffee', '☕', '커피 한 잔 후원하기'], ['admin', '🛡️', '운영자'],
+    ['shop', '🛒', '코인 상점'], ['bag', '🎒', '내 물건'], ['rank', '🏆', '랭킹'], ['settings', '⚙', '설정 · 지도 · 옷 · 도움말'], ['coffee', '💗', '감사한 마음 전하기'], ['admin', '🛡️', '운영자'],
   ];
   let open = null;
   const setOpen = (k) => {
