@@ -17,6 +17,7 @@ import { ITEMS, START_ITEMS } from './items.js';
 import { openStore, persist, persistBatch, flushAll, storeKind, loadClearPhotos, saveClearPhoto } from './store.js';
 import { MAX_LV, HIDDEN_LV, ADMIN_LV, levelOf, xpAt, CLEAR_COINS, CHAPTER_XP, clearXp, themeRewardXp, timeLimitMs, SHOP, isWear, blankProfile, profileView, dayKey, statRange, pruneStats, addPeriodXp, levelBoard, weekKey, monthKey, GOLD_IDS, GOLD_STAFF, isGold, giveGold, randomGold, goldWorn, weeklyPodium } from './progress.js';
 import { Accounts, clientIp } from './accounts.js';
+import { createLobbySanta } from './lobby-santa.js';
 import { attachArcade, arcadeStatus } from './arcade-service.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -142,6 +143,13 @@ const prof = (name) => {
   if (!profChecked.has(name)) { profChecked.add(name); for (const [id, n] of Object.entries(pf.items)) { const it = SHOP[id]; if (it && n > it.max) pf.items[id] = it.max; } if (goldConflictsWithCostume(pf.equip)) pf.equip.costume = ''; } // (고양이 세트와 로봇 코스튬은 함께 입지 않는다)
   return pf;
 };
+function arcadeAnalytics(){
+ const entries=Object.values(accountData.list).filter(a=>a.name!==ADMIN_NAME);
+ const visits=entries.filter(a=>a.arcadeVisits?.length);
+ const returned=visits.filter(a=>a.arcadeVisits.length>1).length;
+ const played=entries.map(a=>profiles[a.name]?.arcade).filter(Boolean);
+ return {players:played.length, opens:played.reduce((n,a)=>n+(a.opens||0),0),attempts:played.reduce((n,a)=>n+(a.attempts||0),0),solved:played.reduce((n,a)=>n+(a.cleared||0),0),completed:played.filter(a=>a.cleared>=100).length,visitors:visits.length,returned,returnRate:visits.length?Math.round(returned/visits.length*1000)/10:0};
+}
 const findByName = (name) => [...players.values()].find((p) => p.name === name && !p.offline);
 const sendProfile = (p) => { if (p) io.to(p.id).emit('profile', { ...profileView(prof(p.name), p.admin), arcade: arcadeStatus(prof(p.name)), hiddenOk: hiddenOk(p.name) }); };
 // 장비 문자열: 날개|탈것|타는 중|손에 든 것(0 없음 · 1 전설의 검 · 2 황금 고양이 지팡이)|코스튬|황금 고양이 부위 글자
@@ -187,6 +195,15 @@ let seq = 1;
 // ───── 위치 방송 (전송량 줄이기): 1초에 10번, '바뀐 사람'만, 숫자는 소수 둘째 자리까지
 //  한 사람 = [id, x, z, y, ry, 깃발(걷기1·웅크림2·손전등4)] (+ 이름·외형 번호·파티·장비·감정표현이 바뀌었을 때만 뒤에 덧붙인다)
 //  아무도 움직이지 않으면 아무것도 보내지 않는다. 방에 새로 들어온 화면에는 전체를 한 번 보낸다.
+const lobbySanta = createLobbySanta();
+setInterval(()=>{ const state=lobbySanta.update(.1,[...players.values()]);io.to('lobby').emit('lobby:santa',state); },100).unref?.();
+// Keep each member's fastest eligible result, including historical team records.
+function bestThemeRanks(list) {
+ const seen=new Set();return [...list].sort((a,b)=>a.ms-b.ms||a.at-b.at).flatMap(record=>{
+   const names=[...new Set(record.names||[])].filter(name=>!seen.has(name));names.forEach(name=>seen.add(name));
+   return names.length?[{...record,names}]:[];
+ });
+}
 const TICK_MS = 100;
 const r2 = (v) => Math.round(v * 100) / 100;
 const dynOf = (p) => [r2(p.x), r2(p.z), r2(p.y || 0), r2(p.ry), (p.anim ? 1 : 0) | (p.crouch ? 2 : 0) | (p.light ? 4 : 0)];
@@ -416,6 +433,7 @@ io.on('connection', (sock) => {
     sendProfile(np);
     flushMail(np);
     // 방문 통계: 오늘 방문 수 + 방문자
+    if (!asAdmin && account) { account.arcadeVisits ||= []; const today=dayKey();if(!account.arcadeVisits.includes(today)){account.arcadeVisits.push(today);accounts.save();} }
     if (!asAdmin) { const d = (stats.days[dayKey()] ||= { v: 0, u: {} }); d.v++; d.u[name] ||= 0; saveStats(); }
     io.to('lobby').emit('chat', { channel: 'system', text: `${name} 님이 접속했습니다.` });
   });
@@ -868,7 +886,7 @@ io.on('connection', (sock) => {
   sock.on('admin:stats', adminOnly((ack) => {
     if (typeof ack !== 'function') return;
     ack({ players: [...players.values()].map((p) => ({ id: p.id, name: p.name, room: p.room === 'lobby' ? '로비' : p.room ? '게임 중' : '-', offline: !!p.offline, admin: !!p.admin, muted: Math.max(0, Math.ceil(((chatPenalty.get(p.name)?.muteUntil || 0) - Date.now()) / 1000)), warns: chatPenalty.get(p.name)?.warns || 0, lv: levelOf(prof(p.name).xp) })), games: instances.size, accounts: accounts.size, feedbackNew: feedback.list.filter((f) => !f.done).length,
-      visit: { day: statRange(stats, 1), week: statRange(stats, 7), month: statRange(stats, 30) },
+      arcade: arcadeAnalytics(), visit: { day: statRange(stats, 1), week: statRange(stats, 7), month: statRange(stats, 30) },
       daily: Array.from({ length: 14 }, (_, i) => { const k = dayKey(Date.now() - i * 86400000); const r = stats.days[k]; const u = Object.values(r?.u || {}); return { day: k, visitors: u.length, visits: r?.v || 0, totalMs: u.reduce((a, b) => a + b, 0) }; }) });
   }));
   sock.on('admin:mute', adminOnly(({ id, minutes }) => {
@@ -926,14 +944,14 @@ io.on('connection', (sock) => {
   // 랭킹 조회: 테마별 상위 10개
   sock.on('rank:get', (ack) => {
     const out = {};
-    for (const s of Object.values(SCENARIOS)) out[s.id] = (ranks[s.id] || []).filter(record => record.ms <= timeLimitMs(s.difficulty || 3)).slice(0, 10).map((r) => ({ names: r.names, ms: r.ms, fear: r.fear, ending: r.ending, at: r.at, hints: r.hints ?? null }));
+    for (const s of Object.values(SCENARIOS)) out[s.id] = bestThemeRanks((ranks[s.id] || []).filter(record => record.ms <= timeLimitMs(s.difficulty || 3))).slice(0, 10).map((r) => ({ names: r.names, ms: r.ms, fear: r.fear, ending: r.ending, at: r.at, hints: r.hints ?? null }));
     if (typeof ack === 'function') ack(out);
   });
   // 랭킹 한꺼번에: 주간 · 월간 · 총 레벨 랭킹 + 테마별 클리어 시간
   sock.on('rank:all', (ack) => {
     if (typeof ack !== 'function') return;
     const themes = {};
-    for (const s of Object.values(SCENARIOS)) themes[s.id] = (ranks[s.id] || []).filter(record => record.ms <= timeLimitMs(s.difficulty || 3)).slice(0, 10).map((r) => ({ names: r.names, ms: r.ms, fear: r.fear, ending: r.ending, at: r.at, hints: r.hints ?? null }));
+    for (const s of Object.values(SCENARIOS)) themes[s.id] = bestThemeRanks((ranks[s.id] || []).filter(record => record.ms <= timeLimitMs(s.difficulty || 3))).slice(0, 10).map((r) => ({ names: r.names, ms: r.ms, fear: r.fear, ending: r.ending, at: r.at, hints: r.hints ?? null }));
     const boards = levelBoards();
     const level = {};
     for (const k of ['week', 'month', 'total']) level[k] = { rows: boards[k].rows, total: boards[k].total, me: me && !me.admin ? boards[k].rankOf(me.name) : null };
@@ -1077,7 +1095,7 @@ io.on('connection', (sock) => {
         if (full && ms > 0 && !over) {
           const list = (ranks[sc.id] ||= []);
           list.push({ names, ms, fear, ending: type, at: Date.now(), hints });
-          list.sort((a, b) => a.ms - b.ms); ranks[sc.id] = list.slice(0, 50); saveRanks();
+          list.sort((a, b) => a.ms - b.ms); ranks[sc.id] = bestThemeRanks(list).slice(0, 50); saveRanks();
         }
         lobbyNotice(`🏆 ${partyLabel(names)} 님이 '${sc.short}' 테마를 클리어했습니다!${full && ms ? ` (${fmtTime(ms)} · 힌트 ${hints}개${over ? ' · 시간 초과' : ''})` : ''}`);
         syncParty(party);
@@ -1175,7 +1193,7 @@ function levelBoards() {
 // 매주 월요일 0시(한국 시간)에 지난주 상위 3명의 보상을 확정한다.
 stats.weekly ||= { done: '', champ: null, log: [] };
 const goldSetText = () => `황금 고양이 세트 7종을 모두 모았어요! ${SHOP[GOLD_STAFF].icon} ${SHOP[GOLD_STAFF].name}을(를) 받았습니다. (귀신 퇴치 무제한 · 🎒 내 물건에서 들기)`;
-const adminKit = (pf) => { let ch = false; for (const id of [...GOLD_IDS, GOLD_STAFF]) if (!pf.items[id]) { pf.items[id] = 1; ch = true; } if (ch) saveProfiles(); };
+const adminKit = (pf) => { let ch = false; for (const id of [...GOLD_IDS, GOLD_STAFF, 'mask_bighead']) if (!pf.items[id]) { pf.items[id] = 1; ch = true; } if (ch) saveProfiles(); };
 function champView() {
   const { champ, podium } = stats.weekly;
   // 기존 1위 기록도 새 서버에서 표시할 수 있다.
@@ -1287,7 +1305,7 @@ let last = Date.now();
 setInterval(() => {
   const now = Date.now(); const dt = (now - last) / 1000; last = now;
   const byRoom = new Map();
-  for (const p of players.values()) { if (!p.room || p.offline) continue; let l = byRoom.get(p.room); if (!l) byRoom.set(p.room, (l = [])); l.push(p); }
+  for (const p of players.values()) { if (!p.room || p.offline) continue; if(!io.sockets.sockets.get(p.sid)?.connected) continue; let l = byRoom.get(p.room); if (!l) byRoom.set(p.room, (l = [])); l.push(p); }
   for (const [room, list] of byRoom) {
     const meta = metaOf(room);
     let ghosts = null;

@@ -19,8 +19,8 @@ export function buildArcadeCabinet() {
   for(let i=0;i<210;i++) { p.strokeStyle='#b2a38b'; p.globalAlpha=.1+rnd()*.22; p.beginPath(); const x=rnd()*1024,y=rnd()*1024; p.moveTo(x,y);p.lineTo(x+rnd()*7,y+12+rnd()*90);p.stroke(); }
   p.globalAlpha=1;
   const surface=tex(patina);
-  const metal = new THREE.MeshStandardMaterial({map:surface,bumpMap:surface,bumpScale:.016,metalness:.48,roughness:.87});
-  const trim = new THREE.MeshStandardMaterial({color:'#6c6b59',metalness:.65,roughness:.65});
+  const metal = new THREE.MeshStandardMaterial({map:surface,bumpMap:surface,bumpScale:.016,emissive:'#6b614c',emissiveMap:surface,emissiveIntensity:.35,metalness:.25,roughness:.87});
+  const trim = new THREE.MeshStandardMaterial({color:'#aaa48b',emissive:'#625b42',emissiveIntensity:.25,metalness:.65,roughness:.65});
   const black = new THREE.MeshStandardMaterial({color:'#121714',roughness:.76});
   const rubber = new THREE.MeshStandardMaterial({color:'#0b0c0b',roughness:.98});
   const red = new THREE.MeshStandardMaterial({color:'#71362b',roughness:.65});

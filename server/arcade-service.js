@@ -13,12 +13,12 @@ export const arcadeStatus = profile => {
   const cleared = Math.min(ARCADE_TARGET, Math.max(0, Math.floor(Number(profile.arcade?.cleared) || 0)));
   return {cleared,total:ARCADE_TARGET,available:ARCADE_PUZZLES.length,percent:Math.round(cleared/ARCADE_TARGET*1000)/10,next:Math.min(cleared+1,ARCADE_TARGET),badge:cleared===ARCADE_TARGET};
 };
-export function arcadeQuestion(profile,id) {
+export function arcadeQuestion(profile,id,admin=false) {
   const state=arcadeStatus(profile);
   if(!Number.isInteger(id)||id<1||id>ARCADE_TARGET)return {error:'잘못된 문제 번호입니다.'};
-  if(id>state.next)return {error:'이전 문제부터 풀어 주세요.'};
+  if(!admin && id>state.next)return {error:'이전 문제부터 풀어 주세요.'};
   const p=bank.get(id);if(!p)return {error:'아직 제작·검수가 끝나지 않은 문제입니다.',state};
-  return {state,puzzle:{id:p.id,title:p.title,prompt:p.prompt,hint:p.hint,difficulty:p.difficulty}};
+  return {state:{...state,preview:admin},puzzle:{id:p.id,title:p.title,prompt:p.prompt,hint:p.hint,difficulty:p.difficulty}};
 }
 export function arcadeAnswer(profile,id,value) {
   const view=arcadeQuestion(profile,id);if(view.error)return view;
@@ -39,12 +39,14 @@ export function attachArcade(sock,{getPlayer,profile,save,changed}) {
     if(!p||p.sid!==sock.id||p.room!=='lobby'){ack({error:'로비에 접속한 상태에서 이용해 주세요.'});return null;}
     return p;
   };
-  sock.on('arcade:open',ack=>{const p=ready(ack);if(p)ack(arcadeQuestion(profile(p.name),arcadeStatus(profile(p.name)).next));});
-  sock.on('arcade:question',(id,ack)=>{const p=ready(ack);if(p)ack(arcadeQuestion(profile(p.name),id));});
+  sock.on('arcade:open',ack=>{const p=ready(ack);if(p){const pf=profile(p.name);if(!p.admin){pf.arcade||={cleared:0};pf.arcade.opens=(pf.arcade.opens||0)+1;save();}ack(arcadeQuestion(pf,arcadeStatus(pf).next,p.admin));}});
+  sock.on('arcade:question',(id,ack)=>{const p=ready(ack);if(p)ack(arcadeQuestion(profile(p.name),id,p.admin));});
   sock.on('arcade:answer',(data,ack)=>{
     const p=ready(ack);if(!p)return;
     if(Date.now()-lastAnswer<700)return ack({error:'잠시 후 다시 확인해 주세요.'});lastAnswer=Date.now();
     const pf=profile(p.name),previous=structuredClone({arcade:pf.arcade,items:pf.items});
+    if(p.admin){const v=arcadeQuestion(pf,data?.id,true);if(v.error)return ack(v);const q=bank.get(data.id);return ack({correct:normalize(data.answer||'')===normalize(q.answer),explain:q.explain,state:{...arcadeStatus(pf),preview:true}});}
+    pf.arcade||={cleared:0};pf.arcade.attempts=(pf.arcade.attempts||0)+1;save();
     const result=arcadeAnswer(pf,data?.id,data?.answer);
     if(result.advanced || result.rewarded){try{save();}catch(e){pf.arcade=previous.arcade;pf.items=previous.items;return ack({error:'저장하지 못했습니다. 다시 시도해 주세요.'});}changed(p);}
     ack(result);

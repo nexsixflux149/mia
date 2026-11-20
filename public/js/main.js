@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { lobbySantaVisual } from './lobby-santa.js';
 import { openArcade } from './arcade-ui.js';
 import { createAvatar, animateAvatar, textSprite, OPTIONS, SKIN, ACCENT, HAIRC, EYEC, DEFAULT_LOOK, EMOTES, EMOTE_DUR, jumpElevation } from './avatar.js';
 import { Cinema } from './cinema.js';
@@ -22,7 +23,9 @@ await Promise.race([document.fonts.load('16px "Gowun Dodum"').catch(() => []), n
 // 화면(클라이언트)과 서버가 주고받는 방식의 버전 — 서버(server/index.js 의 PROTO)와 맞춘다
 const PROTO = 4;
 // 웹소켓으로 바로 붙는다 (막힌 곳에서는 예전 방식으로 자동 전환) — 처음 붙을 때 오가는 양이 줄어든다
+let santaVisual=null,santaState=null;
 const socket = io({ transports: ['websocket', 'polling'], tryAllTransports: true });
+socket.on('lobby:santa',s=>{santaState=s;});
 // 연결이 끊겼다 다시 붙으면(모바일 앱 전환 등) 같은 플레이어로 이어서 접속
 socket.on('connect', () => {
   if (!S?.resume) return;
@@ -1082,6 +1085,7 @@ socket.on('state', (m) => {
     syncOther(p);
   }
   if (seen) for (const id of [...S.net.keys()]) if (!seen.has(id)) dropOther(id);
+  if (seen) for(const id of [...S.others.keys()]) if(!seen.has(id)) dropOther(id);
   if ('g' in m) syncGhosts(m.g);
 });
 function syncGhosts(ghosts) {
@@ -1248,6 +1252,12 @@ function loop() {
     if (S.room === 'lobby' && S.world.rides?.swing) { const b = new Set(); if (S.mount?.ride === 'swing') b.add(S.mount.seat); for (const g of S.others.values()) { const rd = g.userData.target?.ride; if (rd?.startsWith('swing:')) b.add(Number(rd.split(':')[1])); } S.world.rides.swing.setBusy(b); }
     S.world.shopFace?.(me.x, me.z);
     S.world.update?.(t, dt);
+    if(S.room==='lobby' && santaState){
+      if(!santaVisual){santaVisual=lobbySantaVisual();scene.add(santaVisual.root);santaVisual.root.position.set(santaState.x,0,santaState.z);}
+      santaVisual.root.visible=true;const old=santaVisual.root.position.clone();
+      santaVisual.root.position.lerp(new THREE.Vector3(santaState.x,0,santaState.z),Math.min(1,dt*12));santaVisual.root.rotation.y=santaState.ry;
+      santaVisual.update(t,old.distanceTo(santaVisual.root.position)>.001);
+    }else if(santaVisual)santaVisual.root.visible=false;
     graphics.update(camera.position, me); watchPerf(performance.now());
     updateThemeBubble();
     // 보조광: 머리 위가 아니라 카메라 쪽에서 넓게 비춰 캐릭터 머리가 하얗게 빛나지 않게 한다
@@ -2295,7 +2305,7 @@ function openAdmin() {
   const load = () => socket.emit('admin:stats', (st) => {
     head.textContent = `접속자 ${st.players.filter((p) => !p.offline).length}명 · 진행 중인 게임 ${st.games}개 · 고정 계정 ${st.accounts ?? '-'}개`; list.innerHTML = '';
     fbB.textContent = '📮 고객소리함 보기' + (st.feedbackNew ? ` (새 글 ${st.feedbackNew})` : '');
-    statBox.innerHTML = ''; if (st.visit) statBox.appendChild(visitStats(st));
+    statBox.innerHTML = ''; if(st.arcade){const a=st.arcade;statBox.append(el('p','',`오락실 참여 ${a.players}명 · 열기 ${a.opens}회 · 제출 ${a.attempts}회 · 누적 해결 ${a.solved}문제 · 완주 ${a.completed}명`),el('p','muted',`집계 시작 후 다른 날짜 재방문 ${a.returned}/${a.visitors}명 (${a.returnRate}%) · 관리자 제외`));} if (st.visit) statBox.appendChild(visitStats(st));
     for (const p of st.players) {
       const row = el('div', 'admin-row');
       row.append(el('span', 'an', (p.admin ? '🛡️ ' : '') + p.name), el('span', 'muted', `${p.room}${p.offline ? ' · 끊김' : ''}${p.muted ? ` · 🚫${Math.ceil(p.muted / 60)}분` : ''}${p.warns ? ` · 경고${p.warns}` : ''}`));

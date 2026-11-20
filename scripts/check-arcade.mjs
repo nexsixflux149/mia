@@ -27,6 +27,6 @@ attachArcade(sock,{getPlayer:()=>player,profile:()=>profile,save:()=>saved++,cha
 handlers['arcade:open'](r=>reply=r);assert.ok(reply.error);
 player={name:'tester',sid:'test',room:'game'};handlers['arcade:open'](r=>reply=r);assert.ok(reply.error);
 player.room='lobby';handlers['arcade:open'](r=>reply=r);assert.equal(reply.puzzle.id,14);
-handlers['arcade:answer']({id:14,answer:'11'},r=>reply=r);assert.equal(reply.correct,true);assert.equal(saved,1);
+handlers['arcade:answer']({id:14,answer:'11'},r=>reply=r);assert.equal(reply.correct,true);assert.equal(saved,3);
 handlers['arcade:answer']({id:15,answer:'SOS'},r=>reply=r);assert.ok(reply.error);
 console.log('PASS: 100 sequential answers, rejection of wrong/locked/invalid requests, private answers, 13/14 boundary, persistence roundtrip, 99 no reward, 100 one reward + 100%, replay idempotence, ownership, lobby restriction, rate limiting.');
