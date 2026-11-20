@@ -1282,7 +1282,9 @@ function maskGhost() { // 귀신 가면: 핏기 없는 창백한 얼굴 · 퀭�
 }
 function maskBighead() {
   const donor = createAvatar({body:'#ffd6a5',accent:'#ff8fab',ears:'bear',hat:'none',eyes:'big',eyeColor:'#5a3825',brows:'soft',mouth:'smile',cheeks:'blush',extra:'none',hair:'short',hairColor:'#5a3825',outfit:'plain',acc:'none',pin:'none',held:'none'});
-  const head = donor.userData.head; head.removeFromParent(); head.position.set(0,0,0); head.scale.setScalar(2);
+  const head = donor.userData.head;
+  for (const part of [...head.children]) if (part.userData.avatarNeck) { head.remove(part); part.geometry.dispose(); }
+  head.removeFromParent(); head.position.set(0,0,0); head.scale.setScalar(2);
   const kept=new Set();head.traverse(o=>{if(o.geometry)kept.add(o.geometry);for(const m of [].concat(o.material||[])){kept.add(m);for(const v of Object.values(m))if(v?.isTexture)kept.add(v);}});
   const disposed=new Set(); const drop=v=>{if(v&&!kept.has(v)&&!disposed.has(v)&&!isShared(v)){disposed.add(v);v.dispose?.();}};
   donor.traverse(o=>{drop(o.geometry);for(const m of [].concat(o.material||[])){if(!kept.has(m)&&!isShared(m)){for(const v of Object.values(m))if(v?.isTexture)drop(v);drop(m);}}});

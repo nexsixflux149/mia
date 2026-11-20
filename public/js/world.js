@@ -1,3 +1,4 @@
+import {buildLobbyMountain} from './lobby-mountain.js';
 import {withoutDesktopHints} from './mobile-copy.js';
 import * as THREE from 'three';
 import { buildArcadeCabinet } from './arcade-cabinet.js';
@@ -1191,7 +1192,7 @@ export function buildLobby(scene, opts = {}) {
   const cMat2 = new THREE.MeshBasicMaterial({ color: '#2a1a24', fog: false, transparent: true, opacity: 0.85 });
   for (let i = 0; i < 16; i++) {
     const c = new THREE.Group(); const a = (i / 16) * Math.PI * 2 + Math.random() * 0.3, r = 42 + Math.random() * 30;
-    c.position.set(Math.cos(a) * r, 20 + Math.random() * 16, Math.sin(a) * r);
+    c.position.set(Math.cos(a) * r, 76 + Math.random() * 16, Math.sin(a) * r);
     const n = 4 + Math.floor(Math.random() * 4);
     for (let k = 0; k < n; k++) { const b = new THREE.Mesh(new THREE.SphereGeometry(2.2 + Math.random() * 1.8, 14, 10), k % 3 === 2 ? cMat2 : cMat); b.position.set((k - n / 2) * 2.4 + Math.random(), Math.random() * 1.2, Math.random() * 2); b.scale.y = 0.6; c.add(b); }
     c.userData.ph = Math.random() * 6; clouds.add(c);
@@ -1338,11 +1339,14 @@ export function buildLobby(scene, opts = {}) {
     for (let k = 0; k < n; k++) { const a = Math.random() * Math.PI * 2, r = 17 + Math.random() * 27; m4.makeRotationZ((Math.random() - 0.5) * 0.5); const x = Math.cos(a) * r, z = Math.sin(a) * r; m4.setPosition(x, onOuterPath(x * LS, z * LS) ? -1 : 0.15, z); grass.setMatrixAt(k, m4); }
     root.add(grass);
   }
-  colliders.push(...ringColliders(30.5 * LS).map((c) => ({ ...c, noSpread: true })));
+  colliders.push(...ringColliders(30.5 * LS).filter(c => c.z > -38).map((c) => ({ ...c, noSpread: true })));
   spreadLobby(root, colliders, [...park.interactives, ...outer.interactives, ...extra.interactives], { ...park.rides, ...extra.rides });
   { const f0 = extra.shopFace; extra.shopFace = (x, z) => f0(x / LS, z / LS); }
   const deco = buildLobbyDeco(root, colliders, themes);
   const updateChristmasTree = buildChristmasTree(root, colliders);
+  const mountain = buildLobbyMountain(); root.add(mountain.root);
+  const mountainSign = textSprite('귀문산 등산로 · 중턱 테마 터 10곳', {size:38,color:'#f2dfae',bg:'rgba(12,20,17,.86)'});
+  mountainSign.position.set(0,2.2,-40); mountainSign.scale.set(8,1,1); root.add(mountainSign);
   scene.add(root);
   let lastT = 0;
   const update = (t) => {
@@ -1358,7 +1362,7 @@ export function buildLobby(scene, opts = {}) {
       e.spin.forEach((s) => (s.rotation.z = Math.sin(t * 1.2 + i) * 0.15));
     });
   };
-  return { root, colliders, walls: [], objects: {}, flickers: [], ceiling: [], update, bounds: 28.5 * LS, outdoor: true, background: scene.background, fog: scene.fog, themes, exhibits, hiddenGate: !!opts.hidden, setChamp: (c) => champSign.set(c), snapBoard, shopFace: extra.shopFace, clickables: [...extra.clickables, ...deco.clickables], wishStar: deco.wishStar, xmasGift: deco.xmasGift, interactives: [...park.interactives, ...outer.interactives, ...extra.interactives, ...deco.interactives], rides: { ...park.rides, ...extra.rides, ...deco.rides } };
+  return { root, colliders, walls: [], objects: {}, flickers: [], ceiling: [], update, mountain, bounds: 28.5 * LS, outdoor: true, background: scene.background, fog: scene.fog, themes, exhibits, hiddenGate: !!opts.hidden, setChamp: (c) => champSign.set(c), snapBoard, shopFace: extra.shopFace, clickables: [...extra.clickables, ...deco.clickables], wishStar: deco.wishStar, xmasGift: deco.xmasGift, interactives: [...park.interactives, ...outer.interactives, ...extra.interactives, ...deco.interactives], rides: { ...park.rides, ...extra.rides, ...deco.rides } };
 }
 
 // ───── 로비 쉼터: 불멍 캠프파이어 + 통나무 벤치 · 타면 움직이는 그네 · 코인 상점

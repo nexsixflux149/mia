@@ -515,7 +515,7 @@ io.on('connection', (sock) => {
   sock.on('move', (m) => {
     if (!me || !m) return;
     if ([m.x, m.z, m.ry].some((v) => typeof v !== 'number' || !isFinite(v))) return;
-    me.x = m.x; me.z = m.z; me.ry = m.ry; me.y = typeof m.y === 'number' && isFinite(m.y) ? Math.max(0, Math.min(12, m.y)) : 0; me.anim = m.anim ? 1 : 0; me.run = !!m.run; me.crouch = !!m.crouch; me.sneak = !!m.sneak;
+    me.x = m.x; me.z = m.z; me.ry = m.ry; me.y = typeof m.y === 'number' && isFinite(m.y) ? Math.max(0, Math.min(me.room === 'lobby' ? 48 : 12, m.y)) : 0; me.anim = m.anim ? 1 : 0; me.run = !!m.run; me.crouch = !!m.crouch; me.sneak = !!m.sneak;
     me.em = typeof m.em === 'string' ? m.em.slice(0, 10) : ''; me.eid = Number(m.eid) | 0;
     if (m.ride !== undefined && !me.usesSeatClaims) {
       const seat = m.ride;

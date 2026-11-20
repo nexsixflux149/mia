@@ -1,3 +1,5 @@
+import {mountainMoveAllowed} from './mountain-layout.js';
+import {teammateLight,remotePoseInterval} from './multiplayer-budget.js';
 import {installMobileCopy} from './mobile-copy.js';
 import * as THREE from 'three';
 import { lobbySantaVisual } from './lobby-santa.js';
@@ -374,7 +376,7 @@ function setTag(g, name, color, title = '') { if (g.userData.tag) removeLabel(g.
 // 깬 테마 수(도장)에 따른 이름표 위 칭호
 function rankOf(n) { return n <= 3 ? '방린이' : n <= 6 ? '방중수' : n <= 8 ? '방고수' : n <= 10 ? '탈출러' : '고인물'; }
 function myTag() { if (myAvatar) setTag(myAvatar, (S.profile?.arcade?.badge ? '🏅 ' : '') + myAvatar.userData.name, '#ffe08a', rankOf(Object.values(S.unlockedBy || {}).filter((v) => v.cleared).length)); }
-function setLight(g, on) { g.userData.spot.visible = !!on && (S.room === 'game' || g.userData.isMe); /* 로비에선 내 손전등만 (빛 개수를 줄여 가볍게) */ g.userData.spot.intensity = on ? 160 : 0; g.userData.beam.visible = false; } // 빛줄기 효과는 눈부셔서 표시하지 않는다
+function setLight(g, on) { g.userData.spot.visible = !!on && (g.userData.isMe || (S.room === 'game' && g.userData.id === S.otherLightId)); g.userData.spot.intensity = on ? 160 : 0; g.userData.beam.visible = false; } // 빛줄기 효과는 눈부셔서 표시하지 않는다
 function rebuildMyAvatar() {
   removeAvatar(myAvatar);
   myAvatar = makeAvatar(S.me, S.myName, look, true);
@@ -633,6 +635,10 @@ function pickAvatar(cx, cy) {
 function groundAt(cx, cy) {
   ndc.set((cx / innerWidth) * 2 - 1, -(cy / innerHeight) * 2 + 1);
   ray.setFromCamera(ndc, camera);
+  if (S.room === 'lobby' && S.world?.mountain) {
+    const hit = ray.intersectObjects(S.world.mountain.walkMeshes,false)[0];
+    if (hit) return hit.point;
+  }
   const p = new THREE.Vector3();
   return ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), p) ? p : null;
 }
@@ -752,7 +758,9 @@ function collide(nx, nz, feetY = 0) {
       else { const px = c.hw - Math.abs(nx - c.x), pz = c.hd - Math.abs(nz - c.z); if (px < pz) nx = c.x + Math.sign(nx - c.x || 1) * (c.hw + R); else nz = c.z + Math.sign(nz - c.z || 1) * (c.hd + R); }
     }
   }
-  if (S.world?.bounds) { const d = Math.hypot(nx, nz); if (d > S.world.bounds) { nx *= S.world.bounds / d; nz *= S.world.bounds / d; } }
+  if (S.room === 'lobby' && S.world?.mountain) {
+    if (!mountainMoveAllowed(nx,nz,me.x,me.z,S.world.bounds)) return [me.x,me.z];
+  } else if (S.world?.bounds) { const d = Math.hypot(nx, nz); if (d > S.world.bounds) { nx *= S.world.bounds / d; nz *= S.world.bounds / d; } }
   return [nx, nz];
 }
 let stepT = 0;
@@ -805,9 +813,10 @@ function updateMove(dt) {
   }
   me.moving = !!(vx || vz) && !blocked;
   const jumping = S.room === 'lobby' && !S.perch && S.em === 'jump';
-  const previousFeetY = jumping ? jumpElevation(S.emT) : 0;
+  const groundY = S.room === 'lobby' && !S.perch ? (S.world?.mountain?.heightAt(me.x,me.z) ?? 0) : 0;
+  const previousFeetY = groundY + (jumping ? jumpElevation(S.emT) : 0);
   if (S.em) { S.emT += dt; const d = EMOTE_DUR[S.em]; if ((me.moving && S.em !== 'jump' && S.em !== 'snow') || (d && S.emT > d)) S.em = ''; }
-  const feetY = jumping ? jumpElevation(S.emT) : 0;
+  const feetY = groundY + (jumping ? jumpElevation(S.emT) : 0);
   const ox = me.x, oz = me.z;
   const nx = me.x + (me.moving ? vx * speed * dt : 0);
   const nz = me.z + (me.moving ? vz * speed * dt : 0);
@@ -832,6 +841,7 @@ function updateMove(dt) {
     me.ry = wrapAng(me.ry + diff * Math.min(1, dt * 12));
     stepT += dt; if (stepT > (run ? 0.26 : S.crouch || sneak ? 0.6 : 0.36)) { stepT = 0; if (!S.crouch && !sneak) audio.step(S.world?.outdoor); }
   }
+  if (S.room === 'lobby' && !S.perch) me.y = S.world?.mountain?.heightAt(me.x,me.z) ?? 0;
   myAvatar.position.set(me.x, me.y || 0, me.z);
   myAvatar.rotation.y = me.ry;
 }
@@ -1116,13 +1126,21 @@ const crowdFrustum = new THREE.Frustum();
 const crowdMatrix = new THREE.Matrix4();
 const crowdBounds = new THREE.Sphere();
 function updateOthers(dt, t) {
-  const crowded = S.room === 'lobby' && S.others.size >= 6;
+  const crowded = S.others.size >= 2;
+  S.otherLightId = S.room === 'game' ? teammateLight(S.others,me.x,me.z,S.otherLightId) : null;
   if (crowded) crowdFrustum.setFromProjectionMatrix(crowdMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
   const frameDt = dt;
   for (const g of S.others.values()) {
     dt = frameDt;
     const p = g.userData.target; if (!p) continue;
     const u = g.userData;
+    setLight(g,p.light);
+    // Position interpolation stays at display rate; only articulated poses are budgeted.
+    if (!p.ride || S.room !== 'lobby') {
+      const k=Math.min(1,frameDt*10);
+      g.position.x+=(p.x-g.position.x)*k;g.position.z+=(p.z-g.position.z)*k;g.position.y+=((p.y||0)-g.position.y)*k;
+      g.rotation.y+=wrapAng(p.ry-g.rotation.y)*k;
+    }
     if (crowded) {
       crowdBounds.center.set(p.x, (p.y || 0) + 1.8, p.z);
       crowdBounds.radius = 6; // 큰 썰매와 날개까지 화면 가장자리에서 잘리지 않게 포함한다.
@@ -1130,7 +1148,7 @@ function updateOthers(dt, t) {
       g.matrixWorldAutoUpdate = g.visible;
       u.crowdDt = (u.crowdDt || 0) + dt;
       const distance = Math.hypot(p.x - me.x, p.z - me.z);
-      const interval = g.visible ? (distance < 9 ? 0 : 1 / 30) : 1 / 8;
+      const interval = remotePoseInterval(g.visible,distance);
       if (u.crowdDt < interval) continue;
       dt = Math.min(u.crowdDt, .2);
       u.crowdDt = 0;
@@ -1143,10 +1161,6 @@ function updateOthers(dt, t) {
       const [rn, si] = p.ride.split(':'); const rp = S.world?.rides?.[rn]?.pos(Number(si));
       if (rp) { g.position.set(rp.x, rp.y, rp.z); g.rotation.y = rp.ry; g.userData.emT = (g.userData.emT || 0) + dt; animateAvatar(g, dt, false, t, false, p.em || null, g.userData.emT); applyGear(g, (p.gear || '').replace(/\|1\|/, '|0|')); animateGear(g, t, dt, false); continue; }
     }
-    const k = Math.min(1, dt * 10);
-    g.position.x += (p.x - g.position.x) * k; g.position.z += (p.z - g.position.z) * k; g.position.y += ((p.y || 0) - g.position.y) * k;
-    let diff = p.ry - g.rotation.y; diff = wrapAng(diff);
-    g.rotation.y += diff * k;
     g.userData.emT = (g.userData.emT || 0) + dt;
     animateAvatar(g, dt, !!p.anim, t, !!p.crouch, p.em || null, g.userData.emT);
     applyGear(g, p.gear || ''); animateGear(g, t, dt, !!p.anim);

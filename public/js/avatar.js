@@ -234,7 +234,7 @@ export function createAvatar(look, { legColor, sleeveColor } = {}) {
   const inner = new THREE.Group(); inner.scale.set(1.08, 0.95, 1); head.add(inner);
   inner.add(new THREE.Mesh(new THREE.SphereGeometry(0.42, 64, 48), skin));
   // 목
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 0.16, 38), skin); neck.position.y = -0.4; head.add(neck);
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 0.16, 38), skin); neck.userData.avatarNeck = true; neck.position.y = -0.4; head.add(neck);
 
   // 얼굴 텍스처
   const fc = document.createElement('canvas'); fc.width = fc.height = 512;
