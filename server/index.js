@@ -17,6 +17,7 @@ import { ITEMS, START_ITEMS } from './items.js';
 import { openStore, persist, persistBatch, flushAll, storeKind, loadClearPhotos, saveClearPhoto } from './store.js';
 import { MAX_LV, HIDDEN_LV, ADMIN_LV, levelOf, xpAt, CLEAR_COINS, CHAPTER_XP, clearXp, themeRewardXp, timeLimitMs, SHOP, isWear, blankProfile, profileView, dayKey, statRange, pruneStats, addPeriodXp, levelBoard, weekKey, monthKey, GOLD_IDS, GOLD_STAFF, isGold, giveGold, randomGold, goldWorn, weeklyPodium } from './progress.js';
 import { Accounts, clientIp } from './accounts.js';
+import { attachArcade, arcadeStatus } from './arcade-service.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
@@ -142,7 +143,7 @@ const prof = (name) => {
   return pf;
 };
 const findByName = (name) => [...players.values()].find((p) => p.name === name && !p.offline);
-const sendProfile = (p) => { if (p) io.to(p.id).emit('profile', { ...profileView(prof(p.name), p.admin), hiddenOk: hiddenOk(p.name) }); };
+const sendProfile = (p) => { if (p) io.to(p.id).emit('profile', { ...profileView(prof(p.name), p.admin), arcade: arcadeStatus(prof(p.name)), hiddenOk: hiddenOk(p.name) }); };
 // 장비 문자열: 날개|탈것|타는 중|손에 든 것(0 없음 · 1 전설의 검 · 2 황금 고양이 지팡이)|코스튬|황금 고양이 부위 글자
 function goldConflictsWithCostume({ gold, costume }) {
   return Boolean(gold && costume && (costume !== 'costume_xmas' || gold !== 'm'));
@@ -189,7 +190,7 @@ let seq = 1;
 const TICK_MS = 100;
 const r2 = (v) => Math.round(v * 100) / 100;
 const dynOf = (p) => [r2(p.x), r2(p.z), r2(p.y || 0), r2(p.ry), (p.anim ? 1 : 0) | (p.crouch ? 2 : 0) | (p.light ? 4 : 0)];
-const extOf = (p) => ({ n: p.name, lv: p.lv, pt: p.partyId || '', g: gearOf(p), em: p.em || '', eid: p.eid || 0, rd: p.room === 'lobby' ? p.ride || '' : '', et: p.eat || 0, st: stampsOf(p.name) });
+const extOf = (p) => ({ n: p.name, lv: p.lv, pt: p.partyId || '', g: gearOf(p), em: p.em || '', eid: p.eid || 0, rd: p.room === 'lobby' ? p.ride || '' : '', et: p.eat || 0, st: stampsOf(p.name), ab: arcadeStatus(prof(p.name)).badge });
 // 깬 테마 수(도장) — 이름표 위 칭호용. 테마 12개뿐이라 매번 세도 가볍다
 const stampsOf = (name) => name ? Object.values(SCENARIOS).filter((s) => saves[s.saveKey(name) + ':clear']).length : 0;
 const roomMeta = new Map(); // room -> { gk: 마지막으로 보낸 귀신 상태, ghosts, full: 다음 번에 전체를 보낼지, fullAt }
@@ -320,6 +321,7 @@ function leaveParty(p) {
 
 io.on('connection', (sock) => {
   let me = null;
+  attachArcade(sock, {getPlayer:()=>me, profile:prof, save:saveProfiles, changed:p=>{sendProfile(p);needFull(p.room);}});
 
   const setMe = (p) => { me = p; sock.data.pid = p ? p.id : null; };
   // 입장 · 이어 접속 때 화면에 돌려주는 내 정보
@@ -627,7 +629,7 @@ io.on('connection', (sock) => {
     if (!me) return; const it = SHOP[id]; if (!it) return;
     const pf = prof(me.name); const lv = levelOf(pf.xp); const have = pf.items[id] || 0;
     if (it.kind === 'rename' && !me.acct) return sock.emit('toast', { text: '고정 계정으로 접속하면 닉네임 변경권을 살 수 있어요.' });
-    if (it.nosale) return sock.emit('toast', { text: it.gift === 'xmas' ? `${it.icon} ${it.name}은(는) 비매품이에요. 로비 소원의 별 앞 🎁 선물상자에서 받을 수 있어요.` : it.kind === 'staff' ? `${it.icon} ${it.name}은(는) 비매품이에요. 황금 고양이 세트 7종을 모두 모으면 받아요.` : `${it.icon} ${it.name}은(는) 비매품이에요. 매주 주간랭킹 1~3위에게 아직 없는 부위 하나가 무작위로 주어져요.` });
+    if (it.nosale) return sock.emit('toast', { text: it.gift === 'arcade' ? '🧸 왕대두 인형탈은 미아 오락실 100문제 완주 보상이며 구매할 수 없어요.' : it.gift === 'xmas' ? `${it.icon} ${it.name}은(는) 비매품이에요. 로비 소원의 별 앞 🎁 선물상자에서 받을 수 있어요.` : it.kind === 'staff' ? `${it.icon} ${it.name}은(는) 비매품이에요. 황금 고양이 세트 7종을 모두 모으면 받아요.` : `${it.icon} ${it.name}은(는) 비매품이에요. 매주 주간랭킹 1~3위에게 아직 없는 부위 하나가 무작위로 주어져요.` });
     if (!me.admin && lv < it.lv) return sock.emit('toast', { text: `🔒 Lv.${it.lv} 부터 살 수 있어요. (지금 Lv.${lv})` });
     if (have >= it.max) return sock.emit('toast', { text: it.max > 1 ? `${it.icon} ${it.name}은(는) ${it.max}개까지만 가질 수 있어요.` : `${it.icon} ${it.name}은(는) 이미 가지고 있어요.` });
     if (!me.admin && (pf.coins || 0) < it.price) return sock.emit('toast', { text: `🪙 코인이 모자라요. (${it.price}코인 필요 · 지금 ${pf.coins || 0}코인)` });
@@ -814,6 +816,7 @@ io.on('connection', (sock) => {
     if (!me) return; const t = players.get(to); const it = SHOP[id];
     if (!t || t === me || !it) return;
     const a = prof(me.name), b = prof(t.name);
+    if (it.gift === 'arcade') return sock.emit('toast', {text:'왕대두 인형탈은 직접 100문제를 완주해야 받을 수 있어요.'});
     if (it.nosale && !me.admin) return sock.emit('toast', { text: `${it.icon} ${it.name}은(는) 비매품이라 선물할 수 없어요.` });
     if (!a.items[id] && !me.admin) return sock.emit('toast', { text: '가지고 있지 않은 물건이에요.' });
     if ((b.items[id] || 0) >= it.max) return sock.emit('toast', { text: it.max > 1 ? `${t.name} 님은 ${it.name}을(를) 더 받을 수 없어요. (최대 ${it.max}개)` : `${t.name} 님은 ${it.icon} ${it.name}을(를) 이미 가지고 있어요. (아이템별 1개만 가질 수 있어요)` });
@@ -1295,7 +1298,7 @@ setInterval(() => {
     const full = meta.full || now - meta.fullAt > 10000; // 가끔은 전체를 보내 혹시 어긋난 화면을 바로잡는다
     const out = [];
     for (const p of list) {
-      const d = dynOf(p), dk = d.join(), e = extOf(p), ek = `${e.n}|${e.lv}|${e.pt}|${e.g}|${e.em}|${e.eid}|${e.rd}|${e.et}|${e.st}`;
+      const d = dynOf(p), dk = d.join(), e = extOf(p), ek = `${e.n}|${e.lv}|${e.pt}|${e.g}|${e.em}|${e.eid}|${e.rd}|${e.et}|${e.st}|${e.ab}`;
       if (full || p._sr !== room || ek !== p._ek) out.push([p.id, ...d, e]);
       else if (dk !== p._dk) out.push([p.id, ...d]);
       p._dk = dk; p._ek = ek; p._sr = room;

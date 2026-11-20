@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { buildArcadeCabinet } from './arcade-cabinet.js';
 import { buildProp, FOOT, setPropTheme, markShared, disposeTree } from './props.js';
 import { buildXmasProp, decorateXmas } from './xmas-visuals.js';
 import { wrapGift } from './gift-ribbon.js';
@@ -1532,6 +1533,15 @@ function buildLobbyExtras(root, colliders, add) {
   }
   // ── 고객소리함 (광장 동쪽, 상점 옆) — 빨간 우편함. 버그 · 건의사항을 적어 넣는다
   const clickables = [];
+  // Balloon clown is at (6.5,14.5); shop at (7.6*LS,3.4*LS).
+  // Midpoint uses final lobby coordinates so it stays between the two after spreading.
+  {
+    const cx = 9.33, cz = 9.97, g = buildArcadeCabinet();
+    g.position.set(cx,0,cz); g.rotation.y = Math.atan2(-cx,5*LS-cz); g.userData.noSpread = true; root.add(g);
+    colliders.push({x:cx,z:cz,hw:.9,hd:.9,noSpread:true});
+    interactives.push({id:'arcade',kind:'arcade',x:cx,z:cz,r:2.8,label:'미아 오락실',verb:'연습게임',noSpread:true});
+    clickables.push({id:'arcade',group:g});
+  }
   {
     const cx = 3.9, cz = 3.5; const g = new THREE.Group(); g.position.set(cx, 0, cz); g.rotation.y = Math.atan2(0 - cx, 7 - cz); root.add(g); // 입장하는 사람들 쪽을 바라보게
     const red = pm('#d4202a', { roughness: 0.35, metalness: 0.25 }), redD = pm('#9a1018', { roughness: 0.4, metalness: 0.25 }), dark = pm('#1a1216', { roughness: 0.6 }), gold = pm('#ffd36a', { roughness: 0.3, metalness: 0.6, emissive: '#a06a10', emissiveIntensity: 0.35 });

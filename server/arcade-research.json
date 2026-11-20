@@ -1,0 +1,56 @@
+{
+  "target": 100,
+  "authored": 100,
+  "status": "automated-checks-passed-human-playtest-pending",
+  "strictRequirement": "Different solution principles, not parameter or story reskins. Labels alone are not proof of semantic uniqueness.",
+  "independentHumanTestsolves": 0,
+  "sources": [
+    {
+      "url": "https://puzzledpint.org/volunteering/write-puzzles/",
+      "use": "Editorial principles: thematic clues, aha moment, not requiring external theme knowledge; no source puzzle copied."
+    },
+    {
+      "url": "https://www.chiark.greenend.org.uk/~sgtatham/puzzles/",
+      "use": "Survey of published puzzle genres. Original small boards and clues authored separately."
+    },
+    {
+      "url": "https://2020.teammatehunt.com/wrapup",
+      "use": "Survey of puzzle-hunt production and testsolving workflow."
+    },
+    {
+      "url": "https://roomescapeartist.com/2017/04/12/alternative-puzzle-solutions-for-escape-rooms-design-tip/",
+      "use": "Remove ambiguous answers or explicitly accept all intended solutions."
+    },
+    {
+      "url": "https://www.chiark.greenend.org.uk/~sgtatham/puzzles/doc/blackbox.html",
+      "use": "Design review: exact hidden layout may be ambiguous; validate permitted answers."
+    },
+    {
+      "url": "https://www.chiark.greenend.org.uk/~sgtatham/puzzles/doc/lightup.html",
+      "use": "Survey of geometric constraints and fully stated rules."
+    }
+  ],
+  "reviewFindings": [
+    {
+      "id": 35,
+      "finding": "Two height orders satisfied original clues. Added explicit relative-height clue and enumerated all 24 permutations."
+    },
+    {
+      "id": 40,
+      "finding": "Two terminal peg locations possible. Revised question to ask for all reachable final locations and verified both."
+    },
+    {
+      "id": 56,
+      "finding": "Independent enumeration corrected the initial cryptarithm answer to72."
+    },
+    {
+      "id": 64,
+      "finding": "Corrected positional feedback; all 120 possible codes enumerated."
+    },
+    {
+      "id": 75,
+      "finding": "Computed all single-bit corrections; damaged bit is7."
+    }
+  ],
+  "remaining": 0
+}

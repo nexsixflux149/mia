@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { openArcade } from './arcade-ui.js';
 import { createAvatar, animateAvatar, textSprite, OPTIONS, SKIN, ACCENT, HAIRC, EYEC, DEFAULT_LOOK, EMOTES, EMOTE_DUR, jumpElevation } from './avatar.js';
 import { Cinema } from './cinema.js';
 import { xmasMirrorPanel } from './xmas-mirrors.js';
@@ -362,7 +363,7 @@ function makeAvatar(id, name, lk, isMe) {
 function setTag(g, name, color, title = '') { if (g.userData.tag) removeLabel(g.userData.tag); g.userData.tag = addLabel(g, textSprite(name, { size: 30, color, bg: 'rgba(10,8,12,.72)', stroke: 'rgba(0,0,0,.85)', sub: title }), title ? 1.59 : 1.55); }
 // 깬 테마 수(도장)에 따른 이름표 위 칭호
 function rankOf(n) { return n <= 3 ? '방린이' : n <= 6 ? '방중수' : n <= 8 ? '방고수' : n <= 10 ? '탈출러' : '고인물'; }
-function myTag() { if (myAvatar) setTag(myAvatar, myAvatar.userData.name, '#ffe08a', rankOf(Object.values(S.unlockedBy || {}).filter((v) => v.cleared).length)); }
+function myTag() { if (myAvatar) setTag(myAvatar, (S.profile?.arcade?.badge ? '🏅 ' : '') + myAvatar.userData.name, '#ffe08a', rankOf(Object.values(S.unlockedBy || {}).filter((v) => v.cleared).length)); }
 function setLight(g, on) { g.userData.spot.visible = !!on && (S.room === 'game' || g.userData.isMe); /* 로비에선 내 손전등만 (빛 개수를 줄여 가볍게) */ g.userData.spot.intensity = on ? 160 : 0; g.userData.beam.visible = false; } // 빛줄기 효과는 눈부셔서 표시하지 않는다
 function rebuildMyAvatar() {
   removeAvatar(myAvatar);
@@ -633,7 +634,7 @@ function hoverCheck(e) {
   let label = null;
   const th = S.room === 'lobby' ? pickTheme(e.clientX, e.clientY) : null;
   if (th) label = `${THEME_INFO[th]?.title || ''} — 클릭해서 시작`;
-  else if (S.room === 'lobby') { const ck = pickClickable(e.clientX, e.clientY); if (ck) label = { mailbox: '📮 고객소리함 — 버그 · 건의사항 보내기', wishstar: '🌠 소원의 별 — 소원빌기', vote: '🗳️ 테마 투표 전광판 — 투표하기', xmasgift: '🎁 크리스마스 선물상자 — 선물받기' }[ck] || null; }
+  else if (S.room === 'lobby') { const ck = pickClickable(e.clientX, e.clientY); if (ck) label = { arcade: '🕹️ 미아 오락실 — 미니 방탈출', mailbox: '📮 고객소리함 — 버그 · 건의사항 보내기', wishstar: '🌠 소원의 별 — 소원빌기', vote: '🗳️ 테마 투표 전광판 — 투표하기', xmasgift: '🎁 크리스마스 선물상자 — 선물받기' }[ck] || null; }
   if (id) { const ent = S.world.objects[id]; label = (ent.done ? '✓ ' : '') + (ent.data.label || '') + (distTo(ent) > reach(ent) ? '  (클릭하면 다가감)' : ''); }
   else if (!th) { const av = pickAvatar(e.clientX, e.clientY); if (av) label = `${av.userData.name} (클릭: 메뉴)`; }
   canvas.style.cursor = label ? 'pointer' : 'default';
@@ -1029,7 +1030,7 @@ S.net = new Map();
 function applyPlayer(e) {
   let p = S.net.get(e[0]); if (!p) { p = { id: e[0] }; S.net.set(e[0], p); }
   p.x = e[1]; p.z = e[2]; p.y = e[3]; p.ry = e[4]; p.anim = e[5] & 1; p.crouch = e[5] & 2 ? 1 : 0; p.light = !!(e[5] & 4);
-  const x = e[6]; if (x) { p.name = x.n; p.lv = x.lv; p.partyId = x.pt || null; p.gear = x.g; p.em = x.em; p.eid = x.eid; p.ride = x.rd; p.et = x.et || 0; p.st = x.st || 0; }
+  const x = e[6]; if (x) { p.name = x.n; p.lv = x.lv; p.partyId = x.pt || null; p.gear = x.g; p.em = x.em; p.eid = x.eid; p.ride = x.rd; p.et = x.et || 0; p.st = x.st || 0; p.arcadeBadge = !!x.ab; }
   return p;
 }
 /** 다른 사람 한 명을 화면에 맞춘다 (캐릭터 만들기 · 외형 받기 · 감정표현 · 손전등 · 파티 표시) */
@@ -1058,7 +1059,7 @@ function syncOther(p) {
   g.userData.target = p;
   setLight(g, p.light);
   const inParty = !!S.party?.members.some((m) => m.id === p.id);
-  if (g.userData.inParty !== inParty || g.userData.tagName !== p.name || g.userData.tagSt !== p.st) { g.userData.inParty = inParty; g.userData.tagName = p.name; g.userData.tagSt = p.st; setTag(g, (inParty ? '★ ' : '') + p.name, inParty ? '#8fd3ff' : '#fff', rankOf(p.st || 0)); }
+  if (g.userData.inParty !== inParty || g.userData.tagName !== p.name || g.userData.tagSt !== p.st || g.userData.arcadeBadge !== p.arcadeBadge) { g.userData.inParty = inParty; g.userData.tagName = p.name; g.userData.tagSt = p.st; g.userData.arcadeBadge = p.arcadeBadge; setTag(g, (p.arcadeBadge ? '🏅 ' : '') + (inParty ? '★ ' : '') + p.name, inParty ? '#8fd3ff' : '#fff', rankOf(p.st || 0)); }
 }
 const syncAllOthers = () => { for (const p of S.net.values()) syncOther(p); };
 function dropOther(id) { S.net.delete(id); const g = S.others.get(id); if (g) { removeAvatar(g); S.others.delete(id); } }
@@ -2688,6 +2689,7 @@ async function claimLobbySeat(id, candidates) {
 async function lobbyAct(id) {
   if (requestingSeat) return;
   if (S.mount) { dismount(); toast('내렸어요.'); return; }
+  if (id === 'arcade') { openArcade({socket,openModal}); return; }
   if (id === 'shop') { setTimeout(openShop, 160); return; }
   if (id === 'mailbox') { setTimeout(openFeedback, 160); return; }
   if (id === 'wishstar') { setTimeout(openWish, 160); return; }
@@ -3224,7 +3226,7 @@ async function loadShareInfo() {
 
 // ─────────────────────────── 레벨 · 코인 · 상점 · 내 물건 · 선물
 const GOLD_ORDER = ['gold_hat', 'gold_mask', 'gold_gloves', 'gold_top', 'gold_bottom', 'gold_shoes', 'gold_tail']; // 황금 고양이 세트 (비매품 · 주간랭킹 1~3위 보상)
-const SHOP_ORDER = ['rename_ticket', 'popper', 'rocket', 'wings_fairy', 'mount_pony', 'wings_angel', 'mount_broom', 'mount_cat', 'mount_dog', 'mount_wolf', 'mount_unicorn', 'wings_bat', 'tail_devil', 'horn_devil', 'wings_devil', 'mount_trex', 'wings_dragon', 'sword', 'mount_ufo', 'mount_lion', 'mount_turtle', 'mount_human', 'costume_robot', 'mount_carriage', 'chainsaw', 'mask_paper', 'mask_rabbit', 'mask_menhera', 'mask_fox', 'mask_bear', 'mask_hahoe', 'mask_wolf', 'mask_venice', 'mask_ghost', 'mask_oni', 'mount_sleigh', 'costume_xmas', ...GOLD_ORDER, 'gold_staff'];
+const SHOP_ORDER = ['rename_ticket', 'popper', 'rocket', 'wings_fairy', 'mount_pony', 'wings_angel', 'mount_broom', 'mount_cat', 'mount_dog', 'mount_wolf', 'mount_unicorn', 'wings_bat', 'tail_devil', 'horn_devil', 'wings_devil', 'mount_trex', 'wings_dragon', 'sword', 'mount_ufo', 'mount_lion', 'mount_turtle', 'mount_human', 'costume_robot', 'mount_carriage', 'chainsaw', 'mask_paper', 'mask_rabbit', 'mask_menhera', 'mask_fox', 'mask_bear', 'mask_hahoe', 'mask_wolf', 'mask_venice', 'mask_ghost', 'mask_oni', 'mask_bighead', 'mount_sleigh', 'costume_xmas', ...GOLD_ORDER, 'gold_staff'];
 const coinsText = () => (S.profile?.coins === -1 ? '∞' : String(S.profile?.coins ?? 0));
 // 손에 든 것: 0 없음 · 1 전설의 검 · 2 황금 고양이 지팡이
 function holdCode() { const it = S.profile?.items; return S.holdSaw && it?.chainsaw ? 3 : S.holdStaff && it?.gold_staff ? 2 : S.holdSword && it?.sword ? 1 : 0; }
@@ -3283,6 +3285,7 @@ function renderXp() {
 }
 socket.on('profile', (pf) => {
   const was = S.profile; S.profile = pf;
+  if (was?.arcade?.badge !== pf.arcade?.badge) myTag();
   if (pf.items?.costume_xmas) S.world?.xmasGift?.hide(); // 계정 정보가 로비보다 늦게 와도 이미 받은 선물상자는 숨긴다
   if (!was && pf.equip?.mount) S.riding = true; // 탈것을 착용해 두었다면 타고 시작
   if (was && pf.equip?.mount && pf.equip.mount !== was.equip?.mount) S.riding = true; // 새 탈것을 착용하면 바로 탄다
@@ -3430,12 +3433,16 @@ function openShop() {
       const it = S.shop[id]; if (!it) continue;
       const have = pf.items?.[id] || 0, locked = !pf.admin && pf.lv < it.lv, full = have >= it.max;
       const c = el('div', 'shop-card' + (sel === id ? ' sel' : '') + (locked ? ' locked' : ''));
-      if (it.nosale) { c.classList.add('nosale'); c.innerHTML = `<div class="si">${it.icon}</div><div class="sn">${it.name}</div><div class="sp">비매품</div><div class="sl">${have ? '✅ 보유' : it.gift === 'xmas' ? '🎄 크리스마스 선물' : it.kind === 'staff' ? '세트 7종 보상' : '🏆 주간 1위 보상'}</div>`; }
+      if (it.nosale) { c.classList.add('nosale'); c.innerHTML = `<div class="si">${it.icon}</div><div class="sn">${it.name}</div><div class="sp">비매품</div><div class="sl">${have ? '✅ 보유' : it.gift === 'arcade' ? '🧩 100문제 완주 보상' : it.gift === 'xmas' ? '🎄 크리스마스 선물' : it.kind === 'staff' ? '세트 7종 보상' : '🏆 주간 1위 보상'}</div>`; }
       else c.innerHTML = `<div class="si">${it.icon}</div><div class="sn">${it.name}</div><div class="sp">🪙 ${it.price.toLocaleString()}</div><div class="sl">${locked ? `🔒 Lv.${it.lv}` : it.max > 1 ? `${have}/${it.max}개` : have ? '✅ 보유' : `Lv.${it.lv}+`}</div>`;
       c.onclick = () => { sel = id; previewItem(id); draw(); };
       grid.appendChild(c);
     }
     const it = S.shop[sel]; const have = pf.items?.[sel] || 0; const locked = !it.nosale && !pf.admin && pf.lv < it.lv;
+    if (it.gift === 'arcade') {
+      info.append(el('div','sh-t',`${it.icon} ${it.name}`),el('div','sh-d',it.desc),el('div','sh-d muted',it.tip),el('div','sh-lv',have?'✅ 보유':`완주 진행 ${pf.arcade?.cleared || 0} / 100`));
+      const bag=el('button','btn','🎒 내 물건');bag.onclick=()=>openBag();info.append(bag);return;
+    }
     if (it.nosale) { // 비매품: 전시만 한다 (살 수 없다)
       const goldHave = GOLD_ORDER.filter((id) => pf.items?.[id]).length;
       info.innerHTML = `<div class="sh-t">${it.icon} ${it.name}</div><div class="sh-d">${it.desc}</div><div class="sh-d muted">${it.tip || ''}</div><div class="sh-lv">${have ? '✅ 가지고 있어요' : it.gift === 'xmas' ? '🎁 로비 소원의 별 앞 선물상자에서 E 키로 받아요 (한 사람에 한 번)' : it.kind === 'staff' ? `황금 고양이 세트 ${goldHave}/7 모음` : '🏆 주간랭킹 1~3위에게 미보유 부위 1개를 무작위로 지급해요'}</div>${it.gift === 'xmas' ? '' : `<div class="muted">아이템별 1개만 가질 수 있어요 · 황금 고양이 세트 ${goldHave}/7${it.kind === 'staff' ? '' : ' · 7종을 다 모으면 🪄 황금 고양이 지팡이(귀신 퇴치 무제한)'}</div>`}`;
@@ -3513,7 +3520,7 @@ function openBag() {
         const b = el('button', 'btn tiny primary', it.kind === 'pop' ? '🎉 펑!' : '🎆 쏘기'); b.onclick = () => { closeModal(); useShopItem(id); };
         acts.appendChild(b);
       }
-      if (!it.nosale || pf.admin) { const gb = el('button', 'btn tiny', '🎁'); gb.title = '친구에게 선물하기'; gb.onclick = () => pickGiftTarget(id); acts.appendChild(gb); } // 비매품은 선물할 수 없다
+      if ((!it.nosale || pf.admin) && it.gift !== 'arcade') { const gb = el('button', 'btn tiny', '🎁'); gb.title = '친구에게 선물하기'; gb.onclick = () => pickGiftTarget(id); acts.appendChild(gb); } // 비매품은 선물할 수 없다
       else acts.appendChild(el('span', 'bag-tag', '비매품'));
       row.appendChild(acts); w.appendChild(row);
     }
@@ -3573,7 +3580,7 @@ function pickGiftTarget(id) {
 function openGift(toId, name) {
   if (!S.profile) return;
   const w = el('div', 'bag'); const pf = S.profile;
-  const ids = SHOP_ORDER.filter((id) => S.shop[id] && (pf.admin || (pf.items?.[id] && !S.shop[id].nosale)));
+  const ids = SHOP_ORDER.filter((id) => S.shop[id] && S.shop[id].gift !== 'arcade' && (pf.admin || (pf.items?.[id] && !S.shop[id].nosale)));
   if (!ids.length) w.appendChild(el('div', 'muted', '선물할 물건이 없어요. 🛒 상점에서 먼저 사 보세요!'));
   for (const id of ids) { const it = S.shop[id]; const b = el('button', 'btn small', `${it.icon} ${it.name}${pf.items?.[id] > 1 ? ` (${pf.items[id]}개)` : ''}`); b.onclick = () => { socket.emit('shop:gift', { to: toId, id }); closeModal(); }; w.appendChild(b); }
   openModal(`🎁 ${name} 님에게 선물하기`, '내 물건 중 하나를 골라 보내요', w);

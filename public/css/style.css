@@ -951,3 +951,13 @@ body.mobile #login .logo { padding: 0; margin: 0; }
 .vote-name, .vote-n { position: relative; }
 .vote-n { font-weight: 800; color: #ffd23a; white-space: nowrap; }
 .vote-note { margin-top: 10px; font-size: 13px; }
+
+/* Arcade practice popup */
+.arcade-panel{display:grid;gap:14px;min-width:0}
+.arcade-panel progress{width:100%;height:12px;accent-color:#acd293}
+.arcade-panel .arcade-nav,.arcade-panel form{display:flex;gap:8px;flex-wrap:wrap}
+.arcade-panel input{min-width:0;max-width:100%;padding:12px;border:1px solid #827357;border-radius:8px;background:#171b18;color:#eff7df;font:inherit}
+.arcade-nav input{width:95px}.arcade-panel form input{flex:1;width:140px}
+.arcade-prompt{white-space:pre-line;line-height:1.9;padding:18px;background:#151c18;border:1px solid #56624b;border-radius:12px;overflow-wrap:anywhere}
+.arcade-panel summary{cursor:pointer;padding:10px}.arcade-panel progress+p{font-size:13px}
+.arcade-panel [hidden]{display:none!important}

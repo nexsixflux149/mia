@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createAvatar, SNOW_RELEASE } from './avatar.js';
-import { boxG, markShared } from './props.js';
+import { boxG, markShared, isShared, disposeTree } from './props.js';
 
 // ───── 상점 물건 모양 (날개 · 탈것 · 전설의 검) + 사용 효과 (폭죽 · 검 · 방귀)
 // 모든 날개·탈것은 조금씩 반복해서 움직이고, 살짝 빛난다.
@@ -1278,14 +1278,32 @@ function maskGhost() { // 귀신 가면: 핏기 없는 창백한 얼굴 · 퀭�
   };
   return g;
 }
-const MASKS = { mask_paper: maskPaper, mask_fox: maskFox, mask_hahoe: maskHahoe, mask_venice: maskVenice, mask_oni: maskOni, mask_rabbit: maskRabbit, mask_menhera: maskMenhera, mask_bear: maskBear, mask_wolf: maskWolf, mask_ghost: maskGhost };
+function maskBighead() {
+  const donor = createAvatar({body:'#ffd6a5',accent:'#ff8fab',ears:'bear',hat:'none',eyes:'big',eyeColor:'#5a3825',brows:'soft',mouth:'smile',cheeks:'blush',extra:'none',hair:'short',hairColor:'#5a3825',outfit:'plain',acc:'none',pin:'none',held:'none'});
+  const head = donor.userData.head; head.removeFromParent(); head.position.set(0,0,0); head.scale.setScalar(2);
+  const kept=new Set();head.traverse(o=>{if(o.geometry)kept.add(o.geometry);for(const m of [].concat(o.material||[])){kept.add(m);for(const v of Object.values(m))if(v?.isTexture)kept.add(v);}});
+  const disposed=new Set(); const drop=v=>{if(v&&!kept.has(v)&&!disposed.has(v)&&!isShared(v)){disposed.add(v);v.dispose?.();}};
+  donor.traverse(o=>{drop(o.geometry);for(const m of [].concat(o.material||[])){if(!kept.has(m)&&!isShared(m)){for(const v of Object.values(m))if(v?.isTexture)drop(v);drop(m);}}});
+  const g = new THREE.Group();g.name='왕대두 인형탈';g.add(head);
+  // Raising the doubled head keeps its chin at the original neck instead of inside the torso.
+  head.position.y=.40;
+  return g;
+}
+function hideDollBase(u) {
+  if(u.gMaskId!=='mask_bighead'||!u.head)return;
+  u.dollHeadHidden ||= new Map();
+  for(const child of u.head.children)if(child!==u.gMask){if(!u.dollHeadHidden.has(child))u.dollHeadHidden.set(child,child.visible);child.visible=false;}
+}
+const MASKS = { mask_bighead: maskBighead, mask_paper: maskPaper, mask_fox: maskFox, mask_hahoe: maskHahoe, mask_venice: maskVenice, mask_oni: maskOni, mask_rabbit: maskRabbit, mask_menhera: maskMenhera, mask_bear: maskBear, mask_wolf: maskWolf, mask_ghost: maskGhost };
 /** 상점 가면 하나 (머리 기준 좌표 · 상점 미리보기에서도 쓴다) */
 export function buildMask(id) { const f = MASKS[id]; if (!f) return null; const g = f(); g.userData.gold = true; g.traverse((o) => { if (o.isMesh) o.castShadow = true; }); return g; }
 function setMask(g, id) {
   const u = g.userData;
-  if (u.gMask) { u.gMask.parent?.remove(u.gMask); u.gMask = null; }
+  if(u.dollHeadHidden){for(const [child,visible] of u.dollHeadHidden)child.visible=visible;u.dollHeadHidden=null;}
+  if (u.gMask) { u.gMask.parent?.remove(u.gMask); disposeTree(u.gMask); u.gMask = null; }
   u.gMaskId = id;
   if (id && u.head) { u.gMask = buildMask(id); if (u.gMask) u.head.add(u.gMask); }
+  hideDollBase(u);
 }
 function setCostume(g, id) {
   const u = g.userData;
@@ -1407,6 +1425,7 @@ export function animateGear(g, t, dt, moving) {
   u.gCostume?.anim(t);
   u.gGold?.anim(t, moving);
   u.gMask?.userData.anim?.(t);
+  hideDollBase(u);
   if (u.gMount) {
     // 점프: animateAvatar 가 먼저 올려 둔 몸 높이를 기억해 두었다가 탈것과 함께 폴짝 띄운다
     const jy = u.expr === 'jump' ? Math.max(0, u.rig.position.y) : 0;
