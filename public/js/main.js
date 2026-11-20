@@ -784,7 +784,7 @@ function updateMove(dt) {
       if (p) { me.x = p.x; me.z = p.z; me.y = p.y; me.ry = wrapAng(p.ry); }
       me.moving = false;
       myAvatar.position.set(me.x, me.y, me.z);
-      myAvatar.rotation.y = me.ry;
+      if(p?.q)myAvatar.quaternion.copy(p.q);else myAvatar.rotation.set(0,me.ry,0);
       return;
     }
   }
@@ -1139,7 +1139,7 @@ function updateOthers(dt, t) {
     if (!p.ride || S.room !== 'lobby') {
       const k=Math.min(1,frameDt*10);
       g.position.x+=(p.x-g.position.x)*k;g.position.z+=(p.z-g.position.z)*k;g.position.y+=((p.y||0)-g.position.y)*k;
-      g.rotation.y+=wrapAng(p.ry-g.rotation.y)*k;
+      g.rotation.x=0;g.rotation.z=0;g.rotation.y+=wrapAng(p.ry-g.rotation.y)*k;
     }
     if (crowded) {
       crowdBounds.center.set(p.x, (p.y || 0) + 1.8, p.z);
@@ -1159,7 +1159,7 @@ function updateOthers(dt, t) {
     }
     if (p.ride && S.room === 'lobby') {
       const [rn, si] = p.ride.split(':'); const rp = S.world?.rides?.[rn]?.pos(Number(si));
-      if (rp) { g.position.set(rp.x, rp.y, rp.z); g.rotation.y = rp.ry; g.userData.emT = (g.userData.emT || 0) + dt; animateAvatar(g, dt, false, t, false, p.em || null, g.userData.emT); applyGear(g, (p.gear || '').replace(/\|1\|/, '|0|')); animateGear(g, t, dt, false); continue; }
+      if (rp) { g.position.set(rp.x, rp.y, rp.z); if(rp.q)g.quaternion.copy(rp.q);else g.rotation.set(0,rp.ry,0); g.userData.emT = (g.userData.emT || 0) + dt; animateAvatar(g, dt, false, t, false, p.em || null, g.userData.emT); applyGear(g, (p.gear || '').replace(/\|1\|/, '|0|')); animateGear(g, t, dt, false); continue; }
     }
     g.userData.emT = (g.userData.emT || 0) + dt;
     animateAvatar(g, dt, !!p.anim, t, !!p.crouch, p.em || null, g.userData.emT);
@@ -2688,13 +2688,14 @@ function mountPos() {
 function dismount(releaseSeat = true) {
   const m = S.mount; if (!m) return;
   if (releaseSeat && socket.connected) socket.emit('lobby:seat', '');
-  S.mount = null; S.em = ''; me.y = 0; me.ry = wrapAng(me.ry); S.moveTarget = null;
+  S.mount = null; S.em = ''; if(myAvatar)myAvatar.rotation.set(0,me.ry,0); me.y = 0; me.ry = wrapAng(me.ry); S.moveTarget = null;
   if (m.kind === 'ride') {
     const it = S.world?.interactives?.find((i) => i.id === m.ride);
     const ex = S.world?.rides?.[m.ride]?.exit;
     if (ex) { me.x = ex.x; me.z = ex.z; }
     else if (it) { const a = Math.atan2(me.x - it.x, me.z - it.z); const d = m.ride === 'carousel' ? 3.9 : 0; me.x = it.x + Math.sin(a) * d; me.z = m.ride === 'wheel' ? it.z + 0.6 : it.z + Math.cos(a) * d; if (m.ride === 'wheel') me.x = it.x; }
   } else { const k = m.seat?.back ? -0.75 : 0.7; me.x += Math.sin(me.ry) * k; me.z += Math.cos(me.ry) * k; } // 테이블을 보고 앉는 자리는 뒤로 일어난다
+  me.y = S.world?.mountain?.heightAt(me.x,me.z) ?? 0;
   [me.x, me.z] = collide(me.x, me.z);
   if (S.wasRiding && S.profile?.equip?.mount) { S.riding = true; updateGearButtons(); } S.wasRiding = false;
 }

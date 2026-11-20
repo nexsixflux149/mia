@@ -45,6 +45,11 @@ with tempfile.TemporaryDirectory(prefix='mia-arcade100-test-') as data:
   time.sleep(.3);ws.send('42'+json.dumps(['state:full']))
   state=event(ws,'state')
   while not state.get('f') or not any(row[0]==identities[0]['id'] and row[3]==44 for row in state['p']):state=event(ws,'state')
+  assert call('lobby:seat',['viking:0'])=='viking:0'
+  ws=clients[1];assert call('lobby:seat',['viking:0']) is None
+  assert call('lobby:seat',['viking:1'])=='viking:1'
+  call('lobby:seat','');ws=clients[0];call('lobby:seat','')
+  print('PASS: summit Viking seats are authoritative; occupied seat rejected; release succeeds.')
   link=call('party:link')
   for client in clients[1:]:client.send('42'+json.dumps(['party:joinCode',link['code']]))
   party=event(ws,'party')

@@ -1,3 +1,5 @@
+import {createCoasterTrack} from './coaster-track.js';
+import {mountainGroundHeight,mountainSurface} from './mountain-layout.js';
 import {buildLobbyMountain} from './lobby-mountain.js';
 import {withoutDesktopHints} from './mobile-copy.js';
 import * as THREE from 'three';
@@ -516,39 +518,25 @@ function buildPark(root, colliders, add) {
     interactives.push({ id: 'wheel', kind: 'ride', x: cx, z: cz + 1.8, r: 5.5, label: '관람차', verb: '타기' }); // 관람차가 커서 옆에서도 탈 수 있게 넓게
     const sign = textSprite('🎡 관람차', { size: 30, bg: 'rgba(40,10,40,.75)', color: '#ffd0f0' }); sign.position.set(cx, 1.6, cz + 1.7); root.add(sign);
   }
-  // 롤러코스터: 광장 바깥을 한 바퀴 도는 언덕 트랙 + 4칸 열차(8명). 높은 곳에선 느리고 낮은 곳에선 빠르다
+  // 광장과 산을 잇는 360도 루프 트랙 + 4칸 열차(8명).
   {
-    const M = 720, P = [], cum = [0];
-    for (let i = 0; i < M; i++) {
-      const th = (i / M) * Math.PI * 2;
-      const r = (22 + 0.8 * Math.sin(3 * th + 0.5)) * LS;
-      P.push(new THREE.Vector3(Math.cos(th) * r, 5.2 + 2.2 * Math.sin(2 * th + 1) + 0.8 * Math.sin(5 * th + 2), Math.sin(th) * r));
-    }
-    for (let i = 1; i <= M; i++) cum.push(cum[i - 1] + P[i - 1].distanceTo(P[i % M]));
-    const LEN = cum[M];
-    const ymax = Math.max(...P.map((p) => p.y));
-    // 구간마다 속도(에너지 보존 흉내) → 한 바퀴 시간표
-    const tcum = [0];
-    for (let i = 0; i < M; i++) { const v = Math.sqrt(3.2 * 3.2 + 2 * 4.2 * (ymax - (P[i].y + P[(i + 1) % M].y) / 2)); tcum.push(tcum[i] + (cum[i + 1] - cum[i]) / v); }
-    const LAP = tcum[M];
-    const bs = (arr, v) => { let lo = 0, hi = M; while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (arr[mid] <= v) lo = mid; else hi = mid; } return lo; };
-    const _p = new THREE.Vector3(), _t = new THREE.Vector3();
-    const at = (s) => { s = ((s % LEN) + LEN) % LEN; const i = bs(cum, s); const f = (s - cum[i]) / (cum[i + 1] - cum[i] || 1); const a = P[i], b = P[(i + 1) % M]; return { p: new THREE.Vector3().lerpVectors(a, b, f), t: new THREE.Vector3().subVectors(b, a).normalize() }; };
-    const frontS = () => { const tt = ((parkNow() % LAP) + LAP) % LAP; const i = bs(tcum, tt); const f = (tt - tcum[i]) / (tcum[i + 1] - tcum[i] || 1); return cum[i] + (cum[i + 1] - cum[i]) * f; };
-    const side = (t) => new THREE.Vector3(t.z, 0, -t.x).normalize();
+    const track=createCoasterTrack(),P=track.points,LEN=track.length,cum=track.cum,at=track.at,frontS=track.frontS;
     // 레일 두 줄 + 가운데 등뼈
-    const railPts = (off, dy) => P.filter((_, i) => i % 3 === 0).map((p, k) => { const t = at(cum[k * 3]).t; return p.clone().addScaledVector(side(t), off).add(new THREE.Vector3(0, dy, 0)); });
-    const railMat = pm('#ff3f6c', { metalness: 0.5, roughness: 0.35, emissive: '#ff1f50', emissiveIntensity: 0.25 });
-    for (const off of [-0.38, 0.38]) { const m = mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(railPts(off, 0), true), 760, 0.065, 6, true), railMat, 0, 0, 0, root); m.castShadow = false; m.userData.noSpread = true; }
-    { const m = mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(railPts(0, -0.22), true), 760, 0.13, 6, true), pm('#ffd36a', { metalness: 0.6, roughness: 0.35 }), 0, 0, 0, root); m.castShadow = false; m.userData.noSpread = true; }
+    const railPts=(off,dy)=>P.map((_,i)=>{const f=at(cum[i]);return f.p.addScaledVector(f.right,off).addScaledVector(f.up,dy);});
+    const railMat=pm('#ff3f6c',{metalness:.5,roughness:.35,emissive:'#ff1f50',emissiveIntensity:.25});
+    for(const off of [-.38,.38]){const m=mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(railPts(off,0),true),1600,.065,6,true),railMat,0,0,0,root);m.userData.noSpread=true;}
+    const spine=mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(railPts(0,-.22),true),1600,.13,6,true),pm('#ffd36a',{metalness:.6,roughness:.35}),0,0,0,root);spine.userData.noSpread=true;
     // 침목 · 기둥 (인스턴스로 한 번에)
-    const nTie = Math.floor(LEN / 0.9), nSup = Math.floor(LEN / 3.2);
+    const nTie = Math.floor(LEN / 0.9), nSup = Math.floor(LEN / 7.5);
     const ties = new THREE.InstancedMesh(new THREE.BoxGeometry(1.0, 0.06, 0.16), pm('#6b4a8a'), nTie);
-    const sups = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.09, 0.12, 1, 6), pm('#f0eaff', { metalness: 0.4, roughness: 0.5 }), nSup);
+    const sups = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.09, 0.12, 1, 6), pm('#f0eaff', { metalness: 0.4, roughness: 0.5 }), nSup*2);
     const o = new THREE.Object3D();
-    for (let k = 0; k < nTie; k++) { const { p, t } = at((k / nTie) * LEN); o.position.copy(p); o.position.y -= 0.08; o.lookAt(p.x + t.x, p.y - 0.08 + t.y, p.z + t.z); o.scale.set(1, 1, 1); o.updateMatrix(); ties.setMatrixAt(k, o.matrix); }
-    for (let k = 0; k < nSup; k++) { const { p } = at((k / nSup) * LEN); const h = p.y - 0.3; o.position.set(p.x, h / 2, p.z); o.rotation.set(0, 0, 0); o.scale.set(1, h, 1); o.updateMatrix(); sups.setMatrixAt(k, o.matrix); }
-    ties.userData.noSpread = sups.userData.noSpread = true; root.add(ties, sups);
+    for(let k=0;k<nTie;k++){const f=at(k/nTie*LEN);o.position.copy(f.p).addScaledVector(f.up,-.08);o.quaternion.copy(f.q);o.scale.set(1,1,1);o.updateMatrix();ties.setMatrixAt(k,o.matrix);}
+    const braces=new THREE.InstancedMesh(new THREE.BoxGeometry(1,.12,.12),pm('#f0eaff',{metalness:.4,roughness:.5}),nSup);let supportCount=0,braceCount=0;
+    const column=(x,z,top)=>{const base=z<-38?mountainGroundHeight(x,z):0,h=Math.max(.2,top-base);o.position.set(x,base+h/2,z);o.rotation.set(0,0,0);o.scale.set(1,h,1);o.updateMatrix();sups.setMatrixAt(supportCount++,o.matrix);};
+    for(let k=0;k<nSup;k++){const f=at(k/nSup*LEN),p=f.p,loop=p.x>60&&p.x<65&&p.z>-77&&p.z<-52;if(loop){const anchor=p.clone().addScaledVector(f.up,-.3);for(const side of [-1,1])column(anchor.x+f.right.x*1.8*side,anchor.z+f.right.z*1.8*side,anchor.y+f.right.y*1.8*side);o.position.copy(anchor);o.quaternion.copy(f.q);o.scale.set(3.6,1,1);o.updateMatrix();braces.setMatrixAt(braceCount++,o.matrix);}else column(p.x,p.z,p.y-.3);}
+    sups.count=supportCount;braces.count=braceCount;
+    ties.userData.noSpread=sups.userData.noSpread=braces.userData.noSpread=true;root.add(ties,sups,braces);
     // 열차: 앞칸부터 0~3, 칸마다 2자리
     const CARS = 4, GAP = 1.75, CC = ['#ff3f6c', '#ffc75f', '#6fd6ff', '#b39dff'];
     const cars = [];
@@ -563,8 +551,7 @@ function buildPark(root, colliders, add) {
       mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.9, 6), pm('#ffd36a', { metalness: 0.7 }), 0, 0.72, 0.18, car).rotation.z = Math.PI / 2;
       cars.push(car);
     }
-    const _q = new THREE.Vector3();
-    anim.push(() => { const s0 = frontS(); cars.forEach((car, c) => { const { p, t } = at(s0 - c * GAP); car.position.copy(p); car.lookAt(_q.copy(p).add(t)); }); });
+    anim.push(() => { const s0 = frontS(); cars.forEach((car, c) => { const {p,q}=at(s0-c*GAP);car.position.copy(p);car.quaternion.copy(q); }); });
     // 탑승장: 처음 들어오는 곳(광장 가운데 아래쪽) 바로 옆, 탁 트인 자리. 타면 열차 자리로 바로 올라간다
     const sx = -3.6, sz = 9.2;
     {
@@ -579,11 +566,10 @@ function buildPark(root, colliders, add) {
       anim.push((t) => { arrow.position.y = 1.9 + Math.sin(t * 3) * 0.15; ringM.material.emissiveIntensity = 0.6 + Math.sin(t * 4) * 0.35; });
     }
     const seatPos = (i) => {
-      const c = Math.floor(i / 2), { p, t } = at(frontS() - c * GAP), sd = side(t);
-      const off = i % 2 ? 0.25 : -0.25;
-      return { x: p.x + sd.x * off + t.x * -0.15, z: p.z + sd.z * off + t.z * -0.15, y: p.y + 0.36 + t.y * -0.15, ry: Math.atan2(t.x, t.z) };
+      const c=Math.floor(i/2),f=at(frontS()-c*GAP),v=f.p.clone().addScaledVector(f.right,i%2?.25:-.25).addScaledVector(f.up,.36).addScaledVector(f.t,-.15);
+      return {x:v.x,y:v.y,z:v.z,ry:Math.atan2(f.t.x,f.t.z),q:f.q};
     };
-    rides.coaster = { posFinal: true, seats: CARS * 2, sit: true, exit: { x: sx, z: sz + 0.6 }, pick: (busy) => { for (let i = 0; i < CARS * 2; i++) if (!busy.has(i)) return i; return -1; }, pos: seatPos, front: () => at(frontS()).p };
+    rides.coaster = { posFinal: true, seats: CARS * 2, sit: true, exit: { x: sx, z: sz + 0.6 }, pick: (busy) => { for (let i = 0; i < CARS * 2; i++) if (!busy.has(i)) return i; return -1; }, track, pos: seatPos, front: () => at(frontS()).p };
     interactives.push({ id: 'coaster', kind: 'ride', x: sx, z: sz, r: 2.2, label: '롤러코스터', verb: '타기' });
   }
   // 벤치 (앉기)
@@ -827,21 +813,7 @@ function buildLobbyDeco(root, colliders, themes) {
     }
     fl.count = n; fl.instanceMatrix.needsUpdate = true; if (fl.instanceColor) fl.instanceColor.needsUpdate = true; add(fl);
   }
-  // 달 아래 언덕 위의 성 (실루엣 · 창문만 노랗게)
-  {
-    const g = add(new THREE.Group()); g.position.set(-30, 0, -78); g.rotation.y = 0.35;
-    const dark = new THREE.MeshBasicMaterial({ color: '#160c1e', fog: false }), win = new THREE.MeshBasicMaterial({ color: '#ffcf6a', fog: false });
-    const hill = new THREE.Mesh(new THREE.SphereGeometry(22, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), dark); hill.scale.y = 0.55; g.add(hill);
-    const body = (w, h, d, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), dark); m.position.set(x, y, z); g.add(m); return m; };
-    body(10, 6, 5, 0, 14, 0);
-    for (const [x, h] of [[-5.5, 11], [5.5, 9], [-2, 13], [2.5, 15]]) { const tw = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.2, h, 10), dark); tw.position.set(x, 11 + h / 2, 0); g.add(tw); const roof = new THREE.Mesh(new THREE.ConeGeometry(1.5, 3.2, 10), dark); roof.position.set(x, 11 + h + 1.6, 0); g.add(roof); }
-    for (let i = 0; i < 9; i++) { const w = new THREE.Mesh(new THREE.PlaneGeometry(0.45, 0.7), win); w.position.set(-4 + (i % 5) * 2, 13 + Math.floor(i / 5) * 2.2, 2.6); g.add(w); }
-    g.traverse((m) => { m.userData.noOcc = true; });
-    // 박쥐: 성 위를 빙글빙글, 날개를 파닥
-    const batG = new THREE.BufferGeometry(); batG.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, -0.9, 0.25, 0, -0.45, -0.1, 0, 0, 0, 0, 0.9, 0.25, 0, 0.45, -0.1, 0], 3));
-    const bats = []; for (let i = 0; i < 9; i++) { const b = new THREE.Mesh(batG, new THREE.MeshBasicMaterial({ color: '#0a0610', side: THREE.DoubleSide, fog: false })); b.userData.noOcc = true; add(b); bats.push(b); }
-    anim.push((t) => bats.forEach((b, i) => { const a = t * (0.35 + (i % 3) * 0.08) + i * 0.7, r = 9 + (i % 4) * 2.5; b.position.set(-30 + Math.cos(a) * r, 30 + Math.sin(t * 0.9 + i) * 3 + (i % 3) * 2, -74 + Math.sin(a) * r * 0.6); b.rotation.y = -a; b.scale.set(1, 1 + Math.sin(t * 14 + i) * 0.8, 1); }));
-  }
+  // 이전 배경 성·언덕은 새 산의 테라스와 겹치므로 제거.
   const face = (g, x, z) => { g.rotation.y = Math.atan2(0 - x, 5 - z); };
   // 🍿 팝콘 카트 (광장 남동쪽)
   {
@@ -1203,8 +1175,8 @@ export function buildLobby(scene, opts = {}) {
   root.add(sun);
 
   const FL = lobbyFloor(opts.floor);
-  const ground = new THREE.Mesh(new THREE.CircleGeometry(46, 72), new THREE.MeshStandardMaterial({ roughness: 1, ...FL.ground }));
-  ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; ground.userData.spreadScale = true; root.add(ground);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(180,120), new THREE.MeshStandardMaterial({ roughness: 1, ...FL.ground }));
+  ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; ground.position.z=18; ground.userData.noSpread=true; root.add(ground);
   const plaza = new THREE.Mesh(new THREE.CircleGeometry(16.5, 56), new THREE.MeshStandardMaterial({ roughness: 1, ...FL.plaza }));
   plaza.rotation.x = -Math.PI / 2; plaza.position.y = 0.01; plaza.receiveShadow = true; plaza.userData.spreadScale = true; root.add(plaza);
 
@@ -1339,19 +1311,23 @@ export function buildLobby(scene, opts = {}) {
     for (let k = 0; k < n; k++) { const a = Math.random() * Math.PI * 2, r = 17 + Math.random() * 27; m4.makeRotationZ((Math.random() - 0.5) * 0.5); const x = Math.cos(a) * r, z = Math.sin(a) * r; m4.setPosition(x, onOuterPath(x * LS, z * LS) ? -1 : 0.15, z); grass.setMatrixAt(k, m4); }
     root.add(grass);
   }
-  colliders.push(...ringColliders(30.5 * LS).filter(c => c.z > -38).map((c) => ({ ...c, noSpread: true })));
+  // 확장 지형의 바깥 경계는 mountainMoveAllowed에서 제한한다.
   spreadLobby(root, colliders, [...park.interactives, ...outer.interactives, ...extra.interactives], { ...park.rides, ...extra.rides });
   { const f0 = extra.shopFace; extra.shopFace = (x, z) => f0(x / LS, z / LS); }
   const deco = buildLobbyDeco(root, colliders, themes);
   const updateChristmasTree = buildChristmasTree(root, colliders);
   const mountain = buildLobbyMountain(); root.add(mountain.root);
+  colliders.push({x:0,z:-128,hw:5,hd:2.1,noSpread:true});
+  // Clear the former pond approach without removing the theme gates or the observation wheel.
+  for(const o of [...root.children]){if(o===mountain.root||o.isLight||o.isInstancedMesh||o.isPoints||o.isSprite)continue;if(((Math.abs(o.position.x)<2.4&&o.position.z<-27&&o.position.z>-42)||(o.position.z<-38&&mountainSurface(o.position.x,o.position.z,2)!==null))&&o.position.y<8){const box=new THREE.Box3().setFromObject(o),size=box.getSize(new THREE.Vector3());if(size.x<7&&size.z<7){root.remove(o);disposeTree(o);}}}
+  for(let i=colliders.length-1;i>=0;i--){const c=colliders[i];if(Math.abs(c.x)<2.4&&c.z<-27&&c.z>-42)colliders.splice(i,1);}
   const mountainSign = textSprite('귀문산 등산로 · 중턱 테마 터 10곳', {size:38,color:'#f2dfae',bg:'rgba(12,20,17,.86)'});
-  mountainSign.position.set(0,2.2,-40); mountainSign.scale.set(8,1,1); root.add(mountainSign);
+  mountainSign.position.set(3.8,2.2,-29); mountainSign.scale.set(8,1,1); root.add(mountainSign);
   scene.add(root);
   let lastT = 0;
   const update = (t) => {
     snapBoard.update(Math.min(0.1, Math.max(0, t - lastT))); lastT = t;
-    park.update(t); outer.update(t); deco.update(t); updateChristmasTree(t); champSign.update(t, deco.wishStar.y()); fireflies.update(t); extra.update(t);
+    mountain.update(t); park.update(t); outer.update(t); deco.update(t); updateChristmasTree(t); champSign.update(t, deco.wishStar.y()); fireflies.update(t); extra.update(t);
     clouds.rotation.y = t * 0.006; clouds.children.forEach((c) => (c.position.y += Math.sin(t * 0.3 + c.userData.ph) * 0.004));
     flies.rotation.y = t * 0.02; flies.position.y = Math.sin(t) * 0.2;
     exhibits.forEach((e, i) => {
@@ -1362,7 +1338,7 @@ export function buildLobby(scene, opts = {}) {
       e.spin.forEach((s) => (s.rotation.z = Math.sin(t * 1.2 + i) * 0.15));
     });
   };
-  return { root, colliders, walls: [], objects: {}, flickers: [], ceiling: [], update, mountain, bounds: 28.5 * LS, outdoor: true, background: scene.background, fog: scene.fog, themes, exhibits, hiddenGate: !!opts.hidden, setChamp: (c) => champSign.set(c), snapBoard, shopFace: extra.shopFace, clickables: [...extra.clickables, ...deco.clickables], wishStar: deco.wishStar, xmasGift: deco.xmasGift, interactives: [...park.interactives, ...outer.interactives, ...extra.interactives, ...deco.interactives], rides: { ...park.rides, ...extra.rides, ...deco.rides } };
+  return { root, colliders, walls: [], objects: {}, flickers: [], ceiling: [], update, mountain, bounds: 28.5 * LS, outdoor: true, background: scene.background, fog: scene.fog, themes, exhibits, hiddenGate: !!opts.hidden, setChamp: (c) => champSign.set(c), snapBoard, shopFace: extra.shopFace, clickables: [...extra.clickables, ...deco.clickables], wishStar: deco.wishStar, xmasGift: deco.xmasGift, interactives: [...park.interactives, ...outer.interactives, ...extra.interactives, ...deco.interactives, ...mountain.interactives], rides: { ...park.rides, ...extra.rides, ...deco.rides, ...mountain.rides } };
 }
 
 // ───── 로비 쉼터: 불멍 캠프파이어 + 통나무 벤치 · 타면 움직이는 그네 · 코인 상점
@@ -1694,21 +1670,7 @@ function buildOuterPark(root, colliders, add, pathMat = null) {
     const p = new THREE.Mesh(new THREE.PlaneGeometry(branchHalfWidth * 2, branchEnd - branchStart), new THREE.MeshStandardMaterial({ color: pathMat?.color || '#cdbf9f', roughness: 1 }));
     p.rotation.x = -Math.PI / 2; p.rotation.z = -a + Math.PI / 2; const r = (branchStart + branchEnd) / 2; p.position.set(Math.cos(a) * r, 0.011, Math.sin(a) * r); p.scale.y = LS; root.add(p);
   }
-  // 북쪽: 연못 + 분수
-  {
-    const cx = 0, cz = -20.8;
-    const water = new THREE.Mesh(new THREE.CircleGeometry(4.6, 40), new THREE.MeshStandardMaterial({ color: '#3f8fc8', roughness: 0.15, metalness: 0.3, emissive: '#0a3050', emissiveIntensity: 0.4 }));
-    water.rotation.x = -Math.PI / 2; water.position.set(cx, 0.06, cz); root.add(water);
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(4.7, 0.28, 8, 48), new THREE.MeshStandardMaterial({ color: '#d8d0c4', roughness: 0.8 })); rim.rotation.x = -Math.PI / 2; rim.position.set(cx, 0.12, cz); root.add(rim);
-    add({ t: 'fountain', x: cx, z: cz });
-    colliders.push({ x: cx, z: cz, hw: 4.4, hd: 4.4 });
-    const jets = [];
-    for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; const j = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.09, 1.6, 6), new THREE.MeshBasicMaterial({ color: '#cfefff', transparent: true, opacity: 0.6 })); j.position.set(cx + Math.cos(a) * 2.9, 0.8, cz + Math.sin(a) * 2.9); root.add(j); jets.push(j); }
-    const lilies = [];
-    for (let i = 0; i < 7; i++) { const a = i * 0.9 + 0.3, r = 3.4 + (i % 2) * 0.6; const l = new THREE.Mesh(new THREE.CircleGeometry(0.32, 10), new THREE.MeshStandardMaterial({ color: '#4caf6a' })); l.rotation.x = -Math.PI / 2; l.position.set(cx + Math.cos(a) * r, 0.08, cz + Math.sin(a) * r); root.add(l); const f = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), new THREE.MeshStandardMaterial({ color: '#ffb7d9', emissive: '#ff6fa8', emissiveIntensity: 0.3 })); f.position.set(l.position.x, 0.14, l.position.z); root.add(f); lilies.push(l); }
-    anim.push((t) => { jets.forEach((j, i) => { j.scale.y = 0.7 + Math.abs(Math.sin(t * 2 + i)) * 0.6; j.position.y = j.scale.y * 0.8; }); water.material.emissiveIntensity = 0.35 + Math.sin(t * 1.5) * 0.08; });
-    for (const s of [-1, 1]) add({ t: 'bench', x: cx + s * 6.4, z: cz + 1.5, r: s * 70 });
-  }
+  // 북쪽 연못과 분수는 등산로 진입 광장으로 비워 둔다.
   // 꽃밭 (서쪽 · 동쪽 · 남쪽)
   const FL = ['#ff6f91', '#ffc75f', '#c9a8ff', '#ffffff', '#ff9671', '#6fd6ff'];
   const flowerBed = (cx, cz, w, d, seed) => {
