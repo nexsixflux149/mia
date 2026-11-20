@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {buildGreatCape,buildHeadAxe,buildGiantBow,buildWaterDeer,collectionCostume} from './shop-collection.js';
 import { createAvatar, SNOW_RELEASE } from './avatar.js';
 import { boxG, markShared, isShared, disposeTree } from './props.js';
 
@@ -32,6 +33,7 @@ function wingShape(kind) {
   return new THREE.ShapeGeometry(s, 16);
 }
 export function buildWings(id) {
+  if(id==='cape_grand')return buildGreatCape();
   const g = new THREE.Group(); const sides = [];
   const kind = id.replace('wings_', '');
   for (const s of [-1, 1]) {
@@ -1290,11 +1292,11 @@ function maskBighead() {
   return g;
 }
 function hideDollBase(u) {
-  if(u.gMaskId!=='mask_bighead'||!u.head)return;
+  if(!['mask_bighead','mask_waterdeer'].includes(u.gMaskId)||!u.head)return;
   u.dollHeadHidden ||= new Map();
   for(const child of u.head.children)if(child!==u.gMask){if(!u.dollHeadHidden.has(child))u.dollHeadHidden.set(child,child.visible);child.visible=false;}
 }
-const MASKS = { mask_bighead: maskBighead, mask_paper: maskPaper, mask_fox: maskFox, mask_hahoe: maskHahoe, mask_venice: maskVenice, mask_oni: maskOni, mask_rabbit: maskRabbit, mask_menhera: maskMenhera, mask_bear: maskBear, mask_wolf: maskWolf, mask_ghost: maskGhost };
+const MASKS = { mask_waterdeer: buildWaterDeer, mask_bighead: maskBighead, mask_paper: maskPaper, mask_fox: maskFox, mask_hahoe: maskHahoe, mask_venice: maskVenice, mask_oni: maskOni, mask_rabbit: maskRabbit, mask_menhera: maskMenhera, mask_bear: maskBear, mask_wolf: maskWolf, mask_ghost: maskGhost };
 /** 상점 가면 하나 (머리 기준 좌표 · 상점 미리보기에서도 쓴다) */
 export function buildMask(id) { const f = MASKS[id]; if (!f) return null; const g = f(); g.userData.gold = true; g.traverse((o) => { if (o.isMesh) o.castShadow = true; }); return g; }
 function setMask(g, id) {
@@ -1307,15 +1309,16 @@ function setMask(g, id) {
 }
 function setCostume(g, id) {
   const u = g.userData;
-  if (u.gCostume) { u.gCostume.parts.forEach((m) => m.parent?.remove(m)); u.gCostume = null; }
+  if (u.gCostume) { u.gCostume.parts.forEach((m) => {m.parent?.remove(m);if(u.gCostume.collection)disposeTree(m);}); u.gCostume = null; }
   // 원래 몸(옷·얼굴·머리카락·장신구)을 숨기거나 되돌린다 — 상점 날개·탈것·검은 그대로
   const keep = new Set([u.gWings, u.gMount, u.gSword, u.gSnack, u.gMask].filter(Boolean));
   // 트리 코스튬: 얼굴(머리)과 발은 그대로 보이고, 모자 · 동물 귀만 감춘다 (트리 꼭대기 별이 대신한다)
-  const showRoots = id === 'costume_xmas' ? new Set([u.head, ...(u.legs || [])].filter(Boolean)) : null;
-  const walk = (o, show) => { if (keep.has(o) || o.userData.gold) return; if (showRoots?.has(o)) show = true; if (show && (o.userData.hatPart || o.userData.earPart)) show = false; const hide = id && !show; if (o.isMesh && !o.userData.robot) { if (hide) { if (o.userData.vis0 == null) o.userData.vis0 = o.visible; o.visible = false; } else if (o.userData.vis0 != null) { o.visible = o.userData.vis0; delete o.userData.vis0; } } o.children.forEach((c) => walk(c, show)); };
+  const showRoots = id === 'costume_xmas' ? new Set([u.head, ...(u.legs || [])].filter(Boolean)) : ['costume_lolita','costume_lolita_white','costume_lolita_black'].includes(id) ? new Set([u.head,...u.arms,...u.legs]) : null;
+  const walk = (o, show) => { if (keep.has(o) || o.userData.gold) return; if (showRoots?.has(o)) show = true; if (show && id==='costume_xmas' && (o.userData.hatPart || o.userData.earPart)) show = false; const hide = id && !show; if (o.isMesh && !o.userData.robot) { if (hide) { if (o.userData.vis0 == null) o.userData.vis0 = o.visible; o.visible = false; } else if (o.userData.vis0 != null) { o.visible = o.userData.vis0; delete o.userData.vis0; } } o.children.forEach((c) => walk(c, show)); };
   walk(u.rig, false);
   if (id === 'costume_robot') u.gCostume = robotParts(u);
   if (id === 'costume_xmas') u.gCostume = xmasParts(u);
+  if(['costume_lolita','costume_lolita_white','costume_lolita_black','costume_sentai'].includes(id)){u.gCostume=collectionCostume(u,id);u.gCostume.collection=true;}
   u.gCostumeId = id;
 }
 /** gear = "날개|탈것|타는중(1/0)|손에 든 것(0 없음 · 1 전설의 검 · 2 황금 고양이 지팡이)|코스튬|황금 고양이 부위 글자(hmgtbsl)" */
@@ -1394,8 +1397,8 @@ export function applyGear(g, gear = '') {
   if (u.gWingsId !== w) { if (u.gWings) u.rig.remove(u.gWings); u.gWings = w ? buildWings(w) : null; if (u.gWings) u.rig.add(u.gWings); u.gWingsId = w; }
   const tl = tail === 'tail_devil' && !costume ? tail : ''; // 코스튬을 입으면 꼬리는 감춘다
   if ((u.gTailId || '') !== tl) { if (u.gTail) u.rig.remove(u.gTail); u.gTail = tl ? buildDevilTail() : null; if (u.gTail) u.rig.add(u.gTail); u.gTailId = tl; }
-  const hn = horn === 'horn_devil' && !costume ? horn : '';
-  if ((u.gHornId || '') !== hn) { u.gHorn?.parent?.remove(u.gHorn); u.gHorn = hn && u.head ? buildDevilHorns() : null; if (u.gHorn) u.head.add(u.gHorn); u.gHornId = hn; }
+  const hn = ['horn_devil','head_axe','head_giantbow'].includes(horn) && (!costume || ['costume_lolita','costume_lolita_white','costume_lolita_black'].includes(costume)) ? horn : '';
+  if ((u.gHornId || '') !== hn) { if(u.gHorn){u.gHorn.parent?.remove(u.gHorn);disposeTree(u.gHorn);} u.gHorn = hn && u.head ? (hn==='head_axe'?buildHeadAxe():hn==='head_giantbow'?buildGiantBow():buildDevilHorns()) : null; if (u.gHorn) u.head.add(u.gHorn); u.gHornId = hn; }
   const mid = riding === '1' ? m : '';
   if (u.gMountId !== mid) { if (u.gMount) g.remove(u.gMount); u.gMount = mid ? buildMount(mid) : null; if (u.gMount) g.add(u.gMount); u.gMountId = mid; }
   const sw = sword === '1' || sword === '2' || sword === '3' ? sword : '';
@@ -1407,7 +1410,7 @@ export function applyGear(g, gear = '') {
     if (sw === '2' && u.arms?.[0]) { const s = buildStaff(); s.position.set(-0.1, -0.33, 0.05); s.rotation.set(0.66, 0, 0.36); u.arms[0].add(s); u.gSword = s; } // 머리에 묻히지 않게 바깥으로 기울여 든다
   }
   // 트리 코스튬은 얼굴이 드러나므로 가면 한 개를 함께 쓸 수 있다.
-  const mk = (!costume || costume === 'costume_xmas') && Object.hasOwn(MASKS, mask) ? mask : '';
+  const mk = (!costume || costume === 'costume_xmas' || ['costume_lolita','costume_lolita_white','costume_lolita_black'].includes(costume)) && Object.hasOwn(MASKS, mask) ? mask : '';
   const costumeGold = costume === 'costume_xmas' ? gold.replace(/[^m]/g, '') : costume ? '' : gold;
   const gset = mk ? costumeGold.replace('m', '') : costumeGold;
   if ((u.gCostumeId || '') !== costume) { if (u.gGold) setGold(g, ''); if (u.gMask) setMask(g, ''); setCostume(g, costume); }

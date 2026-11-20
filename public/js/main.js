@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { lobbySantaVisual } from './lobby-santa.js';
+import {bindPreviewTurn} from './preview-turn.js';
 import { openArcade } from './arcade-ui.js';
 import { createAvatar, animateAvatar, textSprite, OPTIONS, SKIN, ACCENT, HAIRC, EYEC, DEFAULT_LOOK, EMOTES, EMOTE_DUR, jumpElevation } from './avatar.js';
 import { Cinema } from './cinema.js';
@@ -180,13 +181,11 @@ const pvd = new THREE.DirectionalLight('#fff', 1.6); pvd.position.set(2, 3, 3); 
 const pvr = new THREE.DirectionalLight('#ffb3c7', 1.2); pvr.position.set(-3, 2, -2); pv.scene.add(pvr);
 pv.renderer.outputColorSpace = THREE.SRGBColorSpace;
 pv.renderer.setPixelRatio(Math.min(2, devicePixelRatio));
-$('#preview').addEventListener('pointerdown', (e) => { pv.drag = e.clientX; });
-addEventListener('pointerup', () => { pv.drag = null; });
-addEventListener('pointermove', (e) => { if (pv.drag != null) { pv.rot += (e.clientX - pv.drag) * 0.012; pv.drag = e.clientX; } });
+bindPreviewTurn($('#preview'),delta=>{pv.rot+=delta;});
 let pvTimer = null;
 function refreshPreview() { clearTimeout(pvTimer); pvTimer = setTimeout(() => { if (pv.av) { pv.av.userData.visualUpgrade?.dispose(); pv.scene.remove(pv.av); disposeTree(pv.av); } pv.av = createAvatar(look); pv.scene.add(pv.av); }, 30); }
 let pvLoop = true;
-(function loopPv(t) { requestAnimationFrame(loopPv); if (!pvLoop) return; if (pv.av) { pv.av.rotation.y = pv.rot + (pv.drag == null ? Math.sin(t / 2000) * 0.25 : 0); animateAvatar(pv.av, 0.016, false, t / 1000); } pv.renderer.render(pv.scene, pv.cam); })(0);
+(function loopPv(t) { requestAnimationFrame(loopPv); if (!pvLoop) return; if (pv.av) { pv.av.rotation.y = pv.rot; animateAvatar(pv.av, 0.016, false, t / 1000); } pv.renderer.render(pv.scene, pv.cam); })(0);
 buildOptions(); refreshPreview();
 
 // 사진 얼굴
@@ -3242,7 +3241,7 @@ async function loadShareInfo() {
 
 // ─────────────────────────── 레벨 · 코인 · 상점 · 내 물건 · 선물
 const GOLD_ORDER = ['gold_hat', 'gold_mask', 'gold_gloves', 'gold_top', 'gold_bottom', 'gold_shoes', 'gold_tail']; // 황금 고양이 세트 (비매품 · 주간랭킹 1~3위 보상)
-const SHOP_ORDER = ['rename_ticket', 'popper', 'rocket', 'wings_fairy', 'mount_pony', 'wings_angel', 'mount_broom', 'mount_cat', 'mount_dog', 'mount_wolf', 'mount_unicorn', 'wings_bat', 'tail_devil', 'horn_devil', 'wings_devil', 'mount_trex', 'wings_dragon', 'sword', 'mount_ufo', 'mount_lion', 'mount_turtle', 'mount_human', 'costume_robot', 'mount_carriage', 'chainsaw', 'mask_paper', 'mask_rabbit', 'mask_menhera', 'mask_fox', 'mask_bear', 'mask_hahoe', 'mask_wolf', 'mask_venice', 'mask_ghost', 'mask_oni', 'mask_bighead', 'mount_sleigh', 'costume_xmas', ...GOLD_ORDER, 'gold_staff'];
+const SHOP_ORDER = ['costume_lolita_white','costume_lolita_black','head_giantbow','costume_lolita','costume_sentai','cape_grand','head_axe','mask_waterdeer','rename_ticket', 'popper', 'rocket', 'wings_fairy', 'mount_pony', 'wings_angel', 'mount_broom', 'mount_cat', 'mount_dog', 'mount_wolf', 'mount_unicorn', 'wings_bat', 'tail_devil', 'horn_devil', 'wings_devil', 'mount_trex', 'wings_dragon', 'sword', 'mount_ufo', 'mount_lion', 'mount_turtle', 'mount_human', 'costume_robot', 'mount_carriage', 'chainsaw', 'mask_paper', 'mask_rabbit', 'mask_menhera', 'mask_fox', 'mask_bear', 'mask_hahoe', 'mask_wolf', 'mask_venice', 'mask_ghost', 'mask_oni', 'mask_bighead', 'mount_sleigh', 'costume_xmas', ...GOLD_ORDER, 'gold_staff'];
 const coinsText = () => (S.profile?.coins === -1 ? '∞' : String(S.profile?.coins ?? 0));
 // 손에 든 것: 0 없음 · 1 전설의 검 · 2 황금 고양이 지팡이
 function holdCode() { const it = S.profile?.items; return S.holdSaw && it?.chainsaw ? 3 : S.holdStaff && it?.gold_staff ? 2 : S.holdSword && it?.sword ? 1 : 0; }
@@ -3423,8 +3422,9 @@ function shopPreview() {
   const r = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true }); r.setPixelRatio(Math.min(2, devicePixelRatio)); r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.4;
   const sc = new THREE.Scene(); sc.add(new THREE.HemisphereLight('#ffffff', '#443344', 2.2)); const dl = new THREE.DirectionalLight('#fff', 1.6); dl.position.set(2, 3, 3); sc.add(dl);
   const cam = new THREE.PerspectiveCamera(36, 240 / 220, 0.1, 50); cam.position.set(0, 1.3, 4.2); cam.lookAt(0, 0.75, 0);
-  shopPv = { canvas, r, sc, cam, av: null, gear: '', on: false };
-  const tick = (t) => { if (!shopPv.on) return; requestAnimationFrame(tick); if (shopPv.av) { const tt = t / 1000; shopPv.av.rotation.y = tt * 0.6; animateAvatar(shopPv.av, 0.016, shopPv.walk, tt); applyGear(shopPv.av, shopPv.gear); animateGear(shopPv.av, tt, 0.016, shopPv.walk); } r.render(sc, cam); };
+  shopPv = { canvas, r, sc, cam, av: null, gear: '', on: false, rot:0 };
+  bindPreviewTurn(canvas,delta=>{shopPv.rot+=delta;});
+  const tick = (t) => { if (!shopPv.on) return; requestAnimationFrame(tick); if (shopPv.av) { const tt = t / 1000; shopPv.av.rotation.y = shopPv.rot; animateAvatar(shopPv.av, 0.016, shopPv.walk, tt); applyGear(shopPv.av, shopPv.gear); animateGear(shopPv.av, tt, 0.016, shopPv.walk); } r.render(sc, cam); };
   shopPv.start = () => { if (shopPv.on) return; shopPv.on = true; requestAnimationFrame(tick); };
   return shopPv;
 }

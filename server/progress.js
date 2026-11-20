@@ -23,6 +23,14 @@ export const timeLimitMs = (difficulty) => (difficulty === 1 ? 30 : difficulty <
 export const GOLD_NOTE = '비매품 - 매주 주간랭킹 1~3위에게 아직 없는 부위 하나를 무작위 지급';
 // 상점 물건. kind: wings(등에 다는 날개) · mount(타는 것, 탄 동안 이동 속도 1.5배) · pop(파티 꼬깔 폭죽) · rocket(쏘아 올리는 폭죽) · sword(전설의 검)
 export const SHOP = {
+  costume_lolita_white: {name:'로리타 드레스 · 화이트',icon:'🤍',kind:'costume',price:180,lv:1,max:1,desc:'따로 소장하는 화이트 로리타 드레스. 우윳빛 원단과 흰 레이스, 리본 보닛을 맞췄어요.'},
+  costume_lolita_black: {name:'로리타 드레스 · 블랙',icon:'🖤',kind:'costume',price:180,lv:1,max:1,desc:'따로 소장하는 블랙 로리타 드레스. 검은 원단에 스모키 레이스와 금빛 코르셋 장식을 더했어요.'},
+  head_giantbow: {name:'새틴 대왕리본',icon:'🎀',kind:'horn',price:90,lv:1,max:1,desc:'톤다운 핑크 새틴의 풍성한 대왕리본. 입체적인 고리와 접힌 주름, 흘러내리는 꼬리가 머리 위를 장식해요.'},
+  costume_lolita: {name:'로리타 드레스',icon:'🎀',kind:'costume',price:180,lv:1,max:1,desc:'버건디 벨벳풍 드레스. 겹겹의 아이보리 레이스와 진주 장식, 코르셋 리본과 퍼프 소매를 달았어요.'},
+  costume_sentai: {name:'전대물 코스튬',icon:'🦸',kind:'costume',price:200,lv:1,max:1,desc:'붉은 헬멧과 검은 바이저, 은빛 장갑·부츠와 금빛 별 문장이 빛나는 오리지널 히어로 슈트.'},
+  cape_grand: {name:'대형 왕실 망토',icon:'🦹',kind:'wings',price:160,lv:1,max:1,desc:'등 뒤로 부드럽게 펼쳐지는 남색 망토. 와인빛 안감, 금장 테두리와 사슬 브로치가 달려 있어요. 등 장비 슬롯에 착용해요.'},
+  head_axe: {name:'머리에 찍힌 도끼',icon:'🪓',kind:'horn',price:80,lv:1,max:1,desc:'나무 손잡이와 금속 도끼날을 기울여 고정한 공포 소품 머리장식. 도끼 자국은 분장용 페인트예요.'},
+  mask_waterdeer: {name:'왕고라니 탈',icon:'🦌',kind:'mask',price:150,lv:1,max:1,desc:'얼굴 전체보다 큰 고라니 인형탈. 긴 귀와 검은 눈, 크림빛 주둥이, 고라니 특유의 작은 송곳니를 살렸어요.'},
   mask_bighead: {name:'왕대두 인형탈',icon:'🧸',kind:'mask',price:0,lv:1,max:1,nosale:true,gift:'arcade',desc:'비매품 · 미아 오락실 100문제 완주 보상',tip:'기본 곰귀·갈색 머리 인형의 머리가 가로·세로·깊이 모두 2배! 내 물건에서 착용하거나 벗을 수 있어요.'},
   rename_ticket: { name: '닉네임 변경권', icon: '🎫', kind: 'rename', price: 30, lv: 1, max: 1, desc: '광장에서 새 닉네임으로 한 번 바꿀 수 있어요. 레벨, 코인, 아이템과 클리어 기록은 그대로 이어져요.' },
   popper: { name: '파티 꼬깔 폭죽', icon: '🎉', kind: 'pop', price: 3, lv: 1, max: 10, desc: '앞에 있는 친구를 향해 펑! 색종이가 쏟아지고 아주 큰 소리가 나요.' },
