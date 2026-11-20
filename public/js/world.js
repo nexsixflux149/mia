@@ -1533,16 +1533,16 @@ function buildLobbyExtras(root, colliders, add) {
   }
   // ── 고객소리함 (광장 동쪽, 상점 옆) — 빨간 우편함. 버그 · 건의사항을 적어 넣는다
   const clickables = [];
-  // Half-size cabinet, moved behind its former position as marked in the placement reference.
+  // Placement reference: cabinet behind the mailbox, facing diagonally into the plaza.
   {
-    const cx = 3.9 * LS - 1.65, cz = 3.5 * LS - 1.5, g = buildArcadeCabinet();
-    g.position.set(cx,0,cz); g.scale.setScalar(0.5); g.rotation.y = 0; g.userData.noSpread = true; root.add(g);
+    const cx = 3.9 * LS, cz = 2.6, g = buildArcadeCabinet();
+    g.position.set(cx,0,cz); g.scale.setScalar(0.5); g.rotation.y = -Math.PI / 4; g.userData.noSpread = true; root.add(g);
     colliders.push({x:cx,z:cz,hw:.45,hd:.45,noSpread:true});
     interactives.push({id:'arcade',kind:'arcade',x:cx,z:cz,r:1.8,label:'미아 오락실',verb:'연습게임',noSpread:true});
     clickables.push({id:'arcade',group:g});
   }
   {
-    const cx = 3.9, cz = 3.5; const g = new THREE.Group(); g.position.set(cx, 0, cz); g.rotation.y = Math.atan2(0 - cx, 7 - cz); root.add(g); // 입장하는 사람들 쪽을 바라보게
+    const cx = 4.8, cz = 4.5; const g = new THREE.Group(); g.position.set(cx, 0, cz); g.rotation.y = Math.atan2(0 - cx, 7 - cz); root.add(g); // 입장하는 사람들 쪽을 바라보게
     const red = pm('#d4202a', { roughness: 0.35, metalness: 0.25 }), redD = pm('#9a1018', { roughness: 0.4, metalness: 0.25 }), dark = pm('#1a1216', { roughness: 0.6 }), gold = pm('#ffd36a', { roughness: 0.3, metalness: 0.6, emissive: '#a06a10', emissiveIntensity: 0.35 });
     mesh(new THREE.CylinderGeometry(0.3, 0.36, 0.1, 20), dark, 0, 0.05, 0, g); // 받침
     mesh(new THREE.CylinderGeometry(0.075, 0.09, 0.72, 14), dark, 0, 0.46, 0, g); // 기둥
