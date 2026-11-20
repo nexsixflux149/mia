@@ -1,6 +1,6 @@
-// 클리어 기념 인화 사진 + 클리어 도장표
+// 클리어 기념 인화 사진 + 클리어 스탬프
 //  ① 3D 로 한 장 찍는다: 그 테마의 귀신들이 뒤에 서고, 파티원들이 앞에서 ✌ 포즈
-//  ② 2D 캔버스에서 테두리(액자) · 도장표 · 글씨를 얹어 한 장의 사진으로 만든다 (테두리는 다시 고를 수 있다)
+//  ② 2D 캔버스에서 테두리(액자) · 스탬프 · 글씨를 얹어 한 장의 사진으로 만든다 (테두리는 다시 고를 수 있다)
 import * as THREE from 'three';
 import { createAvatar, animateAvatar } from './avatar.js';
 import { createGhost, animateGhost, dressXmas } from './ghosts.js';
@@ -168,12 +168,12 @@ export async function shootPhoto({ members = [], ghostTypes = [], themeId, tint 
   }
 }
 
-// ─────────────────────────── ② 테두리 · 도장표 · 글씨
+// ─────────────────────────── ② 테두리 · 스탬프 · 글씨
 const rr = (x, a, b, w, h, rad) => { x.beginPath(); x.moveTo(a + rad, b); x.arcTo(a + w, b, a + w, b + h, rad); x.arcTo(a + w, b + h, a, b + h, rad); x.arcTo(a, b + h, a, b, rad); x.arcTo(a, b, a + w, b, rad); x.closePath(); };
 function fitText(x, text, maxW, font, size, min = 18) { let s = size; do { x.font = font.replace('%', s); if (x.measureText(text).width <= maxW) break; s -= 2; } while (s > min); return s; }
 const rnd = (seed) => { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
 
-/** 클리어 도장표 한 장을 그린다 (왼쪽 위 모서리 기준, 크기 w) */
+/** 클리어 스탬프 한 장을 그린다 (왼쪽 위 모서리 기준, 크기 w) */
 export function drawStampCard(x, ox, oy, w, { stamps = [], hidden = null, dark = false }) {
   const cols = 5, rows = Math.ceil(stamps.length / cols) || 2;
   const pad = w * 0.055, cell = (w - pad * 2) / cols, R = cell * 0.4, head = w * 0.15;
@@ -185,7 +185,7 @@ export function drawStampCard(x, ox, oy, w, { stamps = [], hidden = null, dark =
   x.strokeStyle = dark ? '#ffd36a' : '#c0262d'; x.lineWidth = Math.max(2, w * 0.008); x.setLineDash([w * 0.03, w * 0.018]); rr(x, ox + pad * 0.4, oy + pad * 0.4, w - pad * 0.8, h - pad * 0.8, w * 0.03); x.stroke(); x.setLineDash([]);
   const done = stamps.filter((s) => s.cleared).length;
   x.textBaseline = 'middle'; x.textAlign = 'left'; x.fillStyle = dark ? '#ffe9a8' : '#7a1218';
-  x.font = `700 ${Math.round(w * 0.072)}px ${FONT_FAT}`; x.fillText('클리어 도장표', ox + pad * 1.1, oy + head * 0.62);
+  x.font = `700 ${Math.round(w * 0.072)}px ${FONT_FAT}`; x.fillText('클리어 스탬프', ox + pad * 1.1, oy + head * 0.62);
   x.textAlign = 'right'; x.fillStyle = dark ? '#fff' : '#c0262d'; x.fillText(`${done} / ${stamps.length}`, ox + w - pad * 1.1, oy + head * 0.62);
   stamps.forEach((s, i) => {
     const cx = ox + pad + cell * (i % cols) + cell / 2, cy = oy + head + cell * Math.floor(i / cols) + cell / 2;
@@ -295,7 +295,7 @@ export function composePhoto(photo, info, frameId = 'polaroid') {
     tube(tint, 24, 9); tube('#6ae8ff', 44, 4);
   }
 
-  // ── 사진 위: 도장표 (왼쪽 위) · CLEAR 도장 (오른쪽 아래) · 날짜
+  // ── 사진 위: 스탬프 (왼쪽 위) · CLEAR 도장 (오른쪽 아래) · 날짜
   x.save(); x.translate(PX + 26, PY + 30); x.rotate(-0.055);
   drawStampCard(x, 0, 0, 372, { stamps: info.stamps || [], hidden: info.hidden, dark: false });
   x.restore();

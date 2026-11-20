@@ -656,7 +656,7 @@ io.on('connection', (sock) => {
   });
 
   sock.on('party:leave', () => { if (me) leaveParty(me); });
-  // ───── 상점 · 내 물건 · 선물
+  // ───── 상점 · 인벤토리 · 선물
   sock.on('profile:get', () => sendProfile(me));
   sock.on('shop:buy', (id) => {
     if (!me) return; const it = SHOP[id]; if (!it) return;
@@ -672,7 +672,7 @@ io.on('connection', (sock) => {
     if (isWear(id) && !pf.equip[it.kind] && !(it.kind === 'costume' && pf.equip.gold)) pf.equip[it.kind] = id; // 처음 산 날개·탈것은 바로 착용 (고양이 세트를 입고 있으면 코스튬은 그대로 둔다)
     saveProfiles(); sendProfile(me);
     sock.emit('shop:bought', { id });
-    sock.emit('toast', { text: `${it.icon} ${it.name}을(를) 샀어요!${isWear(id) ? ' (🎒 내 물건에서 착용/해제)' : ' (🎒 내 물건에서 사용)'}` });
+    sock.emit('toast', { text: `${it.icon} ${it.name}을(를) 샀어요!${isWear(id) ? ' (🎒 인벤토리에서 착용/해제)' : ' (🎒 인벤토리에서 사용)'}` });
   });
   sock.on('shop:rename', async (requested, ack) => {
     if (typeof ack !== 'function') return;
@@ -1207,7 +1207,7 @@ function levelBoards() {
 
 // 매주 월요일 0시(한국 시간)에 지난주 상위 3명의 보상을 확정한다.
 stats.weekly ||= { done: '', champ: null, log: [] };
-const goldSetText = () => `황금 고양이 세트 7종을 모두 모았어요! ${SHOP[GOLD_STAFF].icon} ${SHOP[GOLD_STAFF].name}을(를) 받았습니다. (귀신 퇴치 무제한 · 🎒 내 물건에서 들기)`;
+const goldSetText = () => `황금 고양이 세트 7종을 모두 모았어요! ${SHOP[GOLD_STAFF].icon} ${SHOP[GOLD_STAFF].name}을(를) 받았습니다. (귀신 퇴치 무제한 · 🎒 인벤토리에서 들기)`;
 const adminKit = (pf) => { let ch = false; for (const id of [...GOLD_IDS, GOLD_STAFF, 'mask_bighead']) if (!pf.items[id]) { pf.items[id] = 1; ch = true; } if (ch) saveProfiles(); };
 function champView() {
   const { champ, podium } = stats.weekly;
@@ -1227,7 +1227,7 @@ function awardWeeklyRank(row) {
   const reward = row.item ? giveGold(pf, row.item) : { staff: false };
   pf.weeklyGold = { k: row.k, item: row.item };
   const text = item
-    ? `🏆 지난주 주간랭킹 ${row.rank}위! ${item.icon} ${item.name}을(를) 받았어요. (🎒 내 물건)`
+    ? `🏆 지난주 주간랭킹 ${row.rank}위! ${item.icon} ${item.name}을(를) 받았어요. (🎒 인벤토리)`
     : `🏆 지난주 주간랭킹 ${row.rank}위! 황금 고양이 세트 7종을 이미 모두 가지고 있어요.`;
   (pf.mail ||= []).push({ text, at: row.at });
   if (reward.staff) pf.mail.push({ text: goldSetText(), at: row.at });

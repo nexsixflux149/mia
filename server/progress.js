@@ -31,7 +31,7 @@ export const SHOP = {
   cape_grand: {name:'대형 왕실 망토',icon:'🦹',kind:'wings',price:160,lv:1,max:1,desc:'등 뒤로 부드럽게 펼쳐지는 남색 망토. 와인빛 안감, 금장 테두리와 사슬 브로치가 달려 있어요. 등 장비 슬롯에 착용해요.'},
   head_axe: {name:'머리에 찍힌 도끼',icon:'🪓',kind:'horn',price:80,lv:1,max:1,desc:'나무 손잡이와 금속 도끼날을 기울여 고정한 공포 소품 머리장식. 도끼 자국은 분장용 페인트예요.'},
   mask_waterdeer: {name:'왕고라니 탈',icon:'🦌',kind:'mask',price:150,lv:1,max:1,desc:'얼굴 전체보다 큰 고라니 인형탈. 긴 귀와 검은 눈, 크림빛 주둥이, 고라니 특유의 작은 송곳니를 살렸어요.'},
-  mask_bighead: {name:'왕대두 인형탈',icon:'🧸',kind:'mask',price:0,lv:1,max:1,nosale:true,gift:'arcade',desc:'비매품 · 미아 오락실 100문제 완주 보상',tip:'기본 곰귀·갈색 머리 인형의 머리가 가로·세로·깊이 모두 2배! 내 물건에서 착용하거나 벗을 수 있어요.'},
+  mask_bighead: {name:'왕대두 인형탈',icon:'🧸',kind:'mask',price:0,lv:1,max:1,nosale:true,gift:'arcade',desc:'비매품 · 미아 오락실 100문제 완주 보상',tip:'기본 곰귀·갈색 머리 인형의 머리가 가로·세로·깊이 모두 2배! 인벤토리에서 착용하거나 벗을 수 있어요.'},
   rename_ticket: { name: '닉네임 변경권', icon: '🎫', kind: 'rename', price: 30, lv: 1, max: 1, desc: '광장에서 새 닉네임으로 한 번 바꿀 수 있어요. 레벨, 코인, 아이템과 클리어 기록은 그대로 이어져요.' },
   popper: { name: '파티 꼬깔 폭죽', icon: '🎉', kind: 'pop', price: 3, lv: 1, max: 10, desc: '앞에 있는 친구를 향해 펑! 색종이가 쏟아지고 아주 큰 소리가 나요.' },
   rocket: { name: '쏘아 올리는 폭죽', icon: '🎆', kind: 'rocket', price: 5, lv: 1, max: 10, desc: '머리 위로 슈우욱— 팡! 잠시 주변이 환해지고, 귀신이 그쪽으로 이끌려 가요.' },

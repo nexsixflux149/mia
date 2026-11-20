@@ -1,3 +1,4 @@
+import {withoutDesktopHints} from './mobile-copy.js';
 import * as THREE from 'three';
 import { buildArcadeCabinet } from './arcade-cabinet.js';
 import { buildProp, FOOT, setPropTheme, markShared, disposeTree } from './props.js';
@@ -5,12 +6,13 @@ import { buildXmasProp, decorateXmas } from './xmas-visuals.js';
 import { wrapGift } from './gift-ribbon.js';
 import { loadXmasOpticalModel } from './xmas-models.js';
 import { dressScenery } from './refined-models.js';
-import { textSprite, createAvatar, animateAvatar } from './avatar.js';
+import { textSprite as rawTextSprite, createAvatar, animateAvatar } from './avatar.js';
 import { buildWings, buildMount, buildSword, buildBalloon, BALLOON_COLORS, buildSnack } from './gear.js';
 const HOTDOG_POS = [16, 18], CANDY_POS = [-10.9, 21.4]; // 핫도그는 팝콘 가게 옆, 솜사탕은 커피 가게 옆 같은 줄 (광장 가장자리 같은 반지름)
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
+const textSprite=(text,options)=>rawTextSprite((matchMedia('(pointer: coarse)').matches||innerWidth<760)?withoutDesktopHints(text):text,options);
 const DEG = Math.PI / 180;
 const lighten = (hex) => '#' + new THREE.Color(hex).lerp(new THREE.Color('#6a7060'), 0.35).getHexString();
 

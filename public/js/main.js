@@ -1,5 +1,7 @@
+import {installMobileCopy} from './mobile-copy.js';
 import * as THREE from 'three';
 import { lobbySantaVisual } from './lobby-santa.js';
+import {equipmentSwitch} from './equipment-switch.js';
 import {bindPreviewTurn} from './preview-turn.js';
 import { openArcade } from './arcade-ui.js';
 import { createAvatar, animateAvatar, textSprite, OPTIONS, SKIN, ACCENT, HAIRC, EYEC, DEFAULT_LOOK, EMOTES, EMOTE_DUR, jumpElevation } from './avatar.js';
@@ -1514,10 +1516,10 @@ socket.on('game:ending', (e) => {
 $('#endBtn').onclick = () => { $('#ending').classList.add('hidden'); socket.emit('party:quit'); };
 socket.on('clears', (ub) => { S.unlockedBy = ub || {}; myTag(); if (!$('#ending').classList.contains('hidden')) showEndExtras(); });
 
-// ─────────────────────────── 클리어 기념 사진 · 클리어 도장표
+// ─────────────────────────── 클리어 기념 사진 · 클리어 스탬프
 const THEME_ICON = { christmas: '🎄', mia: '🔰', gwimun: '👻', ophelia: '⚓', doll: '🎎', hospital: '🏥', camp: '🏕️', west: '🤠', kimono: '🏮', clown: '🎪', park: '🎡', zombie: '🧟' };
 const themeColor = (id) => THEME_INFO[id]?.color || '#ff3a2a';
-/** 도장표에 찍을 테마 목록 (히든 테마는 따로). nowId: 방금 깬 테마 */
+/** 스탬프에 찍을 테마 목록 (히든 테마는 따로). nowId: 방금 깬 테마 */
 function stampList(nowId) {
   const ub = S.unlockedBy || {};
   const card = x => ({ id: x.id, icon: THEME_ICON[x.id] || '★', short: x.short, cleared: !!ub[x.id]?.cleared || x.id === nowId, at: ub[x.id]?.at || 0, now: x.id === nowId });
@@ -1600,7 +1602,7 @@ async function publishClearPhoto(clear) {
   store.set(clearPhotoQueueKey, [...clearPhotoQueue.values()]);
   flushClearPhotos();
 }
-// 엔딩 창 아래: 도장이 찍힌 도장표 + 기념 사진 버튼
+// 엔딩 창 아래: 도장이 찍힌 스탬프 + 기념 사진 버튼
 function showEndExtras() {
   let box = $('#endExtras'); if (!box) { box = el('div'); box.id = 'endExtras'; $('#endBtn').before(box); }
   box.innerHTML = '';
@@ -1673,7 +1675,7 @@ async function openClearPhoto() {
     paint(); audio.play('pickup');
   } catch (err) { console.error(err); wait.textContent = '사진을 만들지 못했어요. 😢 닫고 다시 눌러 주세요.'; }
 }
-/** 클리어 도장표 (설정 · 내 물건에서 언제든 볼 수 있다) */
+/** 클리어 스탬프 (설정 · 인벤토리에서 언제든 볼 수 있다) */
 function openStamps() {
   const { list, hidden, special } = stampList(null);
   const w = el('div', 'stamps');
@@ -1689,7 +1691,7 @@ function openStamps() {
   w.appendChild(grid);
   w.appendChild(el('div', 'muted', '테마를 끝까지 클리어하면 도장이 찍혀요. 클리어할 때마다 귀신들과 함께 찍은 기념 사진도 받을 수 있어요!'));
   if (S.lastClear) { const b = el('button', 'btn primary', '📸 방금 받은 기념 사진 다시 보기'); b.onclick = () => { closeModal(); openClearPhoto(); }; w.appendChild(b); }
-  openModal('🎫 클리어 도장표', '', w);
+  openModal('🎫 클리어 스탬프', '', w);
 }
 // 히든 테마 「데드 시티」 미리보기 영상 (설정 → 미리보기)
 async function playHiddenPreview() {
@@ -2762,10 +2764,10 @@ socket.on('xmas:done', ({ already } = {}) => {
   S.xmasGot = true; S.xmasBusy = false;
   const gb = S.world?.xmasGift;
   if (gb && gb.group.visible) { giftPuffFx(gb.x, gb.y, gb.z); gb.hide(); }
-  if (already) { toast('🎄 크리스마스 선물은 이미 받았어요! 🎒 내 물건에서 입고 벗을 수 있어요.'); return; }
+  if (already) { toast('🎄 크리스마스 선물은 이미 받았어요! 🎒 인벤토리에서 입고 벗을 수 있어요.'); return; }
   audio.play('pop'); audio.play('pickup'); for (let i = 0; i < 6; i++) setTimeout(() => audio.play('twinkle'), 200 + i * 140);
   if (S.riding) { S.riding = false; updateGearButtons(); }
-  const pop = el('div', 'xmas-pop'); pop.innerHTML = '<div class="xp-i">🎄</div><div class="xp-t">크리스마스 선물입니다</div><div class="xp-s">트리 코스튬을 입었어요! 🎒 내 물건에서 벗을 수 있어요</div>';
+  const pop = el('div', 'xmas-pop'); pop.innerHTML = '<div class="xp-i">🎄</div><div class="xp-t">크리스마스 선물입니다</div><div class="xp-s">트리 코스튬을 입었어요! 🎒 인벤토리에서 벗을 수 있어요</div>';
   document.body.appendChild(pop); setTimeout(() => pop.classList.add('out'), 2600); setTimeout(() => pop.remove(), 3400);
 });
 function lobbyNearest() {
@@ -2881,7 +2883,7 @@ function openRank(opt = {}) {
     const wrap = holder; wrap.innerHTML = '';
     const mains = el('div', 'rank-main'); const sub = el('div', 'rank-sub'); const tabs = el('div', 'rank-tabs'); const list = el('div', 'rank-list'); const mine = el('div', 'rank-mine');
     const scs = S.scenarios || []; // 히든 테마도 랭킹은 누구나 볼 수 있다 (버튼 색만 다름)
-    let main = opt.main || S.rankMain || 'week';
+    let main = opt.main || 'theme';
     let cur = opt.theme || S.rankTheme || scs[0]?.id;
     S.rankTab = () => ({ main, theme: cur });
     const md = (k) => `${Number(k.slice(5, 7))}월 ${Number(k.slice(8, 10))}일`;
@@ -2924,7 +2926,7 @@ function openRank(opt = {}) {
       if (main === 'theme') drawTheme(); else drawLevel();
       mine.classList.toggle('hidden', !mine.textContent);
     };
-    [['week', '📅 주간 랭킹'], ['month', '🗓️ 월간 랭킹'], ['total', '👑 총 랭킹'], ['theme', '🚪 테마 랭킹']].forEach(([id, label]) => { const b = el('button', 'btn small', label); b.dataset.id = id; b.onclick = () => { main = id; draw(); }; mains.appendChild(b); });
+    [['theme', '🚪 테마 랭킹'], ['week', '📅 주간 랭킹'], ['month', '🗓️ 월간 랭킹'], ['total', '👑 총 랭킹']].forEach(([id, label]) => { const b = el('button', 'btn small', label); b.dataset.id = id; b.onclick = () => { main = id; draw(); }; mains.appendChild(b); });
     scs.forEach((x) => { const b = el('button', 'btn tiny' + (x.hidden ? ' hid' : ''), x.hidden ? '🧟 ' + x.short : x.short); b.dataset.id = x.id; b.onclick = () => { cur = x.id; draw(); }; tabs.appendChild(b); });
     wrap.append(mains, sub, tabs, list, mine);
     try { draw(); } catch (e) { list.innerHTML = ''; list.appendChild(el('div', 'muted', '랭킹을 표시하지 못했어요.')); console.error(e); }
@@ -3044,7 +3046,7 @@ $('#settingsBtn').onclick = () => {
   sb('👗 옷 갈아입기', () => { closeModal(); $('#lookBtn').click(); });
   sb('❔ 도움말', () => { closeModal(); $('#helpBtn').click(); });
   sb('🧟 히든 「데드 시티」 미리보기 영상 ▶', () => { closeModal(); playHiddenPreview(); }).classList.add('wide');
-  sb('🎫 클리어 도장표', () => { closeModal(); openStamps(); });
+  sb('🎫 클리어 스탬프', () => { closeModal(); openStamps(); });
   sb('📮 고객소리함', () => { closeModal(); openFeedback(); });
   sb('🖼 갤러리 (모두가 찍은 사진)', () => { closeModal(); openGallery(); }).classList.add('wide');
   wrap.appendChild(btns);
@@ -3239,7 +3241,7 @@ async function loadShareInfo() {
   } catch {}
 }
 
-// ─────────────────────────── 레벨 · 코인 · 상점 · 내 물건 · 선물
+// ─────────────────────────── 레벨 · 코인 · 상점 · 인벤토리 · 선물
 const GOLD_ORDER = ['gold_hat', 'gold_mask', 'gold_gloves', 'gold_top', 'gold_bottom', 'gold_shoes', 'gold_tail']; // 황금 고양이 세트 (비매품 · 주간랭킹 1~3위 보상)
 const SHOP_ORDER = ['costume_lolita_white','costume_lolita_black','head_giantbow','costume_lolita','costume_sentai','cape_grand','head_axe','mask_waterdeer','rename_ticket', 'popper', 'rocket', 'wings_fairy', 'mount_pony', 'wings_angel', 'mount_broom', 'mount_cat', 'mount_dog', 'mount_wolf', 'mount_unicorn', 'wings_bat', 'tail_devil', 'horn_devil', 'wings_devil', 'mount_trex', 'wings_dragon', 'sword', 'mount_ufo', 'mount_lion', 'mount_turtle', 'mount_human', 'costume_robot', 'mount_carriage', 'chainsaw', 'mask_paper', 'mask_rabbit', 'mask_menhera', 'mask_fox', 'mask_bear', 'mask_hahoe', 'mask_wolf', 'mask_venice', 'mask_ghost', 'mask_oni', 'mask_bighead', 'mount_sleigh', 'costume_xmas', ...GOLD_ORDER, 'gold_staff'];
 const coinsText = () => (S.profile?.coins === -1 ? '∞' : String(S.profile?.coins ?? 0));
@@ -3291,7 +3293,7 @@ function renderXp() {
   $('#xpLabel').textContent = pf.admin ? `Lv.${pf.lv} 운영자 🛡️` : pf.lv >= pf.max ? `Lv.${pf.lv} 만렙 👑` : `Lv.${pf.lv}  ${pf.xp - pf.cur} / ${span} XP`;
   lvChip.innerHTML = `<b>Lv.${pf.lv}</b> · 🪙 ${coinsText()}`;
   snapChip.hidden = false;
-  lvChip.title = '내 물건 🎒 (I)';
+  lvChip.title = '인벤토리 🎒 (I)';
   if (!pf.equip?.mount) S.riding = false;
   if (!pf.items?.sword) S.holdSword = false;
   if (!pf.items?.gold_staff) S.holdStaff = false;
@@ -3313,11 +3315,11 @@ socket.on('xp', ({ add, why, lv, up }) => {
   const f = el('div', 'xp-float', `+${add} XP${why ? ' · ' + why : ''}`); $('#hud').appendChild(f); setTimeout(() => f.remove(), 2600);
   if (up) { audio.play('bell'); if (myAvatar) burstHearts(myAvatar, 10); }
 });
-socket.on('gift', ({ from, icon, name }) => { toast(`🎁 ${from} 님이 ${icon} ${name}을(를) 선물했어요! (🎒 내 물건)`); audio.play('pickup'); if (myAvatar) burstHearts(myAvatar, 8); });
+socket.on('gift', ({ from, icon, name }) => { toast(`🎁 ${from} 님이 ${icon} ${name}을(를) 선물했어요! (🎒 인벤토리)`); audio.play('pickup'); if (myAvatar) burstHearts(myAvatar, 8); });
 // 우편: 주간랭킹 1~3위 보상처럼 꼭 알려야 하는 소식 (접속해 있지 않았다면 다음에 들어올 때 온다)
 socket.on('mail', ({ text }) => {
   const w = el('div', 'bag'); w.appendChild(el('div', 'mail-text', text));
-  const b = el('button', 'btn primary', '🎒 내 물건 보기'); b.onclick = () => openBag(); w.appendChild(b);
+  const b = el('button', 'btn primary', '🎒 인벤토리 보기'); b.onclick = () => openBag(); w.appendChild(b);
   openModal('🏆 축하합니다!', '주간랭킹 보상', w);
   audio.play('bell'); if (myAvatar) burstHearts(myAvatar, 12);
   addChat({ channel: 'system', text: '🎁 ' + text });
@@ -3344,7 +3346,7 @@ function updateHiddenGate(quiet) {
 // ───── 탈것 · 전설의 검
 function toggleRide() {
   const m = S.profile?.equip?.mount;
-  if (!m) { toast('🐴 탈것이 없어요. 🛒 상점에서 사서 🎒 내 물건에서 착용하세요.'); return; }
+  if (!m) { toast('🐴 탈것이 없어요. 🛒 상점에서 사서 🎒 인벤토리에서 착용하세요.'); return; }
   if (S.mount) dismount();
   S.riding = !S.riding; S.perch = null; me.y = 0;
   toast(S.riding ? `${S.shop[m]?.icon || '🐴'} ${S.shop[m]?.name || '탈것'}에 탔어요! 이동 속도 ${m === 'mount_turtle' ? 2 : 1.5}배 (Z: 내리기)` : '탈것에서 내렸어요.');
@@ -3457,13 +3459,13 @@ function openShop() {
     const it = S.shop[sel]; const have = pf.items?.[sel] || 0; const locked = !it.nosale && !pf.admin && pf.lv < it.lv;
     if (it.gift === 'arcade') {
       info.append(el('div','sh-t',`${it.icon} ${it.name}`),el('div','sh-d',it.desc),el('div','sh-d muted',it.tip),el('div','sh-lv',have?'✅ 보유':`완주 진행 ${pf.arcade?.cleared || 0} / 100`));
-      const bag=el('button','btn','🎒 내 물건');bag.onclick=()=>openBag();info.append(bag);return;
+      const bag=el('button','btn','🎒 인벤토리');bag.onclick=()=>openBag();info.append(bag);return;
     }
     if (it.nosale) { // 비매품: 전시만 한다 (살 수 없다)
       const goldHave = GOLD_ORDER.filter((id) => pf.items?.[id]).length;
       info.innerHTML = `<div class="sh-t">${it.icon} ${it.name}</div><div class="sh-d">${it.desc}</div><div class="sh-d muted">${it.tip || ''}</div><div class="sh-lv">${have ? '✅ 가지고 있어요' : it.gift === 'xmas' ? '🎁 로비 소원의 별 앞 선물상자에서 E 키로 받아요 (한 사람에 한 번)' : it.kind === 'staff' ? `황금 고양이 세트 ${goldHave}/7 모음` : '🏆 주간랭킹 1~3위에게 미보유 부위 1개를 무작위로 지급해요'}</div>${it.gift === 'xmas' ? '' : `<div class="muted">아이템별 1개만 가질 수 있어요 · 황금 고양이 세트 ${goldHave}/7${it.kind === 'staff' ? '' : ' · 7종을 다 모으면 🪄 황금 고양이 지팡이(귀신 퇴치 무제한)'}</div>`}`;
       const nb = el('button', 'btn primary', '비매품 (살 수 없어요)'); nb.disabled = true;
-      const bag2 = el('button', 'btn', '🎒 내 물건'); bag2.onclick = () => openBag();
+      const bag2 = el('button', 'btn', '🎒 인벤토리'); bag2.onclick = () => openBag();
       const row2 = el('div', 'row'); row2.append(nb, bag2); info.appendChild(row2);
       return;
     }
@@ -3473,7 +3475,7 @@ function openShop() {
     buy.disabled = locked || have >= it.max || needsAccount;
     if (needsAccount) buy.textContent = '고정 계정 전용';
     buy.onclick = () => { socket.emit('shop:buy', sel); audio.play('click'); };
-    const bag = el('button', 'btn', '🎒 내 물건'); bag.onclick = () => openBag();
+    const bag = el('button', 'btn', '🎒 인벤토리'); bag.onclick = () => openBag();
     const row = el('div', 'row'); row.append(buy, bag); info.appendChild(row);
   };
   const top = el('div', 'shop-top'); top.append(pvBox, info);
@@ -3486,7 +3488,7 @@ function openShop() {
 }
 socket.on('account:renamed', applyAccountName);
 socket.on('shop:bought', ({ id }) => { audio.play('pickup'); const it = S.shop[id]; if (it?.kind === 'sword') holdWeapon('sword'); if (it?.kind === 'saw') holdWeapon('saw'); });
-// ───── 내 물건 (착용 · 사용 · 선물)
+// ───── 인벤토리 (착용 · 사용 · 선물)
 function openBag() {
   if (!S.profile) return;
   const w = el('div', 'bag');
@@ -3499,7 +3501,7 @@ function openBag() {
       const note = el('div', 'muted gold-note', `🏆 황금 고양이 세트 ${goldHave}/7${goldHave >= 7 ? ' — 세트 완성! 🪄 지팡이로 귀신을 횟수 제한 없이 물리칠 수 있어요' : ' · 7종을 다 모으면 🪄 황금 고양이 지팡이를 받아요'} `);
       if (goldHave >= 2) { // 한꺼번에 입기 / 벗기
         const worn = goldWorn().length;
-        const all = el('button', 'btn tiny' + (worn >= goldHave ? ' primary' : ''), worn >= goldHave ? '모두 벗기' : '모두 입기'); all.onclick = () => socket.emit('shop:equip', { id: 'gold_set', on: worn < goldHave });
+        const all = equipmentSwitch('황금 고양이 세트 전체',worn >= goldHave); all.onclick = () => socket.emit('shop:equip', { id: 'gold_set', on: worn < goldHave });
         note.appendChild(all);
       }
       w.appendChild(note);
@@ -3514,12 +3516,12 @@ function openBag() {
       const acts = el('span', 'ba');
       if (it.kind === 'wings' || it.kind === 'mount' || it.kind === 'costume' || it.kind === 'mask' || it.kind === 'tail' || it.kind === 'horn') {
         const on = pf.equip?.[it.kind] === id;
-        const b = el('button', 'btn tiny' + (on ? ' primary' : ''), on ? '착용 중 ✓' : '착용'); b.onclick = () => { socket.emit('shop:equip', { id, on: !on }); if (it.kind === 'mount') { S.riding = !on; if (!on) { if (S.mount) dismount(); S.perch = null; me.y = 0; toast(`${it.icon} ${it.name}에 탔어요! 이동 속도 ${id === 'mount_turtle' ? 2 : 1.5}배 (Z: 내리기/타기)`); } updateGearButtons(); } };
+        const b = equipmentSwitch(it.name,on); b.onclick = () => { socket.emit('shop:equip', { id, on: !on }); if (it.kind === 'mount') { S.riding = !on; if (!on) { if (S.mount) dismount(); S.perch = null; me.y = 0; toast(`${it.icon} ${it.name}에 탔어요! 이동 속도 ${id === 'mount_turtle' ? 2 : 1.5}배 (Z: 내리기/타기)`); } updateGearButtons(); } };
         acts.appendChild(b);
         if (it.kind === 'mount' && on) { const r = el('button', 'btn tiny', S.riding ? '내리기 (Z)' : '타기 (Z)'); r.onclick = () => { toggleRide(); draw(); }; acts.appendChild(r); }
       } else if (it.kind === 'gold') { // 황금 고양이 부위: 부위마다 따로 입고 벗는다
         const on = (pf.equip?.gold || '').includes(it.part);
-        const b = el('button', 'btn tiny' + (on ? ' primary' : ''), on ? '착용 중 ✓' : '착용'); b.onclick = () => socket.emit('shop:equip', { id, on: !on });
+        const b = equipmentSwitch(it.name,on); b.onclick = () => socket.emit('shop:equip', { id, on: !on });
         acts.appendChild(b);
       } else if (it.kind === 'sword' || it.kind === 'staff' || it.kind === 'saw') {
         const kind = it.kind, held = kind === 'sword' ? S.holdSword : kind === 'saw' ? S.holdSaw : S.holdStaff;
@@ -3543,9 +3545,9 @@ function openBag() {
   };
   draw();
   S.bagRefresh = () => { if ($('#modalBody').firstChild === w) draw(); else S.bagRefresh = null; };
-  openModal('🎒 내 물건', '날개·탈것·코스튬·가면은 착용하면 모두에게 보여요 · 아이템별 1개만 가질 수 있어요 (폭죽은 여러 개)', w);
+  openModal('🎒 인벤토리', '날개·탈것·코스튬·가면은 착용하면 모두에게 보여요 · 아이템별 1개만 가질 수 있어요 (폭죽은 여러 개)', w);
   footBtn('🛒 상점', () => openShop());
-  footBtn('🎫 도장표', () => openStamps());
+  footBtn('🎫 스탬프', () => openStamps());
 }
 function openRenameTicket() {
   const form = el('form', 'bag custom');
@@ -3599,10 +3601,10 @@ function openGift(toId, name) {
   const ids = SHOP_ORDER.filter((id) => S.shop[id] && S.shop[id].gift !== 'arcade' && (pf.admin || (pf.items?.[id] && !S.shop[id].nosale)));
   if (!ids.length) w.appendChild(el('div', 'muted', '선물할 물건이 없어요. 🛒 상점에서 먼저 사 보세요!'));
   for (const id of ids) { const it = S.shop[id]; const b = el('button', 'btn small', `${it.icon} ${it.name}${pf.items?.[id] > 1 ? ` (${pf.items[id]}개)` : ''}`); b.onclick = () => { socket.emit('shop:gift', { to: toId, id }); closeModal(); }; w.appendChild(b); }
-  openModal(`🎁 ${name} 님에게 선물하기`, '내 물건 중 하나를 골라 보내요', w);
+  openModal(`🎁 ${name} 님에게 선물하기`, '인벤토리 중 하나를 골라 보내요', w);
 }
 $('#sideBtns').insertBefore(Object.assign(el('button', 'btn small', '🛒 상점'), { id: 'shopBtn', onclick: () => openShop() }), $('#rankBtn'));
-$('#sideBtns').insertBefore(Object.assign(el('button', 'btn small', '🎒 내 물건'), { id: 'bagBtn', onclick: () => openBag() }), $('#rankBtn'));
+$('#sideBtns').insertBefore(Object.assign(el('button', 'btn small', '🎒 인벤토리'), { id: 'bagBtn', onclick: () => openBag() }), $('#rankBtn'));
 function updateGearButtons() {
   const rb = $('.abtn.ride'), sb = $('.abtn.sword'), nb = $('.abtn.snack');
   if (nb) { nb.classList.toggle('hidden', !S.snack || S.snack[0] === 'b'); if (S.snack) { nb.firstChild.textContent = SNACK_INFO[S.snack[0]]?.icon || '🍿'; nb.querySelector('small').textContent = `${S.snack[0] === 'c' ? '마시기' : '먹기'} ${S.snack[1]}`; } }
@@ -3636,7 +3638,7 @@ function applyMobile() {
   $('#modalClose').textContent = m ? '닫기' : '닫기 (Esc)';
   $('#emoteBtn').textContent = m ? '😀 감정표현' : '😀 감정표현 (X)';
 }
-applyMobile(); addEventListener('resize', applyMobile);
+applyMobile(); installMobileCopy(); addEventListener('resize', applyMobile);
 {
   const hud = $('#hud');
   // 오른쪽 위 아이콘 툴바: 패널을 하나씩만 열어 화면을 가리지 않게
@@ -3644,7 +3646,7 @@ applyMobile(); addEventListener('resize', applyMobile);
   const panels = { party: '#partyPanel', share: '#sharePanel', roster: '#rosterPanel', chat: '#chat' };
   const btns = [
     ['party', '👥', '파티'], ['chat', '💬', '채팅'], ['roster', '🧑‍🤝‍🧑', '접속자'], ['share', '🔗', '초대 주소'],
-    ['shop', '🛒', '코인 상점'], ['bag', '🎒', '내 물건'], ['rank', '🏆', '랭킹'], ['settings', '⚙', '설정 · 지도 · 옷 · 도움말'], ['coffee', '💗', '감사한 마음 전하기'], ['admin', '🛡️', '운영자'],
+    ['shop', '🛒', '코인 상점'], ['bag', '🎒', '인벤토리'], ['rank', '🏆', '랭킹'], ['settings', '⚙', '설정 · 지도 · 옷 · 도움말'], ['coffee', '💗', '감사한 마음 전하기'], ['admin', '🛡️', '운영자'],
   ];
   let open = null;
   const setOpen = (k) => {

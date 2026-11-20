@@ -961,3 +961,15 @@ body.mobile #login .logo { padding: 0; margin: 0; }
 .arcade-prompt{white-space:pre-line;line-height:1.9;padding:18px;background:#151c18;border:1px solid #56624b;border-radius:12px;overflow-wrap:anywhere}
 .arcade-panel summary{cursor:pointer;padding:10px}.arcade-panel progress+p{font-size:13px}
 .arcade-panel [hidden]{display:none!important}
+
+/* Equipment switches reflect the server-confirmed profile after equip/unequip. */
+.equipment-switch{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:6px 9px;border:1px solid #63515c;border-radius:10px;background:#251f29;color:#ded4db;font:inherit;font-size:12px;cursor:pointer;white-space:nowrap}
+.equipment-switch-track{position:relative;width:38px;height:22px;border-radius:20px;background:#514b57;flex:none;transition:background .15s}
+.equipment-switch-track::after{content:'';position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#eee6e9;transition:transform .15s}
+.equipment-switch[aria-checked="true"]{border-color:#d784a0;color:#ffe9f2}
+.equipment-switch[aria-checked="true"] .equipment-switch-track{background:#bc5e83}
+.equipment-switch[aria-checked="true"] .equipment-switch-track::after{transform:translateX(16px)}
+.equipment-switch:focus-visible{outline:2px solid #ffdc9d;outline-offset:3px}
+@media(prefers-reduced-motion:reduce){.equipment-switch-track,.equipment-switch-track::after{transition:none}}
+
+body.mobile #prompt kbd,body.mobile .slot-key,body.mobile .inv-slot kbd{display:none}
