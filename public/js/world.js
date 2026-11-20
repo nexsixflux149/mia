@@ -1533,11 +1533,10 @@ function buildLobbyExtras(root, colliders, add) {
   }
   // ── 고객소리함 (광장 동쪽, 상점 옆) — 빨간 우편함. 버그 · 건의사항을 적어 넣는다
   const clickables = [];
-  // Balloon clown is at (6.5,14.5); shop at (7.6*LS,3.4*LS).
-  // Midpoint uses final lobby coordinates so it stays between the two after spreading.
+  // Mailbox final position is (3.9*LS,3.5*LS). Cabinet stands immediately beside it.
   {
-    const cx = 6.4, cz = 6.2, g = buildArcadeCabinet();
-    g.position.set(cx,0,cz); g.rotation.y = Math.atan2(-cx,5*LS-cz); g.userData.noSpread = true; root.add(g);
+    const cx = 3.9 * LS - 1.65, cz = 3.5 * LS, g = buildArcadeCabinet();
+    g.position.set(cx,0,cz); g.rotation.y = 0; g.userData.noSpread = true; root.add(g);
     colliders.push({x:cx,z:cz,hw:.9,hd:.9,noSpread:true});
     interactives.push({id:'arcade',kind:'arcade',x:cx,z:cz,r:2.8,label:'미아 오락실',verb:'연습게임',noSpread:true});
     clickables.push({id:'arcade',group:g});
