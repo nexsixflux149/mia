@@ -25,6 +25,10 @@ const PROTO = 4;
 // 웹소켓으로 바로 붙는다 (막힌 곳에서는 예전 방식으로 자동 전환) — 처음 붙을 때 오가는 양이 줄어든다
 let santaVisual=null,santaState=null;
 const socket = io({ transports: ['websocket', 'polling'], tryAllTransports: true });
+function sendPresence(){if(socket.connected && S?.me)socket.emit('presence',!document.hidden);}
+setInterval(sendPresence,10000);
+window.addEventListener('pagehide',()=>{if(socket.connected)socket.emit('presence',false);});
+window.addEventListener('pageshow',()=>sendPresence());
 socket.on('lobby:santa',s=>{santaState=s;});
 // 연결이 끊겼다 다시 붙으면(모바일 앱 전환 등) 같은 플레이어로 이어서 접속
 socket.on('connect', () => {
@@ -33,8 +37,9 @@ socket.on('connect', () => {
     if (!res) return;
     if (res.error) { toast((res.message || '다시 접속하지 못했어요.') + ' 잠시 뒤 화면을 새로 엽니다.'); setTimeout(() => location.reload(), 2500); return; } // 입장이 거절되면 멈춘 화면으로 남지 않게 새로 연다
     // 오래 끊겨 서버가 내 자리를 이미 정리했다면 새 캐릭터로 로비에서 다시 시작한다 (예전 파티 · 게임 화면도 함께 정리)
-    if (!res.resumed) { S.me = res.id; S.myName = res.name; voice.myId = res.id; dropOther(res.id); S.party = null; closeModal(); S.storyQueue = []; closeStory(true); rebuildMyAvatar(); toast('연결이 오래 끊겨 로비에서 다시 시작합니다.'); }
+    if (!res.resumed) { S.me = res.id; S.myName = res.name; sendPresence();voice.myId = res.id; dropOther(res.id); S.party = null; closeModal(); S.storyQueue = []; closeStory(true); rebuildMyAvatar(); toast('연결이 오래 끊겨 로비에서 다시 시작합니다.'); }
     S.resume = { id: res.id, token: res.token }; if (!S.admin) store.set('gwimun-resume', { ...S.resume, name: res.name, at: Date.now() });
+    sendPresence();
     if (res.account && !S.admin) applyAccountName(res.account);
     setLocalSnack(res.snack || '');
     if (S.mount && res.room === 'lobby') dismount(false);
@@ -71,6 +76,7 @@ document.addEventListener('resume', () => wakeCheck('long')); // (안드로이�
 // 창을 닫거나 숨길 때 '마지막 접속 시각'을 남겨 둔다 → 금방 다시 열면 같은 플레이어로 이어서
 addEventListener('pagehide', () => { const r = store.get('gwimun-resume', null); if (r && S.resume) store.set('gwimun-resume', { ...r, at: Date.now() }); });
 document.addEventListener('visibilitychange', () => {
+  sendPresence();
   if (document.hidden) { const r = store.get('gwimun-resume', null); if (r && S.resume) store.set('gwimun-resume', { ...r, at: Date.now() }); }
   if (document.hidden) { hiddenAt = Date.now(); S.joy = null; const k = document.getElementById('joyKnob'); if (k) k.style.transform = ''; return; }
   const away = hiddenAt ? Date.now() - hiddenAt : 0; hiddenAt = 0;
@@ -266,7 +272,7 @@ function enter() {
     setLocalSnack(res.snack || '');
     S.shop = res.shop || {}; S.hiddenOk = !!res.hiddenOk;
     setChamp(res.champ || null); voice.setIce(res.ice); S.lastStateAt = performance.now();
-    voice.myId = res.id; dropOther(res.id); // 혹시 내 캐릭터가 '다른 사람'으로 그려져 있었다면 지운다
+    sendPresence();voice.myId = res.id; dropOther(res.id); // 혹시 내 캐릭터가 '다른 사람'으로 그려져 있었다면 지운다
     $('#login').classList.add('hidden'); $('#hud').classList.remove('hidden');
     pvLoop = false;
     rebuildMyAvatar(); updateHiddenGate(true);

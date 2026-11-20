@@ -41,6 +41,17 @@ with tempfile.TemporaryDirectory(prefix='mia-arcade100-test-') as data:
   state=event(ws,'state');
   while not state.get('f') or len(state['p'])!=12:state=event(ws,'state')
   assert len(state['p'])==12,len(state['p'])
+  # A socket may stay connected while its phone app is in the background.
+  hidden=identities[2]['id'];clients[2].send('42'+json.dumps(['presence',False]))
+  assert event(clients[0],'player:leave')==hidden
+  time.sleep(.5);clients[0].send('42'+json.dumps(['state:full']))
+  snapshot=event(clients[0],'state')
+  while not snapshot.get('f') or hidden in [p[0] for p in snapshot['p']]:snapshot=event(clients[0],'state')
+  clients[2].send('42'+json.dumps(['presence',True]))
+  time.sleep(.5);clients[0].send('42'+json.dumps(['state:full']))
+  snapshot=event(clients[0],'state')
+  while not snapshot.get('f') or hidden not in [p[0] for p in snapshot['p']]:snapshot=event(clients[0],'state')
+  print('PASS: background socket removed immediately; foreground returns same avatar identity.')
   # Drain stale state events before forcing a new authoritative snapshot.
   departed=identities[-1]['id'];clients[-1].close();clients.pop()
   left=event(ws,'player:leave');assert left==departed,(left,departed)

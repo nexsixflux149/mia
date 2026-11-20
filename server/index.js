@@ -201,8 +201,9 @@ let seq = 1;
 // ───── 위치 방송 (전송량 줄이기): 1초에 10번, '바뀐 사람'만, 숫자는 소수 둘째 자리까지
 //  한 사람 = [id, x, z, y, ry, 깃발(걷기1·웅크림2·손전등4)] (+ 이름·외형 번호·파티·장비·감정표현이 바뀌었을 때만 뒤에 덧붙인다)
 //  아무도 움직이지 않으면 아무것도 보내지 않는다. 방에 새로 들어온 화면에는 전체를 한 번 보낸다.
+const lobbyPresent = p => !p.offline && !p.away && (!p.presenceAt || Date.now()-p.presenceAt<45000) && !!io.sockets.sockets.get(p.sid)?.connected;
 const lobbySanta = createLobbySanta();
-setInterval(()=>{ const state=lobbySanta.update(.1,[...players.values()]);io.to('lobby').emit('lobby:santa',state); },100).unref?.();
+setInterval(()=>{ const state=lobbySanta.update(.1,[...players.values()].filter(lobbyPresent));io.to('lobby').emit('lobby:santa',state); },100).unref?.();
 // Keep each member's fastest eligible result, including historical team records.
 function bestThemeRanks(list) {
  const seen=new Set();return [...list].sort((a,b)=>a.ms-b.ms||a.at-b.at).flatMap(record=>{
@@ -221,10 +222,10 @@ const metaOf = (room) => { let m = roomMeta.get(room); if (!m) { m = { gk: 'null
 const needFull = (room) => { if (room) metaOf(room).full = true; };
 function fullState(room) {
   const list = [];
-  for (const p of players.values()) if (p.room === room && !p.offline && io.sockets.sockets.get(p.sid)?.connected) list.push([p.id, ...dynOf(p), extOf(p)]);
+  for (const p of players.values()) if (p.room === room && !p.offline && (room !== 'lobby' || lobbyPresent(p)) && io.sockets.sockets.get(p.sid)?.connected) list.push([p.id, ...dynOf(p), extOf(p)]);
   return { f: 1, p: list, g: roomMeta.get(room)?.ghosts ?? null };
 }
-const lobbyList = () => [...players.values()].filter((p) => !p.offline).map((p) => ({ id: p.id, name: p.name, partyId: p.partyId, inGame: p.room !== 'lobby', room: p.room || '', hearts: hearts[p.name] || 0, admin: !!p.admin, lv: p.admin ? ADMIN_LV : levelOf(prof(p.name).xp) }));
+const lobbyList = () => [...players.values()].filter((p) => !p.offline && (p.room !== 'lobby' || lobbyPresent(p))).map((p) => ({ id: p.id, name: p.name, partyId: p.partyId, inGame: p.room !== 'lobby', room: p.room || '', hearts: hearts[p.name] || 0, admin: !!p.admin, lv: p.admin ? ADMIN_LV : levelOf(prof(p.name).xp) }));
 const broadcastRoster = () => io.emit('roster', lobbyList());
 
 function partyInfo(party) {
@@ -446,6 +447,14 @@ io.on('connection', (sock) => {
   // 방을 옮긴 화면이 '지금 이 방에 있는 사람 전부'를 다시 달라고 할 때
   // (너무 자주 오면 버리지 않고 0.4초에 한 번으로 모아서 보낸다 — 버리면 그 화면에는 다음 전체 방송까지 아무도 안 보인다)
   // 휴대폰이 잠들었다 깨어났을 때: 화면이 '아직 붙어 있나?' 하고 묻는다. 답이 없으면 화면이 스스로 다시 접속한다
+  sock.on('presence', visible => {
+    if(!me || me.sid!==sock.id || typeof visible!=='boolean')return;
+    const was=lobbyPresent(me);me.away=!visible;me.presenceAt=Date.now();
+    if(was!==lobbyPresent(me)){
+      if(me.room==='lobby'&&!visible)io.to('lobby').emit('player:leave',me.id);
+      needFull(me.room);broadcastRoster();
+    }
+  });
   sock.on('alive', (ack) => { if (typeof ack === 'function') ack(me && !me.offline && players.has(me.id) && me.sid === sock.id ? me.id : ''); });
   sock.on('state:full', () => {
     const p = me; if (!p?.room || p.offline) return;
@@ -1311,7 +1320,7 @@ let last = Date.now();
 setInterval(() => {
   const now = Date.now(); const dt = (now - last) / 1000; last = now;
   const byRoom = new Map();
-  for (const p of players.values()) { if (!p.room || p.offline) continue; if(!io.sockets.sockets.get(p.sid)?.connected) continue; let l = byRoom.get(p.room); if (!l) byRoom.set(p.room, (l = [])); l.push(p); }
+  for (const p of players.values()) { if (!p.room || p.offline || (p.room==='lobby'&&!lobbyPresent(p))) continue; if(!io.sockets.sockets.get(p.sid)?.connected) continue; let l = byRoom.get(p.room); if (!l) byRoom.set(p.room, (l = [])); l.push(p); }
   for (const [room, list] of byRoom) {
     const meta = metaOf(room);
     let ghosts = null;
@@ -1339,6 +1348,11 @@ setInterval(() => {
   for (const room of roomMeta.keys()) if (!byRoom.has(room)) roomMeta.delete(room);
 }, TICK_MS);
 
+setInterval(()=>{
+ let changed=false;
+ for(const p of players.values())if(p.room==='lobby'&&!p.offline&&!p.away&&p.presenceAt&&Date.now()-p.presenceAt>=45000){p.away=true;io.to('lobby').emit('player:leave',p.id);changed=true;}
+ if(changed){needFull('lobby');broadcastRoster();}
+},5000).unref?.();
 // 주인 없는 캐릭터 청소: 연결이 사라졌는데 '접속 중'으로 남은 캐릭터를 30초마다 찾아 정리한다 (혹시 모를 경우의 안전장치)
 setInterval(() => {
   for (const p of [...players.values()]) {
