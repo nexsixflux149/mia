@@ -143,6 +143,12 @@ const prof = (name) => {
   if (!profChecked.has(name)) { profChecked.add(name); for (const [id, n] of Object.entries(pf.items)) { const it = SHOP[id]; if (it && n > it.max) pf.items[id] = it.max; } if (goldConflictsWithCostume(pf.equip)) pf.equip.costume = ''; } // (고양이 세트와 로봇 코스튬은 함께 입지 않는다)
   return pf;
 };
+function recordReturnVisit(player){
+ if(player.admin || !player.acct)return;
+ const account=accountData.list[player.acct];if(!account)return;
+ account.arcadeVisits ||= [];const today=dayKey();
+ if(!account.arcadeVisits.includes(today)){account.arcadeVisits.push(today);accounts.save();}
+}
 function arcadeAnalytics(){
  const entries=Object.values(accountData.list).filter(a=>a.name!==ADMIN_NAME);
  const visits=entries.filter(a=>a.arcadeVisits?.length);
@@ -396,7 +402,7 @@ io.on('connection', (sock) => {
         prev.disconnect(true);
       }
       if (viaAccount) old.token = randomBytes(16).toString('hex'); // 예전 창이 다시 붙어 자리를 되가져가지 못하게
-      old.sid = sock.id; setMe(old); old._sr = null;
+      old.sid = sock.id; setMe(old); old._sr = null; recordReturnVisit(old);
       // 외형은 정말 바뀌었을 때만 새로 알린다 (다시 붙을 때마다 모두가 사진 얼굴을 다시 내려받지 않게)
       if (look) { const nl = sanitizeLook(look, name); if (JSON.stringify(nl) !== JSON.stringify(me.look)) { me.look = nl; me.lv++; } }
       sock.join(me.id); if (me.room) { sock.join(me.room); needFull(me.room); }
@@ -433,7 +439,7 @@ io.on('connection', (sock) => {
     sendProfile(np);
     flushMail(np);
     // 방문 통계: 오늘 방문 수 + 방문자
-    if (!asAdmin && account) { account.arcadeVisits ||= []; const today=dayKey();if(!account.arcadeVisits.includes(today)){account.arcadeVisits.push(today);accounts.save();} }
+    recordReturnVisit(np);
     if (!asAdmin) { const d = (stats.days[dayKey()] ||= { v: 0, u: {} }); d.v++; d.u[name] ||= 0; saveStats(); }
     io.to('lobby').emit('chat', { channel: 'system', text: `${name} 님이 접속했습니다.` });
   });
