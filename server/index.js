@@ -221,7 +221,7 @@ const metaOf = (room) => { let m = roomMeta.get(room); if (!m) { m = { gk: 'null
 const needFull = (room) => { if (room) metaOf(room).full = true; };
 function fullState(room) {
   const list = [];
-  for (const p of players.values()) if (p.room === room && !p.offline) list.push([p.id, ...dynOf(p), extOf(p)]);
+  for (const p of players.values()) if (p.room === room && !p.offline && io.sockets.sockets.get(p.sid)?.connected) list.push([p.id, ...dynOf(p), extOf(p)]);
   return { f: 1, p: list, g: roomMeta.get(room)?.ghosts ?? null };
 }
 const lobbyList = () => [...players.values()].filter((p) => !p.offline).map((p) => ({ id: p.id, name: p.name, partyId: p.partyId, inGame: p.room !== 'lobby', room: p.room || '', hearts: hearts[p.name] || 0, admin: !!p.admin, lv: p.admin ? ADMIN_LV : levelOf(prof(p.name).xp) }));
