@@ -1,3 +1,4 @@
+import {buildParkEntrance} from './park-entrance.js';
 import {createCoasterTrack} from './coaster-track.js';
 import {mountainGroundHeight,mountainSurface} from './mountain-layout.js';
 import {buildLobbyMountain} from './lobby-mountain.js';
@@ -361,7 +362,15 @@ function onOuterPath(x, z, margin = 0) {
   const across = Math.abs(Math.abs(x) - Math.abs(z)) * Math.SQRT1_2;
   return along >= branchStart * LS - margin && along <= branchEnd * LS + margin && across <= branchHalfWidth + margin;
 }
-function placeThemes(list) { list.forEach((th, k, all) => { const a = Math.PI + (k / (all.length - 1)) * Math.PI; th.x = +(Math.cos(a) * 15 * LS).toFixed(2); th.z = +(Math.sin(a) * 15 * LS).toFixed(2); }); return list; }
+function placeThemes(list) {
+  const left=Math.ceil(list.length/2),gap=.42;
+  list.forEach((th,k)=>{
+    const first=k<left,start=first?Math.PI:Math.PI*1.5+gap,end=first?Math.PI*1.5-gap:Math.PI*2;
+    const count=first?left:list.length-left,index=first?k:k-left;
+    const a=start+(end-start)*(count>1?index/(count-1):.5);
+    th.x=+(Math.cos(a)*15*LS).toFixed(2);th.z=+(Math.sin(a)*15*LS).toFixed(2);
+  });return list;
+}
 placeThemes(LOBBY_THEMES.filter((t) => !t.hidden));
 
 function portalTex(color, glow) {
@@ -436,16 +445,17 @@ function buildExhibit(root, colliders, th) {
     spin.push(P({ t: 'rocking_horse', x: 1.0, z: 1.7, r: -10 }, 0.9));
   }
   const sign = textSprite(th.label, { size: 40, bg: 'rgba(10,6,14,.85)', color: th.color, border: th.color });
-  sign.position.set(th.x, 5.1, th.z); sign.scale.multiplyScalar(1.3); sign.userData.noSpread = true; root.add(sign);
+  g.scale.setScalar(.84);
+  sign.position.set(th.x, 4.4, th.z); sign.scale.multiplyScalar(1.1); sign.userData.noSpread = true; root.add(sign);
   // 충돌: 받침대 뒤쪽 아치 + 양옆 소품
-  colliders.push({ x: th.x, z: th.z, hw: 1.9, hd: 1.9, noSpread: true });
+  colliders.push({ x: th.x, z: th.z, hw: 1.6, hd: 1.6, noSpread: true });
   return { portal, tex, light, spin, sign, group: g, id: th.id };
 }
 
 
 // ───────────────── 놀이공원 (로비) — 회전목마 · 관람차 · 벤치 · 피크닉 테이블
 // 놀이기구는 실제 시계(Date.now)로 돌려서 모든 접속자 화면에서 같은 위치에 보인다
-const PARK = { carousel: { x: -13.45, z: 9.05 }, wheel: { x: -2.3, z: -18.9 } }; // 관람차는 광장 북쪽, 츠바키야 · 삐에로 관문 사이 뒤에 선다 (관문 너머 하늘에 보인다)
+const PARK = { carousel: { x: -13.45, z: 9.05 }, wheel: { x: -14.8, z: -21.2 } }; // 관람차는 광장 북쪽, 츠바키야 · 삐에로 관문 사이 뒤에 선다 (관문 너머 하늘에 보인다)
 const parkNow = () => Date.now() / 1000;
 function stripeTex(a, b, n = 12) {
   const c = document.createElement('canvas'); c.width = 256; c.height = 32; const x = c.getContext('2d');
@@ -799,7 +809,7 @@ function buildLobbyDeco(root, colliders, themes) {
   // 깃발 줄: 관문 위쪽 가로등끼리 늘어진 줄에 빨강·검정 삼각 깃발
   {
     const north = posts.filter((p) => p.z < 0).sort((a, b) => a.a - b.a), pairs = [];
-    for (let i = 0; i + 1 < north.length; i++) pairs.push([north[i], north[i + 1]]);
+    for (let i = 0; i + 1 < north.length; i++) { const a=north[i],b=north[i+1]; if((Math.max(Math.abs(a.x),Math.abs(b.x))<13&&Math.min(a.z,b.z)<-20)||(a.x*b.x<=0&&Math.max(a.z,b.z)<-17))continue; pairs.push([a,b]); }
     const per = 9, flagG = new THREE.BufferGeometry(); flagG.setAttribute('position', new THREE.Float32BufferAttribute([-0.13, 0, 0, 0.13, 0, 0, 0, -0.3, 0], 3)); flagG.computeVertexNormals();
     const fl = new THREE.InstancedMesh(flagG, new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, roughness: 0.8 }), Math.max(1, pairs.length * per));
     const o = new THREE.Object3D(), col = new THREE.Color(); let n = 0;
@@ -1308,7 +1318,7 @@ export function buildLobby(scene, opts = {}) {
   {
     const n = 1800; const grass = new THREE.InstancedMesh(new THREE.ConeGeometry(0.05, 0.32, 4), new THREE.MeshStandardMaterial({ color: '#3f6a40', roughness: 1 }), n);
     const m4 = new THREE.Matrix4();
-    for (let k = 0; k < n; k++) { const a = Math.random() * Math.PI * 2, r = 17 + Math.random() * 27; m4.makeRotationZ((Math.random() - 0.5) * 0.5); const x = Math.cos(a) * r, z = Math.sin(a) * r; m4.setPosition(x, onOuterPath(x * LS, z * LS) ? -1 : 0.15, z); grass.setMatrixAt(k, m4); }
+    for (let k = 0; k < n; k++) { const a = Math.random() * Math.PI * 2, r = 17 + Math.random() * 27; m4.makeRotationZ((Math.random() - 0.5) * 0.5); const x = Math.cos(a) * r, z = Math.sin(a) * r; m4.setPosition(x, (onOuterPath(x * LS, z * LS) || (Math.abs(x*LS)<10&&z*LS<-27&&z*LS>-37)) ? -1 : 0.15, z); grass.setMatrixAt(k, m4); }
     root.add(grass);
   }
   // 확장 지형의 바깥 경계는 mountainMoveAllowed에서 제한한다.
@@ -1319,10 +1329,11 @@ export function buildLobby(scene, opts = {}) {
   const mountain = buildLobbyMountain(); root.add(mountain.root);
   colliders.push({x:0,z:-128,hw:5,hd:2.1,noSpread:true});
   // Clear the former pond approach without removing the theme gates or the observation wheel.
-  for(const o of [...root.children]){if(o===mountain.root||o.isLight||o.isInstancedMesh||o.isPoints||o.isSprite)continue;if(((Math.abs(o.position.x)<2.4&&o.position.z<-27&&o.position.z>-42)||(o.position.z<-38&&mountainSurface(o.position.x,o.position.z,2)!==null))&&o.position.y<8){const box=new THREE.Box3().setFromObject(o),size=box.getSize(new THREE.Vector3());if(size.x<7&&size.z<7){root.remove(o);disposeTree(o);}}}
-  for(let i=colliders.length-1;i>=0;i--){const c=colliders[i];if(Math.abs(c.x)<2.4&&c.z<-27&&c.z>-42)colliders.splice(i,1);}
+  for(const o of [...root.children]){if(o===mountain.root||o.isLight||o.isInstancedMesh||o.isPoints||o.isSprite)continue;if(((Math.abs(o.position.x)<9.5&&o.position.z<-27&&o.position.z>-37)||(o.position.z<-38&&mountainSurface(o.position.x,o.position.z,2)!==null))&&o.position.y<8){const box=new THREE.Box3().setFromObject(o),size=box.getSize(new THREE.Vector3());if(size.x<7&&size.z<7){root.remove(o);disposeTree(o);}}}
+  for(let i=colliders.length-1;i>=0;i--){const c=colliders[i];if(Math.abs(c.x)<9.5&&c.z<-27&&c.z>-37)colliders.splice(i,1);}
+  const entrance=buildParkEntrance();root.add(entrance.root);colliders.push(...entrance.colliders,...mountain.observatoryColliders);
   const mountainSign = textSprite('귀문산 등산로 · 중턱 테마 터 10곳', {size:38,color:'#f2dfae',bg:'rgba(12,20,17,.86)'});
-  mountainSign.position.set(3.8,2.2,-29); mountainSign.scale.set(8,1,1); root.add(mountainSign);
+  mountainSign.position.set(8,1.2,-36); mountainSign.scale.set(8,1,1); root.add(mountainSign);
   scene.add(root);
   let lastT = 0;
   const update = (t) => {
@@ -1334,11 +1345,11 @@ export function buildLobby(scene, opts = {}) {
       e.tex.rotation = t * (0.4 + i * 0.1);
       e.light.intensity = 4 + Math.sin(t * 2 + i) * 1.5;
       e.portal.material.opacity = 0.8 + Math.sin(t * 3 + i) * 0.12;
-      e.sign.position.y = 5.1 + Math.sin(t * 1.5 + i) * 0.08;
+      e.sign.position.y = 4.4 + Math.sin(t * 1.5 + i) * 0.08;
       e.spin.forEach((s) => (s.rotation.z = Math.sin(t * 1.2 + i) * 0.15));
     });
   };
-  return { root, colliders, walls: [], objects: {}, flickers: [], ceiling: [], update, mountain, bounds: 28.5 * LS, outdoor: true, background: scene.background, fog: scene.fog, themes, exhibits, hiddenGate: !!opts.hidden, setChamp: (c) => champSign.set(c), snapBoard, shopFace: extra.shopFace, clickables: [...extra.clickables, ...deco.clickables], wishStar: deco.wishStar, xmasGift: deco.xmasGift, interactives: [...park.interactives, ...outer.interactives, ...extra.interactives, ...deco.interactives, ...mountain.interactives], rides: { ...park.rides, ...extra.rides, ...deco.rides, ...mountain.rides } };
+  return { root, colliders, walls: [], objects: {}, flickers: [], ceiling: [], update, mountain, bounds: 28.5 * LS, outdoor: true, background: scene.background, fog: scene.fog, themes, exhibits, hiddenGate: !!opts.hidden, setChamp: (c) => champSign.set(c), snapBoard, shopFace: extra.shopFace, clickables: [...extra.clickables, ...deco.clickables, ...mountain.clickables], wishStar: deco.wishStar, xmasGift: deco.xmasGift, interactives: [...park.interactives, ...outer.interactives, ...extra.interactives, ...deco.interactives, ...mountain.interactives], rides: { ...park.rides, ...extra.rides, ...deco.rides, ...mountain.rides } };
 }
 
 // ───── 로비 쉼터: 불멍 캠프파이어 + 통나무 벤치 · 타면 움직이는 그네 · 코인 상점

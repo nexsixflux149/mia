@@ -1,4 +1,4 @@
-import {mountainMoveAllowed} from './mountain-layout.js';
+import {mountainMoveAllowed,lobbyRecoveryPoint} from './mountain-layout.js';
 import {teammateLight,remotePoseInterval} from './multiplayer-budget.js';
 import {installMobileCopy} from './mobile-copy.js';
 import * as THREE from 'three';
@@ -444,7 +444,8 @@ function enterLobby(pos) {
   audio.classicEffects = false;
   audio.xmasMechanical = false;
   cam.dist = CAM_START; // 살짝 줌인된 상태로 시작
-  me.x = pos.x; me.z = pos.z;
+  const restored=lobbyRecoveryPoint(pos.x,pos.z);
+  me.x=restored?.x??pos.x;me.z=restored?.z??pos.z;me.y=restored?.y??(S.world.mountain?.heightAt(me.x,me.z)??0);
   removeGhost(); clearOthers(); clearPings();
   $('#placeTitle').textContent = '미아 광장';
   $('#placeSub').textContent = `${(S.scenarios || []).filter((x) => !x.hidden).length || 10}개의 테마 · 파티를 모아 테마를 고르세요`;
@@ -650,7 +651,7 @@ function hoverCheck(e) {
   let label = null;
   const th = S.room === 'lobby' ? pickTheme(e.clientX, e.clientY) : null;
   if (th) label = `${THEME_INFO[th]?.title || ''} — 클릭해서 시작`;
-  else if (S.room === 'lobby') { const ck = pickClickable(e.clientX, e.clientY); if (ck) label = { arcade: '🕹️ 미아 오락실 — 미니 방탈출', mailbox: '📮 고객소리함 — 버그 · 건의사항 보내기', wishstar: '🌠 소원의 별 — 소원빌기', vote: '🗳️ 테마 투표 전광판 — 투표하기', xmasgift: '🎁 크리스마스 선물상자 — 선물받기' }[ck] || null; }
+  else if (S.room === 'lobby') { const ck = pickClickable(e.clientX, e.clientY); if (ck) label = { viking: '🎢 정상 바이킹 — 탑승하기', arcade: '🕹️ 미아 오락실 — 미니 방탈출', mailbox: '📮 고객소리함 — 버그 · 건의사항 보내기', wishstar: '🌠 소원의 별 — 소원빌기', vote: '🗳️ 테마 투표 전광판 — 투표하기', xmasgift: '🎁 크리스마스 선물상자 — 선물받기' }[ck] || null; }
   if (id) { const ent = S.world.objects[id]; label = (ent.done ? '✓ ' : '') + (ent.data.label || '') + (distTo(ent) > reach(ent) ? '  (클릭하면 다가감)' : ''); }
   else if (!th) { const av = pickAvatar(e.clientX, e.clientY); if (av) label = `${av.userData.name} (클릭: 메뉴)`; }
   canvas.style.cursor = label ? 'pointer' : 'default';
@@ -788,6 +789,7 @@ function updateMove(dt) {
       return;
     }
   }
+  if(S.room==='lobby'&&!S.perch&&S.world?.mountain){const restored=lobbyRecoveryPoint(me.x,me.z);if(restored){Object.assign(me,restored);S.moveTarget=null;S.pendingInteract=null;}}
   let vx = 0, vz = 0;
   const runKey = !!(keys.ShiftLeft || keys.ShiftRight);
   const sneak = !!((keys.KeyV && !runKey) || S.mSneak) && !blocked;
@@ -1262,6 +1264,7 @@ function loop() {
   if (cinema.active) { cinema.update(dt); cinema.render(); return; }
   if (S.me && S.world && myAvatar) {
     updateMove(dt);
+    if(window.__dbg)canvas.dataset.debugState=JSON.stringify({room:S.room,x:me.x,z:me.z,y:me.y,moving:me.moving,camera:camera.position.toArray(),mount:S.mount,colliders:(S.world.colliders||[]).filter(c=>Math.abs(c.x-me.x)<c.hw+.33&&Math.abs(c.z-me.z)<c.hd+.33)});
     animateAvatar(myAvatar, dt, me.moving, t, S.crouch || S.sneak, S.em || null, S.emT);
     applyGear(myAvatar, myGear()); animateGear(myAvatar, t, dt, me.moving);
     if (cashObj) { cashObj.userData.anim(t); if (!cashObj.userData.sent && S.room === 'game' && Math.hypot(me.x - cashObj.position.x, me.z - cashObj.position.z) < 0.9) { cashObj.userData.sent = true; socket.emit('cash:take'); setTimeout(() => { if (cashObj) cashObj.userData.sent = false; }, 3000); } }

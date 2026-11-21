@@ -2,13 +2,13 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import * as THREE from 'three';
-import {MOUNTAIN_TRAIL,MOUNTAIN_PATHS,MOUNTAIN_SLOTS,mountainSurface,mountainMoveAllowed} from '../public/js/mountain-layout.js';
+import {MOUNTAIN_TRAIL,MOUNTAIN_PATHS,MOUNTAIN_SLOTS,mountainSurface,mountainMoveAllowed,lobbyRecoveryPoint} from '../public/js/mountain-layout.js';
 import {teammateLight,remotePoseInterval} from '../public/js/multiplayer-budget.js';
 assert.equal(MOUNTAIN_SLOTS.length,10);
 for(const p of MOUNTAIN_SLOTS)assert.equal(mountainSurface(p.x,p.z),16);
-for(let i=1;i<MOUNTAIN_TRAIL.length;i++){
- const a=MOUNTAIN_TRAIL[i-1],b=MOUNTAIN_TRAIL[i];let previous=a;
- for(let j=1;j<=200;j++){const t=j/200,p={x:a.x+(b.x-a.x)*t,z:a.z+(b.z-a.z)*t};assert(mountainMoveAllowed(p.x,p.z,previous.x,previous.z),`blocked segment ${i} step ${j}`);previous=p;}
+for(const path of MOUNTAIN_PATHS)for(let i=1;i<path.length;i++){
+ const a=path[i-1],b=path[i];let previous=a;
+ for(let j=1;j<=4;j++){const t=j/4,p={x:a.x+(b.x-a.x)*t,z:a.z+(b.z-a.z)*t};assert(mountainMoveAllowed(p.x,p.z,previous.x,previous.z),`blocked segment ${i} step ${j}`);previous=p;}
 }
 assert(!mountainMoveAllowed(0,-94,0,-83));assert(!mountainMoveAllowed(70,-100,0,-80));
 const source=readFileSync(new URL('../public/js/main.js',import.meta.url),'utf8');
@@ -30,7 +30,7 @@ S.room='lobby';context.updateOthers(1/60,2.2);assert.equal([...S.others.values()
 console.log('PASS: actual 4-player update loop: 180 vs 360 articulated pose updates at 60Hz, continuous movement, maximum one teammate spotlight; all mountain paths and ten slots connected.');
 
 // Exercise the production movement/collision code rather than only its height helper.
-Object.assign(context,{mountainMoveAllowed,keys:{},typing:()=>false,loginOpen:()=>false,updateStatus:()=>{},audio:{step:()=>{}},EMOTE_DUR:{},cam:{yaw:0},myAvatar:new THREE.Group()});
+Object.assign(context,{mountainMoveAllowed,lobbyRecoveryPoint,keys:{},typing:()=>false,loginOpen:()=>false,updateStatus:()=>{},audio:{step:()=>{}},EMOTE_DUR:{},cam:{yaw:0},myAvatar:new THREE.Group()});
 Object.assign(S,{room:'lobby',world:{mountain:{heightAt:mountainSurface},colliders:[],bounds:45.6},em:'',run:false,sneak:false});
 Object.assign(me,{x:0,z:-40,y:0,ry:0});
 vm.runInContext(source.slice(source.indexOf('const R = 0.32'),source.indexOf('let sendT =')),context);
@@ -52,3 +52,13 @@ context.socket={connected:false};vm.runInContext(source.slice(source.indexOf('fu
 assert(context.myAvatar.rotation.x===0&&context.myAvatar.rotation.z===0,'dismount must reset roll and pitch');assert.equal(me.y,44,'dismount must preserve summit ground height');
 console.log('PASS: local and remote riders follow full train rotation; dismount restores upright pose and mountain ground.');
 
+
+S.mount=null;S.room='lobby';S.world.colliders=[];
+Object.assign(me,{x:-19.81,z:-69.54,y:0});context.updateMove(1/60);
+assert(mountainSurface(me.x,me.z)!==null,'legacy bend position not recovered');assert(me.y>8,'recovered below mountain');
+assert(Math.hypot(me.x+19.81,me.z+69.54)>.1,'position remained stuck');
+const oldX=me.x,oldZ=me.z,route=MOUNTAIN_PATHS.flat(),nearest=route.reduce((a,b)=>Math.hypot(a.x-me.x,a.z-me.z)<Math.hypot(b.x-me.x,b.z-me.z)?a:b);
+S.moveTarget=route[Math.min(route.length-1,route.indexOf(nearest)+8)];for(let i=0;i<20;i++)context.updateMove(1/60);
+assert(Math.hypot(me.x-oldX,me.z-oldZ)>.2,'movement still blocked after recovery');
+assert.equal(lobbyRecoveryPoint(0,5),null,'normal spawn moved unnecessarily');
+console.log('PASS: actual reported saved position recovers above terrain and can walk again; normal lobby spawn unchanged.');

@@ -1,3 +1,4 @@
+import {textSprite} from './avatar.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import * as T from 'three';
 export function buildSummitViking(){
@@ -17,8 +18,10 @@ export function buildSummitViking(){
  const seatPoints=[];for(let row=0;row<2;row++)for(let col=0;col<4;col++){const x=-2.7+col*1.8,z=row?.62:-.62;add(new T.BoxGeometry(1.2,.14,.72),steel,x,.25,z,boat);add(new T.BoxGeometry(1.2,.7,.12),wood,x,.6,z+(row?.4:-.4),boat);beam(new T.Vector3(x-.55,.8,z),new T.Vector3(x+.55,.8,z),.055,gold,boat);seatPoints.push(new T.Vector3(x,.33,z));}
  // Batch rigid pieces by material, retaining only the ship pivot as an animated group.
  for(const parent of [boat,pivot,root]){const buckets=new Map();for(const child of [...parent.children])if(child.isMesh){child.updateMatrix();let list=buckets.get(child.material);if(!list)buckets.set(child.material,list=[]);const g=child.geometry.index?child.geometry.toNonIndexed():child.geometry.clone();g.applyMatrix4(child.matrix);list.push(g);parent.remove(child);child.geometry.dispose();}for(const [material,geos]of buckets){const geometry=mergeGeometries(geos,false);geos.forEach(g=>g.dispose());parent.add(new T.Mesh(geometry,material));}}
+ const sign=textSprite('바이킹 탑승 · 배를 누르세요',{size:40,color:'#ffe5a3',bg:'rgba(28,20,18,.9)'});sign.position.set(0,2,-8.7);sign.scale.set(5,1,1);root.add(sign);
+ const pad=add(new T.CylinderGeometry(1.1,1.1,.06,40),gold,0,.04,8.8);
  const angle=()=>Math.sin(Date.now()/1000*.75)*1.05;
  const update=()=>{pivot.rotation.z=angle();};
  const ride={posFinal:true,seats:8,sit:true,exit:{x:0,z:-119,y:44},pick:busy=>seatPoints.findIndex((_,i)=>!busy.has(i)),pos(i){const a=angle(),v=seatPoints[i].clone().add(new T.Vector3(0,-8,0)).applyAxisAngle(new T.Vector3(0,0,1),a).add(new T.Vector3(0,54,-128)),q=new T.Quaternion().setFromAxisAngle(new T.Vector3(0,0,1),a);if(i<4)q.multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0,1,0),Math.PI));return {x:v.x,y:v.y,z:v.z,ry:0,q};}};
- return {root,update,ride,interactive:{id:'viking',kind:'ride',x:0,y:44,z:-119,r:2.8,label:'정상 바이킹',verb:'타기'}};
+ return {root,update,ride,interactive:{id:'viking',kind:'ride',x:0,y:44,z:-125,r:10,label:'정상 바이킹',verb:'타기'}};
 }

@@ -1,3 +1,4 @@
+import {addBellDress} from './bell-dress.js';
 import * as THREE from 'three';
 import { upgradeAvatar } from './visual-upgrade.js';
 import { MORE_OPTIONS, MORE_OUTFITS } from './customization-options.js';
@@ -8,7 +9,7 @@ import { addHairPin, addHeldItem, addBodyAccessory, addGarmentDetails, drawMoreF
 export const OPTIONS = {
   ears: [['bear', '곰'], ['bunny', '토끼'], ['cat', '고양이'], ['fox', '여우'], ['devil', '뿔'], ['none', '없음']],
   hat: [['none', '없음'], ['beanie', '비니'], ['ribbon', '리본'], ['sprout', '새싹'], ['cap', '야구모자'], ['halo', '천사링'], ['crown', '왕관'], ['flower', '꽃핀'], ['tophat', '실크햇'], ['beret', '베레모'], ['headphones', '헤드폰'], ['catband', '고양이 머리띠'], ['tiara', '티아라'], ['strawhat', '밀짚모자'], ['frog', '개구리 모자'], ['mushroom', '버섯 모자']],
-  eyes: [['dot', '동글'], ['big', '왕눈'], ['sparkle', '반짝'], ['smile', '웃음'], ['sleepy', '졸림'], ['wink', '윙크'], ['star', '별'], ['heart', '하트'], ['teary', '글썽'], ['angry', '화남'], ['dizzy', '어질'], ['closed', '감음'], ['cat', '고양이눈'], ['zoro', '조로 눈']],
+  eyes: [['dot', '동글'], ['big', '왕눈'], ['sparkle', '반짝'], ['smile', '웃음'], ['sleepy', '졸림'], ['wink', '윙크'], ['star', '별'], ['heart', '하트'], ['teary', '글썽'], ['angry', '화남'], ['dizzy', '어질'], ['closed', '감음'], ['cat', '고양이눈'], ['zoro', '베인 눈']],
   brows: [['none', '없음'], ['soft', '순둥'], ['worried', '걱정'], ['angry', '버럭'], ['thick', '짙은']],
   mouth: [['smile', '미소'], ['open', '활짝'], ['cat', 'ω'], ['tongue', '메롱'], ['o', '오!'], ['flat', '무표정'], ['fang', '덧니'], ['pout', '뾰로통'], ['grin', '씨익']],
   cheeks: [['blush', '발그레'], ['none', '없음'], ['freckles', '주근깨'], ['hearts', '하트'], ['bandaid', '반창고'], ['swirl', '빙글']],
@@ -370,15 +371,13 @@ function addOutfit(rig, l, O) {
       skirt('#9aa0aa', 0.28, 0.36, 0.2, 0.3);
       break;
     case 'princess':
-      skirt(l.accent, 0.27, 0.56, 0.6, 0.27);
-      skirt('#fff0f6', 0.4, 0.58, 0.12, 0.27);
+      addBellDress(rig,l.accent);
       for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; add(new THREE.SphereGeometry(0.025, 10, 6), '#ffd36a', Math.sin(a) * 0.5, 0.3, Math.cos(a) * 0.5, 0, 0, 0, { metalness: 0.8 }); }
       for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.09, 16, 13), '#fff0f6', 0.3 * s, 0.8, 0);
       add(new THREE.SphereGeometry(0.035, 13, 10), '#ff8fd0', 0, 0.72, 0.28, 0, 0, 0, { emissive: '#ff4fb0', emissiveIntensity: 0.5 });
       break;
     case 'gothic':
-      skirt('#16101a', 0.27, 0.5, 0.58, 0.28);
-      for (let i = 0; i < 3; i++) skirt(i % 2 ? '#2a1a2a' : '#4a0a1a', 0.42 + i * 0.03, 0.5 + i * 0.03, 0.05, 0.3 + i * 0.06);
+      addBellDress(rig,'#241827',true);
       add(new THREE.TorusGeometry(0.26, 0.04, 10, 29), '#e8e0f0', 0, 0.83, 0, Math.PI / 2);
       add(new THREE.BoxGeometry(0.03, 0.12, 0.015), '#c0c4cc', 0, 0.62, 0.285, 0, 0, 0, { metalness: 0.8 }); add(new THREE.BoxGeometry(0.08, 0.025, 0.015), '#c0c4cc', 0, 0.65, 0.287, 0, 0, 0, { metalness: 0.8 });
       break;

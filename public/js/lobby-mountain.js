@@ -1,3 +1,4 @@
+import {buildSummitObservatory} from './summit-observatory.js';
 import {buildSummitViking} from './summit-viking.js';
 import * as T from 'three';
 import {MOUNTAIN_TRAIL,MOUNTAIN_PATHS,MOUNTAIN_SLOTS,mountainSurface,mountainGroundHeight} from './mountain-layout.js';
@@ -49,7 +50,7 @@ export function buildLobbyMountain(){
  for(const [a,b] of [[[-40,16,-76],[-5,16,-76]],[[5,16,-76],[40,16,-76]],[[-40,16,-90],[32,16,-90]],[[-40,16,-90],[-40,16,-76]],[[40,16,-90],[40,16,-76]],[[-14,44,-136],[14,44,-136]],[[-14,44,-136],[-14,44,-116]],[[14,44,-136],[14,44,-116]],[[-14,44,-116],[-5,44,-116]],[[5,44,-116],[14,44,-116]]])boundary(a,b);
  const railMesh=new T.InstancedMesh(new T.CylinderGeometry(.055,.055,1,5),dark,rails.length),poleMesh=new T.InstancedMesh(new T.BoxGeometry(.18,.85,.18),dark,posts.length),glow=new T.InstancedMesh(new T.BoxGeometry(.23,.16,.23),new T.MeshBasicMaterial({color:'#f6d79b',toneMapped:false}),lamps.length);
  const quat=new T.Quaternion(),scale=new T.Vector3();rails.forEach(([a,b],i)=>{const d=b.clone().sub(a);quat.setFromUnitVectors(new T.Vector3(0,1,0),d.clone().normalize());m.compose(a.clone().add(b).multiplyScalar(.5),quat,scale.set(1,d.length(),1));railMesh.setMatrixAt(i,m);});posts.forEach((v,i)=>{m.makeTranslation(v.x,v.y+.42,v.z);poleMesh.setMatrixAt(i,m);m.makeTranslation(v.x,v.y+.96,v.z);glow.setMatrixAt(i,m);});root.add(railMesh,poleMesh,glow);
- const viking=buildSummitViking();root.add(viking.root);
+ const viking=buildSummitViking();root.add(viking.root);const observatory=buildSummitObservatory();root.add(observatory.root);
  root.traverse(o=>{if(o.isMesh)o.userData.noOcc=true;});
- return {root,walkMeshes:[path,terrace,summit],heightAt:mountainSurface,trail:MOUNTAIN_TRAIL,slots:MOUNTAIN_SLOTS,rides:{viking:viking.ride},interactives:[viking.interactive],update:viking.update};
+ return {root,walkMeshes:[path,terrace,summit],heightAt:mountainSurface,trail:MOUNTAIN_TRAIL,slots:MOUNTAIN_SLOTS,observatoryColliders:observatory.colliders,clickables:[{id:'viking',group:viking.root}],rides:{viking:viking.ride},interactives:[viking.interactive],update:viking.update};
 }
